@@ -150,6 +150,9 @@ basal2 <- c(5, 10, 15)
 consumer2 <- c(20, 40, 60)
 events <- 500
 runs <- 100
+
+seedsPrep <- runif(2 * length(basal2) * length(consumer2)) * 1E8
+seedsRun <- runif(runs * length(basal2) * length(consumer2)) * 1E8
 ```
 
 We next produce the nine pools and matrices.
@@ -157,42 +160,55 @@ We next produce the nine pools and matrices.
 ```{r pools2}
 pools2 <- lapply(
   1 : (length(basal2) * length(consumer2)), 
-  function(i, b, c, parameters, logBodySize) {
+  function(i, b, c, s, parameters, logBodySize) {
     LawMorton1996_species(
       Basal = b[i], 
       Consumer = c[i], 
       Parameters = parameters, 
-      LogBodySize = logBodySize
+      LogBodySize = logBodySize,
+      seed = s[i]
     )
   },
   b = rep(basal2, times = length(consumer2)),
   c = rep(consumer2, each = length(basal2)),
+  s = seedsPrep[1:(length(basal2) * length(consumer2))],
   parameters = parameters, logBodySize = logBodySize
 )
-
+```
+```{r commats2}
 communityMats2 <- lapply(
-  pools2, 
-  function(pool, parameters) {
+  seq_along(pools2), 
+  function(i, pools, parameters, s) {
     LawMorton1996_CommunityMat(
-      Pool = pool, 
-      Parameters = parameters
+      Pool = pools[[i]], 
+      Parameters = parameters,
+      seed = s[i]
     )
   }, 
-  parameters = parameters
+  pools = pools2,
+  parameters = parameters,
+  s = seedsPrep[(length(basal2) * length(consumer2) + 1):(
+    2 * length(basal2) * length(consumer2))]
 )
 ```
 
 With each pool and community matrix set, we can now perform our runs.
 We only preserve the final state of systems that are uninvadable.
+The code is straightforward: 
+for each combination of numbers of basal and consumer species,
+run the system `runs` times, taking the associated pool and community matrix,
+check if the result is uninvadable and, if so, store the result.
 
 ```{r table3runs} 
-
 runs <- lapply(
+  # for each combination of numbers of basal and consumer species
   1 : (length(basal2) * length(consumer2)), 
   function(i, pools, communityMats, events, runs) {
+    # run the system `runs` times
     replicate(
       n = runs,
       expr = {
+        # taking the associated pool and community matrix,
         aRun <- LawMorton1996(
           Pool = pools[[i]], 
           CommunityMat = communityMats[[i]],
@@ -202,12 +218,14 @@ runs <- lapply(
           ReturnValues = "Abundance" # Now returns only current abundance.
         )
         
+        # check if the result is uninvadable
         if (LawMorton1996_CheckUninvadable(
           AbundanceRow = aRun$Abundance,
           Pool = pools[[i]],
           CommunityMatrix = communityMats[[i]],
           Threshold = 2
         )) {
+          # and, if so, store the result.
           return(which(!is.na(aRun$Abundance) & aRun$Abundance > 2))
         } else {
           return(NULL)
@@ -220,5 +238,12 @@ runs <- lapply(
   communityMats = communityMats2,
   events = events, runs = runs
 )
+```
 
+Once we have the runs, we need to tabulate them.
+
+```{r tabulationRuns}
+endPoints <- lapply(runs, function(run) {
+  table(unlist(lapply(run, toString)))
+})
 ```

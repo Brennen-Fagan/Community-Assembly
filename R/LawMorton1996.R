@@ -3,8 +3,8 @@ LawMorton1996_species <- function(
   Basal,
   Consumer,
   Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1), # Table 2 values.
-  LogBodySize = c(-2, -1, -1, 0) # c(-2, -1) for Basal, c(-1, 0) for Consumer
-
+  LogBodySize = c(-2, -1, -1, 0), # c(-2, -1) for Basal, c(-1, 0) for Consumer
+  seed = NULL
 ) {
   stopifnot(Basal > 0)
   stopifnot(Consumer >= 0)
@@ -14,6 +14,11 @@ LawMorton1996_species <- function(
     warning("Unrealistic energy consumption efficiency k4: k4 >= 1.")
   }
   stopifnot(Parameters[6] > 0)
+
+  if (!is.null(seed)) {
+    oldSeed <- .Random.seed
+    set.seed(seed)
+  }
 
   # Assign each species in the pool a body size si.
   # Do so by drawing from a uniform distribution and exponentiating.
@@ -48,6 +53,10 @@ LawMorton1996_species <- function(
     },
     k6 = Parameters[6]
   ))
+
+  if (!is.null(seed)) {
+    set.seed(oldSeed)
+  }
 
   Species
 }
@@ -134,16 +143,24 @@ LawMorton1996_aij <- function(
   }
 }
 
-LawMorton1996_CommunityMat <- function(Pool, Parameters) {
+LawMorton1996_CommunityMat <- function(Pool, Parameters, seed = NULL) {
   foreach::foreach(
     i = iterators::iter(Pool, by = 'row'), .combine = 'rbind'
   ) %:% foreach::foreach(
     j = iterators::iter(Pool, by = 'row'), .combine = 'c'
   ) %dopar% {
+    if (!is.null(seed)) {
+      oldSeed <- .Random.seed
+      set.seed(seed + i$ID + j$ID)
+    }
     p <- LawMorton1996_aij(i, j, Parameters)
-    ifelse(p == 0,
+    retval <- ifelse(p == 0,
            0,
            sign(p) * rtruncnorm(0, Inf, abs(p), abs(p) * Parameters[6]))
+    if (!is.null(seed)) {
+      set.seed(oldSeed)
+    }
+    retval
   }
 }
 
@@ -399,15 +416,26 @@ LawMorton1996_CheckUninvadable <- function(
   AbundanceRow,
   Pool,
   CommunityMatrix,
-  Threshold = 1E-4
+  Threshold = 1E-4,
+  EliminateSmallPopulations = FALSE
   ) {
-  # It it is uninvadable by any other species from the pool because the per
+  # It is uninvadable by any other species from the pool because the per
   # capita rate of increase of each species absent from the community is
   # negative at the equilibrium point.
   # The per capita rate of increase is the function f_i = r_i + Sum_j(aij xj).
   Abundance <- AbundanceRow[-1]
-  Abundance[is.na(Abundance)] <- 0
+
+  if (EliminateSmallPopulations) {
+    Abundance[is.na(Abundance) | Abundance <= Threshold] <- 0
+  } else {
+    Abundance[is.na(Abundance)] <- 0
+  }
+
   notPresent <- !(!is.na(Abundance) & Abundance > Threshold)
   all(Pool$ReproductionRate[notPresent] +
         CommunityMatrix[notPresent, ] %*% Abundance < 0)
 }
+
+# LawMorton1996_CheckPermanence <- function(
+#
+# )
