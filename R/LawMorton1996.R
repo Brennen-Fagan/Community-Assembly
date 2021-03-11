@@ -218,7 +218,7 @@ LawMorton1996_PermanenceAssembly <- function(
   }
 
   statesEncountered <- list(
-    IDs = list(integer(0)),
+    IDs = list(toString(integer(0))),
     Equilibria = list(NULL), # If does not exist, use NA.
     Permanent = TRUE
     )
@@ -233,9 +233,48 @@ LawMorton1996_PermanenceAssembly <- function(
         # Add species to the community.
         community <- sort(c(community, ID))
 
-        # Check Permanence.
+        # Store properties.
+        stateNumber <- which(toString(community) %in% statesEncountered$IDs)
+        if (length(stateNumber) == 0) {
+          stateNumber <- length(statesEncountered$IDs) + 1
+          statesEncountered$IDs[stateNumber] <- toString(community)
 
-        # Evaluate abundance for future iterations.
+          statesEncountered$Equilibria[stateNumber] <-
+            rootSolve::steady(
+              y = rep(1, length(community)),
+              func = GeneralisedLotkaVolterra,
+              parms = list(a = CommunityMat[community, community],
+                           r = Pool$ReproductionRate[community]),
+              positive = TRUE
+            )
+
+          statesEncountered$Permanent[stateNumber] <- NA
+        }
+
+        # Calculate permanence if necessary.
+        if (is.na(statesEncountered$Permanent[stateNumber])) {
+          # To calculate permanence, need to consider the powerset of the community.
+          # Then, using each retrieved equilibrium from the powerset, perform:
+          # minimize z using h_i > 0
+          # subject to Sum_i(f_i (x_j) h_i) + z > 0 for each subcommunity j.
+          # where f_i is per capita rate of growth of species i,
+          #       x_j is a retrieved equilibrium
+        }
+
+        # Check permanence.
+        if (statesEncountered$Permanent[stateNumber]) {
+          if ("Sequence" %in% ReturnValues) {
+            records$Outcome[eventNumber] <- "Type 2 (Permanent)"
+          }
+        } else {
+          if ("Sequence" %in% ReturnValues) {
+            records$Outcome[eventNumber] <- "Type 3 (!Permanent)"
+          }
+
+          # Need to find an attracting subcommunity.
+          # Attracting if permanent and
+          # uninvadable by members of the community not in the subcommunity.
+        }
 
       } else {
         if ("Sequence" %in% ReturnValues) {
