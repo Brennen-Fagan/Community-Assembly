@@ -150,14 +150,16 @@ LawMorton1996_CommunityMat <- function(Pool, Parameters, seed = NULL) {
     j = iterators::iter(Pool, by = 'row'), .combine = 'c'
   ) %dopar% {
     if (!is.null(seed)) {
-      oldSeed <- .Random.seed
+      if (exists(".Random.seed")) {
+        oldSeed <- .Random.seed
+      }
       set.seed(seed + i$ID + j$ID)
     }
     p <- LawMorton1996_aij(i, j, Parameters)
     retval <- ifelse(p == 0,
            0,
            sign(p) * rtruncnorm(0, Inf, abs(p), abs(p) * Parameters[6]))
-    if (!is.null(seed)) {
+    if (!is.null(seed) & exists("oldSeed")) {
       set.seed(oldSeed)
     }
     retval
@@ -437,5 +439,8 @@ LawMorton1996_CheckUninvadable <- function(
 }
 
 # LawMorton1996_CheckPermanence <- function(
+#   Pool,
+#   CommunityMatrix
+# ) {
 #
-# )
+# }
