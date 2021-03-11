@@ -68,3 +68,26 @@ GeneralisedLotkaVolterra <- function(
     list(y * (r + a %*% y))
   })
 }
+
+addMissingEquilibriaEntries <- function(i, set, nnz, master) {
+  # meant to be used in lapply
+  # i is the index of the set we are using
+  # set is a list of subcommunities
+  # nnz is the nonzero values that we are going to add zeros to
+  # master is the full community that we need to add zeros for.
+  retval <- rep(0, length(master))
+  setInd <- 1
+  masInd <- 1
+  while (setInd <= length(set[[i]])) {
+    if (set[[i]][setInd] == master[masInd]) {
+      retval[masInd] <- nnz[[i]][setInd]
+      masInd <- masInd + 1
+      setInd <- setInd + 1
+    } else if (set[[i]][setInd] < master[masInd]) {
+      setInd <- setInd + 1
+    } else {
+      masInd <- masInd + 1
+    }
+  }
+  return(retval)
+}

@@ -159,7 +159,7 @@ LawMorton1996_PermanenceAssembly <- function(
   LogBodySize = c(-2, -1, -1, 0), # c(-2, -1) for Basal, c(-1, 0) for Consumer
   ArrivalEvents = 10,
   ArrivalSampler = c("rearrange", "iid"),
-  ReturnValues = c("Community", "Sequence", "Pool", "Matrix"),
+  ReturnValues = c("Community", "Sequence", "States", "Pool", "Matrix"),
   Pool = NULL,
   CommunityMat = NULL,
   seed = NULL
@@ -207,16 +207,24 @@ LawMorton1996_PermanenceAssembly <- function(
   community <- NULL
   if ("Sequence" %in% ReturnValues) {
     records <- data.frame(
-      Events = 1:ArrivalEvents,
-      Addition = ArrivalIDs,
+      Events = 0:ArrivalEvents,
+      Addition = c(NA, ArrivalIDs),
       Outcome = factor(NA, levels = c(
+        "Present",
         "Type 1 (Failure)",
         "Type 2 (Permanent)",
-        "Type 3 (!Permanent)"))
+        "Type 3 (!Permanent)")),
+      Community = NA
     )
-    eventNumber <- 1
+    eventNumber <- 2
   }
 
+  #TODO This really should be some form of object
+  #     In that case, we would have a checkPermanence routine.
+  #     The routine would do what we do on lines 258 - 388 that
+  #     we reproduce effectively starting on line 431.
+  #     (We won't just recursively calculate permanence because
+  #     we may not need it if we are in a permanent state already.)
   statesEncountered <- list(
     IDs = list(toString(integer(0))),
     Equilibria = list(NULL), # If does not exist, use NA.
@@ -239,7 +247,7 @@ LawMorton1996_PermanenceAssembly <- function(
           stateNumber <- length(statesEncountered$IDs) + 1
           statesEncountered$IDs[stateNumber] <- toString(community)
 
-          statesEncountered$Equilibria[stateNumber] <-
+          statesEncountered$Equilibria[[stateNumber]] <-
             rootSolve::steady(
               y = rep(1000, length(community)),
               func = GeneralisedLotkaVolterra,
@@ -281,16 +289,18 @@ LawMorton1996_PermanenceAssembly <- function(
 
               statesEncountered$IDs[stateNumberSet] <- toString(set)
 
-              statesEncountered$Equilibria[stateNumberSet] <-
+              #TODO consider dividing the function by x to remove 0.
+              statesEncountered$Equilibria[[stateNumberSet]] <-
                 rootSolve::steady(
-                  y = rep(1, length(set)),
+                  y = rep(1000, length(set)),
                   func = GeneralisedLotkaVolterra,
                   parms = list(a = CommunityMat[set, set],
                                r = Pool$ReproductionRate[set]),
                   positive = TRUE
-                )
+                )$y
 
               statesEncountered$Permanent[stateNumberSet] <- NA
+              equilibria[[i]] <- statesEncountered$Equilibria[[stateNumberSet]]
             } else {
               # A subcommunity already observed.
               equilibria[[i]] <- statesEncountered$Equilibria[[id]]
@@ -385,28 +395,185 @@ LawMorton1996_PermanenceAssembly <- function(
 
         # Check permanence.
         if (statesEncountered$Permanent[stateNumber]) {
+          abundance <- statesEncountered$Equilibria[[stateNumber]]
+
           if ("Sequence" %in% ReturnValues) {
             records$Outcome[eventNumber] <- "Type 2 (Permanent)"
+            records$Community[eventNumber] <- I(list(community))
             eventNumber <- eventNumber + 1
           }
-
-          abundance <- statesEncountered$Equilibria[[stateNumber]]
         } else {
-          if ("Sequence" %in% ReturnValues) {
-            records$Outcome[eventNumber] <- "Type 3 (!Permanent)"
-            eventNumber <- eventNumber + 1
-          }
-
           # Need to find an attracting subcommunity.
           # Attracting if permanent and
           # uninvadable by members of the community not in the subcommunity.
+          subcommunities <- unlist(
+            lapply(1:length(community), function(m, community, ...) {
+              lapply(combn(m, ...), function(x) community[x])
+            },
+            x = 1:length(community), simplify = FALSE, community = community),
+            recursive = FALSE
+          )
+
+          subcommunitiesPermanent <- rep(NA, length(subcommunities))
+          for (scIndex in 1:length(subcommunities)) {
+            set <- subcommunities[[scIndex]]
+            id <- which(toString(set) == statesEncountered$IDs)
+
+            # Since we have already written down whether the community
+            # is permanent or not, we should have all subcommunities
+            # listed in the states we have encountered already, alongside
+            # their equilibria.
+            stopifnot(length(id) == 1)
+
+            if (is.na(statesEncountered$Permanent[id])) {
+              # We have not recorded whether this state is permanent or not!
+              # Need to perform the permanence check: retrieve all subcommunities
+              # check their equilibria, use it to build a coefficients matrix
+              # and run a linear program.
+
+              # Note that the subcommunities generated are sorted.
+              subsubcommunities <- unlist(
+                lapply(1:length(set), function(m, community, ...) {
+                  lapply(combn(m, ...), function(x) community[x])
+                },
+                x = 1:length(set), simplify = FALSE, community = set),
+                recursive = FALSE
+              )
+
+              # Would use lapply, but we may want side effects.
+
+              equilibria <- list()
+              for (i in 1:length(subsubcommunities)) {
+                subset <- subsubcommunities[[i]]
+                subid <- which(toString(subset) == statesEncountered$IDs)
+                # A subsubcommunity already observed.
+                equilibria[[i]] <- statesEncountered$Equilibria[[subid]]
+              }
+
+              # Adjust equilibria size.
+              equilibria <- lapply(
+                seq_along(subsubcommunities),
+                addMissingEquilibriaEntries,
+                set = subsubcommunities,
+                nnz = equilibria,
+                master = set
+              )
+
+
+              # Gather coefficients.
+              # Row: equilibria
+              # Col: per capita growth rate
+              coefficients <- lapply(
+                equilibria,
+                FUN = function(eq, rs, m) {
+                  # f_col evaluated at equilibrium_row, col = 1:length(community)
+                  # f_col = r_col + sum()
+                  rs + m %*% eq
+                },
+                rs = Pool$ReproductionRate[set],
+                m = CommunityMat[set, set]
+              )
+
+              # h_i coefficients
+              coefficientsMatrix <- matrix(
+                unlist(coefficients), byrow = TRUE,
+                nrow = length(equilibria), ncol = length(set)
+              )
+
+              # add z
+              coefficientsMatrix <- cbind(
+                coefficientsMatrix,
+                rep(1, length(equilibria))
+              )
+
+              # add constraint h_i > 0
+              coefficientsMatrix <- rbind(
+                coefficientsMatrix,
+                cbind(diag(ncol = length(set),
+                           nrow = length(set)),
+                      rep(0, length(set)))
+              )
+
+              # add constraint sum(h_i) < 1 (cannot use <=, but equivalent in lp.)
+              # same as -sum(h_i) > -1
+              coefficientsMatrix <- rbind(
+                coefficientsMatrix,
+                c(rep(-1, length(set)), 0)
+              )
+
+              #TODO Due to numerical problems, we round. There must be a better way.
+              coefficientsMatrix <- round(coefficientsMatrix, 6)
+
+
+              # Perform optimisation problem.
+              output <- lpSolve::lp(
+                "min", # minimize
+                c(rep(0, length(set)), 1), # 0 * h_1...h_n + z subject to
+                coefficientsMatrix,
+                ">",
+                c(rep(0, length(equilibria)), #sum(fi(xj) * hi) + z > 0
+                  rep(1E-4, length(set)), # h_i should not be 0.
+                  -1) # -sum(h_i) > -1
+              )
+              statesEncountered$Permanent[id] <-
+                if (output$solution[length(output$solution)] <= 0) TRUE else FALSE
+            }
+            subcommunitiesPermanent[scIndex] <- statesEncountered$Permanent[id]
+          }
+
+          # Remove subcommunities that are not permanent.
+          for (scIndex in length(subcommunitiesPermanent):1) {
+            if (!subcommunitiesPermanent[scIndex]) {
+              subcommunities[[scIndex]] <- NULL
+            }
+          }
+
+          # Check for an uninvadable (w.r.t. community) subcommunity.
+          subcommunitiesUninvadable <- rep(NA, length(subcommunities))
+          for (scIndex in 1:length(subcommunities)) {
+            set <- subcommunities[[scIndex]]
+            id <- which(toString(set) == statesEncountered$IDs)
+            abundanceRow <- statesEncountered$Equilibria[[id]]
+            abundanceRow <- addMissingEquilibriaEntries(
+              1, list(set), abundanceRow, community
+            )
+
+            # Add a time column to the abundanceRow
+            abundanceRow <- c(NA, abundanceRow)
+
+            subcommunitiesUninvadable[scIndex] <- LawMorton1996_CheckUninvadable(
+              AbundanceRow = abundanceRow,
+              Pool = Pool[community, ],
+              CommunityMatrix = CommunityMat[community, community]
+            )
+          }
+
+          stopifnot(sum(subcommunitiesUninvadable) == 1)
+          scIndex <- which(subcommunitiesUninvadable)
+          community <- subcommunities[[scIndex]]
+          abundance <- statesEncountered$Equilibria[[
+            which(toString(community) == statesEncountered$IDs)
+          ]]
+
+          if ("Sequence" %in% ReturnValues) {
+            records$Outcome[eventNumber] <- "Type 3 (!Permanent)"
+            records$Community[eventNumber] <- I(list(community))
+            eventNumber <- eventNumber + 1
+          }
         }
 
       } else {
         if ("Sequence" %in% ReturnValues) {
           records$Outcome[eventNumber] <- "Type 1 (Failure)"
+          records$Community[eventNumber] <- I(list(community))
           eventNumber <- eventNumber + 1
         }
+      }
+    } else {
+      if ("Sequence" %in% ReturnValues) {
+        records$Outcome[eventNumber] <- "Present"
+        records$Community[eventNumber] <- I(list(community))
+        eventNumber <- eventNumber + 1
       }
     }
 
@@ -417,7 +584,23 @@ LawMorton1996_PermanenceAssembly <- function(
     set.seed(oldSeed)
   }
 
-  retval <- records
+  retval <- list()
+
+  if ("Community" %in% ReturnValues) {
+    retval$Community <- community
+  }
+  if ("Sequence" %in% ReturnValues) {
+    retval$Sequence <- records
+  }
+  if ("States" %in% ReturnValues) {
+    retval$States <- statesEncountered
+  }
+  if ("Pool" %in% ReturnValues) {
+    retval$Pool <- Pool
+  }
+  if ("Matrix" %in% ReturnValues) {
+    retval$Matrix <- CommunityMat
+  }
 
   return(retval)
 }
