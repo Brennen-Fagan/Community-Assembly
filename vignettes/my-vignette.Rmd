@@ -40,6 +40,194 @@ if (parallelise) {
 library(ggplot2)
 ```
 
+# Table 1 and Figure 2
+First we create the system suggested by Table 1.
+
+```{r table1pool}
+table1Pool <- data.frame(
+  ID = 1:4,
+  Type = NA,
+  Size = NA,
+  ReproductionRate = c(0.86, 1.35, -1.01, -0.89)
+)
+
+table1Mat <- matrix(
+  c(
+    -0.97, -0.77, -0.35,  0.00,
+    -0.97, -1.08, -0.02,  0.00,
+     1.74,  0.29,  0.00, -0.07,
+     0.00,  0.00,  1.26,  0.00
+  ),
+  byrow = TRUE, ncol = 4, nrow = 4
+)
+
+table1Record <- matrix(0, nrow = (10 + 1) * 4, ncol = (4 + 1))
+table1RecordRow <- 1
+table1RecordTime <- 0
+```
+
+Next, we introduce species 1 to a system and let it equilibrate.
+
+```{r table1Invade1}
+table1Abundance <- c(0.1,0,0,0)
+table1Present <- which(table1Abundance > 0)
+table1Result <- LawMorton1996_NumIntegration(
+      table1Mat[table1Present, table1Present],
+      table1Pool$ReproductionRate[table1Present],
+      table1Abundance[table1Present],
+      OuterTimeStepSize = 20,
+      InnerTimeStepSize = 2
+    )
+
+table1Abundance_New <- table1Result[nrow(table1Result), 2:ncol(table1Result)]
+
+table1Abundance_New <- ifelse(
+      table1Abundance_New > 1E-4 * table1Abundance[table1Present] &
+        table1Abundance_New > 0,
+      table1Abundance_New,
+      0
+    )
+
+table1Abundance[table1Present] <- table1Abundance_New
+stopifnot((table1Abundance > 0.1) == c(1, 0, 0, 0))
+
+table1Record[table1RecordRow:(nrow(table1Result) + table1RecordRow - 1), 1] <- table1Result[, 1] + table1RecordTime
+table1Record[table1RecordRow:(nrow(table1Result) + table1RecordRow - 1), 2] <- table1Result[, 2]
+table1RecordRow <- table1RecordRow + nrow(table1Result)
+table1RecordTime <- table1RecordTime + table1Result[nrow(table1Result), 1]
+
+table1Result
+```
+
+Then we introduce species 4, which should arrive but fail to invade.
+Note the system is not uninvadable: checking yields
+`r LawMorton1996_CheckUninvadable(c(0, table1Abundance), table1Pool, table1Mat)`.
+
+```{r table1Invade1}
+table1Abundance[4] <- table1Abundance[4] + 0.1
+table1Present <- which(table1Abundance > 0)
+table1Result <- LawMorton1996_NumIntegration(
+      table1Mat[table1Present, table1Present],
+      table1Pool$ReproductionRate[table1Present],
+      table1Abundance[table1Present],
+      OuterTimeStepSize = 20,
+      InnerTimeStepSize = 2
+    )
+
+table1Abundance_New <- table1Result[nrow(table1Result), 2:ncol(table1Result)]
+
+table1Abundance_New <- ifelse(
+      table1Abundance_New > 1E-4 * table1Abundance[table1Present] &
+        table1Abundance_New > 0,
+      table1Abundance_New,
+      0
+    )
+
+table1Abundance[table1Present] <- table1Abundance_New
+stopifnot((table1Abundance > 0.1) == c(1, 0, 0, 0))
+
+table1Record[table1RecordRow:(nrow(table1Result) + table1RecordRow - 1), 1] <- table1Result[, 1] + table1RecordTime
+table1Record[table1RecordRow:(nrow(table1Result) + table1RecordRow - 1), 2] <- table1Result[, 2]
+table1Record[table1RecordRow:(nrow(table1Result) + table1RecordRow - 1), 5] <- table1Result[, 3]
+table1RecordRow <- table1RecordRow + nrow(table1Result)
+table1RecordTime <- table1RecordTime + table1Result[nrow(table1Result), 1]
+
+table1Result
+```
+
+Species 3, on the other hand, should successfully invade when it arrives and subsequently coexist with species 1.
+
+```{r table1Invade1}
+table1Abundance[3] <- table1Abundance[3] + 0.1
+table1Present <- which(table1Abundance > 0)
+table1Result <- LawMorton1996_NumIntegration(
+      table1Mat[table1Present, table1Present],
+      table1Pool$ReproductionRate[table1Present],
+      table1Abundance[table1Present],
+      OuterTimeStepSize = 20,
+      InnerTimeStepSize = 2
+    )
+
+table1Abundance_New <- table1Result[nrow(table1Result), 2:ncol(table1Result)]
+
+table1Abundance_New <- ifelse(
+      table1Abundance_New > 1E-4 * table1Abundance[table1Present] &
+        table1Abundance_New > 0,
+      table1Abundance_New,
+      0
+    )
+
+table1Abundance[table1Present] <- table1Abundance_New
+stopifnot((table1Abundance > 0.1) == c(1, 0, 1, 0))
+
+table1Record[table1RecordRow:(nrow(table1Result) + table1RecordRow - 1), 1] <- table1Result[, 1] + table1RecordTime
+table1Record[table1RecordRow:(nrow(table1Result) + table1RecordRow - 1), 2] <- table1Result[, 2]
+table1Record[table1RecordRow:(nrow(table1Result) + table1RecordRow - 1), 4] <- table1Result[, 3]
+table1RecordRow <- table1RecordRow + nrow(table1Result)
+table1RecordTime <- table1RecordTime + table1Result[nrow(table1Result), 1]
+
+table1Result
+```
+
+Note the system is not uninvadable: checking yields
+`r LawMorton1996_CheckUninvadable(c(0, table1Abundance), table1Pool, table1Mat)`.
+
+When species 2 invades the community, we instead should see both species 1 and 3 die out.
+
+```{r table1Invade1}
+table1Abundance[2] <- table1Abundance[2] + 0.1
+table1Present <- which(table1Abundance > 0)
+table1Result <- LawMorton1996_NumIntegration(
+      table1Mat[table1Present, table1Present],
+      table1Pool$ReproductionRate[table1Present],
+      table1Abundance[table1Present],
+      OuterTimeStepSize = 100,
+      InnerTimeStepSize = 2
+    )
+
+table1Abundance_New <- table1Result[nrow(table1Result), 2:ncol(table1Result)]
+
+table1Abundance_New <- ifelse(
+      table1Abundance_New > 1E-4 * table1Abundance[table1Present] &
+        table1Abundance_New > 0,
+      table1Abundance_New,
+      0
+    )
+
+table1Abundance[table1Present] <- table1Abundance_New
+stopifnot((table1Abundance > 0.1) == c(0, 1, 0, 0))
+
+table1Result <- table1Result[1:11, ]
+
+table1Record[table1RecordRow:(nrow(table1Result) + table1RecordRow - 1), 1] <- table1Result[, 1] + table1RecordTime
+table1Record[table1RecordRow:(nrow(table1Result) + table1RecordRow - 1), 2] <- table1Result[, 2]
+table1Record[table1RecordRow:(nrow(table1Result) + table1RecordRow - 1), 3] <- table1Result[, 3]
+table1Record[table1RecordRow:(nrow(table1Result) + table1RecordRow - 1), 4] <- table1Result[, 4]
+table1RecordRow <- table1RecordRow + nrow(table1Result)
+table1RecordTime <- table1RecordTime + table1Result[nrow(table1Result), 1]
+
+table1Result
+```
+
+Finally, the system is uninvadable:
+`r LawMorton1996_CheckUninvadable(c(0, table1Abundance), table1Pool, table1Mat)`.
+This is straightforward to check manually by looking at the per capita growth rates.
+```{r table1manualcheck}
+table1ManualCheck <- table1Pool$ReproductionRate + table1Mat %*% table1Abundance
+stopifnot(round(table1ManualCheck, 2) == c(-0.10, 0, -0.65, -0.89))
+table1ManualCheck
+```
+
+We can also plot the results.
+
+```{r figure2}
+figure2 <- LawMorton1996_PlotAbundance(
+  Abundance = table1Record,
+  guides = TRUE
+)
+figure2
+```
+
 # Table 2
 >Table 2: A community assembly sequence from a pool of 5 basal and 10 consumer species.
 The species pool was constructed according to the method given in the Appendix with log body sizes taken at random
@@ -270,6 +458,7 @@ Once we have the runs, we need to tabulate them.
 endPoints <- lapply(results2, function(run) {
   table(unlist(run))
 })
+endPoints
 ```
 
 ```{r finished}

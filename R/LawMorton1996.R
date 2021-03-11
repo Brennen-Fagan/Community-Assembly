@@ -196,13 +196,19 @@ LawMorton1996_NumIntegration <- function(
   # OuterTimeStepSize is the length of the solution,
   # InnerTimeStepSize is the time in between records of the solution.
 
-  deSolve::rk(
+  ts <- seq(from = 0,
+            to = OuterTimeStepSize,
+            by = InnerTimeStepSize)
+
+  deSolve::ode(
     X,
-    times = seq(from = 0,
-                to = OuterTimeStepSize,
-                by = InnerTimeStepSize),
+    times = ts,
     func = GeneralisedLotkaVolterra,
-    parms = list(a = A, r = R)
+    parms = list(a = A, r = R),
+    events = list(func = function(t, y, parms) {
+      y[y < 0] <- 0
+      y
+    }, time = ts)
   )
 }
 
@@ -304,7 +310,8 @@ LawMorton1996 <- function(
     CurrentAbundance_New <- Run_GLV[nrow(Run_GLV), 2:(ncol(Run_GLV))]
 
     CurrentAbundance_New <- ifelse(
-      CurrentAbundance_New > EliminationThreshold * CurrentAbundance[SpeciesPresent],
+      CurrentAbundance_New > EliminationThreshold * CurrentAbundance[SpeciesPresent] &
+        CurrentAbundance_New > 0,
       CurrentAbundance_New,
       0
     )
