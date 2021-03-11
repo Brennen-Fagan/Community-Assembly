@@ -282,7 +282,7 @@ Now we will call the central function, providing the prespecified pool and commu
 (In effect, we are producing Figure 2 of Law and Morton, 1996.)
 
 ```{r initialRun}
-results <- LawMorton1996(
+results <- LawMorton1996_NumericalAssembly(
   Pool = pool, 
   CommunityMat = communityMat,
   IntegratorTimeStep = 100,
@@ -423,7 +423,7 @@ results2 <- lapply(
     foreach::foreach(
       seed = iterators::iter(ourSeeds)
     ) %dopar% {
-      aRun <- LawMorton1996(
+      aRun <- LawMorton1996_NumericalAssembly(
         Pool = ourPool, 
         CommunityMat = ourMat,
         IntegratorTimeStep = 100,
