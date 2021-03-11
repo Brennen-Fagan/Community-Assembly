@@ -1,5 +1,5 @@
 ---
-title: "Law and Morton 1996: Tables 2 and 3"
+title: "Law and Morton 1996: For comparison"
 author: "Brennen Fagan"
 date: "Created 2021-03-09, last compiled `r Sys.Date()`"
 output: rmarkdown::html_vignette
@@ -19,7 +19,24 @@ knitr::opts_chunk$set(
 ```{r setup}
 library(RMTRCode2)
 library(foreach)
-foreach::registerDoSEQ()
+parallelise <- tryCatch(
+  {
+    library(parallel)
+    library(doParallel)
+    TRUE
+  },
+  error = function(e) {
+    return(FALSE)
+  }
+  )
+if (parallelise) {
+  clust <- parallel::makeCluster(
+    min(c(parallel::detectCores(), 1))
+  )
+  doParallel::registerDoParallel(clust)
+} else {
+  foreach::registerDoSEQ()
+}
 library(ggplot2)
 ```
 
@@ -199,6 +216,7 @@ for each combination of numbers of basal and consumer species,
 run the system `runs` times, taking the associated pool and community matrix,
 check if the result is uninvadable and, if so, store the result.
 
+<!--
 ```{r table3runs} 
 runs <- lapply(
   # for each combination of numbers of basal and consumer species
@@ -239,11 +257,53 @@ runs <- lapply(
   events = events, runs = runs
 )
 ```
+-->
+
+```{r table3runsv2} 
+runs <- lapply(
+  # for each combination of numbers of basal and consumer species
+  1 : (length(basal2) * length(consumer2)), 
+  function(i, pools, communityMats, events, runs, seeds) {
+    ourSeeds <- seeds[((i - 1) * runs + 1) : (i * runs)]
+    ourPool <- pools[[i]]
+    ourMat <- communityMats[[i]]
+    
+    foreach::foreach(
+      seed = iterators::iter(ourSeeds)
+    ) %dopar% {
+      aRun <- LawMorton1996(
+          Pool = ourPool, 
+          CommunityMat = ourMat,
+          IntegratorTimeStep = 100,
+          InnerTimeStepSize = NULL, # Only see the results of numerics.
+          ArrivalEvents = events,
+          ReturnValues = "Abundance", # Now returns only current abundance.
+          seed = seed
+        )
+      
+      if (LawMorton1996_CheckUninvadable(
+          AbundanceRow = aRun$Abundance,
+          Pool = ourPool,
+          CommunityMatrix = ourMat,
+          Threshold = 2
+        )) {
+          # and, if so, store the result.
+          return(toString(which(!is.na(aRun$Abundance) & aRun$Abundance > 2)))
+        } else {
+          return(toString(NULL))
+        }
+    }
+  },
+  pools = pools2,
+  communityMats = communityMats2,
+  events = events, runs = runs, seeds = seedsRun
+)
+```
 
 Once we have the runs, we need to tabulate them.
 
 ```{r tabulationRuns}
 endPoints <- lapply(runs, function(run) {
-  table(unlist(lapply(run, toString)))
+  table(run)
 })
 ```
