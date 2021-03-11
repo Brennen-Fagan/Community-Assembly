@@ -259,6 +259,57 @@ LawMorton1996_PermanenceAssembly <- function(
           # subject to Sum_i(f_i (x_j) h_i) + z > 0 for each subcommunity j.
           # where f_i is per capita rate of growth of species i,
           #       x_j is a retrieved equilibrium
+
+          subcommunities <- unlist(
+            lapply(1:(nrow(Pool)), combn,
+                   x = 1:nrow(Pool), simplify = FALSE),
+            recursive = FALSE
+          )
+
+          # Would use lapply, but we may want side effects.
+
+          equilibria <- list()
+          for (i in 1:length(subcommunities)) {
+            set <- subcommunities[[i]]
+            id <- which(toString(set) %in% statesEncountered$IDs)
+            if (length(id) == 0) {
+              # A subcommunity not yet observed.
+              stateNumberSet <- length(statesEncountered$IDs) + 1
+
+              statesEncountered$IDs[stateNumberSet] <- toString(set)
+
+              statesEncountered$Equilibria[stateNumberSet] <-
+                rootSolve::steady(
+                  y = rep(1, length(set)),
+                  func = GeneralisedLotkaVolterra,
+                  parms = list(a = CommunityMat[set, set],
+                               r = Pool$ReproductionRate[set]),
+                  positive = TRUE
+                )
+
+              statesEncountered$Permanent[stateNumberSet] <- NA
+            } else {
+              # A subcommunity already observed.
+              equilibria[[i]] <- statesEncountered$Equilibria[i]
+            }
+          }
+
+          # Gather coefficients.
+
+
+          # Perform optimisation problem.
+          output <- lpSolve::lp(
+            "min", # minimize
+            c(rep(0, length(community)), 1), # h_1...h_n, z subject to
+            matrix(c(
+
+            )),
+            ">",
+            rep(0, length(subcommunities))
+            )
+
+          statesEncountered$permanent[stateNumber] <-
+            if (output < 0) TRUE else FALSE
         }
 
         # Check permanence.
