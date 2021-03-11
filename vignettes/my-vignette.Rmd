@@ -99,7 +99,7 @@ results <- LawMorton1996(
   CommunityMat = communityMat,
   IntegratorTimeStep = 100,
   InnerTimeStepSize = 10,
-  ArrivalEvents = 30,
+  ArrivalEvents = 25,
   seed = seedsRun
 )
 ```
@@ -270,4 +270,10 @@ Once we have the runs, we need to tabulate them.
 endPoints <- lapply(results2, function(run) {
   table(unlist(run))
 })
+```
+
+```{r finished}
+if (parallelise) {
+  parallel::stopCluster(clust)
+}
 ```
