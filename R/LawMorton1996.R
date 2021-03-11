@@ -230,7 +230,7 @@ LawMorton1996_PermanenceAssembly <- function(
           Pool$ReproductionRate[ID] +
           sum(CommunityMat[community, community] * abundance, na.rm = TRUE) > 0
           ) { # (Note: || will skip abundance if community is null.)
-        # Add species to the community.
+        # Add species to the community. Note that we sort for uniqueness.
         community <- sort(c(community, ID))
 
         # Store properties.
@@ -260,6 +260,7 @@ LawMorton1996_PermanenceAssembly <- function(
           # where f_i is per capita rate of growth of species i,
           #       x_j is a retrieved equilibrium
 
+          # Note that the subcommunities generated are sorted.
           subcommunities <- unlist(
             lapply(1:(nrow(Pool)), combn,
                    x = 1:nrow(Pool), simplify = FALSE),
@@ -294,7 +295,45 @@ LawMorton1996_PermanenceAssembly <- function(
             }
           }
 
+          # Adjust equilibria size.
+          equilibria <- lapply(
+            seq_along(subcommunities),
+            function(i, set, nnz, master) {
+              retval <- rep(0, length(master))
+              setInd <- 1
+              masInd <- 1
+              while (setInd < length(set[[i]])) {
+                if (set[[i]][setInd] == master[masInd]) {
+                  retval[masInd] <- nnz[[i]][setInd]
+                  masInd <- masInd + 1
+                  setInd <- setInd + 1
+                } else if (set[[i]][setInd] < master[masInd]) {
+                  setInd <- setInd + 1
+                } else {
+                  masInd <- masInd + 1
+                }
+              }
+              return(retval)
+            },
+            set = subcommunities,
+            nnz = equilibria,
+            master = community
+          )
+
+
           # Gather coefficients.
+          # Row: equilibria
+          # Col: per capita growth rate
+          coefficients <- lapply(
+            equilibria,
+            FUN = function(eq, rs, m) {
+              # f_col evaluated at equilibrium_row, col = 1:length(community)
+              # f_col = r_col + sum()
+              rs + m %*% eq
+            },
+            rs = Pool$ReproductionRate[community],
+            m = CommunityMat[community, community]
+          )
 
 
           # Perform optimisation problem.
@@ -340,6 +379,8 @@ LawMorton1996_PermanenceAssembly <- function(
   if (!is.null(seed)) {
     set.seed(oldSeed)
   }
+
+  retval <- records
 
   return(retval)
 }
