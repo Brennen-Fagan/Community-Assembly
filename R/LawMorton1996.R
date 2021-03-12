@@ -121,6 +121,16 @@ LawMorton1996_NumericalAssembly <- function(
     CurrentAbundance[SpeciesPresent] <- CurrentAbundance_New
 
     SpeciesPresent <- which(CurrentAbundance > 0)
+
+
+    # We can add a check when ``sufficiently many'' species have been added.
+    # Or, if it is cheap, we can just check immediately if a community is invadable.
+    if (LawMorton1996_CheckUninvadable(
+      AbundanceRow = c(NA, CurrentAbundance),
+      Pool = Pool, CommunityMatrix = CommunityMat
+    )) {
+      break()
+    }
   }
 
   retval <- list()
@@ -524,8 +534,7 @@ LawMorton1996_PermanenceAssembly <- function(
               )
 
               #TODO Due to numerical problems, we round. There must be a better way.
-              coefficientsMatrix <- round(coefficientsMatrix, 6)
-
+              coefficientsMatrix <- round(coefficientsMatrix, 8)
 
               # Perform optimisation problem.
               output <- lpSolve::lp(
@@ -537,8 +546,11 @@ LawMorton1996_PermanenceAssembly <- function(
                   rep(1E-4, length(set)), # h_i should not be 0.
                   -1) # -sum(h_i) > -1
               )
+
+              output <- round(output$solution, 8)
+
               statesEncountered$Permanent[id] <-
-                if (output$solution[length(output$solution)] <= 0) TRUE else FALSE
+                if (output[length(output)] <= 0) TRUE else FALSE
             }
             subcommunitiesPermanent[scIndex] <- statesEncountered$Permanent[id]
           }
@@ -613,7 +625,16 @@ LawMorton1996_PermanenceAssembly <- function(
       }
     }
 
-
+    # We can add a check when ``sufficiently many'' species have been added.
+    # Or, if it is cheap, we can just check immediately if a community is invadable.
+    if (LawMorton1996_CheckUninvadable(
+      AbundanceRow = c(NA, addMissingEquilibriaEntries(
+        1, list(community), list(abundance), 1:nrow(Pool)
+      )),
+      Pool = Pool, CommunityMatrix = CommunityMat
+    )) {
+      break()
+    }
   }
 
   if (!is.null(seed)) {

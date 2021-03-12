@@ -463,6 +463,65 @@ endPoints
 
 # Table 7
 
+Table 7 is described thusly in the original paper.
+
+>Effect of increasing the number of consumers in
+ a species pool on the invasion resistance of communities
+ assembled from the pool.
+ The initial species pool of five basal species and five
+ consumers was constructed by the method described in Table
+ 2. The species pool was incremented by adding five new
+ consumers at a time up to a maximum of 35; these new species
+ were chosen at random from the same distributions as the
+ first five consumers. Two hundred assembly sequences were
+ taken from each pool, with 500 iterations in each. Every
+ assembly sequence converged to an endpoint within 500 it-
+ erations; for each species pool only one endpoint was ob-
+ served. Invasion resistance at each iteration was measured by
+ the proportion of assembly sequences in which the new spe-
+ cies added at that iteration could not increase, i.e., did not
+ satisfy Inequality 3. Sequences that had already reached an
+ endpoint were excluded, so the measure of invasion resistance
+ corresponds to the line Type 1(b) in Fig. 3B. The proportions
+ are given as averages over the period in which between 0.2
+ and 0.8 of the assembly sequences were at the endpoint.
+ 
+We begin by constructing a pool with 5 basal and 45 consumer species for a
+round 50 species.
+
+
+```{r table7params}
+# > runif(1) * 1E8
+# [1] 16528055
+set.seed(16528055)
+seedsPrep7 <- runif(2) * 1E8
+seedsRun7 <- runif(1) * 1E8
+
+basal7 <- 5
+consumers7 <- 45
+
+events7 <- 500
+runs7 <- 200
+```
+
+```{r pool7}
+pool7 <- LawMorton1996_species(
+  Basal = basal7, 
+  Consumer = consumers7, 
+  Parameters = parameters, 
+  LogBodySize = logBodySize,
+  seed = seedsPrep7[1]
+)
+pool7
+```
+
+```{r interactions7}
+communityMat <- LawMorton1996_CommunityMat(
+  Pool = pool7, 
+  Parameters = parameters,
+  seed = seedsPrep7[2]
+)
+```
 
 ```{r finished}
 if (parallelise) {
