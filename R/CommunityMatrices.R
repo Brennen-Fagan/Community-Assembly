@@ -75,6 +75,8 @@ addMissingEquilibriaEntries <- function(i, set, nnz, master) {
   # set is a list of subcommunities
   # nnz is the nonzero values that we are going to add zeros to
   # master is the full community that we need to add zeros for.
+  stopifnot(is.list(set))
+  stopifnot(is.list(nnz))
   retval <- rep(0, length(master))
   setInd <- 1
   masInd <- 1

@@ -159,7 +159,9 @@ LawMorton1996_PermanenceAssembly <- function(
   LogBodySize = c(-2, -1, -1, 0), # c(-2, -1) for Basal, c(-1, 0) for Consumer
   ArrivalEvents = 10,
   ArrivalSampler = c("rearrange", "iid"),
-  ReturnValues = c("Community", "Sequence", "States", "Pool", "Matrix"),
+  ReturnValues = c("Community", "Equilibrium",
+                   "Sequence", "States",
+                   "Pool", "Matrix"),
   Pool = NULL,
   CommunityMat = NULL,
   seed = NULL
@@ -236,10 +238,16 @@ LawMorton1996_PermanenceAssembly <- function(
     if (!(ID %in% community)) {
       # Check if species can increase when rare. Yes -> Add to community.
       if (Pool$ReproductionRate[ID] +
-          sum(CommunityMat[community, community] * abundance, na.rm = TRUE) > 0
-          ) { # (Note: || will skip abundance if community is null.)
+          sum(CommunityMat[ID, community] * abundance, na.rm = TRUE) > 0
+          ) { # (Note: 0x0 mat * 0 is 0.)
         # Add species to the community. Note that we sort for uniqueness.
-        community <- sort(c(community, ID))
+        sorted <- sort(c(community, ID), index.return = TRUE)
+        community <- sorted$x
+        if (length(community) == 1) {
+          abundance <- 0.1
+        } else {
+          abundance <- c(abundance, 0.1)[sorted$ix] # 0.1 is initial density.
+        }
 
         # Store properties.
         stateNumber <- which(toString(community) == statesEncountered$IDs)
@@ -247,13 +255,20 @@ LawMorton1996_PermanenceAssembly <- function(
           stateNumber <- length(statesEncountered$IDs) + 1
           statesEncountered$IDs[stateNumber] <- toString(community)
 
+          # Best way to avoid ending up at the other boundaries?
+          # In practice, the positive (pos) argument is actually non-negative.
+          # What happens when we have a community without a reassembly path?
+          # Easiest way is to start from the previous equilibrium and run.
+          # Should we divide out the equilibria we do not want?
+          # Should we do anything about negative populations if "runsteady"?
           statesEncountered$Equilibria[[stateNumber]] <-
             rootSolve::steady(
-              y = rep(1000, length(community)),
+              y = abundance,
               func = GeneralisedLotkaVolterra,
               parms = list(a = CommunityMat[community, community],
                            r = Pool$ReproductionRate[community]),
-              positive = TRUE
+              #pos = TRUE,
+              method = "runsteady"
             )$y
 
           statesEncountered$Permanent[stateNumber] <- NA
@@ -289,14 +304,17 @@ LawMorton1996_PermanenceAssembly <- function(
 
               statesEncountered$IDs[stateNumberSet] <- toString(set)
 
-              #TODO consider dividing the function by x to remove 0.
+              parentEquilibrium <- statesEncountered$Equilibria[[stateNumber]]
+              parentEquilibrium <- parentEquilibrium[community %in% set]
+
               statesEncountered$Equilibria[[stateNumberSet]] <-
                 rootSolve::steady(
-                  y = rep(1000, length(set)),
+                  y = parentEquilibrium + 1, # force away from 0's.
                   func = GeneralisedLotkaVolterra,
                   parms = list(a = CommunityMat[set, set],
                                r = Pool$ReproductionRate[set]),
-                  positive = TRUE
+                  #pos = TRUE,
+                  method = "runsteady"
                 )$y
 
               statesEncountered$Permanent[stateNumberSet] <- NA
@@ -375,7 +393,9 @@ LawMorton1996_PermanenceAssembly <- function(
           )
 
           #TODO Due to numerical problems, we round. There must be a better way.
-          coefficientsMatrix <- round(coefficientsMatrix, 6)
+          # Cannot round without having to round again later, as this has induced
+          # different numerical problems (i.e. a result of 1E-10 instead of 0).
+          coefficientsMatrix <- round(coefficientsMatrix, 8)
 
 
           # Perform optimisation problem.
@@ -389,8 +409,10 @@ LawMorton1996_PermanenceAssembly <- function(
               -1) # -sum(h_i) > -1
             )
 
+          output <- round(output$solution, 8)
+
           statesEncountered$Permanent[stateNumber] <-
-            if (output$solution[length(output$solution)] <= 0) TRUE else FALSE
+            if (output[length(output)] <= 0) TRUE else FALSE
         }
 
         # Check permanence.
@@ -535,7 +557,7 @@ LawMorton1996_PermanenceAssembly <- function(
             id <- which(toString(set) == statesEncountered$IDs)
             abundanceRow <- statesEncountered$Equilibria[[id]]
             abundanceRow <- addMissingEquilibriaEntries(
-              1, list(set), abundanceRow, community
+              1, list(set), list(abundanceRow), community
             )
 
             # Add a time column to the abundanceRow
@@ -548,12 +570,26 @@ LawMorton1996_PermanenceAssembly <- function(
             )
           }
 
-          stopifnot(sum(subcommunitiesUninvadable) == 1)
-          scIndex <- which(subcommunitiesUninvadable)
-          community <- subcommunities[[scIndex]]
-          abundance <- statesEncountered$Equilibria[[
-            which(toString(community) == statesEncountered$IDs)
-          ]]
+          stopifnot(sum(subcommunitiesUninvadable) >= 1)
+
+          if (sum(subcommunitiesUninvadable) > 1) {
+            # Law and Morton 1996 use numerical integration at this point.
+            # We have already done this with our steady-state calculation.
+            numericalSoln <- which(
+              statesEncountered$Equilibria[[stateNumber]] > abundance * 1E-4
+            )
+            community <- community[numericalSoln]
+            abundance <- statesEncountered$Equilibria[[
+              which(toString(community) == statesEncountered$IDs)
+            ]]
+
+          } else {
+            scIndex <- which(subcommunitiesUninvadable)
+            community <- subcommunities[[scIndex]]
+            abundance <- statesEncountered$Equilibria[[
+              which(toString(community) == statesEncountered$IDs)
+            ]]
+          }
 
           if ("Sequence" %in% ReturnValues) {
             records$Outcome[eventNumber] <- "Type 3 (!Permanent)"
@@ -588,6 +624,12 @@ LawMorton1996_PermanenceAssembly <- function(
 
   if ("Community" %in% ReturnValues) {
     retval$Community <- community
+  }
+  if ("Equilibrium" %in% ReturnValues) {
+    abundance <- addMissingEquilibriaEntries(
+      1, list(community), list(abundance), 1:nrow(Pool)
+    )
+    retval$Equilibrium <- abundance
   }
   if ("Sequence" %in% ReturnValues) {
     retval$Sequence <- records

@@ -1,0 +1,243 @@
+---
+title: 'Law and Morton 1996: For comparison using permanence'
+author: "Brennen Fagan"
+date: "Created 2021-03-12, last compiled `r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+%\VignetteIndexEntry{my-vignette}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+  
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+collapse = TRUE,
+comment = "#>"
+)
+```
+
+```{r setup}
+library(RMTRCode2)
+library(foreach)
+parallelise <- tryCatch(
+  {
+    library(parallel)
+    library(doParallel)
+    TRUE
+  },
+  error = function(e) {
+    return(FALSE)
+  }
+)
+if (parallelise) {
+  clust <- parallel::makeCluster(
+    min(c(parallel::detectCores(), 1))
+  )
+  doParallel::registerDoParallel(clust)
+} else {
+  foreach::registerDoSEQ()
+}
+library(ggplot2)
+```
+
+# Table 1
+First we create the system suggested by Table 1.
+
+```{r table1pool}
+table1Pool <- data.frame(
+  ID = 1:4,
+  Type = NA,
+  Size = NA,
+  ReproductionRate = c(0.86, 1.35, -1.01, -0.89)
+)
+
+table1Mat <- matrix(
+  c(
+    -0.97, -0.77, -0.35,  0.00,
+    -0.97, -1.08, -0.02,  0.00,
+     1.73,  0.29,  0.00, -0.07,
+     0.00,  0.00,  1.26,  0.00
+  ),
+  byrow = TRUE, ncol = 4, nrow = 4
+)
+```
+
+```{r table1Perm}
+table1 <- LawMorton1996_PermanenceAssembly(
+  Pool = table1Pool,
+  CommunityMat = table1Mat,
+  ArrivalEvents = 8,
+  seed = 14 # Produces 1, 4, 3, 2, as in the paper.
+)
+table1$Sequence
+```
+
+# Table 2
+```{r parameters}
+# > runif(1) * 1E8
+# [1] 16528055
+set.seed(16528055)
+seedsPrep <- runif(2) * 1E8
+seedsRun <- runif(1) * 1E8
+
+basal = 5
+consumers = 10
+logBodySize = c(-2, -1, -1, 0)
+parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1)
+```
+
+```{r pool}
+pool <- LawMorton1996_species(
+  Basal = basal, 
+  Consumer = consumers, 
+  Parameters = parameters, 
+  LogBodySize = logBodySize,
+  seed = seedsPrep[1]
+)
+pool
+```
+
+```{r interactions}
+communityMat <- LawMorton1996_CommunityMat(
+  Pool = pool, 
+  Parameters = parameters,
+  seed = seedsPrep[2]
+)
+```
+
+```{r initialRun}
+results <- LawMorton1996_PermanenceAssembly(
+  Pool = pool, 
+  CommunityMat = communityMat,
+  ArrivalEvents = 30,
+  seed = seedsRun
+)
+
+results$Sequence
+```
+
+# Table 3
+
+```{r prevUninvadable}
+LawMorton1996_CheckUninvadable(
+  AbundanceRow = c(NA, results$Equilibrium),
+  Pool = pool,
+  CommunityMatrix = communityMat,
+  Threshold = 2
+)
+```
+
+```{r parameters2}
+# > runif(1) * 1E8
+# [1] 3680180
+set.seed(3680180)
+
+basal2 <- c(5, 10, 15)
+consumer2 <- c(20, 40, 60)
+events <- 500
+runs <- 100
+
+seedsPrep2 <- runif(2 * length(basal2) * length(consumer2)) * 1E8
+seedsRun2 <- runif(runs * length(basal2) * length(consumer2)) * 1E8
+```
+
+```{r pools2}
+pools2 <- lapply(
+  1 : (length(basal2) * length(consumer2)), 
+  function(i, b, c, s, parameters, logBodySize) {
+    LawMorton1996_species(
+      Basal = b[i], 
+      Consumer = c[i], 
+      Parameters = parameters, 
+      LogBodySize = logBodySize,
+      seed = s[i]
+    )
+  },
+  b = rep(basal2, times = length(consumer2)),
+  c = rep(consumer2, each = length(basal2)),
+  s = seedsPrep2[1:(length(basal2) * length(consumer2))],
+  parameters = parameters, logBodySize = logBodySize
+)
+```
+```{r commats2}
+communityMats2 <- lapply(
+  seq_along(pools2), 
+  function(i, pools, parameters, s) {
+    LawMorton1996_CommunityMat(
+      Pool = pools[[i]], 
+      Parameters = parameters,
+      seed = s[i]
+    )
+  }, 
+  pools = pools2,
+  parameters = parameters,
+  s = seedsPrep2[(length(basal2) * length(consumer2) + 1):(
+    2 * length(basal2) * length(consumer2))]
+)
+```
+
+```{r table3runsv2} 
+results2 <- lapply(
+  # for each combination of numbers of basal and consumer species
+  1 : (length(basal2) * length(consumer2)), 
+  function(i, pools, communityMats, events, runs, seeds) {
+    print(i)
+    ourSeeds <- seeds[((i - 1) * runs + 1) : (i * runs)]
+    ourPool <- pools[[i]]
+    ourMat <- communityMats[[i]]
+    
+    # run the system `runs` times
+    foreach::foreach(
+      seed = iterators::iter(ourSeeds)
+    ) %dopar% {
+      aRun <- tryCatch({
+        LawMorton1996_PermanenceAssembly(
+          Pool = ourPool, 
+          CommunityMat = ourMat,
+          ArrivalEvents = events,
+          ReturnValues = c("Community", "Equilibrium"),
+          seed = seed
+        )},
+        error = function(e) {
+          message(e)
+          message(seed)
+          message(nrow(ourPool))
+          return(list(errorMessage = paste(e, seed, nrow(ourPool))))
+        }
+      )
+
+      if (length(aRun) == 1) {
+        return(aRun$errorMessage)
+      }
+            
+      if (LawMorton1996_CheckUninvadable(
+        AbundanceRow = c(NA, aRun$Equilibrium),
+        Pool = ourPool,
+        CommunityMatrix = ourMat,
+        Threshold = 2
+      )) {
+        # and, if so, store the result.
+        return(toString(aRun$Community))
+      } else {
+        return(toString(NULL))
+      }
+    }
+  },
+  pools = pools2,
+  communityMats = communityMats2,
+  events = events, runs = runs, seeds = seedsRun2
+)
+```
+
+```{r tabulationRuns}
+endPoints <- lapply(results2, function(run) {
+  table(unlist(run))
+})
+endPoints
+```
+
+```{r finished}
+if (parallelise) {
+  parallel::stopCluster(clust)
+}
+```
