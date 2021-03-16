@@ -26,7 +26,7 @@ LawMorton1996_species <- function(
   Species <- data.frame(
     ID = 1:(Basal + Consumer),
     Type = c(rep("Basal", Basal), rep("Consumer", Consumer)),
-    Size = exp(c(runif(Basal, min = LogBodySize[1], max = LogBodySize[2]),
+    Size = 10^(c(runif(Basal, min = LogBodySize[1], max = LogBodySize[2]),
                  runif(Consumer, min = LogBodySize[3], max = LogBodySize[4]))),
     ReproductionRate = 0
   )
@@ -222,18 +222,18 @@ LawMorton1996_PlotAbundance <- function(
   if (!is.null(Sequence)) {
     thePlot <- thePlot + ggplot2::geom_vline(
       data = Sequence,
-      mapping = ggplot2::aes(xintercept = Time),
+      mapping = ggplot2::aes(xintercept = Events),
       linetype = "dashed",
       color = "black"
     )
 
-    timeDiff <- mean(diff(Sequence$Time), na.rm = TRUE)
+    timeDiff <- mean(diff(Sequence$Events), na.rm = TRUE)
 
     thePlot <- thePlot + ggplot2::geom_label(
       data = Sequence,
       mapping = ggplot2::aes(
-        x = Time + timeDiff/3,
-        label = IDs
+        x = Events + timeDiff/3,
+        label = Addition
       ),
       y = max(long$Abundance, na.rm = TRUE) * 0.85,
       color = "black"

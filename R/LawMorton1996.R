@@ -48,6 +48,7 @@ LawMorton1996_NumericalAssembly <- function(
   CurrentAbundance <- rep(0, speciesNum)
   SpeciesPresent <- NULL
   if (!is.null(InnerTimeStepSize)) {
+    stopifnot(InnerTimeStepSize < IntegratorTimeStep)
     # Store Time and Abundances for plotting.
     TimeAbundances <- rbind(
       matrix(
@@ -75,8 +76,25 @@ LawMorton1996_NumericalAssembly <- function(
     ]
   }
 
+
+  if ("Sequence" %in% ReturnValues) {
+    SequenceRetVal <- data.frame(
+      Events = c(0, (IntegratorTimeStep + 1) * 0:(ArrivalEvents - 1)),
+      Addition = c(NA, ArrivalIDs),
+      Outcome = factor(NA, levels = c(
+        "Present",
+        "Type 1 (Failure)",
+        "Type 2 (Invade)",
+        "Type 3 (Contract)")),
+      Community = NA
+    )
+  }
+
+  eventNumber <- 1
+
   # Resolve each arrival.
   for (ID in ArrivalIDs) {
+    SpeciesPresent_Old <- SpeciesPresent
     CurrentAbundance[ID] <- CurrentAbundance[ID] + ArrivalDensity
 
     if (!(ID %in% SpeciesPresent)) {
@@ -118,17 +136,44 @@ LawMorton1996_NumericalAssembly <- function(
       TimeAbundances_time <- TimeAbundances_time + Run_GLV[nrow(Run_GLV), 1] + 1
     }
 
+    atSteadyState <- all(
+      round(CurrentAbundance_New / CurrentAbundance[SpeciesPresent],
+            -log10(EliminationThreshold)) == 1
+    )
+
     CurrentAbundance[SpeciesPresent] <- CurrentAbundance_New
 
     SpeciesPresent <- which(CurrentAbundance > 0)
+    eventNumber <- eventNumber + 1
 
+    if ("Sequence" %in% ReturnValues) {
+      if (all(SpeciesPresent_Old %in% SpeciesPresent) &&
+          ID %in% SpeciesPresent_Old) {
+        SequenceRetVal$Outcome[eventNumber] <- "Present"
+      } else if (all(SpeciesPresent_Old %in% SpeciesPresent) &&
+                 !(ID %in% SpeciesPresent)
+      ) {
+        SequenceRetVal$Outcome[eventNumber] <- "Type 1 (Failure)"
+      } else if (all(SpeciesPresent_Old %in% SpeciesPresent) &&
+                 (ID %in% SpeciesPresent)
+      ) {
+        SequenceRetVal$Outcome[eventNumber] <- "Type 2 (Invade)"
+      } else {
+        SequenceRetVal$Outcome[eventNumber] <- "Type 3 (Contract)"
+      }
+      SequenceRetVal$Community[eventNumber] <- I(list(SpeciesPresent))
+    }
 
     # We can add a check when ``sufficiently many'' species have been added.
     # Or, if it is cheap, we can just check immediately if a community is invadable.
-    if (LawMorton1996_CheckUninvadable(
-      AbundanceRow = c(NA, CurrentAbundance),
-      Pool = Pool, CommunityMatrix = CommunityMat
-    )) {
+    # The check only works if the system is essentially at steady state.
+    if (eventNumber > nrow(Pool) &&
+        atSteadyState &&
+        length(SpeciesPresent) > 1 &&
+        LawMorton1996_CheckUninvadable(
+          AbundanceRow = c(NA, CurrentAbundance),
+          Pool = Pool, CommunityMatrix = CommunityMat
+        )) {
       break()
     }
   }
@@ -136,17 +181,17 @@ LawMorton1996_NumericalAssembly <- function(
   retval <- list()
   if ("Abundance" %in% ReturnValues) {
     if (!is.null(InnerTimeStepSize)) {
-      retval$Abundance <- TimeAbundances
+      lastRow <- sum(apply(TimeAbundances, MARGIN = 1, FUN = function(x) {
+        !all(is.na(x[-1]))
+      }))
+      retval$Abundance <- TimeAbundances[1:lastRow, ]
     } else {
       retval$Abundance <- c((IntegratorTimeStep + 1) * ArrivalEvents - 1,
                             CurrentAbundance)
     }
   }
   if ("Sequence" %in% ReturnValues) {
-    retval$Sequence <- data.frame(
-      Time = (IntegratorTimeStep + 1) * 0:(ArrivalEvents - 1),
-      IDs = ArrivalIDs
-    )
+    retval$Sequence <- SequenceRetVal
   }
   if ("Pool" %in% ReturnValues) {
     retval$Pool <- Pool
@@ -228,8 +273,8 @@ LawMorton1996_PermanenceAssembly <- function(
         "Type 3 (!Permanent)")),
       Community = NA
     )
-    eventNumber <- 2
   }
+  eventNumber <- 2
 
   #TODO This really should be some form of object
   #     In that case, we would have a checkPermanence routine.
@@ -432,7 +477,6 @@ LawMorton1996_PermanenceAssembly <- function(
           if ("Sequence" %in% ReturnValues) {
             records$Outcome[eventNumber] <- "Type 2 (Permanent)"
             records$Community[eventNumber] <- I(list(community))
-            eventNumber <- eventNumber + 1
           }
         } else {
           # Need to find an attracting subcommunity.
@@ -606,7 +650,6 @@ LawMorton1996_PermanenceAssembly <- function(
           if ("Sequence" %in% ReturnValues) {
             records$Outcome[eventNumber] <- "Type 3 (!Permanent)"
             records$Community[eventNumber] <- I(list(community))
-            eventNumber <- eventNumber + 1
           }
         }
 
@@ -614,25 +657,26 @@ LawMorton1996_PermanenceAssembly <- function(
         if ("Sequence" %in% ReturnValues) {
           records$Outcome[eventNumber] <- "Type 1 (Failure)"
           records$Community[eventNumber] <- I(list(community))
-          eventNumber <- eventNumber + 1
         }
       }
     } else {
       if ("Sequence" %in% ReturnValues) {
         records$Outcome[eventNumber] <- "Present"
         records$Community[eventNumber] <- I(list(community))
-        eventNumber <- eventNumber + 1
       }
     }
 
     # We can add a check when ``sufficiently many'' species have been added.
     # Or, if it is cheap, we can just check immediately if a community is invadable.
-    if (LawMorton1996_CheckUninvadable(
-      AbundanceRow = c(NA, addMissingEquilibriaEntries(
-        1, list(community), list(abundance), 1:nrow(Pool)
-      )),
-      Pool = Pool, CommunityMatrix = CommunityMat
-    )) {
+    eventNumber <- eventNumber + 1
+    if (eventNumber - 1 > nrow(Pool) &&
+        length(SpeciesPresent) > 1 &&
+        LawMorton1996_CheckUninvadable(
+          AbundanceRow = c(NA, addMissingEquilibriaEntries(
+            1, list(community), list(abundance), 1:nrow(Pool)
+          )),
+          Pool = Pool, CommunityMatrix = CommunityMat
+        )) {
       break()
     }
   }

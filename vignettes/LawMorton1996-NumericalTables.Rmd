@@ -426,21 +426,24 @@ results2 <- lapply(
       aRun <- LawMorton1996_NumericalAssembly(
         Pool = ourPool, 
         CommunityMat = ourMat,
-        IntegratorTimeStep = 100,
+        IntegratorTimeStep = 10000, # Empirically closer to permanence method.
         InnerTimeStepSize = NULL, # Only see the results of numerics.
         ArrivalEvents = events,
         ReturnValues = "Abundance", # Now returns only current abundance.
-        seed = seed
+        seed = seed,
+        EliminationThreshold = 1E-1
       )
       
+      # The function breaks early if the internal system appears to be at
+      # steady-state and uninvadable to any new species.
+      # Re-run the check to see if the system is still uninvadable.
       if (LawMorton1996_CheckUninvadable(
         AbundanceRow = aRun$Abundance,
         Pool = ourPool,
-        CommunityMatrix = ourMat,
-        Threshold = 2
+        CommunityMatrix = ourMat
       )) {
         # and, if so, store the result.
-        return(toString(which(!is.na(aRun$Abundance) & aRun$Abundance > 2)))
+        return(toString(which(!is.na(aRun$Abundance) & aRun$Abundance > 2)[-1] - 1))
       } else {
         return(toString(NULL))
       }
@@ -494,14 +497,15 @@ round 50 species.
 # > runif(1) * 1E8
 # [1] 16528055
 set.seed(16528055)
-seedsPrep7 <- runif(2) * 1E8
-seedsRun7 <- runif(1) * 1E8
 
 basal7 <- 5
 consumers7 <- 45
 
 events7 <- 500
 runs7 <- 200
+
+seedsPrep7 <- runif(2) * 1E8
+seedsRun7 <- runif(runs * (basal7 + consumers7 - 5) / 5) * 1E8
 ```
 
 ```{r pool7}
@@ -516,10 +520,53 @@ pool7
 ```
 
 ```{r interactions7}
-communityMat <- LawMorton1996_CommunityMat(
+communityMat7 <- LawMorton1996_CommunityMat(
   Pool = pool7, 
   Parameters = parameters,
   seed = seedsPrep7[2]
+)
+```
+
+```{r table7runsv2} 
+results7 <- lapply(
+  # for each combination of numbers of basal and consumer species
+  1:((basal7 + consumers7 - 5) / 5), 
+  function(i, poollimit, pools, communityMats, events, runs, seeds) {
+    ourSeeds <- seeds[((i - 1) * runs + 1) : (i * runs)]
+    ourPool <- pools[1:poollimit,]
+    ourMat <- communityMats[1:poollimit, 1:poollimit]
+    
+    # run the system `runs` times
+    foreach::foreach(
+      seed = iterators::iter(ourSeeds)
+    ) %dopar% {
+      aRun <- LawMorton1996_NumericalAssembly(
+        Pool = ourPool, 
+        CommunityMat = ourMat,
+        IntegratorTimeStep = 10000,
+        InnerTimeStepSize = 5000, 
+        ArrivalEvents = events,
+        ReturnValues = c("Abundance", "Sequence"), 
+        seed = seed
+      )
+      
+      if (LawMorton1996_CheckUninvadable(
+        AbundanceRow = aRun$Abundance[nrow(aRun$Abundance), ],
+        Pool = ourPool,
+        CommunityMatrix = ourMat,
+        Threshold = 2
+      )) {
+        # and, if so, store the result.
+        return(aRun$Sequence)
+      } else {
+        return(toString(NULL))
+      }
+    }
+  },
+  poollimit = seq(from = 10, by = 5, to = 50),
+  pools = pool7,
+  communityMats = communityMat7,
+  events = events, runs = runs, seeds = seedsRun2
 )
 ```
 

@@ -213,8 +213,7 @@ results2 <- lapply(
       if (LawMorton1996_CheckUninvadable(
         AbundanceRow = c(NA, aRun$Equilibrium),
         Pool = ourPool,
-        CommunityMatrix = ourMat,
-        Threshold = 2
+        CommunityMatrix = ourMat
       )) {
         # and, if so, store the result.
         return(toString(aRun$Community))
