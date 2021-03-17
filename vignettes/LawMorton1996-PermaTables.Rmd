@@ -209,12 +209,24 @@ results2 <- lapply(
       if (length(aRun) == 1) {
         return(aRun$errorMessage)
       }
-            
-      if (LawMorton1996_CheckUninvadable(
+      
+      worked <- tryCatch({LawMorton1996_CheckUninvadable(
         AbundanceRow = c(NA, aRun$Equilibrium),
         Pool = ourPool,
         CommunityMatrix = ourMat
-      )) {
+      )},
+        error = function(e) {
+          message("In worked:")
+          message(e)
+          message(seed)
+          message(nrow(ourPool))
+          return(NA)
+        }
+      )
+            
+      if (is.na(worked)) {
+        return("Failed")
+      } else if (worked) {
         # and, if so, store the result.
         return(toString(aRun$Community))
       } else {

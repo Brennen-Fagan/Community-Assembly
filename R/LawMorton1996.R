@@ -101,15 +101,35 @@ LawMorton1996_NumericalAssembly <- function(
       SpeciesPresent[length(SpeciesPresent) + 1] <- ID
     }
 
-    Run_GLV <- LawMorton1996_NumIntegration(
-      CommunityMat[SpeciesPresent, SpeciesPresent],
-      Pool$ReproductionRate[SpeciesPresent],
-      CurrentAbundance[SpeciesPresent],
-      OuterTimeStepSize = IntegratorTimeStep,
-      InnerTimeStepSize = if(is.null(InnerTimeStepSize)) {
-        IntegratorTimeStep
-      } else {InnerTimeStepSize}
-    )
+    # Run_GLV <- LawMorton1996_NumIntegration(
+    #   CommunityMat[SpeciesPresent, SpeciesPresent],
+    #   Pool$ReproductionRate[SpeciesPresent],
+    #   CurrentAbundance[SpeciesPresent],
+    #   OuterTimeStepSize = IntegratorTimeStep,
+    #   InnerTimeStepSize = if(is.null(InnerTimeStepSize)) {
+    #     IntegratorTimeStep
+    #   } else {InnerTimeStepSize}
+    # )
+
+    rootSolveCounter <- 0
+    Run_GLV <- NA
+    while(rootSolveCounter < 5 && any(is.na(Run_GLV))) {
+      Run_GLV <- tryCatch(
+        LawMorton1996_NumIntegration(
+          CommunityMat[SpeciesPresent, SpeciesPresent],
+          Pool$ReproductionRate[SpeciesPresent],
+          CurrentAbundance[SpeciesPresent] + abs(rnorm(n = length(SpeciesPresent))) * sqrt(rootSolveCounter),
+          OuterTimeStepSize = IntegratorTimeStep,
+          InnerTimeStepSize = if(is.null(InnerTimeStepSize)) {
+            IntegratorTimeStep
+          } else {InnerTimeStepSize}
+        ),
+        error = function(e) {
+          return(NA)
+        })
+      rootSolveCounter <- rootSolveCounter + 1
+    }
+    stopifnot(!is.na(Run_GLV))
 
     CurrentAbundance_New <- Run_GLV[nrow(Run_GLV), 2:(ncol(Run_GLV))]
 
@@ -136,10 +156,20 @@ LawMorton1996_NumericalAssembly <- function(
       TimeAbundances_time <- TimeAbundances_time + Run_GLV[nrow(Run_GLV), 1] + 1
     }
 
-    atSteadyState <- all(
-      round(CurrentAbundance_New / CurrentAbundance[SpeciesPresent],
-            -log10(EliminationThreshold)) == 1
-    )
+    # We ignore the new addition if the new addition died out.
+    if (CurrentAbundance_New[length(CurrentAbundance_New)] == 0 &&
+        length(CurrentAbundance_New) > 1) {
+      atSteadyState <- all(
+        round(CurrentAbundance_New[-length(CurrentAbundance_New)] /
+                CurrentAbundance[SpeciesPresent][-length(CurrentAbundance_New)],
+              -log10(EliminationThreshold)) == 1
+      )
+    } else {
+      atSteadyState <- all(
+        round(CurrentAbundance_New / CurrentAbundance[SpeciesPresent],
+              -log10(EliminationThreshold)) == 1
+      )
+    }
 
     CurrentAbundance[SpeciesPresent] <- CurrentAbundance_New
 
@@ -316,15 +346,26 @@ LawMorton1996_PermanenceAssembly <- function(
           # Easiest way is to start from the previous equilibrium and run.
           # Should we divide out the equilibria we do not want?
           # Should we do anything about negative populations if "runsteady"?
-          statesEncountered$Equilibria[[stateNumber]] <-
-            rootSolve::steady(
-              y = abundance,
-              func = GeneralisedLotkaVolterra,
-              parms = list(a = CommunityMat[community, community],
-                           r = Pool$ReproductionRate[community]),
-              #pos = TRUE,
-              method = "runsteady"
-            )$y
+          rootSolveCounter <- 0
+          rootSolveSteadyResult <- NA
+          while(rootSolveCounter < 5 && is.na(rootSolveSteadyResult)) {
+            rootSolveSteadyResult <- tryCatch(
+              rootSolve::steady(
+                y = abundance + abs(rnorm(n = length(abundance))) * sqrt(rootSolveCounter),
+                func = GeneralisedLotkaVolterra,
+                parms = list(a = CommunityMat[community, community],
+                             r = Pool$ReproductionRate[community]),
+                #pos = TRUE,
+                method = "runsteady"
+              )$y,
+              error = function(e) {
+                return(NA)
+              })
+            rootSolveCounter <- rootSolveCounter + 1
+          }
+          stopifnot(!is.na(rootSolveSteadyResult))
+
+          statesEncountered$Equilibria[[stateNumber]] <- rootSolveSteadyResult
 
           statesEncountered$Permanent[stateNumber] <- NA
         }
@@ -362,15 +403,36 @@ LawMorton1996_PermanenceAssembly <- function(
               parentEquilibrium <- statesEncountered$Equilibria[[stateNumber]]
               parentEquilibrium <- parentEquilibrium[community %in% set]
 
-              statesEncountered$Equilibria[[stateNumberSet]] <-
-                rootSolve::steady(
-                  y = parentEquilibrium + 1, # force away from 0's.
-                  func = GeneralisedLotkaVolterra,
-                  parms = list(a = CommunityMat[set, set],
-                               r = Pool$ReproductionRate[set]),
-                  #pos = TRUE,
-                  method = "runsteady"
-                )$y
+              # statesEncountered$Equilibria[[stateNumberSet]] <-
+              #   rootSolve::steady(
+              #     y = parentEquilibrium + 1, # force away from 0's.
+              #     func = GeneralisedLotkaVolterra,
+              #     parms = list(a = CommunityMat[set, set],
+              #                  r = Pool$ReproductionRate[set]),
+              #     #pos = TRUE,
+              #     method = "runsteady"
+              #   )$y
+
+              rootSolveCounter <- 0
+              rootSolveSteadyResult <- NA
+              while(rootSolveCounter < 5 && is.na(rootSolveSteadyResult)) {
+                rootSolveSteadyResult <- tryCatch(
+                  rootSolve::steady(
+                    y = parentEquilibrium + 1 + abs(rnorm(n = length(parentEquilibrium))) * sqrt(rootSolveCounter),
+                    func = GeneralisedLotkaVolterra,
+                    parms = list(a = CommunityMat[set, set],
+                                 r = Pool$ReproductionRate[set]),
+                    #pos = TRUE,
+                    method = "runsteady"
+                  )$y,
+                  error = function(e) {
+                    return(NA)
+                  })
+                rootSolveCounter <- rootSolveCounter + 1
+              }
+              stopifnot(!is.na(rootSolveSteadyResult))
+
+              statesEncountered$Equilibria[[stateNumberSet]] <- rootSolveSteadyResult
 
               statesEncountered$Permanent[stateNumberSet] <- NA
               equilibria[[i]] <- statesEncountered$Equilibria[[stateNumberSet]]
@@ -669,14 +731,16 @@ LawMorton1996_PermanenceAssembly <- function(
     # We can add a check when ``sufficiently many'' species have been added.
     # Or, if it is cheap, we can just check immediately if a community is invadable.
     eventNumber <- eventNumber + 1
+    uninvadable <- LawMorton1996_CheckUninvadable(
+      AbundanceRow = c(NA, addMissingEquilibriaEntries(
+        1, list(community), list(abundance), 1:nrow(Pool)
+      )),
+      Pool = Pool, CommunityMatrix = CommunityMat
+    )
     if (eventNumber - 1 > nrow(Pool) &&
-        length(SpeciesPresent) > 1 &&
-        LawMorton1996_CheckUninvadable(
-          AbundanceRow = c(NA, addMissingEquilibriaEntries(
-            1, list(community), list(abundance), 1:nrow(Pool)
-          )),
-          Pool = Pool, CommunityMatrix = CommunityMat
-        )) {
+        length(community) > 1 &&
+        uninvadable
+        ) {
       break()
     }
   }

@@ -415,6 +415,7 @@ results2 <- lapply(
   # for each combination of numbers of basal and consumer species
   1 : (length(basal2) * length(consumer2)), 
   function(i, pools, communityMats, events, runs, seeds) {
+    print(i)
     ourSeeds <- seeds[((i - 1) * runs + 1) : (i * runs)]
     ourPool <- pools[[i]]
     ourMat <- communityMats[[i]]
@@ -550,11 +551,13 @@ results7 <- lapply(
         seed = seed
       )
       
+      lastRow <- which(is.na(aRun$Sequence$Community[-1]))[1]
+      aRun$Sequence <- aRun$Sequence[1:lastRow, ]
+      
       if (LawMorton1996_CheckUninvadable(
         AbundanceRow = aRun$Abundance[nrow(aRun$Abundance), ],
         Pool = ourPool,
-        CommunityMatrix = ourMat,
-        Threshold = 2
+        CommunityMatrix = ourMat
       )) {
         # and, if so, store the result.
         return(aRun$Sequence)
