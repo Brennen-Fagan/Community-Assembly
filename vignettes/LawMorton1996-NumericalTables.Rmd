@@ -506,7 +506,7 @@ events7 <- 500
 runs7 <- 200
 
 seedsPrep7 <- runif(2) * 1E8
-seedsRun7 <- runif(runs * (basal7 + consumers7 - 5) / 5) * 1E8
+seedsRun7 <- runif(runs7 * (basal7 + consumers7 - 5) / 5) * 1E8
 ```
 
 ```{r pool7}
@@ -534,8 +534,8 @@ results7 <- lapply(
   1:((basal7 + consumers7 - 5) / 5), 
   function(i, poollimit, pools, communityMats, events, runs, seeds) {
     ourSeeds <- seeds[((i - 1) * runs + 1) : (i * runs)]
-    ourPool <- pools[1:poollimit,]
-    ourMat <- communityMats[1:poollimit, 1:poollimit]
+    ourPool <- pools[1:(poollimit[i]),]
+    ourMat <- communityMats[1:(poollimit[i]), 1:(poollimit[i])]
     
     # run the system `runs` times
     foreach::foreach(
@@ -569,7 +569,7 @@ results7 <- lapply(
   poollimit = seq(from = 10, by = 5, to = 50),
   pools = pool7,
   communityMats = communityMat7,
-  events = events, runs = runs, seeds = seedsRun2
+  events = events7, runs = runs7, seeds = seedsRun7
 )
 ```
 
