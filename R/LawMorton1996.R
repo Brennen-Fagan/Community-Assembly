@@ -688,9 +688,11 @@ LawMorton1996_PermanenceAssembly <- function(
             )
           }
 
-          stopifnot(sum(subcommunitiesUninvadable) >= 1)
+          # Cycles might stop this from working: 1 2 3 -> 2 -> 1 2 -> 1 2 3
+          # i.e. if 1 2 3 is not permanent, but all of its subsets are invadable
+          # stopifnot(sum(subcommunitiesUninvadable) >= 1)
 
-          if (sum(subcommunitiesUninvadable) > 1) {
+          if (sum(subcommunitiesUninvadable) != 1) {
             # Law and Morton 1996 use numerical integration at this point.
             # We have already done this with our steady-state calculation.
             numericalSoln <- which(
