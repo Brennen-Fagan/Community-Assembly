@@ -40,7 +40,8 @@ LawMorton1996_NumericalAssembly <- function(
   }
 
   if (!is.null(seed)) {
-    oldSeed <- .Random.seed
+    if (exists(".Random.seed"))
+      oldSeed <- .Random.seed
     set.seed(seed)
   }
 
@@ -231,7 +232,8 @@ LawMorton1996_NumericalAssembly <- function(
   }
 
   if (!is.null(seed)) {
-    set.seed(oldSeed)
+    if (exists("oldSeed"))
+      set.seed(oldSeed)
   }
 
   return(retval)
@@ -274,7 +276,8 @@ LawMorton1996_PermanenceAssembly <- function(
   }
 
   if (!is.null(seed)) {
-    oldSeed <- .Random.seed
+    if (exists(".Random.seed"))
+      oldSeed <- .Random.seed
     set.seed(seed)
   }
 
@@ -748,7 +751,8 @@ LawMorton1996_PermanenceAssembly <- function(
   }
 
   if (!is.null(seed)) {
-    set.seed(oldSeed)
+    if (exists("oldSeed"))
+      set.seed(oldSeed)
   }
 
   retval <- list()

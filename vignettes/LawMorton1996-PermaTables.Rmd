@@ -4,7 +4,7 @@ author: "Brennen Fagan"
 date: "Created 2021-03-12, last compiled `r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
-%\VignetteIndexEntry{my-vignette}
+  %\VignetteIndexEntry{LawMorton1996-PermaTables}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -38,6 +38,7 @@ if (parallelise) {
   foreach::registerDoSEQ()
 }
 library(ggplot2)
+library(dplyr)
 ```
 
 # Table 1
@@ -245,6 +246,181 @@ endPoints <- lapply(results2, function(run) {
   table(unlist(run))
 })
 endPoints
+```
+
+# Table 7
+
+```{r table7params}
+# > runif(1) * 1E8
+# [1] 16528055
+set.seed(16528055)
+
+basal7 <- 5
+consumers7 <- 45
+
+events7 <- 500
+runs7 <- 200
+
+seedsPrep7 <- runif(2) * 1E8
+seedsRun7 <- runif(runs7 * (basal7 + consumers7 - 5) / 5) * 1E8
+```
+
+```{r pool7}
+pool7 <- LawMorton1996_species(
+  Basal = basal7, 
+  Consumer = consumers7, 
+  Parameters = parameters, 
+  LogBodySize = logBodySize,
+  seed = seedsPrep7[1]
+)
+pool7
+```
+
+```{r interactions7}
+communityMat7 <- LawMorton1996_CommunityMat(
+  Pool = pool7, 
+  Parameters = parameters,
+  seed = seedsPrep7[2]
+)
+```
+
+```{r table7runsv2} 
+results7 <- lapply(
+  # for each combination of numbers of basal and consumer species
+  1:((basal7 + consumers7 - 5) / 5), 
+  function(i, poollimit, pools, communityMats, events, runs, seeds) {
+    print(i)
+    ourSeeds <- seeds[((i - 1) * runs + 1) : (i * runs)]
+    ourPool <- pools[1:(poollimit[i]),]
+    ourMat <- communityMats[1:(poollimit[i]), 1:(poollimit[i])]
+    
+    # run the system `runs` times
+    foreach::foreach(
+      seed = iterators::iter(ourSeeds)
+    ) %dopar% {
+      aRun <- LawMorton1996_PermanenceAssembly(
+        Pool = ourPool, 
+        CommunityMat = ourMat,
+        ArrivalEvents = events,
+        ReturnValues = c("Equilibrium", "Sequence"), 
+        seed = seed
+      )
+      
+      lastRow <- which(is.na(aRun$Sequence$Community[-1]))[1]
+      if (is.na(lastRow)) {
+        lastRow <- nrow(aRun$Sequence)
+      }
+      aRun$Sequence <- aRun$Sequence[1:lastRow, ]
+      
+      if (LawMorton1996_CheckUninvadable(
+        AbundanceRow = c(NA, aRun$Equilibrium),
+        Pool = ourPool,
+        CommunityMatrix = ourMat
+      )) {
+        # and, if so, store the result.
+        return(aRun$Sequence)
+      } else {
+        return(toString(NULL))
+      }
+    }
+  },
+  poollimit = seq(from = 10, by = 5, to = 50),
+  pools = pool7,
+  communityMats = communityMat7,
+  events = events7, runs = runs7, seeds = seedsRun7
+)
+```
+```{r recreateTable7}
+table7Setup <- lapply(
+  seq_along(results7), function(i, r, c) {
+    do.call(
+      rbind, 
+      lapply(r[[i]], function(x) {
+        if (!is.atomic(x)) {
+          data.frame(
+            Iterations = nrow(x), 
+            Endpoint = toString(x$Community[[nrow(x)]]), 
+            Type1 = sum(x$Outcome == "Type 1 (Failure)", na.rm = TRUE)
+          )
+        }
+      })) %>% dplyr::group_by(Endpoint) %>% dplyr::summarise(
+        MeanIterations = mean(Iterations, na.rm = TRUE),
+        Successful = n()
+      ) %>% dplyr::mutate(
+        Basal = 5,
+        Consumers = c /length(r) * i
+      )
+  },
+  r = results7, c = consumers7
+)
+
+# Need to calculate the mean of the invasion resistance 
+table7InvasionResistance <- lapply(
+  seq_along(results7), function(i, r, s, c) {
+    # group by endpoint
+    endpoints <- s[[i]]$Endpoint
+    retval <- data.frame(
+      Basal = 5, 
+      Consumers = c /length(r) * i,
+      Endpoint = endpoints, 
+      InvasionResistance = NA)
+    epcount <- 1
+    # for each endpoint,
+    for (ep in endpoints) {
+      print(ep)
+      # keep a list of active assemblies
+      active <- unlist(lapply(
+        r[[i]], function(x, ep) {
+          !is.atomic(x) && toString(x$Community[[nrow(x)]]) == ep
+        }, 
+        ep = ep
+      ))
+      #print(active)
+      initActive <- active
+      initActiveNum <- sum(active, na.rm = TRUE)
+      maxTimes <- unlist(lapply(r[[i]][active], nrow))
+      # Start at a time when 0.8 of total assemblies are still active.
+      # Stop at the time when 0.2 of total assemblies are still active. 
+      timeSpan <- quantile(maxTimes, c(0.2, 0.8))
+      record <- NULL
+      for (time in timeSpan[1]:timeSpan[2]) { # First step is NA.
+        # Remove assemblies that have reached their endpoint.
+        # Set inactive if your maxTime is over == smaller than current time.
+        active[initActive] <- active[initActive] & maxTimes > time
+        #print(paste0(sum(active), "/", initActiveNum))
+        if (!((sum(active, na.rm = TRUE) / initActiveNum >= 0.2) ||
+              (sum(active, na.rm = TRUE) / initActiveNum <= 0.8))
+        ) {break}
+        # for each timestep (iteration), take Outcome == Type 1 / Outcome != Present
+        record <- c(record, (do.call(
+          rbind,
+          lapply(
+            r[[i]][active], 
+            function(x, time) {
+              data.frame(Outcome = x$Outcome[time])
+            },
+            time = time
+          )
+        ) %>% dplyr::summarise(
+          out = sum(Outcome == "Type 1 (Failure)") / sum(Outcome != "Present") 
+        ))$out)
+      }
+      # Take the mean of the statistic calculated.
+      retval$InvasionResistance[epcount] <- mean(record, na.rm = TRUE)
+      epcount <- epcount + 1
+    }
+    return(retval)
+  },
+  r = results7, s = table7Setup, c = consumers7
+)
+
+table7 <- dplyr::full_join(
+  do.call(rbind, table7Setup),
+  do.call(rbind, table7InvasionResistance),
+  by = c("Basal", "Consumers", "Endpoint")
+)
+
+table7
 ```
 
 ```{r finished}

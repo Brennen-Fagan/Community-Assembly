@@ -4,7 +4,7 @@ author: "Brennen Fagan"
 date: "Created 2021-03-09, last compiled `r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
-%\VignetteIndexEntry{my-vignette}
+  %\VignetteIndexEntry{LawMorton1996-NumericalTables}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -38,6 +38,7 @@ if (parallelise) {
   foreach::registerDoSEQ()
 }
 library(ggplot2)
+library(dplyr)
 ```
 
 # Table 1 and Figure 2
@@ -103,7 +104,7 @@ Then we introduce species 4, which should arrive but fail to invade.
 Note the system is not uninvadable: checking yields
 `r LawMorton1996_CheckUninvadable(c(0, table1Abundance), table1Pool, table1Mat)`.
 
-```{r table1Invade1}
+```{r table1Invade4}
 table1Abundance[4] <- table1Abundance[4] + 0.1
 table1Present <- which(table1Abundance > 0)
 table1Result <- LawMorton1996_NumIntegration(
@@ -137,7 +138,7 @@ table1Result
 
 Species 3, on the other hand, should successfully invade when it arrives and subsequently coexist with species 1.
 
-```{r table1Invade1}
+```{r table1Invade3}
 table1Abundance[3] <- table1Abundance[3] + 0.1
 table1Present <- which(table1Abundance > 0)
 table1Result <- LawMorton1996_NumIntegration(
@@ -174,7 +175,7 @@ Note the system is not uninvadable: checking yields
 
 When species 2 invades the community, we instead should see both species 1 and 3 die out.
 
-```{r table1Invade1}
+```{r table1Invade2}
 table1Abundance[2] <- table1Abundance[2] + 0.1
 table1Present <- which(table1Abundance > 0)
 table1Result <- LawMorton1996_NumIntegration(
@@ -300,6 +301,9 @@ resultsPlot <- LawMorton1996_PlotAbundance(
   Sequence = results$Sequence,
   guides = TRUE
 )
+
+speciesPresent <- SpeciesPresent(results$Abundance, Threshold = 2)
+
 resultsPlot
 ```
 We can also construct the progression of assemblages. 
@@ -310,8 +314,6 @@ Notice that, despite continuing to add species in the simulation after time
 `r speciesPresent$TimeStart[nrow(speciesPresent)]`, the populations remain largely the same.
 
 ```{r whichNotNA}
-speciesPresent <- SpeciesPresent(results$Abundance, Threshold = 2)
-
 dplyr::mutate(speciesPresent, Present = as.character(Present))
 ```
 
