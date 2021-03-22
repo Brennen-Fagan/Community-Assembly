@@ -384,9 +384,11 @@ LawMorton1996_PermanenceAssembly <- function(
                 Tolerance = 1E-12
               )
 
-              if (all(tempval[nrow(tempval), -1] ==
-                      tempval[nrow(tempval) - 1, -1])) {
-                tempval
+              flag <- tempval[nrow(tempval), -1] == 0 |
+                tempval[nrow(tempval), -1] / tempval[nrow(tempval) - 1, -1]
+
+              if (all(flag)) {
+                tempval[nrow(tempval), -1]
               } else {
                 NA
               }
@@ -460,9 +462,11 @@ LawMorton1996_PermanenceAssembly <- function(
                     Tolerance = 1E-12
                   )
 
-                  if (all(tempval[nrow(tempval), -1] ==
-                          tempval[nrow(tempval) - 1, -1])) {
-                    tempval
+                  flag <- tempval[nrow(tempval), -1] == 0 |
+                    tempval[nrow(tempval), -1] / tempval[nrow(tempval) - 1, -1]
+
+                  if (all(flag)) {
+                    tempval[nrow(tempval), -1]
                   } else {
                     NA
                   }
