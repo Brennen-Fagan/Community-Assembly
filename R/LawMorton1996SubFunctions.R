@@ -168,7 +168,8 @@ LawMorton1996_CommunityMat <- function(Pool, Parameters, seed = NULL) {
 LawMorton1996_NumIntegration <- function(
   A, R, X,
   OuterTimeStepSize = 1000,
-  InnerTimeStepSize = 1
+  InnerTimeStepSize = 1,
+  Tolerance = 0
 ) {
   # A = matrix of aij's (community matrix)
   # R = vector of ri's (basic reproduction rate)
@@ -184,9 +185,9 @@ LawMorton1996_NumIntegration <- function(
     X,
     times = ts,
     func = GeneralisedLotkaVolterra,
-    parms = list(a = A, r = R),
+    parms = list(a = A, r = R, epsilon = Tolerance),
     events = list(func = function(t, y, parms) {
-      y[y < 0] <- 0
+      y[y < parms$epsilon] <- 0
       y
     }, time = ts)
   )
@@ -195,7 +196,7 @@ LawMorton1996_NumIntegration <- function(
 LawMorton1996_PlotAbundance <- function(
   Abundance,
   Sequence = NULL,
-  guides = FALSE
+  guides = TRUE
 ) {
 
   colnames(Abundance) <- c("Time", format(1:(ncol(Abundance) - 1)))
