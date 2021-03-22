@@ -1,4 +1,5 @@
 # Law and Morton, 1996 #########################################################
+### Numerical Assembly: ########################################################
 LawMorton1996_NumericalAssembly <- function(
   Basal = NULL,
   Consumer = NULL,
@@ -17,6 +18,7 @@ LawMorton1996_NumericalAssembly <- function(
 ) {
   # EliminationThreshold = (note: actual threshold is X * Threshold.)
 
+  ##### Checks: ################################################################
   if (is.null(Pool) & !is.null(CommunityMat)) {
     stop("CommunityMat should not be specified if Pool is not specified.")
   }
@@ -45,7 +47,7 @@ LawMorton1996_NumericalAssembly <- function(
     set.seed(seed)
   }
 
-  # Setup.
+  ##### Setup: #################################################################
   CurrentAbundance <- rep(0, speciesNum)
   SpeciesPresent <- NULL
   if (!is.null(InnerTimeStepSize)) {
@@ -93,6 +95,7 @@ LawMorton1996_NumericalAssembly <- function(
 
   eventNumber <- 1
 
+  ##### Perform Algorithm: #####################################################
   # Resolve each arrival.
   for (ID in ArrivalIDs) {
     SpeciesPresent_Old <- SpeciesPresent
@@ -209,6 +212,7 @@ LawMorton1996_NumericalAssembly <- function(
     }
   }
 
+  ##### Return: ################################################################
   retval <- list()
   if ("Abundance" %in% ReturnValues) {
     if (!is.null(InnerTimeStepSize)) {
@@ -253,6 +257,7 @@ LawMorton1996_PermanenceAssembly <- function(
   CommunityMat = NULL,
   seed = NULL
 ) {
+  ##### Checks: ################################################################
   if (is.null(Pool) & !is.null(CommunityMat)) {
     stop("CommunityMat should not be specified if Pool is not specified.")
   }
@@ -281,6 +286,7 @@ LawMorton1996_PermanenceAssembly <- function(
     set.seed(seed)
   }
 
+  ##### Setup: #################################################################
   # Generate arrival events.
   arrivalSampler <- match.arg(ArrivalSampler, c("rearrange", "iid"))
   if (arrivalSampler == "iid") {
@@ -322,8 +328,10 @@ LawMorton1996_PermanenceAssembly <- function(
     )
   abundance <- 0
 
+  ##### Perform Algorithm: #####################################################
   for (ID in ArrivalIDs) {
     if (!(ID %in% community)) {
+      ####### Process new species: Invade and Equilibrate: #####################
       # Check if species can increase when rare. Yes -> Add to community.
       if (Pool$ReproductionRate[ID] +
           sum(CommunityMat[ID, community] * abundance, na.rm = TRUE) > 0
@@ -351,19 +359,41 @@ LawMorton1996_PermanenceAssembly <- function(
           # Should we do anything about negative populations if "runsteady"?
           rootSolveCounter <- 0
           rootSolveSteadyResult <- NA
+          # while(rootSolveCounter < 5 && is.na(rootSolveSteadyResult)) {
+          #   rootSolveSteadyResult <- tryCatch(
+          #     rootSolve::steady(
+          #       y = abundance + abs(rnorm(n = length(abundance))) * sqrt(rootSolveCounter),
+          #       func = GeneralisedLotkaVolterra,
+          #       parms = list(a = CommunityMat[community, community],
+          #                    r = Pool$ReproductionRate[community]),
+          #       #pos = TRUE,
+          #       method = "runsteady"
+          #     )$y,
+          #     error = function(e) {
+          #       return(NA)
+          #     })
+          #   rootSolveCounter <- rootSolveCounter + 1
+          # }
           while(rootSolveCounter < 5 && is.na(rootSolveSteadyResult)) {
-            rootSolveSteadyResult <- tryCatch(
-              rootSolve::steady(
-                y = abundance + abs(rnorm(n = length(abundance))) * sqrt(rootSolveCounter),
-                func = GeneralisedLotkaVolterra,
-                parms = list(a = CommunityMat[community, community],
-                             r = Pool$ReproductionRate[community]),
-                #pos = TRUE,
-                method = "runsteady"
-              )$y,
-              error = function(e) {
-                return(NA)
-              })
+            rootSolveSteadyResult <- tryCatch({
+              tempval <- LawMorton1996_NumIntegration(
+                X = abundance + abs(rnorm(n = length(abundance))) * sqrt(rootSolveCounter),
+                A = CommunityMat[community, community],
+                R = Pool$ReproductionRate[community],
+                OuterTimeStepSize = 10000, InnerTimeStepSize = 10,
+                Tolerance = 1E-12
+              )
+
+              if (all(tempval[nrow(tempval), -1] ==
+                      tempval[nrow(tempval) - 1, -1])) {
+                tempval
+              } else {
+                NA
+              }
+            },
+            error = function(e) {
+              return(NA)
+            })
             rootSolveCounter <- rootSolveCounter + 1
           }
           stopifnot(!is.na(rootSolveSteadyResult))
@@ -373,6 +403,7 @@ LawMorton1996_PermanenceAssembly <- function(
           statesEncountered$Permanent[stateNumber] <- NA
         }
 
+        ####### Process new species: Permanence ################################
         # Calculate permanence if necessary.
         if (is.na(statesEncountered$Permanent[stateNumber])) {
           # To calculate permanence, need to consider the powerset of the community.
@@ -419,18 +450,26 @@ LawMorton1996_PermanenceAssembly <- function(
               rootSolveCounter <- 0
               rootSolveSteadyResult <- NA
               while(rootSolveCounter < 5 && is.na(rootSolveSteadyResult)) {
-                rootSolveSteadyResult <- tryCatch(
-                  rootSolve::steady(
-                    y = parentEquilibrium + 1 + abs(rnorm(n = length(parentEquilibrium))) * sqrt(rootSolveCounter),
-                    func = GeneralisedLotkaVolterra,
-                    parms = list(a = CommunityMat[set, set],
-                                 r = Pool$ReproductionRate[set]),
-                    #pos = TRUE,
-                    method = "runsteady"
-                  )$y,
-                  error = function(e) {
-                    return(NA)
-                  })
+                rootSolveSteadyResult <- tryCatch({
+                  tempval <- LawMorton1996_NumIntegration(
+                    X = parentEquilibrium + 1 +
+                      abs(rnorm(n = length(parentEquilibrium))) * sqrt(rootSolveCounter),
+                    A = CommunityMat[set, set],
+                    R = Pool$ReproductionRate[set],
+                    OuterTimeStepSize = 10000, InnerTimeStepSize = 10,
+                    Tolerance = 1E-12
+                  )
+
+                  if (all(tempval[nrow(tempval), -1] ==
+                          tempval[nrow(tempval) - 1, -1])) {
+                    tempval
+                  } else {
+                    NA
+                  }
+                },
+                error = function(e) {
+                  return(NA)
+                })
                 rootSolveCounter <- rootSolveCounter + 1
               }
               stopifnot(!is.na(rootSolveSteadyResult))
@@ -535,6 +574,7 @@ LawMorton1996_PermanenceAssembly <- function(
             if (output[length(output)] <= 0) TRUE else FALSE
         }
 
+        ####### Process new species: Type 2 or 3? ##############################
         # Check permanence.
         if (statesEncountered$Permanent[stateNumber]) {
           abundance <- statesEncountered$Equilibria[[stateNumber]]
@@ -750,11 +790,7 @@ LawMorton1996_PermanenceAssembly <- function(
     }
   }
 
-  if (!is.null(seed)) {
-    if (exists("oldSeed"))
-      set.seed(oldSeed)
-  }
-
+  ##### Return: ################################################################
   retval <- list()
 
   if ("Community" %in% ReturnValues) {
@@ -777,6 +813,11 @@ LawMorton1996_PermanenceAssembly <- function(
   }
   if ("Matrix" %in% ReturnValues) {
     retval$Matrix <- CommunityMat
+  }
+
+  if (!is.null(seed)) {
+    if (exists("oldSeed"))
+      set.seed(oldSeed)
   }
 
   return(retval)
