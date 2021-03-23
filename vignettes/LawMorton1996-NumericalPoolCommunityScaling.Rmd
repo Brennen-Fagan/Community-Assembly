@@ -30,9 +30,8 @@ parallelise <- tryCatch(
   }
 )
 if (parallelise) {
-  clust <- parallel::makeCluster(
-    min(c(parallel::detectCores(), 1))
-  )
+  cores <- min(c(parallel::detectCores() - 1, 1))
+  clust <- parallel::makeCluster(cores)
   doParallel::registerDoParallel(clust)
 } else {
   foreach::registerDoSEQ()
@@ -59,38 +58,38 @@ seedsRun <- runif(runs * length(basal) * length(consumer)) * 1E8
 ```
 
 ```{r pools2}
-pools <- lapply(
-  1 : (length(basal) * length(consumer)), 
-  function(i, b, c, s, parameters, logBodySize) {
-    LawMorton1996_species(
-      Basal = b[i], 
-      Consumer = c[i], 
-      Parameters = parameters, 
-      LogBodySize = logBodySize,
-      seed = s[i]
-    )
-  },
+pools <- foreach::foreach(
+  i = 1 : (length(basal) * length(consumer)),
   b = rep(basal, times = length(consumer)),
   c = rep(consumer, each = length(basal)),
   s = seedsPrep[1:(length(basal) * length(consumer))],
-  parameters = parameters, logBodySize = logBodySize
-)
+  .packages = c("RMTRCode2")
+) %dopar% {
+  LawMorton1996_species(
+    Basal = b, 
+    Consumer = c, 
+    Parameters = parameters, 
+    LogBodySize = logBodySize,
+    seed = s
+  )
+}
 ```
 ```{r commats2}
-communityMats <- lapply(
-  seq_along(pools), 
-  function(i, pools, parameters, s) {
-    LawMorton1996_CommunityMat(
-      Pool = pools[[i]], 
-      Parameters = parameters,
-      seed = s[i]
-    )
-  }, 
-  pools = pools,
-  parameters = parameters,
-  s = seedsPrep[(length(basal) * length(consumer) + 1):(
-    2 * length(basal) * length(consumer))]
-)
+communityMats <- foreach::foreach(
+  i = seq_along(pools),
+  s = seedsPrep[
+    (length(basal) * length(consumer) + 1):(
+      2 * length(basal) * length(consumer))
+  ],
+  Pool = pools,
+  .packages = c("RMTRCode2"), .export = c(".Random.seed")
+) %dopar% {
+  LawMorton1996_CommunityMat(
+    Pool = Pool, 
+    Parameters = parameters,
+    seed = s
+  )
+}
 ```
 
 ```{r table3runsv2} 

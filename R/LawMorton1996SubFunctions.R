@@ -15,7 +15,9 @@ LawMorton1996_species <- function(
   stopifnot(Parameters[6] > 0)
 
   if (!is.null(seed)) {
-    oldSeed <- .Random.seed
+    if (exists(".Random.seed")) {
+      oldSeed <- .Random.seed
+    }
     set.seed(seed)
   }
 
@@ -54,7 +56,9 @@ LawMorton1996_species <- function(
   ))
 
   if (!is.null(seed)) {
-    set.seed(oldSeed)
+    if (exists("oldSeed")) {
+      set.seed(oldSeed)
+    }
   }
 
   Species
