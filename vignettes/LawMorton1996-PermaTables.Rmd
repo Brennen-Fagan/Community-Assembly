@@ -248,8 +248,9 @@ endPoints <- lapply(results2, function(run) {
 endPoints
 ```
 
-# Table 7
-
+<!--# Table 7
+Either there was an error or the computational difficulty was too much.
+Killed after > 48 hours of running.
 ```{r table7params}
 # > runif(1) * 1E8
 # [1] 16528055
@@ -422,7 +423,7 @@ table7 <- dplyr::full_join(
 
 table7
 ```
-
+-->
 ```{r finished}
 if (parallelise) {
   parallel::stopCluster(clust)
