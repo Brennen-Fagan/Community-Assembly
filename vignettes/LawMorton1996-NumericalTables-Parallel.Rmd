@@ -1,7 +1,7 @@
 ---
 title: "Law and Morton 1996: For comparison using numerics"
 author: "Brennen Fagan"
-date: "Created 2021-03-09, last compiled `r Sys.Date()`"
+date: "Created 2021-03-23, last compiled `r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Law and Morton 1996: For comparison using numerics}
@@ -370,7 +370,7 @@ seedsRun2 <- runif(runs * length(basal2) * length(consumer2)) * 1E8
 We next produce the nine pools and matrices.
 
 ```{r pools2}
-pools2 <- foreach::foreach(
+system.time(pools2 <- foreach::foreach(
   i = 1 : (length(basal2) * length(consumer2)),
   b = rep(basal2, times = length(consumer2)),
   c = rep(consumer2, each = length(basal2)),
@@ -384,10 +384,10 @@ pools2 <- foreach::foreach(
     LogBodySize = logBodySize,
     seed = s
   )
-}
+})
 ```
 ```{r commats2}
-communityMats2 <- foreach::foreach(
+system.time(communityMats2 <- foreach::foreach(
   i = seq_along(pools2),
   s = seedsPrep2[
     (length(basal2) * length(consumer2) + 1):(
@@ -401,7 +401,7 @@ communityMats2 <- foreach::foreach(
     Parameters = parameters,
     seed = s
   )
-}
+})
 ```
 
 With each pool and community matrix set, we can now perform our runs.
@@ -412,7 +412,7 @@ run the system `runs` times, taking the associated pool and community matrix,
 check if the result is uninvadable and, if so, store the result.
 
 ```{r table3runsv2} 
-results2 <- foreach::foreach(
+system.time(results2 <- foreach::foreach(
   i = 1 : (length(basal2) * length(consumer2))
 ) %:% foreach::foreach(
   seed = iterators::iter(seedsRun2[((i - 1) * runs + 1) : (i * runs)])
@@ -444,7 +444,7 @@ results2 <- foreach::foreach(
   } else {
     return(toString(NULL))
   }
-}
+})
 ```
 
 Once we have the runs, we need to tabulate them.
@@ -520,8 +520,7 @@ communityMat7 <- LawMorton1996_CommunityMat(
 ```
 
 ```{r table7runsv2} 
-# p1 <- proc.time()
-results7 <- foreach::foreach(
+system.time(results7 <- foreach::foreach(
   i = 1:((basal7 + consumers7 - 5) / 5), 
   poollimit = seq(from = 10, by = 5, to = 50)
 ) %:% foreach::foreach(
@@ -556,8 +555,7 @@ results7 <- foreach::foreach(
     } else {
       return(toString(NULL))
     }
-}
-# proc.time() - p1
+})
 ```
 ```{r recreateTable7}
 table7Setup <- lapply(
