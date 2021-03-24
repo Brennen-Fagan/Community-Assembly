@@ -14,9 +14,11 @@ LawMorton1996_NumericalAssembly <- function(
   ReturnValues = c("Abundance", "Sequence", "Pool", "Matrix"),
   Pool = NULL,
   CommunityMat = NULL,
-  seed = NULL
+  seed = NULL,
+  InnerEliminationThreshold = 10^-12
 ) {
   # EliminationThreshold = (note: actual threshold is X * Threshold.)
+  # InnerEliminationThreshold is used to remove population inside integration.
 
   ##### Checks: ################################################################
   if (is.null(Pool) & !is.null(CommunityMat)) {
@@ -120,13 +122,14 @@ LawMorton1996_NumericalAssembly <- function(
     while(rootSolveCounter < 5 && any(is.na(Run_GLV))) {
       Run_GLV <- tryCatch(
         LawMorton1996_NumIntegration(
-          CommunityMat[SpeciesPresent, SpeciesPresent],
-          Pool$ReproductionRate[SpeciesPresent],
-          CurrentAbundance[SpeciesPresent] + abs(rnorm(n = length(SpeciesPresent))) * sqrt(rootSolveCounter),
+          A = CommunityMat[SpeciesPresent, SpeciesPresent],
+          R = Pool$ReproductionRate[SpeciesPresent],
+          X = CurrentAbundance[SpeciesPresent] + abs(rnorm(n = length(SpeciesPresent))) * sqrt(rootSolveCounter),
           OuterTimeStepSize = IntegratorTimeStep,
           InnerTimeStepSize = if(is.null(InnerTimeStepSize)) {
             IntegratorTimeStep
-          } else {InnerTimeStepSize}
+          } else {InnerTimeStepSize},
+          Tolerance = InnerEliminationThreshold
         ),
         error = function(e) {
           return(NA)
