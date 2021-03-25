@@ -31,7 +31,7 @@ parallelise <- tryCatch(
 )
 if (parallelise) {
   clust <- parallel::makeCluster(
-    min(c(parallel::detectCores(), 1))
+    max(c(parallel::detectCores(), 1))
   )
   doParallel::registerDoParallel(clust)
 } else {

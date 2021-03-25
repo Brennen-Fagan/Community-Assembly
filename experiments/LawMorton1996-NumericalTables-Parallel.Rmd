@@ -30,7 +30,7 @@ parallelise <- tryCatch(
   }
 )
 if (parallelise) {
-  cores <- min(c(parallel::detectCores() - 1, 1))
+  cores <- max(c(parallel::detectCores() - 1, 1))
   clust <- parallel::makeCluster(cores)
   doParallel::registerDoParallel(clust)
 } else {
@@ -38,6 +38,7 @@ if (parallelise) {
 }
 library(ggplot2)
 library(dplyr)
+library(tidyr)
 ```
 
 # Table 1 and Figure 2
@@ -453,7 +454,126 @@ Once we have the runs, we need to tabulate them.
 endPoints <- lapply(results2, function(run) {
   table(unlist(run))
 })
+endPoints <- lapply(endPoints, function(x) {
+  mutate(data.frame(x, stringsAsFactors = FALSE),
+         Var1 = as.character(Var1))
+}
+)
 endPoints
+```
+
+What do the networks that these communities describe actually look like?
+
+```{r table3Networks}
+library(igraph)
+library(cheddar)
+cheddarCommunities <- foreach::foreach(
+  communities = iterators::iter(endPoints),
+  matrices = iterators::iter(communityMats2),
+  pools = iterators::iter(pools2)
+) %:% foreach::foreach(
+  community = iterators::iter(communities, by = 'row')
+) %do% {
+  print(community)
+  ourSet <- as.numeric(unlist(strsplit(community$Var1, ', ', fixed = TRUE)))
+  if (all(is.na(ourSet))) {
+    return(NULL)
+  }
+  
+  ourMatrix <- matrices[ourSet, ourSet]
+  
+  colnames(ourMatrix) <- paste0('s',as.character(ourSet))
+  rownames(ourMatrix) <- colnames(ourMatrix)
+  
+  ourGraph <- igraph::graph_from_adjacency_matrix(
+    ourMatrix, weighted = TRUE
+  )
+  
+  ourGraph <- igraph::set.vertex.attribute(
+    ourGraph, "name", value = colnames(ourMatrix)
+  )
+  
+  ourPool <- pools[ourSet,]
+  names(ourPool)[1] <- "node"
+  ourPool$node <- colnames(ourMatrix)
+  names(ourPool)[3] <- "M"
+  
+  # Add in the abundances while we're at it.
+  ourAbund <- LawMorton1996_NumIntegration(
+    A = ourMatrix,
+    R = ourPool$ReproductionRate,
+    X = rep(1, nrow(ourPool)),
+    InnerTimeStepSize = 10,
+    OuterTimeStepSize = 10000
+  )
+  while (!all(round(
+    ourAbund[nrow(ourAbund), -1] / 
+    ourAbund[nrow(ourAbund) - 1, -1], 2) == 1)
+  ) {
+    ourAbund <- LawMorton1996_NumIntegration(
+      A = ourMatrix,
+      R = ourPool$ReproductionRate,
+      X = rep(1, nrow(ourPool)),
+      InnerTimeStepSize = 10,
+      OuterTimeStepSize = 10000
+    )
+  }
+  ourPool$N <- ourAbund[nrow(ourAbund), -1]
+  
+  ourGraphAsDataFrame <- as_data_frame(ourGraph)
+    
+  # cheddar does not like cannibals.
+  ourGraphAsDataFrame <- ourGraphAsDataFrame[
+    ourGraphAsDataFrame$to != ourGraphAsDataFrame$from,
+  ]
+  
+  # Add in abundances for calculating abundance * (gain or loss)
+  ourGraphAsDataFrame <- dplyr::left_join(
+    ourGraphAsDataFrame,
+    dplyr::select(ourPool, node, N),
+    by = c("to" = "node")
+  )
+  
+  # Split data frame.
+  ourResCon <- ourGraphAsDataFrame[ourGraphAsDataFrame$weight > 0,]
+  ourConRes <- ourGraphAsDataFrame[ourGraphAsDataFrame$weight < 0,]
+  
+  # Reorder and rename variables.
+  ourResCon <- dplyr::select(ourResCon, 
+                             resource = to, consumer = from, 
+                             gainPerUnit = weight, resourceAbund = N)
+  ourConRes <- dplyr::select(ourConRes, 
+                             resource = from, consumer = to, 
+                             lossPerUnit = weight, consumerAbund = N)
+  
+  ourResCon <- dplyr::mutate(dplyr::group_by(ourResCon, consumer),
+                             gainEfficiency = gainPerUnit / sum(gainPerUnit),
+                             gainActual = gainPerUnit * resourceAbund,
+                             gainNormal = gainActual / sum(gainActual))
+  ourConRes <- dplyr::mutate(dplyr::group_by(ourConRes, resource),
+                             lossEfficiency = lossPerUnit / sum(lossPerUnit),
+                             lossActual = lossPerUnit * consumerAbund,
+                             lossNormal = lossActual / sum(lossActual))
+  
+  ourCommunity <- cheddar::Community(
+    ourPool,
+    properties = list(
+      title = community$Var1,
+      M.units = "masses",
+      N.units = "abund"
+    ),
+    trophic.links = dplyr::full_join(ourResCon, ourConRes, 
+                                     by = c("resource", "consumer"))
+  )
+  
+  ourCommunity
+}
+
+invisible(lapply(cheddarCommunities, function(y) {
+  lapply(y, function(x) {
+    if (!is.null(x)) PlotWebByLevel(x, show.level.lines = TRUE, level = 'LongWeightedTrophicLevel')
+  })
+}))
 ```
 
 # Table 7
@@ -525,7 +645,7 @@ system.time(results7 <- foreach::foreach(
   poollimit = seq(from = 10, by = 5, to = 50)
 ) %:% foreach::foreach(
   seed = iterators::iter(seedsRun7[((i - 1) * runs7 + 1) : (i * runs7)])
-) %do% {
+) %dopar% {
     ourPool <- pool7[1:(poollimit),]
     ourMat <- communityMat7[1:(poollimit), 1:(poollimit)]
   

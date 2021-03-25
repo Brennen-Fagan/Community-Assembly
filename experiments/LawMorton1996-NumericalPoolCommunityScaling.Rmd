@@ -30,7 +30,7 @@ parallelise <- tryCatch(
   }
 )
 if (parallelise) {
-  cores <- min(c(parallel::detectCores() - 1, 1))
+  cores <- max(c(parallel::detectCores() - 1, 1))
   clust <- parallel::makeCluster(cores)
   doParallel::registerDoParallel(clust)
 } else {
@@ -38,6 +38,9 @@ if (parallelise) {
 }
 library(ggplot2)
 library(dplyr)
+library(tidyr)
+
+export_calculation <- TRUE
 ```
 
 ```{r parameters2}
@@ -59,7 +62,6 @@ seedsRun <- runif(runs * length(basal) * length(consumer)) * 1E8
 
 ```{r pools2}
 pools <- foreach::foreach(
-  i = 1 : (length(basal) * length(consumer)),
   b = rep(basal, times = length(consumer)),
   c = rep(consumer, each = length(basal)),
   s = seedsPrep[1:(length(basal) * length(consumer))],
@@ -76,7 +78,6 @@ pools <- foreach::foreach(
 ```
 ```{r commats2}
 communityMats <- foreach::foreach(
-  i = seq_along(pools),
   s = seedsPrep[
     (length(basal) * length(consumer) + 1):(
       2 * length(basal) * length(consumer))
@@ -90,54 +91,60 @@ communityMats <- foreach::foreach(
     seed = s
   )
 }
+
+if (export_calculation) {
+  save(
+    file = "LawMorton1996-NumericalPoolCommunityScaling-PoolMats.RDS",
+    communityMats,
+    pools
+  )
+}
 ```
 
 ```{r table3runsv2} 
-results <- lapply(
-  # for each combination of numbers of basal and consumer species
-  1 : (length(basal) * length(consumer)), 
-  function(i, pools, communityMats, events, runs, seeds) {
-    print(i)
-    ourSeeds <- seeds[((i - 1) * runs + 1) : (i * runs)]
-    ourPool <- pools[[i]]
-    ourMat <- communityMats[[i]]
+if (export_calculation) {
+  load(
+    file = "LawMorton1996-NumericalPoolCommunityScaling-results.RDS"
+  )
+} else {
+  results <- foreach::foreach(
+    i = 1 : (length(basal) * length(consumer)),
+    ourPool = iterators::iter(pools),
+    ourMat = iterators::iter(communityMats)
+  ) %:% foreach::foreach(
+    seed = iterators::iter(seedsRun[((i - 1) * runs + 1) : (i * runs)])
+  ) %dopar% {
+    # ourPool <- pools[[i]]
+    # ourMat <- communityMats[[i]]
     
-    # run the system `runs` times
-    foreach::foreach(
-      seed = iterators::iter(ourSeeds)
-    ) %dopar% {
-      aRun <- LawMorton1996_NumericalAssembly(
-        Pool = ourPool, 
-        CommunityMat = ourMat,
-        IntegratorTimeStep = 10000,
-        InnerTimeStepSize = 5000, 
-        ArrivalEvents = events,
-        ReturnValues = c("Abundance", "Sequence"), 
-        seed = seed
-      )
-      
-      lastRow <- which(is.na(aRun$Sequence$Community[-1]))[1]
-      if (is.na(lastRow)) {
-        lastRow <- nrow(aRun$Sequence)
-      }
-      aRun$Sequence <- aRun$Sequence[1:lastRow, ]
-      
-      if (LawMorton1996_CheckUninvadable(
-        AbundanceRow = aRun$Abundance[nrow(aRun$Abundance), ],
-        Pool = ourPool,
-        CommunityMatrix = ourMat
-      )) {
-        # and, if so, store the result.
-        return(aRun$Sequence)
-      } else {
-        return(toString(NULL))
-      }
+    aRun <- LawMorton1996_NumericalAssembly(
+      Pool = ourPool, 
+      CommunityMat = ourMat,
+      IntegratorTimeStep = 10000,
+      InnerTimeStepSize = 5000, 
+      ArrivalEvents = events,
+      ReturnValues = c("Abundance", "Sequence"), 
+      seed = seed
+    )
+    
+    lastRow <- which(is.na(aRun$Sequence$Community[-1]))[1]
+    if (is.na(lastRow)) {
+      lastRow <- nrow(aRun$Sequence)
     }
-  },
-  pools = pools,
-  communityMats = communityMats,
-  events = events, runs = runs, seeds = seedsRun
-)
+    aRun$Sequence <- aRun$Sequence[1:lastRow, ]
+    
+    if (LawMorton1996_CheckUninvadable(
+      AbundanceRow = aRun$Abundance[nrow(aRun$Abundance), ],
+      Pool = ourPool,
+      CommunityMatrix = ourMat
+    )) {
+      # and, if so, store the result.
+      return(aRun$Sequence)
+    } else {
+      return(toString(NULL))
+    }
+  }
+}
 ```
 
 ```{r recreateTable7}
@@ -170,4 +177,10 @@ tableSetup <- lapply(
 
 ```{r displayTable}
 tableSetup
+```
+
+```{r finished}
+if (parallelise) {
+  parallel::stopCluster(clust)
+}
 ```
