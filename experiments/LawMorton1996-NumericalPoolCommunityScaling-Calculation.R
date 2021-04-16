@@ -12,10 +12,10 @@ if (!dir.exists(librarypath)) {
 allLibraryPaths <- .libPaths()
 
 packages <- c(
-  "foreach", 
-  "parallel", 
-  "doParallel", 
-  "dplyr", 
+  "foreach",
+  "parallel",
+  "doParallel",
+  "dplyr",
   "tidyr",
   "Rcpp"
 )
@@ -40,6 +40,15 @@ if (!require("RMTRCode2", character.only = TRUE)) {
   )
 }
 library(RMTRCode2)#, lib.loc = librarypath) # lib.loc shouldn't be necessary.
+
+# Create folder for saving.
+directory_save <- file.path(directory, paste0("save-", Sys.Date()))
+# if (dir.exists(directory_save)) {
+#   directory_save <- paste0(directory_save, "-", length(dir(directory)) + 1)
+# }
+if (!dir.exists(directory_save)) {
+  dir.create(directory_save, recursive = TRUE)
+}
 
 # Run sanity checks. ##########################################################
 
@@ -82,10 +91,26 @@ results <- foreach::foreach(
   #.packages = c("RMTRCode2", packages),
   #.export = c("allLibraryPaths")
 ) %:% foreach::foreach(
-  seed = iterators::iter(seedsRun[((i - 1) * runs + 1) : (i * runs)])
+  seed = iterators::iter(seedsRun[((i - 1) * runs + 1) : (i * runs)]),
+  .combine = "rbind"
 ) %dopar% {
   .libPaths(allLibraryPaths)
   library(RMTRCode2)
+
+  savepath <- file.path(
+    directory_save,
+    paste0("run-", i, "-", seed, ".RDS")
+  )
+  # Don't bother if we already have done this calculation.
+  # Don't load it either yet, we likely have a large number of other calcs to do
+  if (file.exists(savepath)) {
+    return(
+      data.frame(
+        Combination = i,
+        Result = savepath
+      )
+    )
+  }
 
   aRun <- LawMorton1996_NumericalAssembly(
     Pool = ourPool,
@@ -103,16 +128,33 @@ results <- foreach::foreach(
   }
   aRun$Sequence <- aRun$Sequence[1:lastRow, ]
 
-  if (LawMorton1996_CheckUninvadable(
+  retval <- if (LawMorton1996_CheckUninvadable(
     AbundanceRow = aRun$Abundance[nrow(aRun$Abundance), ],
     Pool = ourPool,
     CommunityMatrix = ourMat
   )) {
     # and, if so, store the result.
-    return(aRun$Sequence)
+    #return(
+      data.frame(
+        Combination = i,
+        Result = aRun$Sequence
+      )
+    #)
   } else {
-    return(toString(NULL))
+    #return(
+      data.frame(
+        Combination = i,
+        Result = toString(NULL)
+      )
+    #)
   }
+
+  save(
+    file = savepath,
+    retval
+  )
+
+  return(retval)
 }
 
 save(
