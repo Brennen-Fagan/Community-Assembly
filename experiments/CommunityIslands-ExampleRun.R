@@ -1,9 +1,10 @@
 # Settings. ####################################################################
-islands <- c(1, 2) # Community Numbers
+islands2 <- c(2, 3) # Community Numbers
+islands3 <- c(2, 1, 3) # Community Numbers
 
 Tolerance <- 1E-6
 
-OuterTimeStepSize <- 5E3
+OuterTimeStepSize <- 1E4
 InnerTimeStepSize <- 1E2
 
 ts <- seq(from = 0,
@@ -27,7 +28,7 @@ pool <- with(list(
   c = rep(consumer2, each = length(basal2)),
   s = seedsPrep2[1:(length(basal2) * length(consumer2))]
   ),
-  LawMorton1996_species(
+  RMTRCode2::LawMorton1996_species(
     Basal = b[6],
     Consumer = c[6],
     Parameters = parameters,
@@ -42,7 +43,7 @@ comMat <- with(list(
       2 * length(basal2) * length(consumer2))
   ]
   ),
-  LawMorton1996_CommunityMat(
+  RMTRCode2::LawMorton1996_CommunityMat(
     Pool = pool,
     Parameters = parameters,
     seed = s[6]
@@ -51,11 +52,13 @@ comMat <- with(list(
 
 # From LawMorton1996-NumericalTables-Parallel.Rmd
 communities <- c(
+  "",
   "8, 10, 12, 14, 15, 16, 39, 43",
   "8, 12, 14, 15, 16, 38, 39"
 )
 
 inits <- c(
+  "",
   "21, 32, 80, 818, 121, 18, 12, 20",
   "83, 138, 938, 52, 5, 14, 26"
 )
@@ -98,7 +101,7 @@ populations <- lapply(
       # Applying a more specialised tool.
       init <- rootSolve::steady(
         y = init,
-        func = GeneralisedLotkaVolterra,
+        func = RMTRCode2::GeneralisedLotkaVolterra,
         parms = list(a = comMat[com, com],
                      r = pool$ReproductionRate[com],
                      epsilon = epsilon),
@@ -138,13 +141,19 @@ redPool <- pool[redCom,]
 redComMat <- comMat[redCom, redCom]
 
 # Convert to new indices
-redComs <- lapply(communities[islands], function(strCom) {
+redComs2 <- lapply(communities[islands2], function(strCom) {
+  which(redCom %in% as.numeric(
+    unlist(strsplit(strCom, split = ", "))
+  ))
+})
+redComs3 <- lapply(communities[islands3], function(strCom) {
   which(redCom %in% as.numeric(
     unlist(strsplit(strCom, split = ", "))
   ))
 })
 
-redPops <- populations[islands]
+redPops2 <- populations[islands2]
+redPops3 <- populations[islands3]
 
 # Sanity Check: Lengths should match.
 stopifnot(all(
@@ -159,13 +168,26 @@ stopifnot(all(
 # Characterising this as proportions of a population, but that is assuming a
 # normalisation that I do not think is strictly necessary.
 # The matrix is sparse and has colsum = 0, diag < 0, offdiag >= 0.
-dispersalMatrix <- Matrix::bandSparse(
-  n = length(redCom) * length(islands),
-  k = length(redCom) * c(1:(length(islands) - 1),
-                         -(1:(length(islands) - 1))),
+dispersalMatrix2 <- Matrix::bandSparse(
+  n = length(redCom) * length(islands2),
+  k = length(redCom) * c(1:(length(islands2) - 1),
+                         -(1:(length(islands2) - 1))),
   diagonals = c(
     list(rep(0.0001, length(redCom))), # Island 2 -> Island 1
     list(rep(0.0001, length(redCom))) # Island 1 -> Island 2
+  )
+)
+dispersalMatrix3 <- Matrix::bandSparse(
+  n = length(redCom) * length(islands3),
+  k = length(redCom) * c(1:(length(islands3) - 1),
+                         -(1:(length(islands3) - 1))),
+  diagonals = c(
+    list(c(rep(0.0001, length(redCom)),   # Island 2 -> Island 1
+           rep(0.0001, length(redCom)))), # Island 3 -> Island 2
+    list(rep(0, length(redCom))),         # Island 3 -> Island 1
+    list(c(rep(0.0001, length(redCom)),   # Island 1 -> Island 2
+           rep(0.0001, length(redCom)))), # Island 2 -> Island 3
+    list(rep(0, length(redCom)))          # Island 1 -> Island 3
   )
 )
 #   matrix(c(
@@ -173,12 +195,15 @@ dispersalMatrix <- Matrix::bandSparse(
 #   0.01, 0.99
 # ), byrow = TRUE, nrow = 2)
 
-stopifnot(all(dispersalMatrix >= 0))
+stopifnot(all(dispersalMatrix2 >= 0))
+stopifnot(all(dispersalMatrix3 >= 0))
 
-diag(dispersalMatrix) <- -Matrix::colSums(dispersalMatrix)
+diag(dispersalMatrix2) <- -Matrix::colSums(dispersalMatrix2)
+diag(dispersalMatrix3) <- -Matrix::colSums(dispersalMatrix3)
 
 # Sanity Check: Row sums are 0.
-stopifnot(all(Matrix::colSums(dispersalMatrix) == 0))
+stopifnot(all(Matrix::colSums(dispersalMatrix2) == 0))
+stopifnot(all(Matrix::colSums(dispersalMatrix3) == 0))
 
 dynSys <- function(t, y, parms) {
   with(as.list(parms), {
@@ -187,17 +212,23 @@ dynSys <- function(t, y, parms) {
   })
 }
 
-parmesan <- list(
-  r = rep(redPool$ReproductionRate, length(islands)),
-  a = Matrix::bdiag(rep(list(redComMat), length(islands))),
-  d = dispersalMatrix,
+parmesan2 <- list(
+  r = rep(redPool$ReproductionRate, length(islands2)),
+  a = Matrix::bdiag(rep(list(redComMat), length(islands2))),
+  d = dispersalMatrix2,
+  epsilon = Tolerance
+)
+parmesan3 <- list(
+  r = rep(redPool$ReproductionRate, length(islands3)),
+  a = Matrix::bdiag(rep(list(redComMat), length(islands3))),
+  d = dispersalMatrix3,
   epsilon = Tolerance
 )
 
 # Technically, a bit of extra work being done here since we already copied the
 # populations per island. The result is somewhat more readable though.
-abundance_init <- unlist(lapply(
-  seq_along(redComs),
+abundance_init2 <- unlist(lapply(
+  seq_along(redComs2),
   function(i, com, pop, numPops) {
     # Interlace 0's with population values
     k <- 1
@@ -210,37 +241,85 @@ abundance_init <- unlist(lapply(
     }
     return(retval)
   },
-  com = redComs,
-  pop = redPops,
+  com = redComs2,
+  pop = redPops2,
+  numPops = length(redCom)
+))
+abundance_init3 <- unlist(lapply(
+  seq_along(redComs3),
+  function(i, com, pop, numPops) {
+    # Interlace 0's with population values
+    k <- 1
+    retval <- rep(0, numPops)
+    for (j in 1:numPops) {
+      if (j %in% com[[i]]) {
+        retval[j] <- pop[[i]][k]
+        k <- k + 1
+      }
+    }
+    return(retval)
+  },
+  com = redComs3,
+  pop = redPops3,
   numPops = length(redCom)
 ))
 
-abundance <- deSolve::ode(
-  abundance_init,
+abundance2 <- deSolve::ode(
+  abundance_init2,
   times = ts,
   func = dynSys,
-  parms = parmesan,
+  parms = parmesan2,
+  events = list(func = function(t, y, parms) {
+    y[y < parms$epsilon] <- 0
+    y
+  }, time = ts)
+)
+abundance3 <- deSolve::ode(
+  abundance_init3,
+  times = ts,
+  func = dynSys,
+  parms = parmesan3,
   events = list(func = function(t, y, parms) {
     y[y < parms$epsilon] <- 0
     y
   }, time = ts)
 )
 
-abundance_island <- lapply(
-  1:length(islands), function(i, x) {
+abundance2_island <- lapply(
+  1:length(islands2), function(i, x) {
     x[, c(1, (1:length(redCom)) + 1 + (i - 1) * length(redCom))]
   },
-  x = abundance
+  x = abundance2
+)
+abundance3_island <- lapply(
+  1:length(islands3), function(i, x) {
+    x[, c(1, (1:length(redCom)) + 1 + (i - 1) * length(redCom))]
+  },
+  x = abundance3
 )
 
-LawMorton1996_PlotAbundance(abundance_island[[1]]) -> figure1
-LawMorton1996_PlotAbundance(abundance_island[[2]]) -> figure2
+RMTRCode2::LawMorton1996_PlotAbundance(abundance2_island[[1]]) -> figure2_1
+RMTRCode2::LawMorton1996_PlotAbundance(abundance2_island[[2]]) -> figure2_2
+
+RMTRCode2::LawMorton1996_PlotAbundance(abundance3_island[[1]]) -> figure3_1
+RMTRCode2::LawMorton1996_PlotAbundance(abundance3_island[[2]]) -> figure3_2
+RMTRCode2::LawMorton1996_PlotAbundance(abundance3_island[[3]]) -> figure3_3
 
 
-print(figure1 + ggplot2::ggtitle(paste("Init:", toString(redComs[[islands[1]]]))))
-print(figure2 + ggplot2::ggtitle(paste("Init:", toString(redComs[[islands[2]]]))))
+print(figure2_1 + ggplot2::ggtitle(paste("Init:", toString(redComs2[[1]]))))
+print(figure2_2 + ggplot2::ggtitle(paste("Init:", toString(redComs2[[2]]))))
+print(figure3_1 + ggplot2::ggtitle(paste("Init:", toString(redComs3[[1]]))))
+print(figure3_2 + ggplot2::ggtitle(paste("Init:", toString(redComs3[[2]]))))
+print(figure3_3 + ggplot2::ggtitle(paste("Init:", toString(redComs3[[3]]))))
 
-print("Island 1 Species:")
-print(SpeciesPresent(abundance_island[[1]]))
-print("Island 2 Species:")
-print(SpeciesPresent(abundance_island[[2]]))
+print("2 Island 1 Species:")
+print(RMTRCode2::SpeciesPresent(abundance2_island[[1]]))
+print("2 Island 2 Species:")
+print(RMTRCode2::SpeciesPresent(abundance2_island[[2]]))
+
+print("3 Island 1 Species:")
+print(RMTRCode2::SpeciesPresent(abundance3_island[[1]]))
+print("3 Island 2 Species:")
+print(RMTRCode2::SpeciesPresent(abundance3_island[[2]]))
+print("3 Island 3 Species:")
+print(RMTRCode2::SpeciesPresent(abundance3_island[[3]]))
