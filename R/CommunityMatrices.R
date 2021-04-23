@@ -1,5 +1,6 @@
 # Foreach operators
 `%dopar%` <- foreach::`%dopar%`
+`%do%` <- foreach::`%do%`
 `%:%` <- foreach::`%:%`
 
 CommunityMatrix <- function(method, ...) {
@@ -17,12 +18,15 @@ CommunityMatrix <- function(method, ...) {
 }
 
 SpeciesPresent <- function(Abundance, Threshold = 1E-4) {
-  resultsNotNAs <- apply(
-    Abundance[, -1],
-    MARGIN = 1,
-    FUN = function(row, epsilon) {
-      which(!is.na(row) & row > epsilon)
-    }, epsilon = Threshold)
+  # resultsNotNAs <- apply(
+  #   Abundance[, -1],
+  #   MARGIN = 1,
+  #   FUN = function(row, epsilon) {
+  #     which(!is.na(row) & row > epsilon)
+  #   }, epsilon = Threshold)
+  resultsNotNAs <- foreach::foreach(
+    row = iterators::iter(Abundance[, -1], by = 'row')
+  ) %do% {which(!is.na(row) & row > Threshold)}
 
   tempSet <- resultsNotNAs[[1]]
   sets <- data.frame(
