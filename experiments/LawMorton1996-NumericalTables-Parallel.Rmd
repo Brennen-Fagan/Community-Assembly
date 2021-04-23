@@ -416,7 +416,8 @@ check if the result is uninvadable and, if so, store the result.
 system.time(results2 <- foreach::foreach(
   i = 1 : (length(basal2) * length(consumer2))
 ) %:% foreach::foreach(
-  seed = iterators::iter(seedsRun2[((i - 1) * runs + 1) : (i * runs)])
+  seed = iterators::iter(seedsRun2[((i - 1) * runs + 1) : (i * runs)])#,
+  #.combine = "rbind"
 ) %dopar% {
   ourPool <- pools2[[i]]
   ourMat <- communityMats2[[i]]
@@ -441,9 +442,18 @@ system.time(results2 <- foreach::foreach(
     CommunityMatrix = ourMat
   )) {
     # and, if so, store the result.
-    return(toString(which(!is.na(aRun$Abundance) & aRun$Abundance > 2)[-1] - 1))
+    indices <- which(!is.na(aRun$Abundance) & aRun$Abundance > 2)[-1]
+    return(list(list(
+      Combn = toString(indices - 1)),
+      Popul = toString(round(aRun$Abundance[indices])
+      )
+    ))
   } else {
-    return(toString(NULL))
+    return(list(list(
+      Combn = toString(NULL),
+      Popul = toString(NULL)
+      )
+    ))
   }
 })
 ```
@@ -452,7 +462,12 @@ Once we have the runs, we need to tabulate them.
 
 ```{r tabulationRuns}
 endPoints <- lapply(results2, function(run) {
-  table(unlist(run))
+  combns <- which("Combn" == names(unlist(run)))
+  table(unlist(run)[combns])
+})
+endPops <- lapply(results2, function(run) {
+  combns <- which("Popul" == names(unlist(run)))
+  table(unlist(run)[combns])
 })
 endPoints <- lapply(endPoints, function(x) {
   mutate(data.frame(x, stringsAsFactors = FALSE),
