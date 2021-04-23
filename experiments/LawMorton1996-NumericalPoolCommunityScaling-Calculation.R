@@ -62,8 +62,14 @@ print(cargs)
 # Below does not work: mismatch between assigned cores and cores detectable.
 # cores <- max(c(parallel::detectCores(), 1))
 cores <- cargs[1]
-clust <- parallel::makeCluster(cores)
+clust <- parallel::makeCluster(cores, outfile = "")
 doParallel::registerDoParallel(clust)
+
+if (!is.na(cargs[2])) {
+  start <- cargs[2]
+} else {
+  start <- 1
+}
 
 # Perform calculation. ########################################################
 set.seed(38427042)
@@ -84,10 +90,12 @@ load(
   file = "LawMorton1996-NumericalPoolCommunityScaling-PoolMats.RDS"
 )
 
+end <- length(pools)
+
 results <- foreach::foreach(
-  i = 1 : (length(basal) * length(consumer)),
-  ourPool = iterators::iter(pools),
-  ourMat = iterators::iter(communityMats)#,
+  i = start : end,
+  ourPool = iterators::iter(pools[start:end]),
+  ourMat = iterators::iter(communityMats[start:end])#,
   #.packages = c("RMTRCode2", packages),
   #.export = c("allLibraryPaths")
 ) %:% foreach::foreach(
@@ -96,14 +104,17 @@ results <- foreach::foreach(
 ) %dopar% {
   .libPaths(allLibraryPaths)
   library(RMTRCode2)
-
+  
   savepath <- file.path(
     directory_save,
     paste0("run-", i, "-", seed, ".RDS")
   )
+
+  print(paste(i, seed, Sys.time(), "checking", savepath))
   # Don't bother if we already have done this calculation.
   # Don't load it either yet, we likely have a large number of other calcs to do
   if (file.exists(savepath)) {
+    print(paste(i, seed, Sys.time(), "killing"))
     return(
       data.frame(
         Combination = i,
@@ -111,6 +122,8 @@ results <- foreach::foreach(
       )
     )
   }
+  
+  print(paste(i, seed, Sys.time(), "running"))
 
   aRun <- LawMorton1996_NumericalAssembly(
     Pool = ourPool,
@@ -121,6 +134,8 @@ results <- foreach::foreach(
     ReturnValues = c("Abundance", "Sequence"),
     seed = seed
   )
+  
+  print(paste(i, seed, Sys.time(), "summarizing"))
 
   lastRow <- which(is.na(aRun$Sequence$Community[-1]))[1]
   if (is.na(lastRow)) {
@@ -148,11 +163,15 @@ results <- foreach::foreach(
       )
     #)
   }
+  
+  print(paste(i, seed, Sys.time(), "saving"))
 
   save(
     file = savepath,
     retval
   )
+  
+  print(paste(i, seed, Sys.time(), "returning"))
 
   return(retval)
 }
