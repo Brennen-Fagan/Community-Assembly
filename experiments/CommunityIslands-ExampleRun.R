@@ -1,17 +1,17 @@
 # Settings. ####################################################################
-islands <- c(2, 1) # Community Numbers
+islands <- c(1, 2) # Community Numbers
 
 Tolerance <- 1E-6
 
-OuterTimeStepSize <- 2.5E3
-InnerTimeStepSize <- 1E1
+OuterTimeStepSize <- 5E3
+InnerTimeStepSize <- 1E2
 
 ts <- seq(from = 0,
           to = OuterTimeStepSize,
           by = InnerTimeStepSize)
 
 # Recreate the communities. ####################################################
-library(RMTRCode2)
+#library(RMTRCode2)
 
 set.seed(3680180)
 
@@ -164,8 +164,8 @@ dispersalMatrix <- Matrix::bandSparse(
   k = length(redCom) * c(1:(length(islands) - 1),
                          -(1:(length(islands) - 1))),
   diagonals = c(
-    list(rep(0.01, length(redCom))), # Island 2 -> Island 1
-    list(rep(0.01, length(redCom))) # Island 1 -> Island 2
+    list(rep(0.0001, length(redCom))), # Island 2 -> Island 1
+    list(rep(0.0001, length(redCom))) # Island 1 -> Island 2
   )
 )
 #   matrix(c(
