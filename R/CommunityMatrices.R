@@ -26,7 +26,7 @@ SpeciesPresent <- function(Abundance, Threshold = 1E-4) {
 
   tempSet <- resultsNotNAs[[1]]
   sets <- data.frame(
-    TimeStart = results$Abundance[1, 1],
+    TimeStart = Abundance[1, 1],
     TimeStop = NA,
     Present = I(list(tempSet))
   )
@@ -39,7 +39,7 @@ SpeciesPresent <- function(Abundance, Threshold = 1E-4) {
       tempSet <- resultsNotNAs[[i]]
 
       sets <- rbind(sets, data.frame(
-        TimeStart = results$Abundance[i, 1],
+        TimeStart = Abundance[i, 1],
         TimeStop = NA,
         Present = I(list(tempSet))
       ))
