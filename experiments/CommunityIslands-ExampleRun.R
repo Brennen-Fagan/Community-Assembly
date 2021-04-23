@@ -132,6 +132,37 @@ populations <- lapply(
   inits = inits
 )
 
+productivity <- lapply(
+  seq_along(communities),
+  function(i, communities, pops) {
+    com <- as.numeric(
+      unlist(strsplit(communities[i], split = ", "))
+    )
+
+    if (length(com) == 0) {
+      return(NA)
+    }
+
+    pop <- pops[[i]]
+
+    comMatPos <- comMat[com, com]; comMatPos[comMatPos < 0] <- 0
+    poolRepPos <- pool$ReproductionRate[com]; poolRepPos[poolRepPos < 0] <- 0
+
+    parmesanPos <- list(
+      a = comMatPos,
+      r = poolRepPos
+    )
+
+    return(
+      sum(RMTRCode2::GeneralisedLotkaVolterra(0, pop, parmesanPos)[[1]]
+          * pop / sum(pop))
+    )
+
+  },
+  communities = communities,
+  pops = populations
+)
+
 # Reduce to necessary information. #############################################
 # Total list of species present.
 redCom <- sort(unique(as.numeric(
