@@ -444,8 +444,8 @@ system.time(results2 <- foreach::foreach(
     # and, if so, store the result.
     indices <- which(!is.na(aRun$Abundance) & aRun$Abundance > 2)[-1]
     return(list(list(
-      Combn = toString(indices - 1)),
-      Popul = toString(round(aRun$Abundance[indices])
+      Combn = toString(indices - 1),
+      Popul = toString(round(aRun$Abundance[indices]))
       )
     ))
   } else {

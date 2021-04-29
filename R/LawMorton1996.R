@@ -7,7 +7,7 @@ LawMorton1996_NumericalAssembly <- function(
   LogBodySize = c(-2, -1, -1, 0), # c(-2, -1) for Basal, c(-1, 0) for Consumer
   EliminationThreshold = 10^-4,
   IntegratorTimeStep = 1000,
-  ArrivalDensity = 0.1,
+  ArrivalDensity = 0.1, # Note, this can really matter for determining what steady state we go to.
   ArrivalEvents = 10,
   ArrivalSampler = c("rearrange", "iid"),
   InnerTimeStepSize = 100,
