@@ -34,7 +34,8 @@ FindSteadyStateFromEstimate <- function(
   Populations,
   Dynamics = RMTRCode2::GeneralisedLotkaVolterra,
   Tolerance = 1E-1,
-  MaxAttempts = 1E2
+  MaxAttempts = 1E2,
+  maxRandVal = 1E6
 ) {
   if (is.character(Community)) {
     com <- CsvRowSplit(Community)
@@ -47,8 +48,8 @@ FindSteadyStateFromEstimate <- function(
   } else {
     init <- Populations
   }
-  init_min <- min(init)
-  init_max <- max(init)
+  init_min <- min(c(init, 0))
+  init_max <- max(c(init, maxRandVal))
 
   anyZeroOrNotSame <- TRUE # Set T to make at least one look.
   epsilon <- Tolerance
@@ -110,6 +111,10 @@ Productivity <- function(
     pop <- Populations
   }
 
+  if (length(com) == 0) {
+    return(NA)
+  }
+
   comMatPos <- InteractionMatrix[com, com]; comMatPos[comMatPos < 0] <- 0
   poolRepPos <- Pool$ReproductionRate[com]; poolRepPos[poolRepPos < 0] <- 0
 
@@ -135,7 +140,8 @@ IslandDynamics <- function(
   InteractionMatrix,
   Communities, # List containing each Community on each island.
   Populations, # List containing each Population on each island.
-  DispersalPool, # Species related dispersal rates, which are multiplied by
+  DispersalPool, # Species related dispersal rates
+                 # Should have length == nrow(Pool). Multiplied by entries of
   DispersalIsland, # Island related dispersal rates. Is a matrix, row = to.
   Dynamics = IslandLotkaVolterra,
   Tolerance = 1E-1,
@@ -146,12 +152,12 @@ IslandDynamics <- function(
   #(NOT species on each island, since that requires the user knowing things in advance...)
   #DispersalRates, # List of matrices: column = species, row = (TO other) island, entry = travel rate
 ) {
-  # Sanity checks. #############################################################
+  # Sanity check 1. ############################################################
   stopifnot(length(Communities) == length(Populations))
 
-  stopifnot(all(
-    unlist(lapply(Communities, length)) == unlist(lapply(Populations, length))
-  ))
+  if (length(DispersalPool) == 1) {
+    DispersalPool <- rep(DispersalPool, nrow(Pool))
+  }
 
   # Reduce to necessary information. ###########################################
   # Total list of species present.
@@ -178,6 +184,14 @@ IslandDynamics <- function(
   }
   )
 
+  # Sanity Check 2. ###########################################################
+  if (!((all(
+    unlist(lapply(CommunitiesNumeric, length)) ==
+      unlist(lapply(PopulationsNumeric, length))
+  )))) {
+    stop("Entries in Communities and Populations differ.")
+  }
+
   redCom <- sort(unique(unlist(CommunitiesNumeric))) # Uses recursive unlisting
 
   redPool <- Pool[redCom,]
@@ -194,6 +208,8 @@ IslandDynamics <- function(
     unlist(lapply(redComs, length)) == unlist(lapply(redPops, length))
   ))
 
+  redDisPool <- DispersalPool[redCom]
+
   # Create the dispersal matrix. ###############################################
 
   # Alternative: create multiple sparse diagonal matrices, then r and c bind.
@@ -205,7 +221,7 @@ IslandDynamics <- function(
 
   # So the question is how to format the diagonals then.
   dispersalDiags <- NULL
-  for (i in length(Communities):-length(Communities)) {
+  for (i in (length(Communities) - 1):-(length(Communities) - 1)) {
     if (i == 0) next
     # Start in top right band, move to bottom left.
     dispersalDiags <- c(
@@ -219,11 +235,10 @@ IslandDynamics <- function(
                 index + offset >= 1)
               mat[index, index + offset] * vec
             },
-          offset = i, mat = DispersalIsland, vec = DispersalPool
+          offset = i, mat = DispersalIsland, vec = redDisPool
         ))
       ))
       )
-
   }
 
   # Amount of travel from j to i is d[i,j]
@@ -235,7 +250,7 @@ IslandDynamics <- function(
   # The matrix is sparse and has colsum = 0, diag < 0, offdiag >= 0.
   dispersalMatrix <- Matrix::bandSparse(
     n = length(redCom) * length(Communities),
-    k = length(redCom) * c(1:(length(Communities) - 1),
+    k = length(redCom) * c((length(Communities) - 1):1,
                            -(1:(length(Communities) - 1))),
     diagonals = dispersalDiags# c(
       # list(c(rep(0.0001, length(redCom)),   # Island 2 -> Island 1
@@ -281,12 +296,12 @@ IslandDynamics <- function(
   abundance <- deSolve::ode(
     abundance_init,
     times = Times,
-    func = dynSys,
+    func = Dynamics,
     parms = parameters,
     events = list(func = function(t, y, parms) {
       y[y < parms$epsilon] <- 0
       y
-    }, time = ts)
+    }, time = Times)
   )
 
   return(abundance)
