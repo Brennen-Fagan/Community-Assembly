@@ -33,7 +33,8 @@ FindSteadyStateFromEstimate <- function(
   Community,
   Populations,
   Dynamics = RMTRCode2::GeneralisedLotkaVolterra,
-  Tolerance = 1E-1
+  Tolerance = 1E-1,
+  MaxAttempts = 1E2
 ) {
   if (is.character(Community)) {
     com <- CsvRowSplit(Community)
@@ -51,9 +52,10 @@ FindSteadyStateFromEstimate <- function(
 
   anyZeroOrNotSame <- TRUE # Set T to make at least one look.
   epsilon <- Tolerance
+  attempt <- 1
 
   # Run and check to see if anyone dies (bad) or changes (not at steady).
-  while (anyZeroOrNotSame) {
+  while (anyZeroOrNotSame && MaxAttempts > attempt) {
     init_old <- init
 
     init <- rootSolve::steady(
@@ -82,6 +84,8 @@ FindSteadyStateFromEstimate <- function(
     } else {
       anyZeroOrNotSame <- FALSE
     }
+
+    attempt <- attempt + 1
   }
 
   return(init)
@@ -92,7 +96,7 @@ Productivity <- function(
   InteractionMatrix,
   Community,
   Populations,
-  Dynamics = RMTRCode2::GeneralisedLotkaVolterra,
+  Dynamics = RMTRCode2::GeneralisedLotkaVolterra
 ) {
   if (is.character(Community)) {
     com <- CsvRowSplit(Community)
@@ -209,7 +213,7 @@ IslandDynamics <- function(
       list(c(
         unlist(lapply(
           1:length(Communities),
-          function(index,offset,mat,vec) {
+          function(index, offset, mat, vec) {
             if (offset != 0 &&
                 nrow(mat) >= index + offset &&
                 index + offset >= 1)
