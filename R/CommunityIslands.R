@@ -35,7 +35,8 @@ FindSteadyStateFromEstimate <- function(
   Dynamics = RMTRCode2::GeneralisedLotkaVolterra,
   Tolerance = 1E-1,
   MaxAttempts = 1E2,
-  maxRandVal = 1E6
+  maxRandVal = 1E6,
+  Verbose = FALSE
 ) {
   if (is.character(Community)) {
     com <- CsvRowSplit(Community)
@@ -57,6 +58,7 @@ FindSteadyStateFromEstimate <- function(
 
   # Run and check to see if anyone dies (bad) or changes (not at steady).
   while (anyZeroOrNotSame && MaxAttempts > attempt) {
+    if (Verbose) print(paste0(attempt, ":"))
     init_old <- init
 
     init <- rootSolve::steady(
@@ -67,11 +69,11 @@ FindSteadyStateFromEstimate <- function(
                    epsilon = epsilon),
       positive = TRUE
     )$y
-    print(init)
+    if (Verbose) print(init)
 
     if (any(init < epsilon)) {
       # Someone died, reset to random location.
-      print("Died")
+      if (Verbose) print("Died")
       anyZeroOrNotSame <- TRUE
       init[init < epsilon] <- runif(
         n = sum(init < epsilon),
@@ -80,13 +82,17 @@ FindSteadyStateFromEstimate <- function(
       )
     } else if (any(round(init / init_old, 1) != 1)) {
       # Not done, keep going.
-      print("Changed")
+      if (Verbose) print("Changed")
       anyZeroOrNotSame <- TRUE
     } else {
       anyZeroOrNotSame <- FALSE
     }
 
     attempt <- attempt + 1
+  }
+
+  if (attempt >= MaxAttempts) {
+    warning(paste("Failed to converge after", attempt, "attempts."))
   }
 
   return(init)
