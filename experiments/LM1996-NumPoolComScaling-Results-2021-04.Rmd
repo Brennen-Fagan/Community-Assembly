@@ -1,6 +1,8 @@
 ---
 title: "Viking Results, 2021-04"
-output: html_notebook
+output:
+  html_notebook:
+    code_folding: hide
 ---
 
 ```{r dirs}
@@ -126,23 +128,35 @@ for (i in 1:nrow(paramFrame)) {
 }
 ```
 
-```{r showResults}
+<!--```{r showResults}
 paramFrame[, c(1:3, 8:10)]
-```
+```-->
 
 ```{r plot3D}
 # X, Y, Basal and Consumer.
 # Z = Sizes of the Endstates.
 
-temp <- names(unlist(paramFrame$EndStateSizes))
-temp <- temp[temp != "0"]
 
 plotScalingData <- data.frame(
-  row = rep(paramFrame$CombnNum, paramFrame$EndStateSizesNum),
-  Basals = rep(paramFrame$Basals, paramFrame$EndStateSizesNum),
-  Consumers = rep(paramFrame$Consumers, paramFrame$EndStateSizesNum),
-  CommunitySize = as.numeric(temp)
+  row = rep(paramFrame$CombnNum, paramFrame$EndStatesNum),
+  Basals = rep(paramFrame$Basals, paramFrame$EndStatesNum),
+  Consumers = rep(paramFrame$Consumers, paramFrame$EndStatesNum)
 )
+
+# Communities
+comms <- unlist(lapply(paramFrame$EndStates, names))
+freqs <- unlist(paramFrame$EndStates)
+freqs <- freqs[comms != "No Run" & comms != "No State"]
+comms <- comms[comms != "No Run" & comms != "No State"]
+
+plotScalingData$Communities <- comms
+plotScalingData$CommunityFreq <- freqs
+
+# Community Size
+temp <- unlist(lapply(strsplit(plotScalingData$Communities, ','), length))
+plotScalingData$CommunitySize <- temp
+
+# For usage by the reader.
 
 plotScaling <- plotly::plot_ly(
   plotScalingData,
@@ -151,11 +165,18 @@ plotScaling <- plotly::plot_ly(
   z = ~CommunitySize
 )
 
+plotScaling <- plotly::add_markers(plotScaling)
+
 plotScaling <- plotly::layout(
   plotScaling,
-  xaxis = list(type = "log"),
-  yaxis = list(type = "log")
+  scene = list(
+    xaxis = list(type = "log"),
+    yaxis = list(type = "log")
+  )
 )
 
 plotScaling
+```
+```{r plot3dData}
+plotScalingData
 ```
