@@ -219,8 +219,9 @@ for (r in 1:nrow(plotScalingData)) {
       Pool = pools[[CombnNum]], 
       InteractionMatrix = mats[[CombnNum]], 
       Community = Communities, 
-      Populations = rep(50, CommunitySize), # No good guesses here
-      maxRandVal = 1E4, # round of the largest value we have seen so far.
+      Populations = rep(100, CommunitySize), # No good guesses here
+      maxRandVal = 2E4, # 2 * round of the largest value we have seen so far.
+      MaxAttempts = 1E4,
       Verbose = FALSE
     )
   ))
@@ -252,6 +253,28 @@ candidateData <- plotScalingData %>% dplyr::group_by(
 candidateData %>% dplyr::select(-CommunityAbund)
 ```
 
+```{r islandFUN}
+islandFUN <- function(i, dat, pool, mat, dmat) {
+      temp <- dat[i, ]
+      RMTRCode2::IslandDynamics(
+        Pool = pool,
+        InteractionMatrix = mat,
+        Communities = c(
+          list(temp$Communities[1]),
+          rep("", nrow(dmat) - 2),
+          temp$Communities[2]
+        ),
+        Populations = c(
+          list(temp$CommunityAbund[1]),
+          rep("", nrow(dmat) - 2),
+          list(temp$CommunityAbund[2])
+        ),
+        DispersalPool = 0.0001,
+        DispersalIsland = dmat,
+      )
+    }
+```
+
 ```{r islandOneTwo}
 # For each group,
 # For each pair,
@@ -260,12 +283,33 @@ candidateData %>% dplyr::select(-CommunityAbund)
 
 for (grp in unique(candidateData$CombnNum)) {
   candidateDataSubset <- candidateData %>% dplyr::filter(CombnNum == grp)
-  pairings <- combn(nrow(candidateDataSubset), 2, function(i) {
-    
-  })
+  pairingResults<- combn(
+    nrow(candidateDataSubset), 2, 
+    islandFUN,
+    dat = candidateDataSubset, 
+    pool = pools[[grp]],
+    mat = mats[[grp]],
+    dmat = matrix(c(0, 1, 1, 0), nrow = 2, ncol = 2),
+    simplify = FALSE
+  )
 }
 ```
 
 ```{r islandOneEmptyTwo}
-
+for (grp in unique(candidateData$CombnNum)) {
+  candidateDataSubset <- candidateData %>% dplyr::filter(CombnNum == grp)
+  pairingResults<- combn(
+    nrow(candidateDataSubset), 2, 
+    islandFUN,
+    dat = candidateDataSubset, 
+    pool = pools[[grp]],
+    mat = mats[[grp]],
+    dmat = matrix(c(
+      0, 1, 0, # Island 2 -> 1
+      1, 0, 1, # Island 1 -> 2, Island 3 -> 2
+      0, 1, 0  # Island 2 -> 3
+    ), nrow = 3, ncol = 3, byrow = TRUE),
+    simplify = FALSE
+  )
+}
 ```
