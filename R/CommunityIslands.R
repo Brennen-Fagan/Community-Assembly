@@ -27,6 +27,13 @@ CsvRowSplit <- function(csv) {
   return(as.numeric(unlist(strsplit(csv, split = ", "))))
 }
 
+# https://r.789695.n4.nabble.com/Suppressing-output-e-g-from-cat-tp859876p859882.html
+quiet <- function(x) {
+  sink(tempfile())
+  on.exit(sink())
+  invisible(force(x))
+}
+
 FindSteadyStateFromEstimate <- function(
   Pool,
   InteractionMatrix,
@@ -138,6 +145,125 @@ FindSteadyStateFromBasal <- function(
     positive = TRUE
   )$y
   init[basal] <- abund[basal]
+
+  anyZeroOrNotSame <- TRUE # Set T to make at least one look.
+  attempt <- 1
+
+  # Run and check to see if anyone dies (bad) or changes (not at steady).
+  while (anyZeroOrNotSame && MaxAttempts > attempt) {
+    if (Verbose) print(paste0(attempt, ":"))
+    init_old <- init
+
+    init <- rootSolve::steady(
+      y = init,
+      func = Dynamics,
+      parms = list(a = InteractionMatrix[com, com],
+                   r = Pool$ReproductionRate[com],
+                   epsilon = epsilon),
+      positive = TRUE
+    )$y
+    if (Verbose) print(init)
+
+    if (any(init < epsilon)) {
+      # Someone died, reset to random location.
+      if (Verbose) print("Died")
+      anyZeroOrNotSame <- TRUE
+      init[init < epsilon] <- runif(
+        n = sum(init < epsilon),
+        min = init_min,
+        max = init_max
+      )
+    } else if (any(round(init / init_old, 1) != 1)) {
+      # Not done, keep going.
+      if (Verbose) print("Changed")
+      anyZeroOrNotSame <- TRUE
+    } else {
+      anyZeroOrNotSame <- FALSE
+    }
+
+    attempt <- attempt + 1
+  }
+
+  if (attempt >= MaxAttempts) {
+    warning(paste("Failed to converge after", attempt, "attempts."))
+  }
+
+  return(init)
+}
+
+FindSteadyStateFromSize <- function(
+  Pool,
+  InteractionMatrix,
+  Community,
+  Populations,
+  Dynamics = RMTRCode2::GeneralisedLotkaVolterra,
+  Tolerance = 1E-1,
+  MaxAttempts = 1E2,
+  maxRandVal = 1E6,
+  Verbose = FALSE
+) {
+  if (is.character(Community)) {
+    com <- CsvRowSplit(Community)
+  } else {
+    com <- Community
+  }
+
+  if (is.character(Populations)) {
+    init <- CsvRowSplit(Populations)
+  } else {
+    init <- Populations
+  }
+  init_min <- min(c(init, 0))
+  init_max <- max(c(init, maxRandVal))
+
+  basal <- (diag(InteractionMatrix) != 0)[com]
+
+  epsilon <- Tolerance
+
+  # Allow basal species to establish themselves.
+  abund <- init; abund[!basal] <- 0
+  abund <- rootSolve::steady(
+    y = abund,
+    func = Dynamics,
+    parms = list(a = InteractionMatrix[com, com],
+                 r = Pool$ReproductionRate[com],
+                 epsilon = epsilon),
+    # positive = TRUE
+    method = "runsteady"
+  )$y
+  if (Verbose) print(abund)
+
+  # Order consumer's by size (correlated with trophic level).
+  consumerOrder <- order(Pool[com,][!basal,]$Size)
+  for (i in consumerOrder) {
+    if (Verbose) print(paste("Consumer:", i))
+    # Save,
+    abund_old <- abund
+    # Invade,
+    abund[!basal][i] <- 1
+    # Resolve, and
+    abund <- tryCatch(quiet(rootSolve::steady(
+      y = abund,
+      func = Dynamics,
+      parms = list(a = InteractionMatrix[com, com],
+                   r = Pool$ReproductionRate[com],
+                   epsilon = epsilon),
+      method = "runsteady" # positive = TRUE
+    )$y),
+    error = function(e) {
+      if (Verbose) warning(e)
+
+      return(abund_old)
+    })
+    if (Verbose) print(abund)
+    # Reject if something died.
+    if (any(abund_old[abund_old > 0] < epsilon)) {
+      abund <- abund_old
+    }
+  }
+  # Use this as the new starting place.
+  init[abund > 0] <- abund[abund > 0]
+  if (Verbose) print(init)
 
   anyZeroOrNotSame <- TRUE # Set T to make at least one look.
   attempt <- 1

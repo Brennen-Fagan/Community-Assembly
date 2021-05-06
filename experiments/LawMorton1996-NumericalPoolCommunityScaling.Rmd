@@ -41,23 +41,30 @@ library(dplyr)
 library(tidyr)
 
 export_calculation <- TRUE
+version <- 2# of 1, 2.
 ```
 
 ```{r parameters2}
-# > runif(1) * 1E8
-# [1] 38427042
-set.seed(38427042)
-
-basal <- c(3, 10, 30, 100, 300, 1000)
-consumer <- c(3, 10, 30, 100, 300, 1000) * 2
-events <- (max(basal) + max(consumer)) * 2
-runs <- 100
-
-logBodySize <- c(-2, -1, -1, 1) # Morton and Law 1997 version.
-parameters <- c(0.01, 10, 0.5, 0.2, 100, 0.1)
-
-seedsPrep <- runif(2 * length(basal) * length(consumer)) * 1E8
-seedsRun <- runif(runs * length(basal) * length(consumer)) * 1E8
+if (version == 1) {
+  # > runif(1) * 1E8
+  # [1] 38427042
+  set.seed(38427042)
+  
+  basal <- c(3, 10, 30, 100, 300, 1000)
+  consumer <- c(3, 10, 30, 100, 300, 1000) * 2
+  events <- (max(basal) + max(consumer)) * 2
+  runs <- 100
+  
+  logBodySize <- c(-2, -1, -1, 1) # Morton and Law 1997 version.
+  parameters <- c(0.01, 10, 0.5, 0.2, 100, 0.1)
+  
+  seedsPrep <- runif(2 * length(basal) * length(consumer)) * 1E8
+  seedsRun <- runif(runs * length(basal) * length(consumer)) * 1E8
+} else {
+  source(paste0(
+    "LawMorton1996-NumericalPoolCommunityScaling-Settings", version, ".R"
+  ))
+}
 ```
 
 ```{r pools2}
@@ -93,8 +100,13 @@ communityMats <- foreach::foreach(
 }
 
 if (export_calculation) {
+  filenameExported <- if (version == 1) {
+    "LawMorton1996-NumericalPoolCommunityScaling-PoolMats.RDS"
+  } else {
+    paste0("LawMorton1996-NumericalPoolCommunityScaling-PoolMats", version, ".RDS")
+  }
   save(
-    file = "LawMorton1996-NumericalPoolCommunityScaling-PoolMats.RDS",
+    file = filenameExported,
     communityMats,
     pools
   )
