@@ -72,7 +72,8 @@ paramFrame <- with(list(
     SeedRunsNum = 0,
     EndStates = I(rep(list(""), length(b))),
     EndStatesNum = 0,
-    EndStateSizes = I(rep(list(""), length(b)))
+    EndStateSizes = I(rep(list(""), length(b))),
+    EndStateAssembly = I(rep(list(""), length(b)))
   )
   for (i in 1:nrow(temp)) {
     seeds <- sR[((i - 1) * runs + 1) : (i * runs)]
@@ -93,6 +94,10 @@ for (i in 1:nrow(paramFrame)) {
   )
   resultsSize <- list(
     "0" = 0
+  )
+  resultsAssembly <- list(
+    "No Run" = data.frame(),
+    "No State" = data.frame()
   )
   seeds <- unlist(strsplit(paramFrame$SeedRuns[i], ', '))
   for (seed in seeds) {
@@ -121,6 +126,7 @@ for (i in 1:nrow(paramFrame)) {
           
         } else {
           resultsList[[community]] <- 1
+          resultsAssembly[[community]] <- temp
           
           if (size %in% resultsSize) {
             resultsSize[[size]] <- resultsSize[[size]] + 1
@@ -142,6 +148,7 @@ for (i in 1:nrow(paramFrame)) {
   paramFrame$EndStatesNum[i] <- length(resultsList) - 2 # ! No State, No Run
   paramFrame$EndStateSizes[[i]] <- resultsSize
   paramFrame$EndStateSizesNum[i] <- length(resultsSize) - 1 # ! 0
+  paramFrame$EndStateAssembly[[i]] <- resultsAssembly
 }
 ```
 
@@ -162,11 +169,19 @@ plotScalingData <- data.frame(
 # Communities
 comms <- unlist(lapply(paramFrame$EndStates, names))
 freqs <- unlist(paramFrame$EndStates)
+asmbl <- unlist(paramFrame$EndStateAssembly, recursive = FALSE)
+asmbl <- asmbl[comms != "No Run" & comms != "No State"]
 freqs <- freqs[comms != "No Run" & comms != "No State"]
 comms <- comms[comms != "No Run" & comms != "No State"]
 
+asmbl <- lapply(asmbl, function(d) {
+  d %>% dplyr::filter(Result.Outcome != "Type 1 (Failure)" & 
+                        Result.Outcome != "Present")
+})
+
 plotScalingData$Communities <- comms
 plotScalingData$CommunityFreq <- freqs
+plotScalingData$CommunitySeq <- asmbl
 
 # Community Size
 temp <- unlist(lapply(strsplit(plotScalingData$Communities, ','), length))
@@ -194,7 +209,7 @@ plotScaling <- plotly::layout(
 plotScaling
 ```
 ```{r plot3dData}
-plotScalingData
+plotScalingData %>% dplyr::select(-CommunitySeq)
 ```
 # How do they compare to each other?
 
@@ -211,11 +226,23 @@ mats  <- eval(parse(text = temp[1]))
 pools <- eval(parse(text = temp[2]))
 ```
 
-```{r computePopulations}
+```{r computeCandidates}
+candidateData <- plotScalingData %>% dplyr::group_by(
+  CombnNum
+) %>% dplyr::mutate(
+  OtherSteadyStates = dplyr::n() - 1
+) %>% dplyr::filter(
+  OtherSteadyStates > 0
+)
+candidateData %>% dplyr::select(-CommunitySeq)
+```
+
+<!--```{r computePopulations}
 plotScalingData$CommunityAbund <- ""
 for (r in 1:nrow(plotScalingData)) {
+  print(r)
   plotScalingData$CommunityAbund[r] <- with(plotScalingData[r, ], toString(
-    RMTRCode2::FindSteadyStateFromEstimate(
+    RMTRCode2::FindSteadyStateFromSize(
       Pool = pools[[CombnNum]], 
       InteractionMatrix = mats[[CombnNum]], 
       Community = Communities, 
@@ -226,12 +253,46 @@ for (r in 1:nrow(plotScalingData)) {
     )
   ))
 }
+```-->
+
+```{r computePopulations2}
+candidateData$CommunityAbund <- ""
+for (r in 1:nrow(candidateData)) {
+  candidateData$CommunityAbund[r] <- toString(with(
+    candidateData[r, ], {
+      invasions <- CommunitySeq[[1]]$Result.Addition
+      abundance <- rep(0, Basals + Consumers)
+      for (i in invasions) {
+        abundance[i] <- abundance[i] + 1
+        abundance <- RMTRCode2::quiet(
+          deSolve::ode(
+            #rootSolve::steady(
+            y = abundance,
+            times = c(0:10000),
+            func = RMTRCode2::GeneralisedLotkaVolterra,
+            parms = list(a = mats[[CombnNum]],
+                         r = pools[[CombnNum]]$ReproductionRate),
+            #method = "runsteady"
+          )[10001, -1])
+      }
+      #print(paste("Expected", Communities))
+      #print(paste("Calculated", toString(which(abundance > 0))))
+      #print(paste("> Epsilon:", toString(which(abundance > 1E-6))))
+      if (Communities == toString(which(abundance > 1E-6))) {
+        abundance[abundance > 1E-6]
+      } else {
+        "Failure"
+      }
+    }
+  ))
+}
+
 ```
 
 ```{r computeProductivity}
-plotScalingData$CommunityProd <- NA
-for (r in 1:nrow(plotScalingData)) {
-  plotScalingData$CommunityProd[r] <- with(plotScalingData[r, ], 
+candidateData$CommunityProd <- NA
+for (r in 1:nrow(candidateData)) {
+  candidateData$CommunityProd[r] <- with(candidateData[r, ], 
     RMTRCode2::Productivity(
       Pool = pools[[CombnNum]], 
       InteractionMatrix = mats[[CombnNum]], 
@@ -240,17 +301,6 @@ for (r in 1:nrow(plotScalingData)) {
     )
   )
 }
-```
-
-```{r computeCandidates}
-candidateData <- plotScalingData %>% dplyr::group_by(
-  CombnNum
-) %>% dplyr::mutate(
-  OtherSteadyStates = dplyr::n() - 1
-) %>% dplyr::filter(
-  OtherSteadyStates > 0
-)
-candidateData %>% dplyr::select(-CommunityAbund)
 ```
 
 ```{r islandFUN}
