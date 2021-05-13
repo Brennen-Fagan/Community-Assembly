@@ -60,8 +60,8 @@ communities <- c(
 
 inits <- c(
   "",
-  "10, 10, 10, 10, 10",
-  "10, 10, 10, 10, 10"
+  "742, 80, 162, 20, 18",
+  "668, 119, 127, 30, 13"
 )
 
 stopifnot(length(communities) == length(inits))

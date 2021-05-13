@@ -76,7 +76,7 @@ populationsTest <- lapply(
 productivityTest <- lapply(
   seq_along(communities),
   function(i, Pool, InteractionMatrix, Communities, Populations) {
-    Productivity(Pool, InteractionMatrix, Communities[i], Populations[[i]])
+    RMTRCode2::Productivity(Pool, InteractionMatrix, Communities[i], Populations[[i]])
   },
   Pool = pool,
   InteractionMatrix = comMat,
