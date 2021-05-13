@@ -451,6 +451,42 @@ plotScaling %>% plotly::add_trace(z = plotSamplingDataLM3Surf,
                                   type = "surface")
 ```
 
+```{r linearmodel4}
+plotSamplingDataLM4 <- lm(
+  CommunitySize ~ log(Basals) + log(Consumers), 
+  data = plotScalingData
+)
+summary(plotSamplingDataLM4)
+```
+
+```{r plotlyLM4}
+# E.g. https://stackoverflow.com/a/38533046
+plotSamplingDataLM4Res <- 3
+plotSamplingDataLM4AxisX <- sort(unique(plotScalingData$Basals))
+  # seq(min(plotScalingData$Basals), 
+  #                               max(plotScalingData$Basals),
+  #                               by = plotSamplingDataLM2Res) 
+plotSamplingDataLM4AxisY <- sort(unique(plotScalingData$Consumers))
+# seq(min(plotScalingData$Consumers), 
+#                                 max(plotScalingData$Consumers),
+#                                 by = plotSamplingDataLM2Res) 
+plotSamplingDataLM4Surf <- expand.grid(
+  Basals = plotSamplingDataLM3AxisX,
+  Consumers = plotSamplingDataLM3AxisY
+) 
+plotSamplingDataLM4Surf$CommunitySize <- exp(predict.lm(
+  plotSamplingDataLM4, newdata = plotSamplingDataLM4Surf
+))
+plotSamplingDataLM4Surf <- reshape2::acast( # Cast to array/matrix
+  plotSamplingDataLM4Surf, Basals ~ Consumers, value.var = "CommunitySize"
+)
+
+plotScaling %>% plotly::add_trace(z = plotSamplingDataLM4Surf,
+                                  x = plotSamplingDataLM4AxisX,
+                                  y = plotSamplingDataLM4AxisY,
+                                  type = "surface")
+```
+
 # How do they interact with each other (on islands)?
 
 ```{r loadPoolsMats}
