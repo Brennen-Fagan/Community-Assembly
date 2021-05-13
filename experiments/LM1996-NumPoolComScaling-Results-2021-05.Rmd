@@ -385,7 +385,7 @@ summary(plotSamplingDataLM2)
 ```
 
 Adding this to the plot:
-```{r plotlyLM}
+```{r plotlyLM2}
 # E.g. https://stackoverflow.com/a/38533046
 plotSamplingDataLM2Res <- 3
 plotSamplingDataLM2AxisX <- sort(unique(plotScalingData$Basals))
@@ -414,6 +414,42 @@ plotScaling %>% plotly::add_trace(z = plotSamplingDataLM2Surf,
 ```
 
 Not particularly convincing, but it does agree with general ideas (consumers less important than basals).
+
+```{r linearmodel3}
+plotSamplingDataLM3 <- lm(
+  log(CommunitySize) ~ log(Basals) + log(Consumers) - 1, 
+  data = plotScalingData
+)
+summary(plotSamplingDataLM3)
+```
+
+```{r plotlyLM3}
+# E.g. https://stackoverflow.com/a/38533046
+plotSamplingDataLM3Res <- 3
+plotSamplingDataLM3AxisX <- sort(unique(plotScalingData$Basals))
+  # seq(min(plotScalingData$Basals), 
+  #                               max(plotScalingData$Basals),
+  #                               by = plotSamplingDataLM2Res) 
+plotSamplingDataLM3AxisY <- sort(unique(plotScalingData$Consumers))
+# seq(min(plotScalingData$Consumers), 
+#                                 max(plotScalingData$Consumers),
+#                                 by = plotSamplingDataLM2Res) 
+plotSamplingDataLM3Surf <- expand.grid(
+  Basals = plotSamplingDataLM3AxisX,
+  Consumers = plotSamplingDataLM3AxisY
+) 
+plotSamplingDataLM3Surf$CommunitySize <- exp(predict.lm(
+  plotSamplingDataLM3, newdata = plotSamplingDataLM3Surf
+))
+plotSamplingDataLM3Surf <- reshape2::acast( # Cast to array/matrix
+  plotSamplingDataLM3Surf, Basals ~ Consumers, value.var = "CommunitySize"
+)
+
+plotScaling %>% plotly::add_trace(z = plotSamplingDataLM3Surf,
+                                  x = plotSamplingDataLM3AxisX,
+                                  y = plotSamplingDataLM3AxisY,
+                                  type = "surface")
+```
 
 # How do they interact with each other (on islands)?
 
