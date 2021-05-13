@@ -1,0 +1,799 @@
+---
+title: "Answering Questions; Gather Data, 2021-05"
+output:
+  html_notebook:
+    code_folding: hide
+---
+
+```{r libs}
+# Check requisite packages are installed.
+packages <- c(
+  "plotly", 
+  "dplyr"
+)
+for (pkg in packages) {
+  library(pkg, character.only = TRUE)
+}
+```
+
+# Load
+Pulling code almost directly from `LM1996-NumPoolComScaling-Results-2021-05.Rmd`.
+```{r dirs}
+dirViking <- c(
+  file.path(
+    getwd(), "LCAB_LawMorton1996-NumericalPoolCommunityScaling"
+  ),
+  file.path(
+    getwd(), "LCAB_LawMorton1996-NumericalPoolCommunityScaling2"
+  )
+)
+dirVikingResults <- file.path(
+  dirViking, c("results-2021-04", "save-2021-05-10") # Latter not 100% yet.
+)
+resultFormat <- paste0(
+  "run-", 
+  "%d", # Combination Number, or CombnNum.
+  "-", 
+  "%s", # Run Seed.
+  ".RDS"
+)
+```
+
+## 2021-04 Data
+```{r params}
+# Copied from LawMorton1996-NumericalPoolCommunityScaling-Calculation.R
+set.seed(38427042)
+
+basal <- c(3, 10, 30, 100, 300, 1000)
+consumer <- c(3, 10, 30, 100, 300, 1000) * 2
+events <- (max(basal) + max(consumer)) * 2
+runs <- 100
+
+logBodySize <- c(-2, -1, -1, 1) # Morton and Law 1997 version.
+parameters <- c(0.01, 10, 0.5, 0.2, 100, 0.1)
+
+# Need to rerun seedsPrep to get the random number generation right for seedsRun
+seedsPrep <- runif(2 * length(basal) * length(consumer)) * 1E8
+seedsRun <- runif(runs * length(basal) * length(consumer)) * 1E8
+```
+
+```{r organiseParams}
+paramFrame <- with(list(
+  b = rep(basal, times = length(consumer)),
+  c = rep(consumer, each = length(basal)),
+  s1 = seedsPrep[1:(length(basal) * length(consumer))],
+  s2 = seedsPrep[
+    (length(basal) * length(consumer) + 1):(
+      2 * length(basal) * length(consumer))
+  ],
+  sR = seedsRun
+), {
+  temp <- data.frame(
+    CombnNum = 0,
+    Basals = b,
+    Consumers = c,
+    SeedPool = s1,
+    SeedMat = s2,
+    SeedRuns = "",
+    SeedRunsNum = 0,
+    EndStates = I(rep(list(""), length(b))),
+    EndStatesNum = 0,
+    EndStateSizes = I(rep(list(""), length(b))),
+    EndStateSizesNum = NA,
+    EndStateAssembly = I(rep(list(""), length(b))),
+    EndStateAbundance = I(rep(list(""), length(b))),
+    Dataset = "2021-04",
+    DatasetID = 1,
+    stringsAsFactors = FALSE
+  )
+  for (i in 1:nrow(temp)) {
+    seeds <- sR[((i - 1) * runs + 1) : (i * runs)]
+    temp$SeedRuns[i] <- toString(seeds) # CSV
+    temp$SeedRunsNum[i] <- length(seeds)
+  }
+  temp$CombnNum <- 1:nrow(temp)
+  temp
+})
+```
+
+```{r loadResults}
+# Note: n + 2 end states. Failure to finish, failure to obtain state, and state.
+for (i in 1:nrow(paramFrame)) {
+  resultsList <- list(
+    "No Run" = 0,
+    "No State" = 0
+  )
+  resultsSize <- list(
+    "0" = 0
+  )
+  resultsAssembly <- list(
+    "No Run" = data.frame(),
+    "No State" = data.frame()
+  )
+  seeds <- unlist(strsplit(paramFrame$SeedRuns[i], ', '))
+  for (seed in seeds) {
+    fileName <- file.path(
+      dirVikingResults[paramFrame$DatasetID[i]],
+      sprintf(resultFormat, paramFrame$CombnNum[i], seed)
+    )
+    
+    if (file.exists(fileName)) {
+      temp <- load(fileName)
+      temp <- eval(parse(text = temp)) # Get objects.
+      
+      if (is.data.frame(temp)) {
+        community <- toString(
+          temp[[ncol(temp)]][[nrow(temp)]]
+        )
+        size <- toString(length(temp[[ncol(temp)]][[nrow(temp)]]))
+        
+        if (community == "") {
+          resultsList$`No State` <- resultsList$`No State` + 1
+          resultsSize$`0` <- resultsSize$`0` + 1
+          
+        } else if (community %in% names(resultsList)) {
+          resultsList[[community]] <- resultsList[[community]] + 1
+          resultsSize[[size]] <- resultsSize[[size]] + 1
+          
+        } else {
+          resultsList[[community]] <- 1
+          resultsAssembly[[community]] <- temp
+          
+          if (size %in% resultsSize) {
+            resultsSize[[size]] <- resultsSize[[size]] + 1
+          } else {
+            resultsSize[[size]] <- 1
+          }
+        }
+      } else {
+        resultsList$`No State` <- resultsList$`No State` + 1
+        resultsSize$`0` <- resultsSize$`0` + 1
+      }
+    } else {
+      resultsList$`No Run` <- resultsList$`No Run` + 1
+      resultsSize$`0` <- resultsSize$`0` + 1
+    }
+  }
+  
+  paramFrame$EndStates[[i]] <- resultsList
+  paramFrame$EndStatesNum[i] <- length(resultsList) - 2 # ! No State, No Run
+  paramFrame$EndStateSizes[[i]] <- resultsSize
+  paramFrame$EndStateSizesNum[i] <- length(resultsSize) - 1 # ! 0
+  paramFrame$EndStateAssembly[[i]] <- resultsAssembly
+}
+```
+
+## 2021-05 Data
+```{r organiseParams2}
+source(
+  file.path(getwd(), 
+            "LawMorton1996-NumericalPoolCommunityScaling-Settings2.R")
+)
+
+oldNrow <- nrow(paramFrame)
+
+paramFrame <- rbind(paramFrame, with(list(
+  b = rep(basal, times = length(consumer)),
+  c = rep(consumer, each = length(basal)),
+  s1 = seedsPrep[1:(length(basal) * length(consumer))],
+  s2 = seedsPrep[
+    (length(basal) * length(consumer) + 1):(
+      2 * length(basal) * length(consumer))
+  ],
+  sR = seedsRun
+), {
+  temp <- data.frame(
+    CombnNum = 0,
+    Basals = b,
+    Consumers = c,
+    SeedPool = s1,
+    SeedMat = s2,
+    SeedRuns = "",
+    SeedRunsNum = 0,
+    EndStates = I(rep(list(""), length(b))),
+    EndStatesNum = 0,
+    EndStateSizes = I(rep(list(""), length(b))),
+    EndStateSizesNum = NA,
+    EndStateAssembly = I(rep(list(""), length(b))),
+    EndStateAbundance = I(rep(list(""), length(b))),
+    Dataset = "2021-05",
+    DatasetID = 2,
+    stringsAsFactors = FALSE
+  )
+  for (i in 1:nrow(temp)) {
+    seeds <- sR[((i - 1) * runs + 1) : (i * runs)]
+    temp$SeedRuns[i] <- toString(seeds) # CSV
+    temp$SeedRunsNum[i] <- length(seeds)
+  }
+  temp$CombnNum <- 1:nrow(temp)
+  temp
+})
+)
+```
+
+```{r loadResults2}
+# Note: n + 2 end states. Failure to finish, failure to obtain state, and state.
+# Modified from above, but with the abundance recorded.
+for (i in (oldNrow + 1):nrow(paramFrame)) {
+  resultsList <- list(
+    "No Run" = 0,
+    "No State" = 0
+  )
+  resultsSize <- list(
+    "0" = 0
+  )
+  resultsAssembly <- list(
+    "No Run" = data.frame(),
+    "No State" = data.frame()
+  )
+  resultsAbund <- list(
+    "No Run" = "",
+    "No State" = ""
+  )
+  seeds <- unlist(strsplit(paramFrame$SeedRuns[i], ', '))
+  for (seed in seeds) {
+    fileName <- file.path(
+      dirVikingResults[paramFrame$DatasetID[i]],
+      sprintf(resultFormat, paramFrame$CombnNum[i], seed)
+    )
+    
+    if (file.exists(fileName)) {
+      temp <- load(fileName)
+      temp <- eval(parse(text = temp)) # Get objects.
+      
+      if (is.list(temp) && "Result" %in% names(temp)) {
+        
+        if (is.data.frame(temp$Result))
+          community <- temp$Result$Community[[nrow(temp$Result)]]
+        else 
+          community <- temp$Result
+        
+        size <- toString(length(community))
+        
+        if (community[1] != "") 
+          abund <- toString(temp$Abund[community + 1])
+        else 
+          abund <- ""
+        
+        community <- toString(community)
+        
+        if (community == "") {
+          resultsList$`No State` <- resultsList$`No State` + 1
+          resultsSize$`0` <- resultsSize$`0` + 1
+          
+        } else if (community %in% names(resultsList)) {
+          resultsList[[community]] <- resultsList[[community]] + 1
+          resultsSize[[size]] <- resultsSize[[size]] + 1
+          
+        } else {
+          resultsList[[community]] <- 1
+          resultsAssembly[[community]] <- temp
+          resultsAbund[[community]] <- abund
+          
+          if (size %in% resultsSize) {
+            resultsSize[[size]] <- resultsSize[[size]] + 1
+          } else {
+            resultsSize[[size]] <- 1
+          }
+        }
+      } else {
+        resultsList$`No State` <- resultsList$`No State` + 1
+        resultsSize$`0` <- resultsSize$`0` + 1
+      }
+    } else {
+      resultsList$`No Run` <- resultsList$`No Run` + 1
+      resultsSize$`0` <- resultsSize$`0` + 1
+    }
+  }
+  
+  paramFrame$EndStates[[i]] <- resultsList
+  paramFrame$EndStatesNum[i] <- length(resultsList) - 2 # ! No State, No Run
+  paramFrame$EndStateSizes[[i]] <- resultsSize
+  paramFrame$EndStateSizesNum[i] <- length(resultsSize) - 1 # ! 0
+  paramFrame$EndStateAssembly[[i]] <- resultsAssembly
+  paramFrame$EndStateAbundance[[i]] <- resultsAbund
+}
+```
+
+## Test Data
+
+```{r addTest}
+testRowNums <- nrow(paramFrame)
+testRowsToAdd <- c(6, 2)
+
+paramFrame <- with(
+  list(
+    basal2 = c(5, 10, 15),
+    consumer2 = c(20, 40, 60),
+    logBodySize = c(-2, -1, -1, 0),
+    parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1)
+  ),
+  {
+    set.seed(3680180)
+    seedsPrep2 <- runif(2 * length(basal2) * length(consumer2)) * 1E8
+    with(list(
+      b = rep(basal2, times = length(consumer2)),
+      c = rep(consumer2, each = length(basal2)),
+      s1 = seedsPrep2[1:(length(basal2) * length(consumer2))],
+      s2 = seedsPrep2[
+        (length(basal2) * length(consumer2) + 1):(
+          2 * length(basal2) * length(consumer2))
+      ]
+    ), {
+      rbind(
+        paramFrame,
+        data.frame(
+          CombnNum = testRowsToAdd,
+          Basals = b[testRowsToAdd],
+          Consumers = c[testRowsToAdd],
+          SeedPool = s1[testRowsToAdd],
+          SeedMat = s2[testRowsToAdd],
+          SeedRuns = "",
+          SeedRunsNum = 0,
+          EndStates = I(rep(list(""), length(testRowsToAdd))),
+          EndStatesNum = 0,
+          EndStateSizes = I(rep(list(""), length(testRowsToAdd))),
+          EndStateSizesNum = NA,
+          EndStateAssembly = I(rep(list(""), length(testRowsToAdd))),
+          EndStateAbundance = I(rep(list(""), length(testRowsToAdd))),
+          Dataset = "Test",
+          DatasetID = max(paramFrame$DatasetID) + 1,
+          stringsAsFactors = FALSE
+        )
+      )
+    }
+    )
+  }
+)
+
+testRowNums <- (testRowNums + 1):nrow(paramFrame)
+resultsList <- list(
+  list(
+    "No Run" = 0,
+    "No State" = 0,
+    "8, 10, 12, 14, 15, 16, 39, 43" = 1,
+    "8, 12, 14, 15, 16, 38, 39" = 1
+  ),
+  list(
+    "No Run" = 0,
+    "No State" = 0,
+    "2, 4, 6, 12, 29" = 1,
+    "2, 4, 6, 13, 29" = 1
+  )
+)
+resultsSize <- list(
+  list(
+    "0" = 0,
+    "8" = 1,
+    "7" = 1
+  ),
+  list(
+    "0" = 0,
+    "5" = 2
+  )
+)
+resultsAbund <- list(
+  list(
+    "No Run" = "",
+    "No State" = "",
+    "8, 10, 12, 14, 15, 16, 39, 43" = "20.7665807606491, 32.4461165261454, 80.4033387818895, 817.879722033354, 121.136570782828, 18.0390671088957, 12.3834561177271, 19.9674718543196",
+    "8, 12, 14, 15, 16, 38, 39" = "82.592048492812, 138.267379166014, 938.158436379166, 51.8610963745021, 5.03556251837491, 14.1019343145825, 25.9231062711228"
+  ),
+  list(
+    "No Run" = "",
+    "No State" = "",
+    "2, 4, 6, 12, 29" = "742.88553671712, 80.579233072626, 162.128399850253, 20.2082198699389, 18.8589490510429",
+    "2, 4, 6, 13, 29" = "668.664143581837, 119.024146851052, 127.680269383867, 30.657960866033, 13.4844194707944"
+  )
+)
+
+for (j in seq_along(testRowNums)) {
+  i <- testRowNums[j]
+  paramFrame$EndStates[[i]] <- resultsList[[j]]
+  paramFrame$EndStatesNum[i] <- length(resultsList[[j]]) - 2 # ! No State, No Run
+  paramFrame$EndStateSizes[[i]] <- resultsSize[[j]]
+  paramFrame$EndStateSizesNum[i] <- length(resultsSize[[j]]) - 1 # ! 0
+  paramFrame$EndStateAbundance[[i]] <- resultsAbund[[j]]
+}
+
+```
+
+## Plot
+
+```{r plot3D}
+# X, Y, Basal and Consumer.
+# Z = Sizes of the Endstates.
+
+plotScalingData <- data.frame(
+  CombnNum = rep(paramFrame$CombnNum, paramFrame$EndStatesNum),
+  Basals = rep(paramFrame$Basals, paramFrame$EndStatesNum),
+  Consumers = rep(paramFrame$Consumers, paramFrame$EndStatesNum),
+  Dataset = rep(paramFrame$Dataset, paramFrame$EndStatesNum),
+  DatasetID = rep(paramFrame$DatasetID, paramFrame$EndStatesNum)
+)
+
+# Communities
+comms <- unlist(lapply(paramFrame$EndStates, names))
+freqs <- unlist(paramFrame$EndStates)
+asmbl <- unlist(paramFrame$EndStateAssembly, recursive = FALSE)
+asmbl <- asmbl[comms != "No Run" & comms != "No State"]
+freqs <- freqs[comms != "No Run" & comms != "No State"]
+comms <- comms[comms != "No Run" & comms != "No State"]
+
+asmbl <- lapply(asmbl, function(d) {
+  if (is.null(d)) return(NA)
+  if ("Result.Outcome" %in% names(d))
+    d %>% dplyr::filter(Result.Outcome != "Type 1 (Failure)" & 
+                          Result.Outcome != "Present")
+  else
+    d$Result %>% dplyr::filter(Outcome != "Type 1 (Failure)" & 
+                                 Outcome != "Present")
+})
+
+plotScalingData$Communities <- comms
+plotScalingData$CommunityFreq <- freqs
+plotScalingData$CommunitySeq <- asmbl
+
+# Community Size
+temp <- unlist(lapply(strsplit(plotScalingData$Communities, ','), length))
+plotScalingData$CommunitySize <- temp
+
+# For usage by the reader.
+
+plotScaling <- plotly::plot_ly(
+  plotScalingData,
+  x = ~Basals,
+  y = ~Consumers,
+  z = ~CommunitySize,
+  color = ~Dataset,
+  colors = c("red", "blue", "black")
+)
+
+plotScaling <- plotly::add_markers(plotScaling)
+
+plotScaling <- plotly::layout(
+  plotScaling,
+  scene = list(
+    xaxis = list(type = "log"),
+    yaxis = list(type = "log"),
+    camera = list(
+      eye = list(
+        x = -1.25, y = -1.25, z = .05
+      )
+    )
+  )
+)
+
+plotScaling
+```
+
+## Abundances
+
+```{r loadPoolsMats}
+# > runif(1) * 1E8
+# [1] 82598679
+set.seed(82598679)
+
+mats <- list()
+poolsall <- list() # name pools used in save data; be careful!
+
+for (i in 1:length(dirViking)) {
+  temp <- load(file.path(
+    dirViking[i], 
+    paste0("LawMorton1996-NumericalPoolCommunityScaling-PoolMats", 
+           if (i > 1) i else "", 
+           ".RDS")
+  ))
+  mats[[i]] <- eval(parse(text = temp[1]))
+  poolsall[[i]] <- eval(parse(text = temp[2]))
+}
+pools <- poolsall
+
+# Add in the test datasets.
+poolsTemp <- list()
+matsTemp <- list()
+for (r in testRowNums) {
+  testRowRow <- paramFrame[r, ]
+  poolsTemp[[testRowRow$CombnNum]] <- with(testRowRow,
+    RMTRCode2::LawMorton1996_species(
+      Basal = Basals,
+      Consumer = Consumers,
+      Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1),
+      LogBodySize = c(-2, -1, -1, 0),
+      seed = SeedPool
+    )
+  )
+  matsTemp[[testRowRow$CombnNum]] <- with(testRowRow,
+    RMTRCode2::LawMorton1996_CommunityMat(
+      Pool = poolsTemp[[CombnNum]],
+      Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1),
+      seed = SeedMat
+    )
+  )
+}
+pools[[i + 1]] <- poolsTemp
+mats[[i + 1]] <- matsTemp
+
+oldCandidateData <- load(file.path(getwd(), "candidateDataSoFar.Rdata"))
+oldCandidateData <- eval(parse(text = oldCandidateData))
+```
+
+```{r computeCandidates}
+candidateData <- plotScalingData %>% dplyr::group_by(
+  CombnNum, Dataset
+) %>% dplyr::mutate(
+  OtherSteadyStates = dplyr::n() - 1
+) %>% dplyr::filter(
+  OtherSteadyStates > 0
+)
+candidateData %>% dplyr::select(-CommunitySeq)
+```
+
+```{r loadAbundances}
+# First, check if it is in the paramFrame.
+# Second, check if it is in the saved data from the previous.
+# Otherwise, ignore it, we'll figure out what it is and why it is missing later.
+
+candidateData$CommunityAbund <- ""
+
+for (r in 1:nrow(candidateData)) {
+  # ID 1:4 are used to identify paramFrame, 5 used to identify abundance
+  ID <- candidateData[r, 1:6]
+  paramFrameRow <- paramFrame %>% dplyr::filter(
+    CombnNum == ID$CombnNum,
+    Basals == ID$Basals,
+    Consumers == ID$Consumers,
+    Dataset == ID$Dataset
+  )
+  
+  if (is.list(paramFrameRow$EndStateAbundance[[1]])) {
+    entry <- which(ID$Communities == names(paramFrameRow$EndStateAbundance[[1]]))
+    if (length(entry)) {
+      candidateData$CommunityAbund[r] <- paramFrameRow$EndStateAbundance[[1]][[entry]]
+      next()
+    }
+  }
+  
+  if (ID$Dataset == "2021-04") {
+    
+    oldCandDatRow <- oldCandidateData %>% dplyr::filter(
+      CombnNum == ID$CombnNum,
+      Basals == ID$Basals,
+      Consumers == ID$Consumers,
+      Communities == ID$Communities
+    )
+    
+    if (nrow(oldCandDatRow) > 0) {
+      if (oldCandDatRow$CommunityAbund != "") {
+        candidateData$CommunityAbund[r] <- oldCandDatRow$CommunityAbund
+      }
+    }
+  }
+}
+```
+
+```{r filterNoAbund}
+candidateData <- candidateData %>% dplyr::filter(CommunityAbund != "",
+                                                 CommunityAbund != "Failure")
+```
+
+```{r computeProductivity}
+candidateData$CommunityProd <- NA
+for (r in 1:nrow(candidateData)) {
+  candidateData$CommunityProd[r] <- with(
+    candidateData[r, ], 
+    RMTRCode2::Productivity(
+      Pool = pools[[DatasetID]][[CombnNum]], 
+      InteractionMatrix = mats[[DatasetID]][[CombnNum]], 
+      Community = Communities, 
+      Populations = CommunityAbund
+    )
+  )
+}
+```
+
+## Simple Island Results
+```{r islandFUN}
+islandFUN <- function(i, dat, pool, mat, dmat) {
+  temp <- dat[i, ]
+  RMTRCode2::IslandDynamics(
+    Pool = pool,
+    InteractionMatrix = mat,
+    Communities = c(
+      list(temp$Communities[1]),
+      rep("", nrow(dmat) - 2),
+      temp$Communities[2]
+    ),
+    Populations = c(
+      list(temp$CommunityAbund[1]),
+      rep("", nrow(dmat) - 2),
+      list(temp$CommunityAbund[2])
+    ),
+    DispersalPool = 0.0001,
+    DispersalIsland = dmat,
+  )
+}
+```
+
+```{r islandOneTwo}
+# For each group-dataset,
+# For each pair,
+# Run Island Dynamics,
+# Save the result with its pairing
+candidateData$TotalID <- paste(candidateData$CombnNum, candidateData$DatasetID)
+
+islandInteractionsOneTwo <- list()
+
+for (grp in unique(candidateData$TotalID)) {
+  candidateDataSubset <- candidateData %>% dplyr::filter(TotalID == grp)
+  
+  if (nrow(candidateDataSubset) == 1) next()
+  
+  pairingResults <- combn(
+    nrow(candidateDataSubset), 2, 
+    islandFUN,
+    dat = candidateDataSubset, 
+    pool = pools[[
+      candidateDataSubset$DatasetID[1]
+    ]][[candidateDataSubset$CombnNum[1]]],
+    mat = mats[[
+      candidateDataSubset$DatasetID[1]
+    ]][[candidateDataSubset$CombnNum[1]]],
+    dmat = matrix(c(0, 1, 1, 0), nrow = 2, ncol = 2),
+    simplify = FALSE
+  )
+  
+  pairingResults <- lapply(
+    pairingResults, function(mat, isles) {
+      mat <- mat[nrow(mat), -1]
+      retVal <- list()
+      species <- length(mat) / isles
+      for (i in 1:isles) {
+        retVal[[i]] <- mat[((i - 1) * species + 1) : (i * species)]
+      }
+      retVal
+    },
+    isles = 2
+  )
+  
+  islandInteractionsOneTwo[[grp]] <- pairingResults
+}
+```
+
+```{r islandOneEmptyTwo}
+islandInteractionsOneEmptyTwo <- list()
+
+for (grp in unique(candidateData$TotalID)) {
+  candidateDataSubset <- candidateData %>% dplyr::filter(TotalID == grp)
+  
+  if (nrow(candidateDataSubset) == 1) next()
+  
+  pairingResults <- combn(
+    nrow(candidateDataSubset), 2, 
+    islandFUN,
+    dat = candidateDataSubset, 
+    pool = pools[[
+      candidateDataSubset$DatasetID[1]
+    ]][[candidateDataSubset$CombnNum[1]]],
+    mat = mats[[
+      candidateDataSubset$DatasetID[1]
+    ]][[candidateDataSubset$CombnNum[1]]],
+    dmat = matrix(c(
+      0, 1, 0, # Island 2 -> 1
+      1, 0, 1, # Island 1 -> 2, Island 3 -> 2
+      0, 1, 0  # Island 2 -> 3
+    ), nrow = 3, ncol = 3, byrow = TRUE),
+    simplify = FALSE
+  )
+  
+  pairingResults <- lapply(
+    pairingResults, function(mat, isles) {
+      mat <- mat[nrow(mat), -1]
+      retVal <- list()
+      species <- length(mat) / isles
+      for (i in 1:isles) {
+        retVal[[i]] <- mat[((i - 1) * species + 1) : (i * species)]
+      }
+      retVal
+    },
+    isles = 3
+  )
+  
+  islandInteractionsOneEmptyTwo[[grp]] <- pairingResults
+}
+```
+
+```{r compareIslandDynamics}
+# Format of table should be:
+# ID, Community 1, Community 2, Outcomes 1-2, Outcomes 1-0-2
+# For outcomes, species presence will be used.
+
+communities <- NULL
+totalCommunities <- NULL
+for (grp in unique(candidateData$TotalID)) {
+  candidateDataSubset <- candidateData %>% dplyr::filter(TotalID == grp)
+  
+  if (nrow(candidateDataSubset) > 1) {
+    newCommunities <- combn(
+      candidateDataSubset$Communities, 2, 
+    )
+    communities <- c(communities, newCommunities)
+    totalCommunities <- c(
+      totalCommunities,
+      toString(sort(unique(unlist(lapply(newCommunities, 
+                                         RMTRCode2::CsvRowSplit)))))
+    )
+  }
+}
+
+islandInteractionsOneTwoWhich <- unlist(lapply(
+  seq_along(islandInteractionsOneTwo), function(i, x, tC) {
+    lapply(x[[i]], function(y, tC) {
+      lapply(y, function(z, tC) {
+        toString(RMTRCode2::CsvRowSplit(tC)[which(z > 1E-6)])
+      }, tC = tC)
+    },
+    tC = tC[i])
+  },
+  x = islandInteractionsOneTwo,
+  tC = totalCommunities))
+
+islandInteractionsOneEmptyTwoWhich <- unlist(lapply(
+  seq_along(islandInteractionsOneEmptyTwo), function(i, x, tC) {
+    lapply(x[[i]], function(y, tC) {
+      lapply(y, function(z, tC) {
+        toString(RMTRCode2::CsvRowSplit(tC)[which(z > 1E-6)])
+      }, tC = tC)
+    },
+    tC = tC[i])
+  },
+  x = islandInteractionsOneEmptyTwo,
+  tC = totalCommunities))
+
+
+islandInteractionResults <- data.frame(
+  DatasetID = rep(names(islandInteractionsOneTwo), 
+                  unlist(lapply(islandInteractionsOneTwo, length))),
+  Community1 = communities[seq(from = 1, to = length(communities), by = 2)],
+  Community2 = communities[seq(from = 2, to = length(communities), by = 2)],
+  OutcomeWOEmpty_Island1 = islandInteractionsOneTwoWhich[
+    seq(from = 1, to = length(islandInteractionsOneTwoWhich), by = 2)],
+  OutcomeWOEmpty_Island2 = islandInteractionsOneTwoWhich[
+    seq(from = 1, to = length(islandInteractionsOneTwoWhich), by = 2)],
+  OutcomeWEmpty_Island1 = islandInteractionsOneEmptyTwoWhich[
+    seq(from = 1, to = length(islandInteractionsOneEmptyTwoWhich), by = 3)],
+  OutcomeWEmpty_Island2 = islandInteractionsOneEmptyTwoWhich[
+    seq(from = 1, to = length(islandInteractionsOneEmptyTwoWhich), by = 3)],
+  OutcomeWEmpty_Island3 = islandInteractionsOneEmptyTwoWhich[
+    seq(from = 1, to = length(islandInteractionsOneEmptyTwoWhich), by = 3)]
+)
+
+islandInteractionResults
+```
+
+```{r matches}
+islandInteractionResults %>% dplyr::mutate(
+  C1WOInvaded = Community1 != OutcomeWOEmpty_Island1,
+  C2WOInvaded = Community2 != OutcomeWOEmpty_Island2,
+  C1WInvaded = Community1 != OutcomeWEmpty_Island1,
+  C2WInvaded = Community2 != OutcomeWEmpty_Island3,
+  StalemateWO = !C1WOInvaded & !C2WOInvaded,
+  StalemateW = !C1WInvaded & !C2WInvaded,
+  HybridWO = C1WOInvaded & C2WOInvaded,
+  HybridW = C1WInvaded & C2WInvaded,
+) %>% dplyr::select(-dplyr::starts_with("Outcome"))
+```
+
+# Save workspace
+```{r save}
+save(
+  candidateData,
+  islandInteractionsOneEmptyTwo,
+  islandInteractionsOneTwo,
+  mats,
+  paramFrame,
+  plotScalingData,
+  pools,
+  file = "LM1996-NumPoolCom-QDat-2021-05.RData"
+)
+```
