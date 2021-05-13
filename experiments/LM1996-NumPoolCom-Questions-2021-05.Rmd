@@ -1,0 +1,89 @@
+---
+title: "Answering Questions; Gather Data, 2021-05"
+output:
+  html_notebook:
+    code_folding: hide
+---
+
+```{r libs}
+# Check requisite packages are installed.
+packages <- c(
+  "plotly", 
+  "dplyr",
+  "RMTRCode2"
+)
+for (pkg in packages) {
+  library(pkg, character.only = TRUE)
+}
+
+# Reserved Names
+candidateData <- NULL
+islandInteractionsOneEmptyTwo <- NULL
+islandInteractionsOneTwo <- NULL
+mats <- NULL
+paramFrame <- NULL
+plotScalingData <- NULL
+pools <- NULL
+```
+
+# Disentangling Effects on the Viking Data {.tabset}
+
+## Load Data
+```{r loadDat}
+ellipsisApply <- function(..., FUN) {
+  lapply(as.list(...), FUN)
+}
+
+load("LM1996-NumPoolCom-QDat-2021-05.RData")
+# Stop if not all are not null
+stopifnot(all(unlist(ellipsisApply(
+  FUN = function(bool) {!is.null(bool)},
+  candidateData, 
+  islandInteractionsOneEmptyTwo,
+  islandInteractionsOneTwo,
+  mats,
+  paramFrame,
+  plotScalingData,
+  pools
+))))
+```
+
+```{r testPlot}
+plotScaling <- plotly::plot_ly(
+  plotScalingData,
+  x = ~Basals,
+  y = ~Consumers,
+  z = ~CommunitySize,
+  color = ~Dataset,
+  colors = c("red", "blue", "black")
+)
+
+plotScaling <- plotly::add_markers(plotScaling)
+
+plotScaling <- plotly::layout(
+  plotScaling,
+  scene = list(
+    xaxis = list(type = "log"),
+    yaxis = list(type = "log"),
+    camera = list(
+      eye = list(
+        x = -1.25, y = -1.25, z = .05
+      )
+    )
+  )
+)
+
+plotScaling
+```
+
+## Persistence of Hybrid Communities
+The idea is straightforward: after allowing interactions between islands, for islands that are not the same as one of the original communities, isolate the island and check to see what happens.
+
+## Invadability of Hybrid Communities
+Looking at a longer time scale, what happens if/when invasions resume? Do the hybrid communities that emerged retain the uninvadability of the parent communities?
+
+## Presence of Mass Effects
+We check to see what happens when we treat each community as a pool for the other and perform assembly. Are the results the same as the diffusion system?
+
+## Indirect Mutualism
+Here, we check to see if the networks created by each community (hybrid or otherwise) has mutualism embedded in it.
