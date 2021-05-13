@@ -18,8 +18,9 @@ for (pkg in packages) {
 
 # Reserved Names
 candidateData <- NULL
-islandInteractionsOneEmptyTwo <- NULL
+islandInteractionsOneEmptyTwoWhich <- NULL
 islandInteractionsOneTwo <- NULL
+islandInteractionsOneTwoWhich <- NULL
 mats <- NULL
 paramFrame <- NULL
 plotScalingData <- NULL
@@ -40,7 +41,9 @@ stopifnot(all(unlist(ellipsisApply(
   FUN = function(bool) {!is.null(bool)},
   candidateData, 
   islandInteractionsOneEmptyTwo,
+  islandInteractionsOneEmptyTwoWhich,
   islandInteractionsOneTwo,
+  islandInteractionsOneTwoWhich,
   mats,
   paramFrame,
   plotScalingData,
@@ -74,6 +77,166 @@ plotScaling <- plotly::layout(
 )
 
 plotScaling
+```
+
+
+```{r allCommunitiesSanityChecks}
+# Check that the Two island and Three island scenarios are set-up the same.
+stopifnot(unlist(lapply(islandInteractionsOneTwo, length)) == 
+            unlist(lapply(islandInteractionsOneEmptyTwo, length)))
+stopifnot(names(islandInteractionsOneTwo) == 
+            names(islandInteractionsOneEmptyTwo))
+# Check that the Which versions correspond correctly.
+stopifnot(
+  unlist(lapply(islandInteractionsOneTwoWhich, function(x) {
+    length(RMTRCode2::CsvRowSplit(x))
+  })) 
+  == unlist(lapply(islandInteractionsOneTwo, function(x) {
+    # We're like onions; we have LAYERS!
+    lapply(x, function(y) {
+      lapply(y, function(z) {
+        sum(z > 1E-6) # How many "large" entries are there?
+      })})}))
+)
+stopifnot(
+  unlist(lapply(islandInteractionsOneEmptyTwoWhich, function(x) {
+    length(RMTRCode2::CsvRowSplit(x))
+  })) 
+  == unlist(lapply(islandInteractionsOneEmptyTwo, function(x) {
+    # We're like onions; we have LAYERS!
+    lapply(x, function(y) {
+      lapply(y, function(z) {
+        sum(z > 1E-6) # How many "large" entries are there?
+      })})}))
+)
+```
+
+```{r allCommunitiesAddHybrids}
+# Hybrids
+# Create a count of how many times each entry will be repeated.
+allCommunitiesRepeater <- 5 * unlist(lapply(islandInteractionsOneTwo, length))
+
+# Create template.
+allCommunities <- data.frame(
+  CombnNum = rep(0, sum(allCommunitiesRepeater)), # Should repeat all rows.
+  Basals = 0,
+  Consumers = 0,
+  Dataset = "",
+  DatasetID = 0,
+  Communities = "",
+  CommunitySize = 0,
+  OtherSteadyStates = 0, # To be recalculated
+  CommunityAbund = "",
+  CommunityProd = 0,
+  TotalID = "",
+  # Additional Column!, 1 for direct assembly, 0 unused.
+  IslandsUsed = rep(c(2,2,3,3,3), sum(allCommunitiesRepeater)/5)
+)
+
+# Retrieve the rows used to make hybrids
+allCommunitiesProspects <- candidateData %>% dplyr::group_by(
+  CombnNum, Basals, Consumers, Dataset, DatasetID, TotalID
+) %>% dplyr::select(
+  CombnNum:DatasetID, TotalID
+) %>% dplyr::summarise(
+  Count = dplyr::n(), .groups = "keep"
+) %>% dplyr::filter(
+  Count > 1
+) %>% dplyr::select(
+  -Count
+) %>% dplyr::arrange(
+  DatasetID, CombnNum
+)
+
+# Make sure that the names match.
+stopifnot(allCommunitiesProspects$TotalID == names(allCommunitiesRepeater))
+
+# Insert repetitions.
+allCommunities$CombnNum <- rep(allCommunitiesProspects$CombnNum, allCommunitiesRepeater)
+allCommunities$Basals <- rep(allCommunitiesProspects$Basals, allCommunitiesRepeater)
+allCommunities$Consumers <- rep(allCommunitiesProspects$Consumers, allCommunitiesRepeater)
+allCommunities$Dataset <- rep(allCommunitiesProspects$Dataset, allCommunitiesRepeater)
+allCommunities$DatasetID <- rep(allCommunitiesProspects$DatasetID, allCommunitiesRepeater)
+allCommunities$TotalID <- rep(allCommunitiesProspects$TotalID, allCommunitiesRepeater)
+
+# To move over from the data.
+# Communities = "",
+# CommunityAbund = ""
+
+allCommunities[allCommunities$IslandsUsed == 2, ]$Communities <- 
+  islandInteractionsOneTwoWhich
+allCommunities[allCommunities$IslandsUsed == 3, ]$Communities <- 
+  islandInteractionsOneEmptyTwoWhich
+
+allCommunities[allCommunities$IslandsUsed == 2, ]$CommunityAbund <- 
+  # We're like onions; we have LAYERS!
+  unlist(lapply(islandInteractionsOneTwo, function(x) {
+    lapply(x, function(y) {
+      lapply(y, function(z) {
+        toString(z[z > 1E-6])
+      })
+    })
+  }))
+  
+allCommunities[allCommunities$IslandsUsed == 3, ]$CommunityAbund <- 
+  unlist(lapply(islandInteractionsOneEmptyTwo, function(x) {
+    lapply(x, function(y) {
+      lapply(y, function(z) {
+        toString(z[z > 1E-6])
+      })
+    })
+  }))
+
+# To calculate from the data.
+# CommunitySize = 0, # To be calculated from Communities.
+# OtherSteadyStates = 0, # To be recalculated last after filtering
+# CommunityProd = 0, # To be recalculated after Abund stored.
+allCommunities$CommunitySize <- unlist(lapply(
+  allCommunities$Communities, function(x) {
+    length(RMTRCode2::CsvRowSplit(x))
+  })) 
+
+for (r in 1:nrow(allCommunities)) {
+  allCommunities$CommunityProd[r] <- with(
+    allCommunities[r, ], 
+    RMTRCode2::Productivity(
+      Pool = pools[[DatasetID]][[CombnNum]], 
+      InteractionMatrix = mats[[DatasetID]][[CombnNum]], 
+      Community = Communities, 
+      Populations = CommunityAbund
+    )
+  )
+}
+
+# Treating the Productivity like one might treat a hash,
+# if two rows with the same properties are assigned the same hash, 
+# we only keep one. 
+# Five decimal places is probably excessive, 
+# but we can reflect on that if results down the line are not interesting.
+allCommunities <- allCommunities %>% dplyr::mutate(
+  tempProd = round(CommunityProd, 5)
+) %>% dplyr::distinct(
+  CombnNum, Basals, Consumers, Dataset, DatasetID, TotalID,
+  Communities, CommunitySize, tempProd, IslandsUsed,
+  .keep_all = TRUE
+) %>% dplyr::select(
+  -tempProd
+)
+
+#TODO Look at what was excluded and how different they were.
+#TODO Compare with the original communities to see if we should both with IslandsUsed.
+```
+
+```{r allCommunitiesAddOriginals}
+# Original systems
+allCommunities <- rbind(
+  candidateData %>% dplyr::select(
+    -CommunityFreq, -CommunitySeq
+  ) %>% dplyr::mutate(
+    IslandsUsed = 1
+  ), 
+  allCommunities
+)
 ```
 
 ## Persistence of Hybrid Communities
