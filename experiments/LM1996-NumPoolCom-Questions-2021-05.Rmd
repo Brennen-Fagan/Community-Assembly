@@ -5,7 +5,7 @@ output:
     code_folding: hide
 ---
 
-```{r libs}
+```{r libs, message=FALSE}
 # Check requisite packages are installed.
 packages <- c(
   "plotly", 
@@ -80,7 +80,7 @@ plotScaling
 ```
 
 
-```{r allCommunitiesSanityChecks}
+```{r communitiesAllSanityChecks}
 # Check that the Two island and Three island scenarios are set-up the same.
 stopifnot(unlist(lapply(islandInteractionsOneTwo, length)) == 
             unlist(lapply(islandInteractionsOneEmptyTwo, length)))
@@ -111,14 +111,14 @@ stopifnot(
 )
 ```
 
-```{r allCommunitiesAddHybrids}
+```{r communitiesAllAddHybrids}
 # Hybrids
 # Create a count of how many times each entry will be repeated.
-allCommunitiesRepeater <- 5 * unlist(lapply(islandInteractionsOneTwo, length))
+communitiesAllRepeater <- 5 * unlist(lapply(islandInteractionsOneTwo, length))
 
 # Create template.
-allCommunities <- data.frame(
-  CombnNum = rep(0, sum(allCommunitiesRepeater)), # Should repeat all rows.
+communitiesAll <- data.frame(
+  CombnNum = rep(0, sum(communitiesAllRepeater)), # Should repeat all rows.
   Basals = 0,
   Consumers = 0,
   Dataset = "",
@@ -130,11 +130,11 @@ allCommunities <- data.frame(
   CommunityProd = 0,
   TotalID = "",
   # Additional Column!, 1 for direct assembly, 0 unused.
-  IslandsUsed = rep(c(2,2,3,3,3), sum(allCommunitiesRepeater)/5)
+  IslandsUsed = rep(c(2,2,3,3,3), sum(communitiesAllRepeater)/5)
 )
 
 # Retrieve the rows used to make hybrids
-allCommunitiesProspects <- candidateData %>% dplyr::group_by(
+communitiesAllProspects <- candidateData %>% dplyr::group_by(
   CombnNum, Basals, Consumers, Dataset, DatasetID, TotalID
 ) %>% dplyr::select(
   CombnNum:DatasetID, TotalID
@@ -149,26 +149,26 @@ allCommunitiesProspects <- candidateData %>% dplyr::group_by(
 )
 
 # Make sure that the names match.
-stopifnot(allCommunitiesProspects$TotalID == names(allCommunitiesRepeater))
+stopifnot(communitiesAllProspects$TotalID == names(communitiesAllRepeater))
 
 # Insert repetitions.
-allCommunities$CombnNum <- rep(allCommunitiesProspects$CombnNum, allCommunitiesRepeater)
-allCommunities$Basals <- rep(allCommunitiesProspects$Basals, allCommunitiesRepeater)
-allCommunities$Consumers <- rep(allCommunitiesProspects$Consumers, allCommunitiesRepeater)
-allCommunities$Dataset <- rep(allCommunitiesProspects$Dataset, allCommunitiesRepeater)
-allCommunities$DatasetID <- rep(allCommunitiesProspects$DatasetID, allCommunitiesRepeater)
-allCommunities$TotalID <- rep(allCommunitiesProspects$TotalID, allCommunitiesRepeater)
+communitiesAll$CombnNum <- rep(communitiesAllProspects$CombnNum, communitiesAllRepeater)
+communitiesAll$Basals <- rep(communitiesAllProspects$Basals, communitiesAllRepeater)
+communitiesAll$Consumers <- rep(communitiesAllProspects$Consumers, communitiesAllRepeater)
+communitiesAll$Dataset <- rep(communitiesAllProspects$Dataset, communitiesAllRepeater)
+communitiesAll$DatasetID <- rep(communitiesAllProspects$DatasetID, communitiesAllRepeater)
+communitiesAll$TotalID <- rep(communitiesAllProspects$TotalID, communitiesAllRepeater)
 
 # To move over from the data.
 # Communities = "",
 # CommunityAbund = ""
 
-allCommunities[allCommunities$IslandsUsed == 2, ]$Communities <- 
+communitiesAll[communitiesAll$IslandsUsed == 2, ]$Communities <- 
   islandInteractionsOneTwoWhich
-allCommunities[allCommunities$IslandsUsed == 3, ]$Communities <- 
+communitiesAll[communitiesAll$IslandsUsed == 3, ]$Communities <- 
   islandInteractionsOneEmptyTwoWhich
 
-allCommunities[allCommunities$IslandsUsed == 2, ]$CommunityAbund <- 
+communitiesAll[communitiesAll$IslandsUsed == 2, ]$CommunityAbund <- 
   # We're like onions; we have LAYERS!
   unlist(lapply(islandInteractionsOneTwo, function(x) {
     lapply(x, function(y) {
@@ -178,7 +178,7 @@ allCommunities[allCommunities$IslandsUsed == 2, ]$CommunityAbund <-
     })
   }))
   
-allCommunities[allCommunities$IslandsUsed == 3, ]$CommunityAbund <- 
+communitiesAll[communitiesAll$IslandsUsed == 3, ]$CommunityAbund <- 
   unlist(lapply(islandInteractionsOneEmptyTwo, function(x) {
     lapply(x, function(y) {
       lapply(y, function(z) {
@@ -191,14 +191,14 @@ allCommunities[allCommunities$IslandsUsed == 3, ]$CommunityAbund <-
 # CommunitySize = 0, # To be calculated from Communities.
 # OtherSteadyStates = 0, # To be recalculated last after filtering
 # CommunityProd = 0, # To be recalculated after Abund stored.
-allCommunities$CommunitySize <- unlist(lapply(
-  allCommunities$Communities, function(x) {
+communitiesAll$CommunitySize <- unlist(lapply(
+  communitiesAll$Communities, function(x) {
     length(RMTRCode2::CsvRowSplit(x))
   })) 
 
-for (r in 1:nrow(allCommunities)) {
-  allCommunities$CommunityProd[r] <- with(
-    allCommunities[r, ], 
+for (r in 1:nrow(communitiesAll)) {
+  communitiesAll$CommunityProd[r] <- with(
+    communitiesAll[r, ], 
     RMTRCode2::Productivity(
       Pool = pools[[DatasetID]][[CombnNum]], 
       InteractionMatrix = mats[[DatasetID]][[CombnNum]], 
@@ -209,20 +209,20 @@ for (r in 1:nrow(allCommunities)) {
 }
 ```
 
-```{r allCommunitiesAddOriginals}
+```{r communitiesAllAddOriginals}
 # Original systems
-allCommunities <- rbind(
+communitiesAll <- rbind(
   candidateData %>% dplyr::select(
     -CommunityFreq, -CommunitySeq
   ) %>% dplyr::mutate(
     IslandsUsed = 1
   ), 
-  allCommunities
+  communitiesAll
 )
 
 ```
 
-```{r allCommunitiesHash}
+```{r communitiesAllHash}
 # Treating the Productivity like one might treat a hash,
 # if two rows with the same properties are assigned the same hash, 
 # we only keep one. 
@@ -233,7 +233,7 @@ allCommunities <- rbind(
 # Not bothering, sort of, with IslandsUsed, since many times a community is
 # reproduced on varying numbers of islands.
 
-# allCommunities <- allCommunities %>% dplyr::mutate(
+# communitiesAll <- communitiesAll %>% dplyr::mutate(
 #   tempProd = round(CommunityProd, 2)
 # ) %>% dplyr::distinct(
 #   CombnNum, Basals, Consumers, Dataset, DatasetID, TotalID,
@@ -243,7 +243,7 @@ allCommunities <- rbind(
 #   -tempProd
 # )
 
-allCommunities <- allCommunities %>% dplyr::mutate(
+communitiesAll <- communitiesAll %>% dplyr::mutate(
   tempProd = round(CommunityProd, 2)
 ) %>% dplyr::group_by(
   CombnNum, Basals, Consumers, Dataset, DatasetID, TotalID,
@@ -259,6 +259,7 @@ allCommunities <- allCommunities %>% dplyr::mutate(
   CombnNum, Basals, Consumers, Dataset, DatasetID, TotalID
 ) %>% dplyr::mutate(
   OtherSteadyStates = dplyr::n() - 1,
+  Islands1 = grepl(pattern = "1", IslandsUsed, fixed = TRUE) # Will be useful
 )
 
 ```
@@ -266,11 +267,182 @@ allCommunities <- allCommunities %>% dplyr::mutate(
 ## Persistence of Hybrid Communities
 The idea is straightforward: after allowing interactions between islands, for islands that are not the same as one of the original communities, isolate the island and check to see what happens.
 
+```{r hybridsOnly}
+communitiesHybrids <- communitiesAll %>% dplyr::filter(
+  !Islands1
+) %>% dplyr::select(-Islands1)
+```
+
+```{r applyDynamics}
+communitiesHybrids$AfterSepAbund <- ""
+communitiesHybrids$AfterSepCommunity <- ""
+communitiesHybrids$AfterSepCommunitySize <- 0
+communitiesHybrids$AfterSepProduction <- 0
+for (r in 1:nrow(communitiesHybrids)) {
+  temp <- with(
+    communitiesHybrids[r, ],
+    {    
+      temp <- RMTRCode2::CsvRowSplit(Communities)
+      RMTRCode2::LawMorton1996_NumIntegration(
+        A = mats[[DatasetID]][[CombnNum]][temp, temp],
+        R = pools[[DatasetID]][[CombnNum]]$ReproductionRate[temp],
+        X = RMTRCode2::CsvRowSplit(CommunityAbund), 
+        OuterTimeStepSize = 3E4,
+        Tolerance = 1E-6
+      ) # retrieve the abundance over time matrix
+    }
+  ) 
+  
+  temp <- temp[nrow(temp), -1] # choose last row, remove time column.
+  
+  communitiesHybrids$AfterSepCommunity[r] <- toString(
+    RMTRCode2::CsvRowSplit(communitiesHybrids$Communities[r])[which(temp > 1E-6)]
+  )
+  
+  temp <- temp[which(temp > 1E-6)] # remove microfoxes.
+  
+  communitiesHybrids$AfterSepAbund[r] <- toString(temp)
+  communitiesHybrids$AfterSepCommunitySize[r] <- length(temp)
+  
+  communitiesHybrids$AfterSepProduction[r] <- with(
+    communitiesHybrids[r, ], 
+    RMTRCode2::Productivity(
+      Pool = pools[[DatasetID]][[CombnNum]], 
+      InteractionMatrix = mats[[DatasetID]][[CombnNum]], 
+      Community = AfterSepCommunity, 
+      Populations = AfterSepAbund
+    )
+  )
+}
+```
+
+```{r hybridsPersist}
+communitiesHybrids <- communitiesHybrids %>% dplyr::mutate(
+  Persists = AfterSepCommunity == Communities,
+  ProdChange = AfterSepProduction - CommunityProd
+)
+```
+
+So after running the dynamics for 3E4 time units (i.e. 3x the length of time the dynamics in the numerical assembly runs in between assembly steps and 1.5x the length of the island dynamics), the communities that persist are `r which(communitiesHybrids$Persists)`.
+Examining the communities themselves, they are all the same community, albeit with different starting points.
+```{r hybridsPersistWhich}
+communitiesHybrids[communitiesHybrids$Persists, ]
+```
+
+An obvious follow-up question: how many of the communities that collapse do so to communities that we have not already seen?
+
+```{r hybridsCollapseTo}
+communitiesHybrids <- communitiesHybrids %>% dplyr::mutate(
+  AfterSepCommunityAlreadyPresent = AfterSepCommunity %in% communitiesAll$Communities
+)
+sum(!communitiesHybrids$AfterSepCommunityAlreadyPresent)
+```
+
+Consolidating down to unique ending states we have the following.
+
+```{r hybridsCollapseWhich}
+communitiesHybrids[
+  !communitiesHybrids$AfterSepCommunityAlreadyPresent, 
+  ] %>% dplyr::distinct(CombnNum, AfterSepCommunity, .keep_all = TRUE)
+```
+
+We will add these new states to our catalogue of communities from the experiments.
+We also take the abundance after separation if the community persists to better reflect steady-state conditions.
+
+```{r hybridsToAll}
+communitiesAll <- rbind(
+  communitiesAll %>% dplyr::filter(
+    Islands1 == TRUE
+  ) %>% dplyr::mutate(
+    HybridCollapse = FALSE, Persists = TRUE
+  ),
+  communitiesHybrids %>% dplyr::mutate(
+    CommunityAbund = ifelse(Persists, AfterSepAbund, CommunityAbund),
+    Islands1 = FALSE, HybridCollapse = FALSE,
+  ) %>% dplyr::select(
+    -AfterSepAbund, -AfterSepCommunity, -AfterSepCommunitySize, 
+    -AfterSepProduction, -ProdChange, -AfterSepCommunityAlreadyPresent
+  ) ,
+  with(
+    communitiesHybrids[
+      !communitiesHybrids$AfterSepCommunityAlreadyPresent, 
+    ] %>% dplyr::distinct(CombnNum, AfterSepCommunity, .keep_all = TRUE),
+    data.frame(
+      CombnNum = CombnNum,
+      Basals = Basals,
+      Consumers = Consumers,
+      Dataset = Dataset,
+      DatasetID = DatasetID,
+      TotalID = TotalID,
+      Communities = AfterSepCommunity,
+      CommunitySize = AfterSepCommunitySize,
+      CommunityAbund = AfterSepAbund,
+      CommunityProd = AfterSepProduction,
+      IslandsUsed = IslandsUsed,
+      OtherSteadyStates = 0,
+      Islands1 = FALSE,
+      HybridCollapse = TRUE,
+      Persists = TRUE,
+      stringsAsFactors = FALSE
+    ))
+)
+```
+
 ## Invadability of Hybrid Communities
 Looking at a longer time scale, what happens if/when invasions resume? Do the hybrid communities that emerged retain the uninvadability of the parent communities?
 
+This question should be straightforward as it is testing a step from the assembly process.
+```{r allCommunitiesInvadable}
+communitiesAll$Uninvadable <- NA
+for (r in 1:nrow(communitiesAll)) {
+  communitiesAll$Uninvadable[r] <- with(
+    communitiesAll[r, ],
+    {
+      tempRow <- rep(NA, nrow(pools[[DatasetID]][[CombnNum]]) + 1)
+      tempRow[RMTRCode2::CsvRowSplit(Communities) + 1] <- 
+        RMTRCode2::CsvRowSplit(CommunityAbund)
+      RMTRCode2::LawMorton1996_CheckUninvadable(
+        AbundanceRow = tempRow,
+        Pool = pools[[DatasetID]][[CombnNum]],
+        CommunityMatrix = mats[[DatasetID]][[CombnNum]]
+      )
+    }
+  )
+}
+```
+
+We can compare this property against some of the other properties.
+
+Uninvadability versus whether a community was found via assembly ("on Island 1"):
+```{r tableUninvadableIsland1}
+with(communitiesAll,
+     table(Uninvadable, Islands1))
+```
+Never invadable and assembled (good!), but about half of uninvadables are found without being assembled.
+What about of those that persist?
+```{r tableUninvadableIsland1Persist}
+with(communitiesAll %>% dplyr::filter(Persists),
+     table(Uninvadable, Islands1))
+```
+Which of course fills in some of the blanks.
+So none of the communities that persist are uninvadable if they were not an end state of the assembly process.
+
 ## Presence of Mass Effects
 We check to see what happens when we treat each community as a pool for the other and perform assembly. Are the results the same as the diffusion system?
+
+First, update the pairings.
+```{r updateOtherSteadyStates}
+communitiesAll <- communitiesAll %>% dplyr::group_by(
+  CombnNum, Basals, Consumers, Dataset, DatasetID, TotalID
+) %>% dplyr::mutate(
+  OtherSteadyStates = dplyr::n() - 1
+) %>% dplyr::ungroup()
+```
+
+This procedure can be done in two ways: first by directed invasion where one community is a pool for the other, and second with mutual (undirected) invasion where both communities are simultaneously pools for and invaded by each other. 
+Note that in the directed case, we do not need to do any of the communities already marked as uninvadable with respect to the *regional* pools.
+The other communities they would be compared with are subsets of the regional pools, and so would already be checked against.
+
 
 ## Indirect Mutualism
 Here, we check to see if the networks created by each community (hybrid or otherwise) has mutualism embedded in it.
