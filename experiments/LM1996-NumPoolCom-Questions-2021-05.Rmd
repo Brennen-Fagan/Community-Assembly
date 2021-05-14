@@ -207,24 +207,6 @@ for (r in 1:nrow(allCommunities)) {
     )
   )
 }
-
-# Treating the Productivity like one might treat a hash,
-# if two rows with the same properties are assigned the same hash, 
-# we only keep one. 
-# Five decimal places is probably excessive, 
-# but we can reflect on that if results down the line are not interesting.
-allCommunities <- allCommunities %>% dplyr::mutate(
-  tempProd = round(CommunityProd, 5)
-) %>% dplyr::distinct(
-  CombnNum, Basals, Consumers, Dataset, DatasetID, TotalID,
-  Communities, CommunitySize, tempProd, IslandsUsed,
-  .keep_all = TRUE
-) %>% dplyr::select(
-  -tempProd
-)
-
-#TODO Look at what was excluded and how different they were.
-#TODO Compare with the original communities to see if we should both with IslandsUsed.
 ```
 
 ```{r allCommunitiesAddOriginals}
@@ -237,6 +219,48 @@ allCommunities <- rbind(
   ), 
   allCommunities
 )
+
+```
+
+```{r allCommunitiesHash}
+# Treating the Productivity like one might treat a hash,
+# if two rows with the same properties are assigned the same hash, 
+# we only keep one. 
+# One decimal place might be excessive, 
+# but we can reflect on that if results down the line are not interesting.
+# For the record though, it appears that it is a decently good approach at 
+# removing effectively numerical duplicates.
+# Not bothering, sort of, with IslandsUsed, since many times a community is
+# reproduced on varying numbers of islands.
+
+# allCommunities <- allCommunities %>% dplyr::mutate(
+#   tempProd = round(CommunityProd, 2)
+# ) %>% dplyr::distinct(
+#   CombnNum, Basals, Consumers, Dataset, DatasetID, TotalID,
+#   Communities, CommunitySize, tempProd, IslandsUsed,
+#   .keep_all = TRUE
+# ) %>% dplyr::select(
+#   -tempProd
+# )
+
+allCommunities <- allCommunities %>% dplyr::mutate(
+  tempProd = round(CommunityProd, 2)
+) %>% dplyr::group_by(
+  CombnNum, Basals, Consumers, Dataset, DatasetID, TotalID,
+  Communities, CommunitySize, tempProd,
+) %>% dplyr::summarise(
+  CommunityAbund = dplyr::first(CommunityAbund),
+  CommunityProd = dplyr::first(CommunityProd),
+  IslandsUsed = toString(unique(IslandsUsed)),
+  .groups = "drop"
+) %>% dplyr::select(
+  -tempProd
+) %>% dplyr::group_by(
+  CombnNum, Basals, Consumers, Dataset, DatasetID, TotalID
+) %>% dplyr::mutate(
+  OtherSteadyStates = dplyr::n() - 1,
+)
+
 ```
 
 ## Persistence of Hybrid Communities
