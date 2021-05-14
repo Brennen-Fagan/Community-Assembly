@@ -18,6 +18,7 @@ LawMorton1996_CheckUninvadable <- function(
   }
 
   notPresent <- !(!is.na(Abundance) & Abundance > Threshold)
+  if (sum(notPresent) == 0) {return(TRUE)}
   all(Pool$ReproductionRate[notPresent] +
         CommunityMatrix[notPresent, ] %*% Abundance < 0)
 }
