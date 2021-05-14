@@ -442,7 +442,74 @@ communitiesAll <- communitiesAll %>% dplyr::group_by(
 This procedure can be done in two ways: first by directed invasion where one community is a pool for the other, and second with mutual (undirected) invasion where both communities are simultaneously pools for and invaded by each other. 
 Note that in the directed case, we do not need to do any of the communities already marked as uninvadable with respect to the *regional* pools.
 The other communities they would be compared with are subsets of the regional pools, and so would already be checked against.
+We thus have matrices with three possible outcomes for entries: a set of new communities, uninvadability, or `NA` for unevaluated entries. 
+In the directed case we take a row for our invader/pool and column for the invaded community, such that a community is uninvadable with respect to all other communities if its column only contains `FALSE`. 
+(A community is uninvadable by itself for sake of argument.)
+
+```{r invasionDirected}
+invasionsDirected <- list()
+for (grp in unique(communitiesAll$TotalID)) {
+  communitiesGrp <- communitiesAll %>% dplyr::filter(TotalID == grp)
+  
+  invasionsDirected[[grp]] <- matrix(
+    NA, 
+    nrow = nrow(communitiesGrp),
+    ncol = nrow(communitiesGrp)
+  )
+  
+  for (cl in 1:nrow(communitiesGrp)) {
+    if (communitiesGrp$Uninvadable[cl]) {
+      # No point checking, mark FALSE.
+      invasionsDirected[[grp]][, cl] <- FALSE
+    } else {
+      # Check to see if c(o)l(umn) is uninvadable with respect to rows.
+      for (r in 1:nrow(communitiesGrp)) {
+        if (r == cl) {invasionsDirected[[grp]][r, cl] <- FALSE; next()}
+        
+        invasionsDirected[[grp]][r, cl] <- with(
+          communitiesGrp[cl, ],
+          {
+            tempRow <- rep(NA, nrow(pools[[DatasetID]][[CombnNum]]) + 1)
+            tempIDs <- RMTRCode2::CsvRowSplit(Communities)
+            
+            tempRow[tempIDs + 1] <- RMTRCode2::CsvRowSplit(CommunityAbund)
+            
+            # Easiest trick: set reproduction to impossible (-Inf) for species 
+            # not in either the invaders or the invaded.
+            tempPool <- pools[[DatasetID]][[CombnNum]]
+            tempPool$ReproductionRate <- -Inf 
+            tempPool$ReproductionRate[tempIDs] <- 
+              pools[[DatasetID]][[CombnNum]]$ReproductionRate[tempIDs]
+            
+            tempIDs <- RMTRCode2::CsvRowSplit(communitiesGrp$Communities[r])
+            tempPool$ReproductionRate[tempIDs] <- 
+              pools[[DatasetID]][[CombnNum]]$ReproductionRate[tempIDs]
+            
+            # Return FALSE if uninvadable, since no new communities form.
+            !RMTRCode2::LawMorton1996_CheckUninvadable(
+              AbundanceRow = tempRow,
+              Pool = tempPool,
+              CommunityMatrix = mats[[DatasetID]][[CombnNum]]
+            )
+          }
+        )
+      }
+    }
+  }
+  
+  # No TRUEs (== successful invasions)? Go to next set.
+  if (!any(invasionsDirected[[grp]])) {next()}
+  
+  # Any TRUEs are situations in which row can invade column and should be 
+  # checked for what communities appear as a result.
+  for (cl in 1:nrow(communitiesGrp)) {
+    if (!any(invasionsDirected[[grp]][, cl])) {next()}
+    
+    #TODO Develop IslandAssembly function.
+  }
+}
+```
 
 
-## Indirect Mutualism
+## Indirect Mutualism (or Competition)
 Here, we check to see if the networks created by each community (hybrid or otherwise) has mutualism embedded in it.
