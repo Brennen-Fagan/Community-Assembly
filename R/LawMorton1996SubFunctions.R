@@ -65,27 +65,59 @@ LawMorton1996_species <- function(
 }
 
 LawMorton1996_aij <- function(
-  Species_i, Species_j, k = c(0.01, 10, 0.5, 0.2, 100, 0.1) # Table 2 values.
+  Species_i, Species_j, k = c(0.01, 10, 0.5, 0.2, 100, 0.1), # Table 2 values.
+  CompetitionBasal = 0, Connectance = 1, DiagParam = 0 # Suggested by Jon.
 ) {
   # returns 'p's for the effect of j on i, aij
 
   # i == j
   if (Species_i$ID == Species_j$ID) {
     if (Species_i$Type == "Basal") {
-      return(- Species_i$ReproductionRate * Species_i$Size / k[5])
+      return(- Species_i$ReproductionRate * Species_i$Size / k[5] + DiagParam)
     } else if(Species_i$Type == "Consumer") {
-      return(0)
+      return(0 + DiagParam)
     } else {
       return(NA)
     }
   }
 
   # i != j
+  if (runif(1) > Connectance) {
+    return(0)
+  }
+
   if (Species_i$Type == "Basal") {
     if (Species_j$Type == "Basal") {
 
-      # "Basal species are assumed to be independent of one another."
-      return(0)
+      if (CompetitionBasal > 0) {
+        # Without a good idea of what they otherwise would look like, I am
+        # just going to borrow the predation effects.
+        # This is not without precedent; Coyte et al. 2015 used the same dist.
+        # but with different sign pairs for different interaction types.
+        # We will use the CompetitionBasal parameter to scale this effect though.
+        if (Species_i$Size < Species_j$Size) {
+          # Predator on Prey
+          # Note negativity.
+          return(
+            - k[1] * exp(-(log10(k[2] * Species_i$Size / Species_j$Size) / k[3]) ^ 2) * CompetitionBasal
+          )
+
+        } else if (Species_i$Size > Species_j$Size) {
+          # Prey on Predator
+          # Note double negativity in the original, we remove one for competition.
+          aji <-
+            - k[1] * exp(-(log10(k[2] * Species_j$Size / Species_i$Size) / k[3]) ^ 2)
+          return(
+            aji * k[4] * Species_j$Size / Species_i$Size * CompetitionBasal
+          )
+        } else {
+          return(0)
+        }
+
+      } else {
+        # "Basal species are assumed to be independent of one another."
+        return(0)
+      }
 
     } else if (Species_j$Type == "Consumer") {
 
@@ -146,8 +178,13 @@ LawMorton1996_aij <- function(
   }
 }
 
-LawMorton1996_CommunityMat <- function(Pool, Parameters, seed = NULL) {
-  foreach::foreach(
+LawMorton1996_CommunityMat <- function(
+  Pool, Parameters, seed = NULL,
+  Competition = 0, Mutualism = 0, # Suggestion from Coyte 2015, in [0, 1]
+  CompetitionBasal = 0,
+  Connectance = 1, # in [0, 1]
+  DiagParam = 0) {
+  theMatrix <- foreach::foreach(
     i = iterators::iter(Pool, by = 'row'), .combine = 'rbind'
   ) %:% foreach::foreach(
     j = iterators::iter(Pool, by = 'row'), .combine = 'c'
@@ -158,7 +195,8 @@ LawMorton1996_CommunityMat <- function(Pool, Parameters, seed = NULL) {
       }
       set.seed(seed + i$ID + j$ID)
     }
-    p <- LawMorton1996_aij(i, j, Parameters)
+    p <- LawMorton1996_aij(i, j, Parameters, CompetitionBasal,
+                           Connectance, DiagParam)
     retval <- ifelse(p == 0,
                      0,
                      sign(p) * rtruncnorm(0, Inf, abs(p), abs(p) * Parameters[6]))
@@ -167,6 +205,42 @@ LawMorton1996_CommunityMat <- function(Pool, Parameters, seed = NULL) {
     }
     retval
   }
+
+  # Need to handle mutualism, competition outside of the entries, since it
+  # requires knowledge of the other entry's sign and a shared probability.
+  if (!is.null(seed)) {
+    if (exists(".Random.seed")) {
+      oldSeed <- .Random.seed
+    }
+    set.seed(seed)
+  }
+
+  # There are nrow(Pool) * (nrow(Pool) - 1) / 2 Interaction Pairs.
+  # Currently, they are all (+, -) exploitation pairs.
+  # Following Coyte 2015, we recycle the dists but change the signs.
+  probs <- runif(nrow(Pool) * (nrow(Pool) - 1) / 2)
+  pindex <- 1
+  for (i in 1:(nrow(Pool) - 1)) {
+    for (j in (i + 1):nrow(Pool)) {
+      # Note i != j.
+      if (probs[pindex] < Competition) {
+        # Competition
+        theMatrix[i, j] <- -abs(theMatrix[i, j])
+        theMatrix[j, i] <- -abs(theMatrix[j, i])
+      } else if (probs[pindex] < Competition + Mutualism) {
+        # Mutualism
+        theMatrix[i, j] <- abs(theMatrix[i, j])
+        theMatrix[j, i] <- abs(theMatrix[j, i])
+      }
+      pindex <- pindex + 1
+    }
+  }
+
+  if (!is.null(seed) & exists("oldSeed")) {
+    set.seed(oldSeed)
+  }
+
+  return(theMatrix)
 }
 
 LawMorton1996_NumIntegration <- function(
