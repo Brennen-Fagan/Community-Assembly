@@ -621,33 +621,33 @@ for (i in seq_along(foodWebs)[1:5]) {
 
 #### Closed
 
-#### 1
+#### Example LM 1
 ```{r gallery1}
 print(cheddar::PlotWebByLevel(foodWebs[[1]], show.level.lines = TRUE, 
                                 level = "LongWeightedTrophicLevel"))
 ```
 
-#### 2
+#### Example LM 2
 ```{r gallery2}
-print(cheddar::PlotWebByLevel(foodWebs[[21]], show.level.lines = TRUE, 
+print(cheddar::PlotWebByLevel(foodWebs[[28]], show.level.lines = TRUE, 
                                 level = "LongWeightedTrophicLevel"))
 ```
 
-#### 3
+#### Invadable
 ```{r gallery3}
 print(cheddar::PlotWebByLevel(foodWebs[[41]], show.level.lines = TRUE, 
                                 level = "LongWeightedTrophicLevel"))
 ```
 
-#### 4
+#### Does Not Persist
 ```{r gallery4}
 print(cheddar::PlotWebByLevel(foodWebs[[61]], show.level.lines = TRUE, 
                                 level = "LongWeightedTrophicLevel"))
 ```
 
-#### 5
+#### Hybrid
 ```{r gallery5}
-print(cheddar::PlotWebByLevel(foodWebs[[82]], show.level.lines = TRUE, 
+print(cheddar::PlotWebByLevel(foodWebs[[81]], show.level.lines = TRUE, 
                                 level = "LongWeightedTrophicLevel"))
 ```
 
