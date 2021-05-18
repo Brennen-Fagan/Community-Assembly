@@ -71,7 +71,8 @@ populationsTest <- lapply(
   Populations = inits
 )
 
-# stopifnot(all(unlist(lapply(1:3, function(i) {all(populations[[i]] == populationsTest[[i]])}))))
+if (exists("populations"))
+  stopifnot(all(unlist(lapply(1:3, function(i) {all(populations[[i]] == populationsTest[[i]])}))))
 
 productivityTest <- lapply(
   seq_along(communities),
@@ -84,8 +85,12 @@ productivityTest <- lapply(
   Populations = populationsTest
 )
 
-# Interestingly, there is an implementation difference here.
-
+if (exists("productivity"))
+  stopifnot(all(unlist(lapply(1:3, function(i) {
+    ifelse(is.na(productivity[[i]]) & is.na(productivityTest[[i]]),
+           TRUE,
+           all(productivity[[i]] == productivityTest[[i]]))
+  }))))
 abundance1Test <- RMTRCode2::IslandDynamics(
   Pool = pool,
   InteractionMatrix = comMat,
@@ -101,7 +106,8 @@ abundance1Test <- RMTRCode2::IslandDynamics(
   DispersalIsland = matrix(0, nrow = 2, ncol = 2),
   Tolerance = 1E-6
 )
-# stopifnot(all(abundance1 == abundance1Test))
+if (exists("abundance1"))
+  stopifnot(all(abundance1 == abundance1Test))
 
 abundance2Test <- RMTRCode2::IslandDynamics(
   Pool = pool,
@@ -118,7 +124,9 @@ abundance2Test <- RMTRCode2::IslandDynamics(
   DispersalIsland = matrix(c(0, 1, 1, 0), nrow = 2, ncol = 2),
   Tolerance = 1E-6
 )
-# stopifnot(all(abundance2 == abundance2Test))
+if (exists("abundance2"))
+  stopifnot(all(abundance2 == abundance2Test))
+
 
 abundance3Test <- RMTRCode2::IslandDynamics(
   Pool = pool,
@@ -141,4 +149,6 @@ abundance3Test <- RMTRCode2::IslandDynamics(
   ), nrow = 3, ncol = 3, byrow = TRUE),
   Tolerance = 1E-6
 )
-# stopifnot(all(abundance3 == abundance3Test))
+
+if (exists("abundance3"))
+  stopifnot(all(abundance3 == abundance3Test))
