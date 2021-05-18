@@ -5,11 +5,13 @@ output:
     code_folding: hide
 ---
 
-```{r libs, message=FALSE}
+```{r libs, message=FALSE, warning=FALSE}
 # Check requisite packages are installed.
 packages <- c(
   "plotly", 
   "dplyr",
+  "cheddar",
+  "igraph",
   "RMTRCode2"
 )
 for (pkg in packages) {
@@ -513,3 +515,140 @@ for (grp in unique(communitiesAll$TotalID)) {
 
 ## Indirect Mutualism (or Competition)
 Here, we check to see if the networks created by each community (hybrid or otherwise) has mutualism embedded in it.
+
+The first obvious step is to make a gallery of the food webs.
+The reader will notice the upside-down 'T' shape to the plots.
+<!--We will use a neat trick from `https://stackoverflow.com/a/53444654`.
+```{r neatTrick}
+catHeader <- function(text = "", level = 3) {
+    cat(paste0("\n\n", 
+               paste(rep("#", level), collapse = ""), 
+               " ", text, "\n"))
+}
+```
+-->
+
+We will also need to recreate code from the file `LawMorton1996-NumericalTables-Parallel.Rmd`.
+```{r createGraphs}
+foodWebs <- list()
+
+for (r in 1:nrow(communitiesAll)) {
+  foodWebs[[r]] <- with(
+    communitiesAll[r, ],
+    {
+      redCom <- RMTRCode2::CsvRowSplit(Communities)
+      redMat <- mats[[DatasetID]][[CombnNum]][redCom, redCom]
+      redPool <- pools[[DatasetID]][[CombnNum]][redCom, ]
+      
+      colnames(redMat) <- paste0('s',as.character(redCom))
+      rownames(redMat) <- colnames(redMat)
+      
+      names(redPool)[1] <- "node"
+      redPool$node <- colnames(redMat)
+      names(redPool)[3] <- "M"
+      
+      Graph <- igraph::graph_from_adjacency_matrix(
+        redMat, weighted = TRUE
+      )
+      
+      Graph <- igraph::set.vertex.attribute(
+        Graph, "name", value = colnames(redMat)
+      )
+      
+      redPool$N <- RMTRCode2::CsvRowSplit(CommunityAbund)
+      
+      GraphAsDataFrame <- igraph::as_data_frame(Graph)
+    
+      # cheddar does not like cannibals.
+      GraphAsDataFrame <- GraphAsDataFrame[
+        GraphAsDataFrame$to != GraphAsDataFrame$from,
+      ]
+  
+      # Add in abundances for calculating abundance * (gain or loss)
+      GraphAsDataFrame <- dplyr::left_join(
+        GraphAsDataFrame,
+        dplyr::select(redPool, node, N),
+        by = c("to" = "node")
+      )
+  
+      # Split data frame.
+      ResCon <- GraphAsDataFrame[GraphAsDataFrame$weight > 0,]
+      ConRes <- GraphAsDataFrame[GraphAsDataFrame$weight < 0,]
+      
+      # Reorder and rename variables.
+      ResCon <- dplyr::select(ResCon, 
+                                 resource = to, consumer = from, 
+                                 gainPerUnit = weight, resourceAbund = N)
+      ConRes <- dplyr::select(ConRes, 
+                                 resource = from, consumer = to, 
+                                 lossPerUnit = weight, consumerAbund = N)
+      
+      ResCon <- dplyr::mutate(dplyr::group_by(ResCon, consumer),
+                                 gainEfficiency = gainPerUnit / sum(gainPerUnit),
+                                 gainActual = gainPerUnit * resourceAbund,
+                                 gainNormal = gainActual / sum(gainActual))
+      ConRes <- dplyr::mutate(dplyr::group_by(ConRes, resource),
+                                 lossEfficiency = lossPerUnit / sum(lossPerUnit),
+                                 lossActual = lossPerUnit * consumerAbund,
+                                 lossNormal = lossActual / sum(lossActual))
+      
+      cheddarCommunity <- cheddar::Community(
+        redPool,
+        properties = list(
+          title = paste(TotalID, ":", Communities, ": row", r),
+          M.units = "masses",
+          N.units = "abund"
+        ),
+        trophic.links = dplyr::full_join(ResCon, ConRes, 
+                                         by = c("resource", "consumer"))
+      )
+      
+      cheddarCommunity
+    }
+  )
+}
+```
+
+### Example Gallery {.tabset}
+<!--```{r templot, results = "asis", echo = FALSE}
+for (i in seq_along(foodWebs)[1:5]) {
+  tmp <- foodWebs[[i]]
+  catHeader(i, 4)
+  print(cheddar::PlotWebByLevel(tmp, show.level.lines = TRUE, 
+                                level = "LongWeightedTrophicLevel"))
+}
+```-->
+
+#### Closed
+
+#### 1
+```{r gallery1}
+print(cheddar::PlotWebByLevel(foodWebs[[1]], show.level.lines = TRUE, 
+                                level = "LongWeightedTrophicLevel"))
+```
+
+#### 2
+```{r gallery2}
+print(cheddar::PlotWebByLevel(foodWebs[[21]], show.level.lines = TRUE, 
+                                level = "LongWeightedTrophicLevel"))
+```
+
+#### 3
+```{r gallery3}
+print(cheddar::PlotWebByLevel(foodWebs[[41]], show.level.lines = TRUE, 
+                                level = "LongWeightedTrophicLevel"))
+```
+
+#### 4
+```{r gallery4}
+print(cheddar::PlotWebByLevel(foodWebs[[61]], show.level.lines = TRUE, 
+                                level = "LongWeightedTrophicLevel"))
+```
+
+#### 5
+```{r gallery5}
+print(cheddar::PlotWebByLevel(foodWebs[[82]], show.level.lines = TRUE, 
+                                level = "LongWeightedTrophicLevel"))
+```
+
+### Measuring Indirect Interactions
