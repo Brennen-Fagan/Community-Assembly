@@ -404,21 +404,21 @@ IslandNumericalAssembly <- function(
   DispersalPool, # Species related dispersal rates
   # Should have length == nrow(Pool). Multiplied by entries of
   DispersalIsland, # Island related dispersal rates. Is a matrix, row = to.
-  Dynamics = IslandLotkaVolterra,
+  Dynamics = GeneralisedLotkaVolterra,
   Tolerance = 1E-1,
   ArrivalDensity = 0.1,
   ArrivalEvents = 10,
-  ArrivalRate = c("constant", "abundance",
-                  "exponential", "exponentialAbundance"),
-  # Rate = constant => every x time units, a species arrives
-  # Rate = abundance => every x * abundance time units, a species arrives
-  # Rate = exponential => every exp(x) time units, a species arrives
-  # Rate = exponentialAbundance => every exp(x * abundance) time units...
-  Arrivals = c("separate", "groups"),
-  # Arrivals = separate, species arrive 1 by 1 in random order (based on rates)
-  #                    so same rates means alternating behaviour.
-  # Arrivals = groups, species ignore each other
-  #                    so same rates means same arrival times.
+  # ArrivalRate = c("constant", "abundance",
+  #                 "exponential", "exponentialAbundance"),
+  # # Rate = constant => every x time units, a species arrives
+  # # Rate = abundance => every x * abundance time units, a species arrives
+  # # Rate = exponential => every exp(x) time units, a species arrives
+  # # Rate = exponentialAbundance => every exp(x * abundance) time units...
+  # Arrivals = c("separate", "groups"),
+  # # Arrivals = separate, species arrive 1 by 1 in random order (based on rates)
+  # #                    so same rates means alternating behaviour.
+  # # Arrivals = groups, species ignore each other
+  # #                    so same rates means same arrival times.
   ArrivalSampler = c("rearrange", "iid"),
   seed = NULL
 ) {
@@ -438,34 +438,45 @@ IslandNumericalAssembly <- function(
     DispersalIsland = DispersalIsland
   )
 
-  # So we will interpret arrival rates in one of eight ways.
-  arrivalRate <- match.arg(
-    ArrivalRate, c("constant", "abundance",
-                   "exponential", "exponentialAbundance"))
-  arrivals <- match.arg(Arrivals, c("separate", "groups"))
+  # # So we will interpret arrival rates in one of eight ways.
+  # arrivalRate <- match.arg(
+  #   ArrivalRate, c("constant", "abundance",
+  #                  "exponential", "exponentialAbundance"))
+  # arrivals <- match.arg(Arrivals, c("separate", "groups"))
   arrivalSampler <- match.arg(ArrivalSampler, c("rearrange", "iid"))
-  if (arrivalRate == "constant" && arrivals == "separate") {
-    # Pick one by one, according to rate
-    arrivalFunction <- ...
-  } else if (arrivalRate == "constant" && arrivals == "groups") {
-    #
-    arrivalFunction <- ...
-  } else if (arrivalRate == "abundance" && arrivals == "separate") {
-    arrivalFunction <- ...
-  } else if (arrivalRate == "abundance" && arrivals == "groups") {
-    arrivalFunction <- ...
-  } else if (arrivalRate == "exponential" && arrivals == "separate") {
-    arrivalFunction <- ...
-  } else if (arrivalRate == "exponential" && arrivals == "groups") {
-    arrivalFunction <- ...
-  } else if (arrivalRate == "exponentialAbundance" && arrivals == "separate") {
-    arrivalFunction <- ...
-  } else if (arrivalRate == "exponentialAbundance" && arrivals == "groups") {
-    arrivalFunction <- ...
-  }
+  # if (arrivalRate == "constant" && arrivals == "separate") {
+  #   # Pick one by one, according to rate
+  #   arrivalFunction <- ...
+  # } else if (arrivalRate == "constant" && arrivals == "groups") {
+  #   #
+  #   arrivalFunction <- ...
+  # } else if (arrivalRate == "abundance" && arrivals == "separate") {
+  #   arrivalFunction <- ...
+  # } else if (arrivalRate == "abundance" && arrivals == "groups") {
+  #   arrivalFunction <- ...
+  # } else if (arrivalRate == "exponential" && arrivals == "separate") {
+  #   arrivalFunction <- ...
+  # } else if (arrivalRate == "exponential" && arrivals == "groups") {
+  #   arrivalFunction <- ...
+  # } else if (arrivalRate == "exponentialAbundance" && arrivals == "separate") {
+  #   arrivalFunction <- ...
+  # } else if (arrivalRate == "exponentialAbundance" && arrivals == "groups") {
+  #   arrivalFunction <- ...
+  # }
 
   # Note we cannot assume either pool stays constant and
   # cannot thus generate all arrival events before running.
+
+  if (arrivalSampler == "rearrange") {
+    # Instead, we track who has arrived and mark them as unable to emigrate.
+    arrivalTracker <- with(
+      preprocessed,
+      replicate(length(Communities), redCom)
+    )
+    # We will reset it once everyone has emigrated.
+  }
+
+
 
   if (!is.null(seed)) {
     if (exists("oldSeed"))
