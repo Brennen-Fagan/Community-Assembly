@@ -41,11 +41,11 @@ library(dplyr)
 library(tidyr)
 
 export_calculation <- TRUE
-version <- 2# of 1, 2.
+vers <- 3# of 1, 2.
 ```
 
 ```{r parameters2}
-if (version == 1) {
+if (vers == 1) {
   # > runif(1) * 1E8
   # [1] 38427042
   set.seed(38427042)
@@ -62,7 +62,7 @@ if (version == 1) {
   seedsRun <- runif(runs * length(basal) * length(consumer)) * 1E8
 } else {
   source(paste0(
-    "LawMorton1996-NumericalPoolCommunityScaling-Settings", version, ".R"
+    "LawMorton1996-NumericalPoolCommunityScaling-Settings", vers, ".R"
   ))
 }
 ```
@@ -92,18 +92,30 @@ communityMats <- foreach::foreach(
   Pool = pools,
   .packages = c("RMTRCode2"), .export = c(".Random.seed")
 ) %dopar% {
-  LawMorton1996_CommunityMat(
-    Pool = Pool, 
-    Parameters = parameters,
-    seed = s
-  )
+  if (exists("Competition"))
+    LawMorton1996_CommunityMat(
+      Pool = Pool, 
+      Parameters = parameters,
+      seed = s,
+      Competition = Competition,
+      Mutualism = Mutualism,
+      CompetitionBasal = CompetitionBasal,
+      Connectance = Connectance,
+      DiagParam = DiagParam
+    )
+  else 
+    LawMorton1996_CommunityMat(
+      Pool = Pool, 
+      Parameters = parameters,
+      seed = s
+    )
 }
 
 if (export_calculation) {
-  filenameExported <- if (version == 1) {
+  filenameExported <- if (vers == 1) {
     "LawMorton1996-NumericalPoolCommunityScaling-PoolMats.RDS"
   } else {
-    paste0("LawMorton1996-NumericalPoolCommunityScaling-PoolMats", version, ".RDS")
+    paste0("LawMorton1996-NumericalPoolCommunityScaling-PoolMats", vers, ".RDS")
   }
   save(
     file = filenameExported,
