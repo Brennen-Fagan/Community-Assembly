@@ -376,7 +376,8 @@ IslandDynamics <- function(
     Communities = Communities,
     Populations = Populations,
     DispersalPool = DispersalPool,
-    DispersalIsland = DispersalIsland
+    DispersalIsland = DispersalIsland,
+    Tolerance = Tolerance
   )
 
   abundance <- with(
@@ -435,7 +436,8 @@ IslandNumericalAssembly <- function(
     Communities = Communities,
     Populations = Populations,
     DispersalPool = DispersalPool,
-    DispersalIsland = DispersalIsland
+    DispersalIsland = DispersalIsland,
+    Tolerance = Tolerance
   )
 
   # # So we will interpret arrival rates in one of eight ways.
@@ -493,7 +495,8 @@ IslandPreprocess <- function(
   Populations, # List containing each Population on each island.
   DispersalPool, # Species related dispersal rates
   # Should have length == nrow(Pool). Multiplied by entries of
-  DispersalIsland
+  DispersalIsland,
+  Tolerance
 ) {
   # Sanity check 1. ############################################################
   stopifnot(length(Communities) == length(Populations))

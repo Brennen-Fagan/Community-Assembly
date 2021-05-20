@@ -28,6 +28,7 @@ exampleDisIslandList <- list(
   # Undirected
   matrix(c(0, 1, 1, 0), nrow = 2, ncol = 2)
 )
+Tolerance <- 1E-6
 
 examplepreprocessed1 <- RMTRCode2::IslandPreprocess(
   Pool = examplePool,
@@ -35,7 +36,8 @@ examplepreprocessed1 <- RMTRCode2::IslandPreprocess(
   Communities = exampleCommunities$Communities[exampleCommunityNums],
   Populations = exampleCommunities$CommunityAbund[exampleCommunityNums],
   DispersalPool = exampleDisPool,
-  DispersalIsland = exampleDisIslandList[[1]]
+  DispersalIsland = exampleDisIslandList[[1]],
+  Tolerance = Tolerance
 )
 
 examplepreprocessed2 <- RMTRCode2::IslandPreprocess(
@@ -44,7 +46,8 @@ examplepreprocessed2 <- RMTRCode2::IslandPreprocess(
   Communities = exampleCommunities$Communities[exampleCommunityNums],
   Populations = exampleCommunities$CommunityAbund[exampleCommunityNums],
   DispersalPool = exampleDisPool,
-  DispersalIsland = exampleDisIslandList[[2]]
+  DispersalIsland = exampleDisIslandList[[2]],
+  Tolerance = Tolerance
 )
 
 examplepreprocessed3 <- RMTRCode2::IslandPreprocess(
@@ -53,5 +56,6 @@ examplepreprocessed3 <- RMTRCode2::IslandPreprocess(
   Communities = exampleCommunities$Communities[exampleCommunityNums],
   Populations = exampleCommunities$CommunityAbund[exampleCommunityNums],
   DispersalPool = exampleDisPool,
-  DispersalIsland = exampleDisIslandList[[3]]
+  DispersalIsland = exampleDisIslandList[[3]],
+  Tolerance = Tolerance
 )
