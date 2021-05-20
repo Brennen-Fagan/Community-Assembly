@@ -652,3 +652,22 @@ print(cheddar::PlotWebByLevel(foodWebs[[81]], show.level.lines = TRUE,
 ```
 
 ### Measuring Indirect Interactions
+Perhaps the most obvious way to measure indirect effects of one node on another is to consider the matrix power.
+The entries in the first power $M^1$ represent the direct (un-normalised) effects of species $j$ (column) on species $i$ (row).
+(Multiply the interactions by the abundance column vector on the right to see why I use this convention.)
+Then the entries of $M^n$ represent the effects of species $j$ on species $i$ after a path of exactly $n$ steps.
+[https://doi.org/10.1016/j.ecocom.2007.05.002](Scotti et al. 2007) and
+[https://doi.org/10.1111/ele.12638](Zhao et al. 2016) both recommend essentially to normalise this score and sum it across the first so many (3 and 5 respectively) steps.
+The latter uses it for `qualitative feeding` matrices, while the former suggests biomass flow rather than the interaction matrices we are using I believe.
+
+Some notes before we begin with this.
+The units are a bit wonky if we are not paying attention; the interaction matrix itself before multiplying by abundance has units inverse time-density. 
+So instead of taking the interaction matrix $A$ directly, we will instead take $B:b_{i,j} = a_{i, j} x_j s$ where $x$ is an abundance (i.e. density) and $s$ represents a time unit.
+This is a bit strange, since I am not doing the obvious vector operation as I want to preserve the dimensionality.
+This can be thought of as integrating the matrix for one time unit instead to remove that dimension, but this makes the result invalid if the system is not in a steady-state (as the system would then have a time dependence rather than a constant integral).
+
+Next, it is not immediately obvious (to me at least) what the correct way to measure the influence of one species on another is.
+I.e. should one take $\sum_{i = 1}^{n} M^n$? Should there be penalties with distance?
+One way to compare would be to take the integral of the deviations from the steady-state using a perturbation applied sequentially to each species.
+For now, let us just apply the first few powers and see if that yields new information.
+We can continue down other paths if it is interesting or we do not see anything emerge.
