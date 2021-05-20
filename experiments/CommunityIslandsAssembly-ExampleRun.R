@@ -59,3 +59,87 @@ examplepreprocessed3 <- RMTRCode2::IslandPreprocess(
   DispersalIsland = exampleDisIslandList[[3]],
   Tolerance = Tolerance
 )
+
+ArrivalEvents <- 100
+
+# Need to extract the entire community
+### This is in $redCom or $redComs.
+# Need to create one copy per island link.
+### Done in next step.
+# Need to shuffle the copies.
+invaders1 <- lapply(
+  exampleDisIslandList[[1]],
+  function(i, len, events) {
+    if (i > 0) {
+      replicate(
+        n = ceiling(events / len),
+        sample.int(len, replace = FALSE)
+      )[
+        1:events
+      ]
+    } else {
+      NULL
+    }
+  },
+  len = length(examplepreprocessed1$redCom),
+  events = ArrivalEvents
+)
+invaders2 <- lapply(
+  exampleDisIslandList[[2]],
+  function(i, len, events) {
+    if (i > 0) {
+      replicate(
+        n = ceiling(events / len),
+        sample.int(len, replace = FALSE)
+      )[
+        1:events
+      ]
+    } else {
+      NULL
+    }
+  },
+  len = length(examplepreprocessed2$redCom),
+  events = ArrivalEvents
+)
+invaders3 <- lapply(
+  exampleDisIslandList[[3]],
+  function(i, len, events) {
+    if (i > 0) {
+      replicate(
+        n = ceiling(events / len),
+        sample.int(len, replace = FALSE)
+      )[
+        1:events
+      ]
+    } else {
+      NULL
+    }
+  },
+  len = length(examplepreprocessed3$redCom),
+  events = ArrivalEvents
+)
+
+# Iterate across the copies in parallel.
+for (event in 1:ArrivalEvents) {
+  # The elements in the copies tell us who is
+  # attempting to invade.
+  for (island in 1:nrow(islands)) {
+
+  }
+}
+# We then check to see if invasion begins.
+# Since copies are per link, we do not need to
+# make sure that the link exists.
+# We instead need to check to make sure that the
+# species can leave the host island (sufficient
+# abundance) and whether the victim island is
+# invadable by this type.
+# If either condition fails, the invasion does
+# not take place.
+# All systems (with or w/o invasions!) are then
+# progressed in parallel using GLV dynamics.
+# Once the invasions are done, check whether the
+# system is invadable by any species not in the
+# system and, if uninvadable, check the
+# populations against the previous populations
+# to see if the system is in steady-state.
