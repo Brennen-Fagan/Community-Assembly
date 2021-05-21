@@ -703,6 +703,7 @@ for (grp in unique(candidateData$TotalID)) {
 # For outcomes, species presence will be used.
 
 communities <- NULL
+productivities <- NULL
 totalCommunities <- NULL
 for (grp in unique(candidateData$TotalID)) {
   candidateDataSubset <- candidateData %>% dplyr::filter(TotalID == grp)
@@ -711,7 +712,11 @@ for (grp in unique(candidateData$TotalID)) {
     newCommunities <- combn(
       candidateDataSubset$Communities, 2, 
     )
+    newProductivities <- combn(
+      candidateDataSubset$CommunityProd, 2, 
+    )
     communities <- c(communities, newCommunities)
+    productivities <- c(productivities, newProductivities)
     totalCommunities <- c(
       totalCommunities,
       toString(sort(unique(unlist(lapply(newCommunities, 
@@ -749,7 +754,9 @@ islandInteractionResults <- data.frame(
   DatasetID = rep(names(islandInteractionsOneTwo), 
                   unlist(lapply(islandInteractionsOneTwo, length))),
   Community1 = communities[seq(from = 1, to = length(communities), by = 2)],
+  Productivity1 = productivities[seq(from = 1, to = length(productivities), by = 2)],
   Community2 = communities[seq(from = 2, to = length(communities), by = 2)],
+  Productivity2 = productivities[seq(from = 2, to = length(productivities), by = 2)],
   OutcomeWOEmpty_Island1 = islandInteractionsOneTwoWhich[
     seq(from = 1, to = length(islandInteractionsOneTwoWhich), by = 2)],
   OutcomeWOEmpty_Island2 = islandInteractionsOneTwoWhich[
@@ -775,5 +782,6 @@ islandInteractionResults %>% dplyr::mutate(
   StalemateW = !C1WInvaded & !C2WInvaded,
   HybridWO = C1WOInvaded & C2WOInvaded,
   HybridW = C1WInvaded & C2WInvaded,
+  ProdDiff = Productivity1 - Productivity2
 ) %>% dplyr::select(-dplyr::starts_with("Outcome"))
 ```
