@@ -1,0 +1,164 @@
+---
+title: "Community Assembly"
+author: "Brennen Fagan"
+date: "24/05/2021"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## The Project
+<div class="columns-2">
+
+Investigating the relationship between species translocation and biodiversity.
+
+Comparing human driven effects to ecological and evolutionary effects.
+
+Two sub-projects:
+
+- Evolutionary/Species
+- Ecological/Community
+
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+
+```{r, out.width="400px", out.height="200px"}
+#![](RemixKagawaTakimoto2017Fig1.png)
+knitr::include_graphics("RemixKagawaTakimoto2017Fig1.png")
+```
+
+
+```{r, out.width="400px"}
+#![](RemixKagawaTakimoto2017Fig1.png)
+knitr::include_graphics("GenericContinentIsland.png")
+```
+
+</div>
+
+## Law and Morton, 1996
+
+<!--<div class="columns-2">-->
+
+<!-- 
+- Pool: Species that can invade the island.
+- Community: Species present on the island. 
+-->
+- <!--Lotka-Volterra: (Exploitation)--> Predatory-Prey dynamics <!--.
+- Two species classes: --> with Basal and Consumer species.
+- Size structured pool with <!--population (thinking macroecology).
+- --> separate time scales. <!--: fast ecology, slow assembly.-->
+
+```{r loadDat, echo = FALSE, warning=FALSE,message=FALSE, out.height="100%"}
+# Reserved Names
+candidateData <- NULL
+islandInteractionsOneEmptyTwoWhich <- NULL
+islandInteractionsOneTwo <- NULL
+islandInteractionsOneTwoWhich <- NULL
+mats <- NULL
+paramFrame <- NULL
+plotScalingData <- NULL
+pools <- NULL
+
+
+ellipsisApply <- function(..., FUN) {
+  lapply(as.list(...), FUN)
+}
+
+dirthis <- getwd()
+dirdat <- file.path(dirthis,
+                    "..",
+                    "experiments")
+
+load(file.path(dirdat, "LM1996-NumPoolCom-QDat-2021-05.RData"))
+# Stop if not all are not null
+stopifnot(all(unlist(ellipsisApply(
+  FUN = function(bool) {!is.null(bool)},
+  candidateData,
+  islandInteractionsOneEmptyTwo,
+  islandInteractionsOneEmptyTwoWhich,
+  islandInteractionsOneTwo,
+  islandInteractionsOneTwoWhich,
+  mats,
+  paramFrame,
+  plotScalingData,
+  pools
+))))
+```
+
+```{r testPlot, echo=FALSE, warning=FALSE,message=FALSE, out.width="100%"}
+library(plotly)
+#library(htmlwidgets)
+
+plotScaling <- plotly::plot_ly(
+  plotScalingData,
+  x = ~Basals,
+  y = ~Consumers,
+  z = ~CommunitySize,
+  color = ~Dataset,
+  colors = c("red", "blue", "black")
+)
+
+plotScaling <- plotly::add_markers(plotScaling)
+
+plotScaling <- plotly::layout(
+  plotScaling,
+  scene = list(
+    xaxis = list(type = "log"),
+    yaxis = list(type = "log"),
+    camera = list(
+      eye = list(
+        x = -1.25, y = -1.25, z = .05
+      )
+    )
+  )
+)
+
+plotScaling
+```
+
+<!--</div>-->
+
+## Early Results (1)
+Stronger dependence on basal species than on consumer species in the pool.
+
+Larger pools $\implies$ larger communities, but non-trivially.
+
+Size structure induces $\perp$ food webs.
+```{r, out.width="400px"}
+#![](RemixKagawaTakimoto2017Fig1.png)
+knitr::include_graphics("foodweb81.png")
+```
+
+## Early Results (2)
+```{r}
+load("islandcomparisonSimple.Rdata")
+tempdata
+```
+
+## Early Results (3)
+Uninvadability to assembly is not the same as uninvadability to dispersal.
+
+Primary productivity does not seem like a great predictor.
+
+When a hybrid community emerges, it seems to propagate to all islands, even if it does not persist.
+
+Hybrid communities that do persist seem to be invadable.
+
+## Future Work
+Currently:
+
+- Working on testing explicitly if the mass effects $\implies$ invading the uninvadable.
+- Looking for indirect mutualisms/competitions (so far, former not apparent).
+- Modifying the pool (less connected, more mutual/competitive, self-regulation).
+
+Later:
+
+- Include dynamics on the pool.
+- Integrate with evolutionary processes.
+- Add more spatial dimension to the islands.
