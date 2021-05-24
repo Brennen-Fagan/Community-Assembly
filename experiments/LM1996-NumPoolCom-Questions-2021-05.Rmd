@@ -519,15 +519,6 @@ Here, we check to see if the networks created by each community (hybrid or other
 
 The first obvious step is to make a gallery of the food webs.
 The reader will notice the upside-down 'T' shape to the plots.
-<!--We will use a neat trick from `https://stackoverflow.com/a/53444654`.
-```{r neatTrick}
-catHeader <- function(text = "", level = 3) {
-    cat(paste0("\n\n", 
-               paste(rep("#", level), collapse = ""), 
-               " ", text, "\n"))
-}
-```
--->
 
 We will also need to recreate code from the file `LawMorton1996-NumericalTables-Parallel.Rmd`.
 ```{r createGraphs}
@@ -657,8 +648,8 @@ Perhaps the most obvious way to measure indirect effects of one node on another 
 The entries in the first power $M^1$ represent the direct (un-normalised) effects of species $j$ (column) on species $i$ (row).
 (Multiply the interactions by the abundance column vector on the right to see why I use this convention.)
 Then the entries of $M^n$ represent the effects of species $j$ on species $i$ after a path of exactly $n$ steps.
-[https://doi.org/10.1016/j.ecocom.2007.05.002](Scotti et al. 2007) and
-[https://doi.org/10.1111/ele.12638](Zhao et al. 2016) both recommend essentially to normalise this score and sum it across the first so many (3 and 5 respectively) steps.
+[Scotti et al. 2007](https://doi.org/10.1016/j.ecocom.2007.05.002) and
+[Zhao et al. 2016](https://doi.org/10.1111/ele.12638) both recommend essentially to normalise this score and sum it across the first so many (3 and 5 respectively) steps.
 The latter uses it for `qualitative feeding` matrices, while the former suggests biomass flow rather than the interaction matrices we are using I believe.
 
 Some notes before we begin with this.
