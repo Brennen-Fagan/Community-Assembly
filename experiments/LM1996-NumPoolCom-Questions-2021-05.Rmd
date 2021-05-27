@@ -513,6 +513,10 @@ for (grp in unique(communitiesAll$TotalID)) {
 }
 ```
 
+Columns are invadeable by rows if the entry is `TRUE`.
+```{r invadeablematrix}
+invasionsDirected
+```
 
 ## Indirect Mutualism (or Competition)
 Here, we check to see if the networks created by each community (hybrid or otherwise) has mutualism embedded in it.
@@ -790,9 +794,10 @@ matsPerturbationsProps <- do.call(rbind, lapply(matsPerturbation, function(m) {
   inters <- 0
   for (i in 1:(nrow(m) - 1)) {
     for (j in (i+1):(ncol(m))) {
-      if (m[i, j] > 0 && m[j, i] > 0)      mutual <- mutual + 1
-      else if (m[i, j] < 0 && m[j, i] < 0) compet <- compet + 1
-      else                                 exploi <- exploi + 1
+      if (m[i, j] > 0 && m[j, i] > 0)        mutual <- mutual + 1
+      else if (m[i, j] < 0 && m[j, i] < 0)   compet <- compet + 1
+      else if ((m[i, j] < 0 && m[j, i] > 0) ||
+               (m[i, j] > 0 && m[j, i] < 0)) exploi <- exploi + 1
       inters <- inters + 1 # expecting (nrow(m) * (nrow(m) - 1) / 2)
     }
   }
@@ -808,5 +813,112 @@ matsPerturbationsProps <- do.call(rbind, lapply(matsPerturbation, function(m) {
 ```
 
 ```{r}
-cbind(communitiesAll, matsPerturbationsProps)l
+cbind(communitiesAll, matsPerturbationsProps)
+```
+
+How much of this exploitaiton is due to basal species?
+
+```{r}
+matsPerturbationsPropsByType <- do.call(
+  rbind, 
+  lapply(seq_along(matsPerturbation), function(i, permat, commun, commat) {
+    #print(i)
+    if (is.null(permat[[i]])) return(
+      data.frame(
+      SelfRegulationPosBasal = NA,
+      SelfRegulationNegBasal = NA,
+      MutualismBasal = NA,
+      CompetitionBasal = NA,
+      ExploitationBasal = NA,
+      SelfRegulationPosConsu = NA,
+      SelfRegulationNegConsu = NA,
+      MutualismConsu = NA,
+      CompetitionConsu = NA,
+      ExploitationConsu = NA
+      )
+    )
+    
+    sigmat <- with(
+      commun[i, ],
+      {
+        tempCommunity <- RMTRCode2::CsvRowSplit(Communities)
+        sign(commat[[DatasetID]][[CombnNum]][tempCommunity, tempCommunity])
+      })
+    sigmatBasal <- diag(sigmat) < 0
+    permatBasal <- sign(permat[[i]])[sigmatBasal, sigmatBasal]
+    permatConsu <- sign(permat[[i]])[!sigmatBasal, !sigmatBasal]
+    
+    mutualB <- 0
+    mutualC <- 0
+    competB <- 0
+    competC <- 0
+    exploiB <- 0
+    exploiC <- 0
+    intersB <- 0
+    intersC <- 0
+    with(list(m = permatBasal),
+         if (length(m) > 1 && nrow(m) > 1) {
+           for (i in 1:(nrow(m) - 1)) {
+             for (j in (i+1):(ncol(m))) {
+               if (m[i, j] > 0 && m[j, i] > 0)        mutualB <<- mutualB + 1
+               else if (m[i, j] < 0 && m[j, i] < 0)   competB <<- competB + 1
+               else if ((m[i, j] < 0 && m[j, i] > 0) ||
+                        (m[i, j] > 0 && m[j, i] < 0)) exploiB <<- exploiB + 1
+               intersB <<- intersB + 1 # expecting (nrow(m) * (nrow(m) - 1) / 2)
+             }
+           }
+         } else {
+           mutualB <<- NA; competB <<- NA; exploiB <<- NA; intersB <<- NA
+         }
+    )
+    with(list(m = permatConsu),
+         if (length(m) > 1 && nrow(m) > 1) {
+           for (i in 1:(nrow(m) - 1)) {
+             for (j in (i+1):(ncol(m))) {
+               if (m[i, j] > 0 && m[j, i] > 0)        mutualC <<- mutualC + 1
+               else if (m[i, j] < 0 && m[j, i] < 0)   competC <<- competC + 1
+               else if ((m[i, j] < 0 && m[j, i] > 0) ||
+                        (m[i, j] > 0 && m[j, i] < 0)) exploiC <<- exploiC + 1
+               intersC <<- intersC + 1 # expecting (nrow(m) * (nrow(m) - 1) / 2)
+             }
+           }
+         } else {
+           mutualC <<- NA; competC <<- NA; exploiC <<- NA; intersC <<- NA
+         }
+    )
+    
+    if (length(permatBasal) > 1) {
+      srpb <- sum(diag(permatBasal) > 0) / nrow(permatBasal)
+      srnb <- sum(diag(permatBasal) < 0) / nrow(permatBasal)
+    } else {
+      srpb <- sum(sign(permatBasal) == 1)
+      srnb <- sum(sign(permatBasal) == -1)
+    }
+    
+    if (length(permatConsu) > 1) {
+      srpc <- sum(diag(permatConsu) > 0) / nrow(permatConsu)
+      srnc <- sum(diag(permatConsu) < 0) / nrow(permatConsu)
+    } else {
+      srpc <- sum(sign(permatConsu) == 1)
+      srnc <- sum(sign(permatConsu) == -1)
+    }
+    
+    data.frame(
+      SelfRegulationPosBasal = srpb,
+      SelfRegulationNegBasal = srnb,
+      MutualismBasal = mutualB / intersB,
+      CompetitionBasal = competB / intersB,
+      ExploitationBasal = exploiB / intersB,
+      SelfRegulationPosConsu = srpc,
+      SelfRegulationNegConsu = srnc,
+      MutualismConsu = mutualC / intersC,
+      CompetitionConsu = competC / intersC,
+      ExploitationConsu = exploiC / intersC
+    )
+  },
+  permat = matsPerturbation,
+  commun = communitiesAll,
+  commat = mats
+  )
+)
 ```
