@@ -13,6 +13,9 @@ packages <- c(
   "cheddar",
   "igraph",
   "expm",
+  "foreach",
+  "iterators",
+  "rootSolve",
   "RMTRCode2"
 )
 for (pkg in packages) {
@@ -816,7 +819,7 @@ matsPerturbationsProps <- do.call(rbind, lapply(matsPerturbation, function(m) {
 cbind(communitiesAll, matsPerturbationsProps)
 ```
 
-How much of this exploitaiton is due to basal species?
+How much of this exploitation is due to basal species?
 
 ```{r}
 matsPerturbationsPropsByType <- do.call(
@@ -921,4 +924,175 @@ matsPerturbationsPropsByType <- do.call(
   commat = mats
   )
 )
+```
+
+```{r}
+matsPerturbationsPropsByType
+```
+
+Jon suggested trying to obtain the characteristic time scales of the system over which we should measure the results.
+Usually, that is derived from the eigenvalues of the matrix.
+[The following is a nice reminder text.](https://math.stackexchange.com/a/1266273)
+In this case, this suggests that we should also compute the Jacobian of the system, both for comparison and for calculation of the time scale.
+We then will want to recompute the perturbation matrix to see what happens over the more appropriately computed time scale.
+We numerically compute the Jacobian with `rootSolve::jacobian.full`.
+Note that "[t]he Jacobian is estimated numerically, by perturbing the x-values."
+To obtain the eigenvalues, they recommend using the `base::eigen` function.
+
+```{r}
+matsJacobi <- list()
+matsJacobiTimes <- list()
+matsJacobiTimesFast <- list()
+for (i in 1:nrow(communitiesAll)) {
+  communityThe <- communitiesAll[i, ]
+  if (!communityThe$Persists) {next}
+  
+  matsJacobi[[i]] <- 
+    with(
+      communityThe, 
+      {
+        tempCommunity <- RMTRCode2::CsvRowSplit(Communities)
+        rootSolve::jacobian.full(
+          y = RMTRCode2::CsvRowSplit(CommunityAbund), 
+          func = RMTRCode2::GeneralisedLotkaVolterra,
+          parms = list(
+            a = mats[[DatasetID]][[CombnNum]][tempCommunity, tempCommunity],
+            r = pools[[DatasetID]][[CombnNum]]$ReproductionRate[tempCommunity],
+            epsilon = 1E-6
+          )
+        )
+      }
+    )
+  
+  matsJacobiTimes[[i]] <- 1 / min(abs(Re(eigen(matsJacobi[[i]])$values)))
+  matsJacobiTimesFast[[i]] <- 1 / max(abs(Re(eigen(matsJacobi[[i]])$values)))
+}
+```
+
+```{r}
+matsPerturbationWJacobiTimes <- list()
+matsPerturbationWJacobiTimesFast <- list()
+for (i in 1:nrow(communitiesAll)) {
+  communityThe <- communitiesAll[i, ]
+  if (!communityThe$Persists) {next}
+  
+  matsPerturbationWJacobiTimes[[i]] <- matrix(NA, 
+                                  nrow = communityThe$CommunitySize,
+                                  ncol = communityThe$CommunitySize)
+  matsPerturbationWJacobiTimesFast[[i]] <- matrix(NA, 
+                                  nrow = communityThe$CommunitySize,
+                                  ncol = communityThe$CommunitySize)
+  
+  # Each entry is the effect of the column on the row.
+  # Hence, we will be placing column vectors in the matrix.
+  #TODO Note to future me: double check the transpose, just in case.
+  
+  for (r in 1:communityThe$CommunitySize) {
+    matsPerturbationWJacobiTimes[[i]][, r] <- with(
+      communityThe, 
+      {
+        tempCommunity <- RMTRCode2::CsvRowSplit(Communities)
+        perturbation <- rep(0, CommunitySize)
+        abund <- RMTRCode2::CsvRowSplit(CommunityAbund)
+        perturbation[r] <- 0.01 * abund[r] #1#0.0001 * abund[r]
+        dynamics <- RMTRCode2::LawMorton1996_NumIntegration(
+          A = mats[[DatasetID]][[CombnNum]][tempCommunity, tempCommunity],
+          R = pools[[DatasetID]][[CombnNum]]$ReproductionRate[tempCommunity],
+          X = abund + perturbation,
+          OuterTimeStepSize = matsJacobiTimes[[i]],
+          InnerTimeStepSize = matsJacobiTimes[[i]] * 0.001,
+          Tolerance = 1E-6
+        ) # Column: Species, Row: Time
+        timediff <- diff(dynamics[, 1])
+        dynamics <- dynamics[, -1]
+        unlist(lapply(1:ncol(dynamics), FUN = function(nc, x, x0, t) {
+          sum((x[-1, nc] - x0[nc]) * timediff)
+        }, x = dynamics, x0 = abund, t = timediff))
+      }
+    )
+  }
+  for (r in 1:communityThe$CommunitySize) {
+    matsPerturbationWJacobiTimesFast[[i]][, r] <- with(
+      communityThe, 
+      {
+        tempCommunity <- RMTRCode2::CsvRowSplit(Communities)
+        perturbation <- rep(0, CommunitySize)
+        abund <- RMTRCode2::CsvRowSplit(CommunityAbund)
+        perturbation[r] <- 0.01 * abund[r] #1#0.0001 * abund[r]
+        dynamics <- RMTRCode2::LawMorton1996_NumIntegration(
+          A = mats[[DatasetID]][[CombnNum]][tempCommunity, tempCommunity],
+          R = pools[[DatasetID]][[CombnNum]]$ReproductionRate[tempCommunity],
+          X = abund + perturbation,
+          OuterTimeStepSize = matsJacobiTimesFast[[i]],
+          InnerTimeStepSize = matsJacobiTimesFast[[i]] * 0.001,
+          Tolerance = 1E-6
+        ) # Column: Species, Row: Time
+        timediff <- diff(dynamics[, 1])
+        dynamics <- dynamics[, -1]
+        unlist(lapply(1:ncol(dynamics), FUN = function(nc, x, x0, t) {
+          sum((x[-1, nc] - x0[nc]) * timediff)
+        }, x = dynamics, x0 = abund, t = timediff))
+      }
+    )
+  }
+}
+```
+
+(Switching between absolute (1) to relative (0.01) does not cause big changes when using the characteristic time scales. Going for finer resolution (absolute steps of 0.001 vs relative steps of 0.001) also did not substantially affect the results.)
+
+We can look at pair-wise correlations with our matrices.
+To be clear, for each two methods, we proceed to take the correlations of the entries of the matrices for each case and average them.
+We can see that the Jacobian seems fairly consistent with the first graph power as well as the unit perturbation cases, but is not strongly related to the perturbation over the characteristic time scale.
+On the other hand, perturbation over the characteristic time scale is still more consistent with perturbation over a unit time scale than with the attempts at graph powers.
+
+```{r}
+matsToCompare <- list(
+  "PertOverUnit" = matsPerturbation,
+  "PertOverChar" = matsPerturbationWJacobiTimes,
+  "PertOverShrt" = matsPerturbationWJacobiTimesFast,
+  "Jacobian" = matsJacobi,
+  "Graph^1" = matsEffects1,
+  "Graph^2" = matsEffects2,
+  "Graph^3" = matsEffects3,
+  "sum(Graph)" = matsEffectsAdd
+)
+
+matCorrAvg <- foreach::foreach(
+    i = iterators::iter(matsToCompare)
+) %:% foreach::foreach(
+    j = iterators::iter(matsToCompare)
+) %do% {
+    mean(unlist(lapply(seq_along(i), function(k, m1, m2) {
+        if (is.null(m1[[k]])) return(NULL)
+        cor(m1[[k]][1:(nrow(m1[[k]])^2)],
+            m2[[k]][1:(nrow(m2[[k]])^2)])
+    }, m1 = i, m2 = j)))
+} %>% unlist %>% matrix(
+  ncol = length(matsToCompare), nrow = length(matsToCompare)
+)
+
+rownames(matCorrAvg) <- names(matsToCompare)
+colnames(matCorrAvg) <- names(matsToCompare)
+matCorrAvg
+```
+
+One might immediately wonder if the Jacobian is a better measurement of total effects, but the Jacobian does not appear to reflect the indirect competition amongst the Basal species that we might expect.
+For example, see the following matrix.
+
+```{r}
+print("Unit time")
+matsPerturbation[[1]]
+print("Jacobian")
+matsJacobi[[1]]
+```
+
+On the other hand, considering the perturbations over characteristic time scales leads to some unexpected results, such as exploitation relationships instead of competition or no interaction at all.
+While this is not necessarily wrong, it does call into question which matrix best describes the interactions, as each version interacts on different time scales.
+(The Jacobian covers instantaneous time scales, the unit perturbation is over a very short time scale, the characteristic time of the largest magnitude eigenvalue is after the major fluctuations are bounded by exponential decay, and the characteristic time of the smallest magnitude eigenvalue is after the most minor fluctuations are bounded by exponential decay.)
+
+```{r}
+print(paste("Fastest Characteristic Time", matsJacobiTimesFast[[1]]))
+matsPerturbationWJacobiTimesFast[[1]]
+print(paste("Slowest Characteristic Time", matsJacobiTimes[[1]]))
+matsPerturbationWJacobiTimes[[1]]
 ```
