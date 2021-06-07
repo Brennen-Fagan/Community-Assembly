@@ -743,8 +743,10 @@ for (i in 1:nrow(communitiesAll)) {
   )
   matsEffects2[[i]] <- expm::`%^%`(matsEffects1[[i]], 2)
   matsEffects3[[i]] <- expm::`%^%`(matsEffects1[[i]], 3)
+  # As has been pointed out to me, Sum_{k = 0}^{infty}(G^k) = (I - G)^-1
   matsEffectsAdd[[i]] <- 
-    matsEffects1[[i]] + matsEffects2[[i]] + matsEffects3[[i]]
+    solve(diag(nrow(matsEffects1[[i]])) - matsEffects1[[i]],
+          diag(nrow(matsEffects1[[i]])))
 }
 ```
 
@@ -768,7 +770,7 @@ mean(unlist(lapply(seq_along(matsPerturbation), function(i, m1, m2) {
   cor(m1[[i]][1:(nrow(m1[[i]])^2)],
       m2[[i]][1:(nrow(m2[[i]])^2)])
 }, m1 = matsPerturbation, m2 = matsEffects3)))
-print("Perturbation vs Sum of 1:3 powers:")
+print("Perturbation vs Infinite sum of powers starting from 0:")
 mean(unlist(lapply(seq_along(matsPerturbation), function(i, m1, m2) {
   if (is.null(m1[[i]])) return(NULL)
   cor(m1[[i]][1:(nrow(m1[[i]])^2)],
@@ -1077,13 +1079,17 @@ matCorrAvg
 ```
 
 One might immediately wonder if the Jacobian is a better measurement of total effects, but the Jacobian does not appear to reflect the indirect competition amongst the Basal species that we might expect.
-For example, see the following matrix.
+The perturbation over a unit time scale does seem to reflect graph effects if we use the infinite sum $\sum_{k = 0}^{\infty} G^k =  (I - G)^{-1}$, which is reflected in the high average correlation.
+(We have applied this to the interaction matrix multiplied by the abundance of species by column, which can be thought of as the overall effect of the column species on the row species as opposed to the per capita effect.)
+For example, see the following matrices.
 
 ```{r}
 print("Unit time")
 matsPerturbation[[1]]
 print("Jacobian")
 matsJacobi[[1]]
+print("Sum_{k=0}^{infty}(Graph^k)")
+matsEffectsAdd[[1]]
 ```
 
 On the other hand, considering the perturbations over characteristic time scales leads to some unexpected results, such as exploitation relationships instead of competition or no interaction at all.
@@ -1095,4 +1101,40 @@ print(paste("Fastest Characteristic Time", matsJacobiTimesFast[[1]]))
 matsPerturbationWJacobiTimesFast[[1]]
 print(paste("Slowest Characteristic Time", matsJacobiTimes[[1]]))
 matsPerturbationWJacobiTimes[[1]]
+```
+
+## Leontief Analysis
+
+Giving `enaR` a try, we establish the flow matrix as a size-adjusted (assuming size is a proxy for mass) absolute flow of mass from resource to consumer. 
+The `enaR` package also requests 
+
+- a vector of inputs, the amount of “mass” flowing into our basal species, 
+- a vector of respirations, the amount of “mass” lost by our species’ “breathing”,
+- a vector of “exports”, which is the amount of mass passed onto further systems,
+- a vector of total outputs (respiration + exports),
+- a vector of biomass actually stored in each node/species, 
+- and whether the entities species are alive.
+
+```{r}
+Leontief <- list()
+
+stopifnot(nrow(communitiesAll) == length(foodWebs))
+
+for (i in 1:length(foodWebs)) {
+  communityThe <- communitiesAll[i, ]
+  foodwebsThe <- foodWebs[[i]]
+  if (!communityThe$Persists) {next}
+  
+  Leontief[[i]] <- with(
+    foodwebsThe, {
+      flow.mat <- matrix(nrow = nrow(nodes), ncol = nrow(nodes))
+      rownames(flow.mat) <- colnames(flow.mat) <- nodes$node
+      for (link in 1:nrow(trophic.links)) {
+        linkRow <- trophic.links[link, ]
+        # NOTE: from-row-to-column
+        flow.mat[linkRow$resource, linkRow$consumer] <-
+          linkRow$gainActual * foodWebs[[1]]$trophic.links$gainActual * foodWebs[[1]]$nodes$M[]
+      }
+    })
+}
 ```
