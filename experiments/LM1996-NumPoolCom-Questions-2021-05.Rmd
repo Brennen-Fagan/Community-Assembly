@@ -1106,6 +1106,7 @@ matsPerturbationWJacobiTimes[[1]]
 ## Leontief Analysis
 
 Giving `enaR` a try, we establish the flow matrix as a size-adjusted (assuming size is a proxy for mass) absolute flow of mass from resource to consumer. 
+So we will need the amount of abundance consumed multiplied by the amount of 
 The `enaR` package also requests 
 
 - a vector of inputs, the amount of “mass” flowing into our basal species, 
@@ -1133,8 +1134,44 @@ for (i in 1:length(foodWebs)) {
         linkRow <- trophic.links[link, ]
         # NOTE: from-row-to-column
         flow.mat[linkRow$resource, linkRow$consumer] <-
-          linkRow$gainActual * foodWebs[[1]]$trophic.links$gainActual * foodWebs[[1]]$nodes$M[]
+          # Note: mass gained by consumer < mass lost by resource (Thermodynamics)
+          # The amount of mass flowing (from the resource) to the consumer
+          # is the gainPerUnit multiplied by the resourceAbund and consumerAbund
+          # (i.e. the abundance generated multiplied by number of interactions)
+          # multiplied by the proxy for mass generated, consumerSize.
+          linkRow$gainPerUnit * 
+          linkRow$resourceAbund * linkRow$consumerAbund *
+          nodes[linkRow$consumer, ]$M
+        
+        
+        flow.mat[linkRow$consumer, linkRow$resource] <-
+          # The amount of mass flowing from the resource (to the consumer)
+          # is the lossPerUnit multiplied by the resourceAbund and consumerAbund
+          # (i.e. the abundance lost multiplied by number of interactions)
+          # multiplied by the proxy for mass lost, resourceSize.
+          linkRow$lossPerUnit * 
+          linkRow$resourceAbund * linkRow$consumerAbund *
+          nodes[linkRow$resource, ]$M
+        
+        stopifnot(abs(flow.mat[linkRow$consumer, linkRow$resource]) >
+                    abs(flow.mat[linkRow$resource, linkRow$consumer]))
       }
+      
+      # Amount of mass flowing into the system: basal generated.
+      flow.input <- ifelse(
+        nodes$type == "Basal",
+        nodes$M * nodes$ReproductionRate * nodes$N,
+        0
+      )
+      
+      # Amount of mass leaving the system. I think this includes 
+      # losses due to inefficiencies in the flow matrix,
+      # losses due to intra-specific competition (basals)
+      # losses due to failure to predate (consumer reproduction rate)
+      flow.output <- 
+      
+      storage <- nodes$N
+      living <- rep(TRUE, nrow(nodes))
     })
 }
 ```
