@@ -556,6 +556,10 @@ for (r in 1:nrow(communitiesAll)) {
       
       redPool$N <- RMTRCode2::CsvRowSplit(CommunityAbund)
       
+      # For later analysis, take the matrix diagonal.
+      
+      redPool$Intraspecific <- diag(redMat)
+      
       GraphAsDataFrame <- igraph::as_data_frame(Graph)
     
       # cheddar does not like cannibals.
@@ -1106,7 +1110,7 @@ matsPerturbationWJacobiTimes[[1]]
 ## Leontief Analysis
 
 Giving `enaR` a try, we establish the flow matrix as a size-adjusted (assuming size is a proxy for mass) absolute flow of mass from resource to consumer. 
-So we will need the amount of abundance consumed multiplied by the amount of 
+Note that we do not appear to want the losses incorporated into the flow matrix.
 The `enaR` package also requests 
 
 - a vector of inputs, the amount of “mass” flowing into our basal species, 
@@ -1128,8 +1132,9 @@ for (i in 1:length(foodWebs)) {
   
   Leontief[[i]] <- with(
     foodwebsThe, {
-      flow.mat <- matrix(nrow = nrow(nodes), ncol = nrow(nodes))
+      flow.mat <- matrix(data = 0, nrow = nrow(nodes), ncol = nrow(nodes))
       rownames(flow.mat) <- colnames(flow.mat) <- nodes$node
+      if (!is.null(trophic.links)) {
       for (link in 1:nrow(trophic.links)) {
         linkRow <- trophic.links[link, ]
         # NOTE: from-row-to-column
@@ -1156,22 +1161,76 @@ for (i in 1:length(foodWebs)) {
         stopifnot(abs(flow.mat[linkRow$consumer, linkRow$resource]) >
                     abs(flow.mat[linkRow$resource, linkRow$consumer]))
       }
+      }
       
       # Amount of mass flowing into the system: basal generated.
       flow.input <- ifelse(
-        nodes$type == "Basal",
+        nodes$Type == "Basal",
         nodes$M * nodes$ReproductionRate * nodes$N,
         0
       )
       
       # Amount of mass leaving the system. I think this includes 
       # losses due to inefficiencies in the flow matrix,
-      # losses due to intra-specific competition (basals)
-      # losses due to failure to predate (consumer reproduction rate)
-      flow.output <- 
+      # losses due to intra-specific competition (basals), and
+      # losses due to failure to predate (consumer reproduction rate).
+      # It is not quite clear which of these are "respiration" versus "export".
+      # Thinking economically (efficiencies?) I think the inefficiencies in the
+      # flow matrix are more liable to be called respiration.
+      # The population losses could, I think, be considered to be due to leaving
+      # the system to be used in another system, although this is very handwavey
+      # in a silicon system.
+      
+      # Effect on the column, by the row:
+      # go by column, if negative, add the transpose.
+      flow.respiration <- colSums(ifelse(flow.mat < 0, 
+                                         flow.mat + t(flow.mat), 
+                                         0), na.rm = TRUE)
+      
+      # Correct the amount of mass loss due to inefficiency.
+      flow.mat[flow.mat < 0] <- 0
+      
+      # Change in abundance multiplied by size.
+      flow.export <- ifelse(
+        nodes$Type == "Basal",
+        nodes$N^2 * nodes$Intraspecific * nodes$M,
+        nodes$ReproductionRate * nodes$N * nodes$M
+      )
+      
+      flow.output <- flow.respiration + flow.export
       
       storage <- nodes$N
       living <- rep(TRUE, nrow(nodes))
+      
+      enaR::pack(
+        flow.mat, flow.input, 
+        flow.respiration, flow.export, flow.output, 
+        storage, living
+      )
     })
 }
 ```
+
+(Note: "there is no edge attribute named flow" refers to a few strictly basal systems.)
+
+Despite performing the operations only on those systems that persist with 
+steady-state (or at least long run) abundances, some of the calculated input and
+output vectors differ (usually magnitude < $10^-9$).
+We thus next make sure the networks are considered balanced before extracting a relationships table (using a technique attributed to Ulanowicz and Puccia (1990)).
+
+```{r}
+Leontief <- lapply(Leontief, function(x) {
+  if (!is.null(x)) 
+    enaR::enaMTI(enaR::balance(x, method = "AVG2"))$Relations.Table 
+  else x
+})
+```
+
+An easy way to extract the results is to apply the `table` function.
+
+```{r}
+lapply(Leontief, function(x) {if(!is.null(x)) table(x$`Mixed (integral)`)})
+```
+
+In contrast to earlier attempts, we now see a few rare mutualisms.
+The algorithm is detecting them as true mutualisms (rather than "self-mutualism"), but I have not yet investigated what makes them mutualistic (or what the "integral" algorithm is).
