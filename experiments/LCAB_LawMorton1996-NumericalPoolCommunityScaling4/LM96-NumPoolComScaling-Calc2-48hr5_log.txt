@@ -1,0 +1,22 @@
+Thu 20 May 12:58:13 BST 2021: executing task LM96-NumPoolComScaling-Calc2-48hr5
+Fatal error: cannot open file 'LawMorton1996-NumericalPoolCommunityScaling-Calculation2.R': No such file or directory
+
+============================
+ Job utilisation efficiency
+============================
+
+Job ID: 14634453
+Cluster: viking
+User/Group: btf500/clusterusers
+State: FAILED (exit code 2)
+Nodes: 1
+Cores per node: 40
+CPU Utilized: 00:00:01
+CPU Efficiency: 1.25% of 00:01:20 core-walltime
+Job Wall-clock time: 00:00:02
+Memory Utilized: 1.18 MB
+Memory Efficiency: 0.00% of 80.00 GB
+ Requested wall clock time: 2-00:00:00
+    Actual wall clock time: 00:00:02
+Wall clock time efficiency: 0.0%
+           Job queued time: 14:54:09
