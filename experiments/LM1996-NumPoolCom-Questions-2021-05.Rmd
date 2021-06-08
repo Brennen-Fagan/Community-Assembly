@@ -1215,7 +1215,7 @@ for (i in 1:length(foodWebs)) {
 
 Despite performing the operations only on those systems that persist with 
 steady-state (or at least long run) abundances, some of the calculated input and
-output vectors differ (usually magnitude < $10^-9$).
+output vectors differ (usually magnitude < $10^{-9}$).  
 We thus next make sure the networks are considered balanced before extracting a relationships table (using a technique attributed to Ulanowicz and Puccia (1990)).
 
 ```{r}
