@@ -1219,18 +1219,68 @@ output vectors differ (usually magnitude < $10^-9$).
 We thus next make sure the networks are considered balanced before extracting a relationships table (using a technique attributed to Ulanowicz and Puccia (1990)).
 
 ```{r}
-Leontief <- lapply(Leontief, function(x) {
+LeontiefMTI <- lapply(Leontief, function(x) {
   if (!is.null(x)) 
-    enaR::enaMTI(enaR::balance(x, method = "AVG2"))$Relations.Table 
+    enaR::enaMTI(enaR::balance(x, method = "AVG2")) 
   else x
 })
+# Returns
+#  G : Rows are who is consumed,
+#      Columns are who is consuming
+#      Entries are percentages of diet
+#  FP: "Negative impact of predator on prey"
+#  Q = G - t(FP)
+#  M : Indirect impacts formed by the infinite sum of powers of Q beginning at 1.
 ```
 
 An easy way to extract the results is to apply the `table` function.
 
 ```{r}
-lapply(Leontief, function(x) {if(!is.null(x)) table(x$`Mixed (integral)`)})
+lapply(LeontiefMTI, function(x) {if(!is.null(x)) 
+  table(x$Relations.Table$`Mixed (integral)`)})
 ```
 
 In contrast to earlier attempts, we now see a few rare mutualisms.
-The algorithm is detecting them as true mutualisms (rather than "self-mutualism"), but I have not yet investigated what makes them mutualistic (or what the "integral" algorithm is).
+Note that the Leontief matrix specifically removes the zeroth power, so we consider what happens when adding it in and compare with removing it from the graph approach.
+We also have a few cases where the matrix has no non-zero entries due to having only non-interacting basal species which need to be ignored for the averaging to make sense.
+Adding the Leontief matrix of indirect effects to the matrix comparison (and transposing to reflect the differing row-column conventions), we have the following.
+
+```{r, warning=FALSE, message=FALSE}
+matsToCompare <- list(
+  "PertOverUnit" = matsPerturbation,
+  "PertOverChar" = matsPerturbationWJacobiTimes,
+  "PertOverShrt" = matsPerturbationWJacobiTimesFast,
+  "Jacobian" = matsJacobi,
+  "Graph^1" = matsEffects1,
+  "Graph^2" = matsEffects2,
+  "Graph^3" = matsEffects3,
+  "sum(Graph)" = matsEffectsAdd,
+  "sum(Graph)-I" = lapply(matsEffectsAdd, function(x) {
+    if(!is.null(x)) x - diag(nrow = nrow(x), ncol = ncol(x))}),
+  "Leontief" = lapply(LeontiefMTI, function(x) if(!is.null(x)) t(x$M)),
+  "Leontief+I" = lapply(LeontiefMTI, function(x) {
+    if(!is.null(x)) (t(x$M) + diag(nrow = nrow(x$M), ncol = ncol(x$M)))})
+)
+
+matCorrAvg <- foreach::foreach(
+    i = iterators::iter(matsToCompare)
+) %:% foreach::foreach(
+    j = iterators::iter(matsToCompare)
+) %do% {
+    mean(unlist(lapply(seq_along(i), function(k, m1, m2) {
+        if (is.null(m1[[k]])) return(NULL)
+        cor(m1[[k]][1:(nrow(m1[[k]])^2)],
+            m2[[k]][1:(nrow(m2[[k]])^2)])
+    }, m1 = i, m2 = j)), na.rm = TRUE)
+} %>% unlist %>% matrix(
+  ncol = length(matsToCompare), nrow = length(matsToCompare)
+)
+
+rownames(matCorrAvg) <- names(matsToCompare)
+colnames(matCorrAvg) <- names(matsToCompare)
+matCorrAvg
+```
+
+Unpacking the additions to the matrix, the diagonal of the Leontief approach with the zeroth power included matches up extremely well with the approach I had been trying to use with the graphs, $0.953$.
+Removing this power from both the Leontief and graphs approach, the values match up relatively well at about $0.595$, but are not as related as the unit perturbation is to the graph approach $0.695$ or the Jacobian to the graph without the zeroth power $0.660$.
+Of particular note due to the strength of the average correlation is the graphs approach without the zeroth power compared to the first power of the graphs approach, which shows a $0.993$ average correlation.
