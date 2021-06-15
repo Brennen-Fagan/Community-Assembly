@@ -1,0 +1,278 @@
+---
+title: "Transition from Isolates to Hybrids 2021-06"
+output:
+  html_notebook:
+    code_folding: hide
+---
+
+```{r libs, message=FALSE, warning=FALSE}
+# Check requisite packages are installed.
+packages <- c(
+  "plotly", 
+  "dplyr",
+  "cheddar",
+  "igraph",
+  "expm",
+  "foreach",
+  "iterators",
+  "rootSolve",
+  "RMTRCode2"
+)
+for (pkg in packages) {
+  library(pkg, character.only = TRUE)
+}
+
+# Reserved Names
+communitiesAll <- NULL
+invasionsDirected <- NULL
+islandInteractionsOneEmptyTwo <- NULL
+islandInteractionsOneEmptyTwoWhich <- NULL
+islandInteractionsOneTwo <- NULL
+islandInteractionsOneTwoWhich <- NULL
+mats <- NULL
+paramFrame <- NULL
+plotScalingData <- NULL
+pools <- NULL
+```
+
+# Overview
+This is the third file in the `LM1996-NumPoolCom` set after `QDatMake-2021-05` and `Questions-2021-05`. 
+These files took data sets generated from Viking for purely exploitative Lotka-Volterra systems that were assembled according to the rules from Law's and Morton's 1996 and 1997 papers on community assembly.
+The first of these organised the data sets and identified their abundances before examining how the communities compared against each other from those assembled from the same pool.
+Three outcomes were usually observed: one community dominated, the communities persisted but with colonies from their neighbours (sustained by mass effects), or a hybrid community emerged and dominated.
+The second file looked at some of the properties of the various communities we were able to observe either from the initially assembly or from the comparison.
+Broadly, persistence was uncommon if the system was not assembled, and some systems collapsed down to states that we had not yet observed.
+Hybrid systems were invadable by the regional pool again (i.e. they lost the uninvadability property).
+Most systems did not seem to be invadable by the other systems, where invadable from the pool is growth from an infinitesimal, but it was not uncommon to be invadable either.
+There are multiple ways to measure indirect effects, but (indirect) mutualism is highly uncommon in the systems created.
+Competition appears to be not uncommon due to interactions between basal species through their consumers. 
+
+This file returns to the context of communities interacting with each other on islands (the comparison above).
+Here, we want to look at how the transition occurs and if we can determine why each outcome and property emerges.
+
+# Tabs {.tabset}
+
+## Load Data
+
+```{r loadDat}
+ellipsisApply <- function(..., FUN) {
+  lapply(as.list(...), FUN)
+}
+
+load("LM1996-NumPoolCom-QOut-2021-05.RData")
+# Stop if not all are not null
+stopifnot(all(unlist(ellipsisApply(
+  FUN = function(bool) {!is.null(bool)},
+  communitiesAll,
+  invasionsDirected,
+  islandInteractionsOneEmptyTwo,
+  islandInteractionsOneEmptyTwoWhich,
+  islandInteractionsOneTwo,
+  islandInteractionsOneTwoWhich,
+  mats,
+  paramFrame,
+  plotScalingData,
+  pools,
+))))
+```
+
+```{r testPlot}
+plotScaling <- plotly::plot_ly(
+  plotScalingData,
+  x = ~Basals,
+  y = ~Consumers,
+  z = ~CommunitySize,
+  color = ~Dataset,
+  colors = c("red", "blue", "black")
+)
+
+plotScaling <- plotly::add_markers(plotScaling)
+
+plotScaling <- plotly::layout(
+  plotScaling,
+  scene = list(
+    xaxis = list(type = "log"),
+    yaxis = list(type = "log"),
+    camera = list(
+      eye = list(
+        x = -1.25, y = -1.25, z = .05
+      )
+    )
+  )
+)
+
+plotScaling
+```
+
+
+## Dispersal based interactions
+
+There are `r length(islandInteractionsOneTwo)/2` sets of interactions which we place on either 2 or 3 islands to generate `r nrow(communitiesAll)` communities by looking at islands before interaction, islands while interacting near steady-state, and islands after interaction has finished.
+Here, we will try to look at some examples as the system transitions from the first case to the second case.
+Which systems should we focus on? We choose systems reflecting the various outcomes we observe.
+
+<!-- 
+So the problem is that we don't know where the parents are for each set and we don't know which sibling is the important one that we want to focus on.
+In most cases, this is fine though; only `5 2` has more than two possible parents.
+If we strike out that case, then we have either 2 islands or 3 and then the number of islands themselves as the questions.
+Unfortunately, one of the ones that we are interested in is the community that persists from `5 2`. Since it has 44, it must be descended from the first, and since it has 247 it must be descended from the second. Furthermore, since there are 5 copies, it must be obtainable in the three island and two island cases. This must be indices 4 and 5.
+As for a system that collapses without total extinction, we might as well go `5 2` with the first and third. This two appears to occur in both island number cases. Indices 4 and 6.
+For a system that has colonisation we can use the `2 3` test system on either setting. Indices 1 and 2.
+Similarly, for a system that has domination we can use the `6 3` test system on either setting. Indices 7 and 8.
+This gives us one dominant, one colonising, one collapsing and surviving, one hybridising, so we also grab one collapsing without surviving.
+For some variety (in Dataset), we pick `14 1` for the smallest community size. Indices 10 and 11.
+-->
+
+```{r}
+communitiesEX <- list(
+  "HybridPersists" = communitiesAll[c( 4,  5),], # Hybrid Persists.
+  "HybridCollapse" = communitiesAll[c( 4,  6),], # Hybrid Collapses to persist.
+  "Extinction"     = communitiesAll[c(10, 11),], # Go Extinct when uncoupled.
+  "Colonies"       = communitiesAll[c( 1,  2),], # They Colonise each other.
+  "Domination"     = communitiesAll[c( 7,  8),]  # One community Dominates.
+)
+```
+
+```{r islandFUN}
+islandFUN <- function(i, dat, pool, mat, dmat) {
+  temp <- dat[i, ]
+  RMTRCode2::IslandDynamics(
+    Pool = pool,
+    InteractionMatrix = mat,
+    Communities = c(
+      list(temp$Communities[1]),
+      rep("", nrow(dmat) - 2),
+      temp$Communities[2]
+    ),
+    Populations = c(
+      list(temp$CommunityAbund[1]),
+      rep("", nrow(dmat) - 2),
+      list(temp$CommunityAbund[2])
+    ),
+    DispersalPool = 0.0001,
+    DispersalIsland = dmat,
+    Times = c(seq(from = 0, to = 990, by = 10), # Slow high res start
+              seq(from = 1000, to = 20000, by = 500)) # Faster low res.
+  )
+}
+```
+
+```{r}
+communitiesEXIslands <- lapply(communitiesEX, function(tib, pools, mats, dmat) {
+  combn(
+    nrow(tib), 2, 
+    islandFUN,
+    dat = tib, 
+    pool = pools[[
+      tib$DatasetID[1]
+    ]][[tib$CombnNum[1]]],
+    mat = mats[[
+      tib$DatasetID[1]
+    ]][[tib$CombnNum[1]]],
+    dmat = dmat,
+    simplify = FALSE
+  )
+}, pools = pools, mats = mats, dmat = matrix(c(
+  0, 1, 0, # Island 2 -> 1
+  1, 0, 1, # Island 1 -> 2, Island 3 -> 2
+  0, 1, 0  # Island 2 -> 3
+), nrow = 3, ncol = 3, byrow = TRUE))
+```
+
+<!-- 
+  Looking good so far.
+  Now we need to construct a data frame for each list we generated.
+  The dataframe should have time, abundance, species, island, and native/endemic/invader.
+  We create a ggplot with rows as islands, columns as status, color as species, abundance as y, time as x. 
+-->
+
+```{r}
+communitiesEXIslandsLong <- lapply(
+  communitiesEXIslands, 
+  function(listtib, islandsNum) {
+    speciesNum <- (ncol(listtib[[1]]) - 1) / islandsNum
+    
+    retval <- tidyr::pivot_longer(
+      listtib[[1]] %>% as.data.frame, 
+      cols = !"time", 
+      names_to = "Species",
+      values_to = "Abundance"
+    ) %>% dplyr::mutate(
+      Species = as.numeric(Species),
+      Island = floor((Species - 1) / speciesNum),
+      Species = ((Species - 1) %% speciesNum) + 1 # maps 1,2,3,4 %% 4 -> 1:4
+    ) %>% dplyr::group_by(
+      Species, Island
+    ) %>% dplyr::mutate(
+      Native = dplyr::first(Abundance > 0),
+      Invasive = !Native
+    ) %>% dplyr::ungroup() %>% dplyr::group_by(
+      Species, time
+    ) %>% dplyr::mutate(
+      IslandsOccupied = sum(Abundance > 0)
+    ) %>% dplyr::ungroup() %>% dplyr::group_by(
+      Species, Island
+    ) %>% dplyr::mutate(
+      Endemic = Native & dplyr::first(IslandsOccupied) == 1,
+      Type = dplyr::case_when(
+        Endemic ~ "Endemic",
+        Native ~ "Native",
+        Invasive ~ "Invasive",
+        TRUE ~ "Oops"
+      )
+    )
+    
+    return(retval)
+  }, islandsNum = 3
+)
+```
+
+```{r}
+communitiesEXIslandsImages <- lapply(
+  communitiesEXIslandsLong,
+  function(tib) {
+    ggplot2::ggplot(
+      tib,
+      ggplot2::aes(
+        x = time,
+        y = Abundance,
+        color = as.factor(Species),
+        # linetype = Type,
+        group = interaction(Species, Island)
+      )
+    ) + ggplot2::geom_line(
+    ) + ggplot2::facet_grid(
+      Island ~ Type
+    ) + ggplot2::scale_y_log10(
+    )
+  }  
+)
+```
+
+### Cases {.tabset}
+
+#### Hybrid Persists
+```{r}
+communitiesEXIslandsImages[[1]]
+```
+  
+#### Hybrid Collapse
+```{r}
+communitiesEXIslandsImages[[2]]
+```
+  
+#### Hybrid Extincts
+```{r}
+communitiesEXIslandsImages[[3]]
+```
+  
+#### Colonies
+```{r}
+communitiesEXIslandsImages[[4]]
+```
+  
+#### Domination
+```{r}
+communitiesEXIslandsImages[[5]]
+```
+  

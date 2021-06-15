@@ -1284,3 +1284,22 @@ matCorrAvg
 Unpacking the additions to the matrix, the diagonal of the Leontief approach with the zeroth power included matches up extremely well with the approach I had been trying to use with the graphs, $0.953$.
 Removing this power from both the Leontief and graphs approach, the values match up relatively well at about $0.595$, but are not as related as the unit perturbation is to the graph approach $0.695$ or the Jacobian to the graph without the zeroth power $0.660$.
 Of particular note due to the strength of the average correlation is the graphs approach without the zeroth power compared to the first power of the graphs approach, which shows a $0.993$ average correlation.
+
+## Save Workspace
+
+```{r save}
+save(
+  communitiesAll, # Tibble, row is a community.
+  invasionsDirected, # List of who is invadable by whom per pool.
+  islandInteractionsOneEmptyTwo, # Outcomes of three island interactions.
+  islandInteractionsOneEmptyTwoWhich, # Which species are present per island.
+  islandInteractionsOneTwo, # Outcomes of two island interactions.
+  islandInteractionsOneTwoWhich, # Which species are present per island.
+  # Note: the island outcomes are by data set ID followed by by combination.
+  mats, # Interaction Matrices
+  paramFrame, # Contains run information, outcomes. Row is by settings.
+  plotScalingData, # Contains assembly outcomes in a one per row format.
+  pools, # The system pools
+  file = "LM1996-NumPoolCom-QOut-2021-05.RData"
+) # Community: an assembly outcome or hybrid or a hybrid's collapse.
+```
