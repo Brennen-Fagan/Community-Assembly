@@ -153,7 +153,7 @@ islandFUN <- function(i, dat, pool, mat, dmat, abund = NULL) {
     },
     DispersalPool = 0.0001,
     DispersalIsland = dmat,
-    Times = seq(from = 0, to = 2000, by = 0.1),
+    Times = seq(from = 0, to = 20000, by = 500),
       # c(seq(from = 0, to = 999, by = 1), # Slow high res start
       #         seq(from = 1000, to = 20000, by = 500)) # Faster low res.
     Method = deSolve::rkMethod("rk45dp7")
@@ -256,9 +256,6 @@ communitiesEXIslandsImages <- lapply(
 As I am running the code and refining the images, I note that the approach to steady state appears to be extremely fast and that increasing the resolution of the integrator I am using "appears to" quicken it.
 Furthermore, it appears to be the case that the dynamics are changing as the time step size decreases; the oscillations are faster in cases 1 and 2 and in cases 1, 2, and 5 the outcome is different (i.e. no extinctions when the timestep is decreased.)
 Part of this appears to be the system resolving to much lower scales than we would consider physical; a time step of 0.1 yields some (log scale) oscillations near $10^{-8}$.
-Switching methods (from "lsoda" which adapts for problem stiffness) does not appear to fix this, even if the method is adaptive in terms of time steps used ("rk45dp7" or "ode45").
-Part of the problem appears to be that the tolerance, set to 0.1, is being ignored, which suggests I may be using the `deSolve` function(s) incorrectly. 
-This will be the next avenue of investigation, to make sure that the tolerance is interpreted correctly.
 
 ### Cases {.tabset}
 
