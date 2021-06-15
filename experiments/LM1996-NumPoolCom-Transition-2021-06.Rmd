@@ -107,7 +107,7 @@ plotScaling
 
 ## Dispersal based interactions
 
-There are `r length(islandInteractionsOneTwo)/2` sets of interactions which we place on either 2 or 3 islands to generate `r nrow(communitiesAll)` communities by looking at islands before interaction, islands while interacting near steady-state, and islands after interaction has finished.
+There are `r length(islandInteractionsOneTwo)` pools that generated multiple communities which we place on either 2 or 3 islands to generate `r nrow(communitiesAll)` communities by looking at islands before interaction, islands while interacting near steady-state, and islands after interaction has finished.
 Here, we will try to look at some examples as the system transitions from the first case to the second case.
 Which systems should we focus on? We choose systems reflecting the various outcomes we observe.
 
@@ -123,7 +123,7 @@ This gives us one dominant, one colonising, one collapsing and surviving, one hy
 For some variety (in Dataset), we pick `14 1` for the smallest community size. Indices 10 and 11.
 -->
 
-```{r}
+```{r 1}
 communitiesEX <- list(
   "HybridPersists" = communitiesAll[c( 4,  5),], # Hybrid Persists.
   "HybridCollapse" = communitiesAll[c( 4,  6),], # Hybrid Collapses to persist.
@@ -134,7 +134,7 @@ communitiesEX <- list(
 ```
 
 ```{r islandFUN}
-islandFUN <- function(i, dat, pool, mat, dmat) {
+islandFUN <- function(i, dat, pool, mat, dmat, abund = NULL) {
   temp <- dat[i, ]
   RMTRCode2::IslandDynamics(
     Pool = pool,
@@ -144,15 +144,19 @@ islandFUN <- function(i, dat, pool, mat, dmat) {
       rep("", nrow(dmat) - 2),
       temp$Communities[2]
     ),
-    Populations = c(
+    Populations = if (is.null(abund)) c(
       list(temp$CommunityAbund[1]),
       rep("", nrow(dmat) - 2),
       list(temp$CommunityAbund[2])
-    ),
+    ) else {
+      abund
+    },
     DispersalPool = 0.0001,
     DispersalIsland = dmat,
-    Times = c(seq(from = 0, to = 990, by = 10), # Slow high res start
-              seq(from = 1000, to = 20000, by = 500)) # Faster low res.
+    Times = seq(from = 0, to = 2000, by = 0.1),
+      # c(seq(from = 0, to = 999, by = 1), # Slow high res start
+      #         seq(from = 1000, to = 20000, by = 500)) # Faster low res.
+    Method = deSolve::rkMethod("rk45dp7")
   )
 }
 ```
@@ -248,6 +252,13 @@ communitiesEXIslandsImages <- lapply(
   }  
 )
 ```
+
+As I am running the code and refining the images, I note that the approach to steady state appears to be extremely fast and that increasing the resolution of the integrator I am using "appears to" quicken it.
+Furthermore, it appears to be the case that the dynamics are changing as the time step size decreases; the oscillations are faster in cases 1 and 2 and in cases 1, 2, and 5 the outcome is different (i.e. no extinctions when the timestep is decreased.)
+Part of this appears to be the system resolving to much lower scales than we would consider physical; a time step of 0.1 yields some (log scale) oscillations near $10^{-8}$.
+Switching methods (from "lsoda" which adapts for problem stiffness) does not appear to fix this, even if the method is adaptive in terms of time steps used ("rk45dp7" or "ode45").
+Part of the problem appears to be that the tolerance, set to 0.1, is being ignored, which suggests I may be using the `deSolve` function(s) incorrectly. 
+This will be the next avenue of investigation, to make sure that the tolerance is interpreted correctly.
 
 ### Cases {.tabset}
 
