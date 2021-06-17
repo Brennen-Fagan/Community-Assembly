@@ -136,7 +136,7 @@ communitiesEX <- list(
 ```{r islandFUN}
 islandFUN <- function(i, dat, pool, mat, dmat, abund = NULL) {
   temp <- dat[i, ]
-  RMTRCode2::IslandDynamics(
+  RMTRCode2::IslandDynamicsSTODE(
     Pool = pool,
     InteractionMatrix = mat,
     Communities = c(
@@ -151,12 +151,13 @@ islandFUN <- function(i, dat, pool, mat, dmat, abund = NULL) {
     ) else {
       abund
     },
-    DispersalPool = 0.0001,
+    DispersalPool = 0.001,
     DispersalIsland = dmat,
     Times = seq(from = 0, to = 2000, by = 0.1),
       # c(seq(from = 0, to = 999, by = 1), # Slow high res start
       #         seq(from = 1000, to = 20000, by = 500)) # Faster low res.
-    Method = deSolve::rkMethod("rk45dp7")
+    # Method = deSolve::rkMethod("rk45dp7"),
+    Tolerance = 1E-3
   )
 }
 ```
@@ -259,6 +260,10 @@ Part of this appears to be the system resolving to much lower scales than we wou
 Switching methods (from "lsoda" which adapts for problem stiffness) does not appear to fix this, even if the method is adaptive in terms of time steps used ("rk45dp7" or "ode45").
 Part of the problem appears to be that the tolerance, set to 0.1, is being ignored, which suggests I may be using the `deSolve` function(s) incorrectly. 
 This will be the next avenue of investigation, to make sure that the tolerance is interpreted correctly.
+
+Increasing the dispersal rate (0.001 to 0.1) and decreasing the elimination tolerance (0.1 to 0.001) produces behaviour that is more similar to what we had before, although the magnitudes of the abundances do differ. This is not always the case; the 4th system goes from colonies to domination, although this does not seem necessarily wrong. Looking back at the larger time step system that I am expecting, the values we were hitting are below the default tolerance, which suggests they should have been eliminated anyways.
+(This behaviour seems to suggest that the event triggers, then the integration occurs, then the result is reported, which seems a bit strange to be honest.)
+Naturally, the timings appear to be different as well.
 
 ### Cases {.tabset}
 
