@@ -165,8 +165,8 @@ IslandNumericalAssembly <- function(
       # For each island, check all invading links/nonzero col(DispersalIsland)
       # Retrieve the indices acting on and the species present.
       islandIndices <- ((island - 1)  * speciesNum + 1) : (island * speciesNum)
-      recipientIDs <- which(abundance[islandIndices] > Tolerance)
-      recipientSpecies <- allSpeciesOld[[island]] #((recipientIDs - 1) %% speciesNum) + 1
+      islandIDs <- which(abundance[islandIndices] > Tolerance)
+      islandSpecies <- allSpeciesOld[[island]] #((islandIDs - 1) %% speciesNum) + 1
 
       for (i in 1:ncol(DispersalIsland)) {
         # For each invading link,
@@ -184,21 +184,21 @@ IslandNumericalAssembly <- function(
           next
         }
 
-        # Check that additional species is not in recipientIDs (Present)
+        # Check that additional species is not in islandIDs (Present)
 
-        if (candidate %in% recipientSpecies) {
+        if (candidate %in% islandSpecies) {
           outcomes <- c(outcomes, "Present")
           next
         }
 
         # and check that the island is invadable (by that species). (Type 1)
         if (
-          length(recipientSpecies) &
+          #length(islandSpecies) & # Is there anyone there?
           (preprocessed$redPool$ReproductionRate[candidate] +
             sum(preprocessed$redComMat[candidate,
-                                       recipientSpecies] *
-                abundance[recipientIDs],
-                na.rm = TRUE) < 0)
+                                       islandSpecies] *
+                abundance[islandIDs],
+                na.rm = TRUE) < 0) # Can you not reproduce from infinitesimal?
         ) {
           outcomes <- c(outcomes, "Type 1 (Failure)")
           next
@@ -249,7 +249,7 @@ IslandNumericalAssembly <- function(
           }, time = seq(0, to = IntegratorTimeStep,
                         by = if (!is.null(ExtinctionTimeSteps))
                           ExtinctionTimeSteps
-                        else IntegratorTimeStep/2))
+                        else IntegratorTimeStep))
         )
       )
 
@@ -315,7 +315,7 @@ IslandNumericalAssembly <- function(
                 "Type 1 (Failure)"
               }
             }
-            else if (allSpeciesOld[[dest]] %in% allSpecies[[dest]]) {
+            else if (all(allSpeciesOld[[dest]] %in% allSpecies[[dest]])) {
               if (SequenceRetVal[event + 1, clmn] %in% allSpecies[[dest]]) {
                 "Type 2 (Invade)"
               } else {
@@ -334,7 +334,37 @@ IslandNumericalAssembly <- function(
     # Check if uninvadable steady-state for each island relative to links.
     # If so, we are done, otherwise continue running.
 
+    completelyUninvadable <- TRUE
+    for (island in 1:nrow(DispersalIsland)) {
+      islandIndices <- ((island - 1)  * speciesNum + 1) : (island * speciesNum)
+      islandIDs <- which(abundance[islandIndices] > Tolerance)
+      islandSpecies <- allSpeciesOld[[island]]
+      for (i in 1:ncol(DispersalIsland)) {
+        # For each invading link,
+        if (DispersalIsland[island, i] <= 0) next
 
+        iSpecies <- allSpeciesOld[[i]]
+
+        # Only concerned with species that are not already present.
+        iSpecies <- iSpecies[!(iSpecies %in% islandSpecies)]
+
+        # Check if no-one can invade from i to island.
+        if (
+          # length(islandSpecies) &
+          any(preprocessed$redPool$ReproductionRate[iSpecies] +
+           sum(preprocessed$redComMat[iSpecies,
+                                      islandSpecies] *
+               abundance[islandIDs],
+               na.rm = TRUE) > 0)
+        ) {
+          completelyUninvadable <- FALSE
+          break
+        }
+      }
+    }
+    if (completelyUninvadable) {
+      break
+    }
   }
 
   if (!is.null(seed)) {
