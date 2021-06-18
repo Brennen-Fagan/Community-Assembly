@@ -14,7 +14,8 @@ IslandNumericalAssembly <- function(
   IntegratorTimeStep = 100,
   ExtinctionTimeSteps = NULL,
   seed = NULL,
-  ReturnValues = c("Abundance", "Sequence", "Pool", "Matrix")
+  ReturnValues = c("Abundance", "Sequence", "Pool", "Matrix",
+                   "Uninvadable", "Steady", "Events")
 ) {
   if (!is.null(seed)) {
     if (exists(".Random.seed"))
@@ -36,7 +37,7 @@ IslandNumericalAssembly <- function(
   arrivalSampler <- match.arg(ArrivalSampler,
                               arrivalSamplerOptions)
 
-  arrivalIDs <-
+  arrivalIDs <- # Goes down columns first.
     with(
       preprocessed,
       if (arrivalSampler == "rearrange") {
@@ -109,7 +110,7 @@ IslandNumericalAssembly <- function(
               "DNE")) # Better suggestion than DNE?
           )
           colnames(retval) <- paste(
-            c("Addition", "Outcome"), nr[i], nc[i]
+            c("Addition", "Outcome"), nc[i], "->", nr[i]
           )
           retval
         }
@@ -157,18 +158,19 @@ IslandNumericalAssembly <- function(
   for (event in 1:ArrivalEvents) {
     abundanceChange <- rep(0, length(abundance))
 
-    outcomes <- NULL
+    outcomes <- matrix(nrow = nrow(DispersalIsland),
+                       ncol = ncol(DispersalIsland))
 
     # The elements in the copies tell us who is
     # attempting to invade.
-    for (island in 1:nrow(DispersalIsland)) {
+    for (island in 1:nrow(DispersalIsland)) {# Rows are TO
       # For each island, check all invading links/nonzero col(DispersalIsland)
       # Retrieve the indices acting on and the species present.
       islandIndices <- ((island - 1)  * speciesNum + 1) : (island * speciesNum)
-      islandIDs <- which(abundance[islandIndices] > Tolerance)
+      islandIDs <- islandIndices[abundance[islandIndices] > Tolerance]
       islandSpecies <- allSpeciesOld[[island]] #((islandIDs - 1) %% speciesNum) + 1
 
-      for (i in 1:ncol(DispersalIsland)) {
+      for (i in 1:ncol(DispersalIsland)) {# Columns are FROM
         # For each invading link,
         if (DispersalIsland[island, i] <= 0) next
 
@@ -180,14 +182,14 @@ IslandNumericalAssembly <- function(
         # check that the invasion is valid (present on the link) (DNE)
 
         if (abundance[candidate + (i - 1) * speciesNum] < ArrivalDensity) {
-          outcomes <- c(outcomes, "DNE")
+          outcomes[island, i] <- "DNE"
           next
         }
 
         # Check that additional species is not in islandIDs (Present)
 
         if (candidate %in% islandSpecies) {
-          outcomes <- c(outcomes, "Present")
+          outcomes[island, i] <- "Present"
           next
         }
 
@@ -200,7 +202,7 @@ IslandNumericalAssembly <- function(
                 abundance[islandIDs],
                 na.rm = TRUE) < 0) # Can you not reproduce from infinitesimal?
         ) {
-          outcomes <- c(outcomes, "Type 1 (Failure)")
+          outcomes[island, i] <- "Type 1 (Failure)"
           next
         }
 
@@ -226,11 +228,10 @@ IslandNumericalAssembly <- function(
         #  getting the right selections, but then also to have that low
         #  abundance?)
 
-        outcomes <- c(outcomes, NA)
       }
     }
 
-    if (!all(abundanceChange == 0)) {
+    #if (!all(abundanceChange == 0)) {
       # Apply the density record
       abundance <- abundance + abundanceChange
 
@@ -262,9 +263,7 @@ IslandNumericalAssembly <- function(
 
       # 0 anything that should be extinct.
       abundance[abundance < Tolerance] <- 0
-
-
-    }
+    #}
 
     # Record results.
 
@@ -282,7 +281,6 @@ IslandNumericalAssembly <- function(
         unlist(lapply(allSpecies, toString))
 
       # Record Outcomes.
-      outcomeNum <- 1
       for (clmn in seq(from = 2, by = 2, to = ncol(SequenceRetVal) - 3)) {
         # clmn is the Addition, clmn + 1 is the Outcome.
         # Source is the first number in the name.
@@ -299,13 +297,13 @@ IslandNumericalAssembly <- function(
         # The first 4 are the default or recorded in the outcomes string vector.
         # Only the last 2 need to be checked explicitly here.
 
-        if (!is.na(outcomes[outcomeNum])) {
-          SequenceRetVal[event + 1, clmn + 1] <- outcomes[outcomeNum]
-        } else {
-          srce <- strsplit(colnames(SequenceRetVal[event, ])[clmn], split = " ")
-          dest <- as.numeric(srce[[1]][3])
-          srce <- as.numeric(srce[[1]][2])
+        srce <- strsplit(colnames(SequenceRetVal[event, ])[clmn], split = " ")
+        dest <- as.numeric(srce[[1]][4])
+        srce <- as.numeric(srce[[1]][2])
 
+        if (!is.na(outcomes[dest, srce])) {
+          SequenceRetVal[event + 1, clmn + 1] <- outcomes[dest, srce]
+        } else {
           # Check if allSpeciesOld are in allSpecies
           SequenceRetVal[event + 1, clmn + 1] <-
             if (length(allSpeciesOld[[dest]]) == 0) {
@@ -325,19 +323,19 @@ IslandNumericalAssembly <- function(
               "Type 3 (Contract)"
             }
         }
-        outcomeNum <- outcomeNum + 1
       }
 
       allSpeciesOld <- allSpecies
     }
 
     # Check if uninvadable steady-state for each island relative to links.
+    # If we are uninvadable AND (approximately) in steady-state, then we are done.
     # If so, we are done, otherwise continue running.
 
     completelyUninvadable <- TRUE
     for (island in 1:nrow(DispersalIsland)) {
       islandIndices <- ((island - 1)  * speciesNum + 1) : (island * speciesNum)
-      islandIDs <- which(abundance[islandIndices] > Tolerance)
+      islandIDs <- islandIndices[abundance[islandIndices] > Tolerance]
       islandSpecies <- allSpeciesOld[[island]]
       for (i in 1:ncol(DispersalIsland)) {
         # For each invading link,
@@ -362,8 +360,28 @@ IslandNumericalAssembly <- function(
         }
       }
     }
+
     if (completelyUninvadable) {
-      break
+      # Check steady-state
+      steady <- with(
+        preprocessed,
+        rootSolve::steady(
+          abundance,
+          func = IslandLotkaVolterra,
+          parms = parameters
+        ),
+        time = c(0, 1), # If in steady-state, the duration shouldn't matter.
+        method = "runsteady"
+      )
+
+      if (attr(steady, "steady") == TRUE &&
+          all(# Double check that the abundances do match...
+            (steady$y == 0 & abundance == 0) |
+            (round((abundance - steady$y)/abundance,
+                   digits = -log10(Tolerance)) == 0)
+          )){
+        break
+      }
     }
   }
 
@@ -375,6 +393,7 @@ IslandNumericalAssembly <- function(
 
   if ("Abundance" %in% ReturnValues) {
     abundanceHistory[, 1] <- cumsum(abundanceHistory[, 1])
+    colnames(abundanceHistory)[-1] <- as.character(1:(ncol(abundanceHistory) - 1))
     retval$Abundance <- abundanceHistory
   }
   if ("Sequence" %in% ReturnValues) {
@@ -386,14 +405,23 @@ IslandNumericalAssembly <- function(
   if ("Matrix" %in% ReturnValues) {
     retval$Matrix <- InteractionMatrix
   }
+  if ("Uninvadable" %in% ReturnValues) {
+    retval$Uninvadable <- completelyUninvadable
+  }
+  if ("Steady" %in% ReturnValues) {
+    retval$Steady <- steady
+  }
+  if ("Events" %in% ReturnValues) {
+    retval$Events <- event
+  }
 
   return(retval)
 }
 
 # debugonce(IslandNumericalAssembly)
 
-dmat <- matrix(c(
-  0, 1, 0, # Island 2 -> 1
+dmat <- matrix(c( # row = to, column = from
+  0, 1, 0, # Island 2 -> 1, Try 0, 0, 0 if need to test asymmetry.
   1, 0, 1, # Island 1 -> 2, Island 3 -> 2
   0, 1, 0  # Island 2 -> 3
 ), nrow = 3, ncol = 3, byrow = TRUE)
@@ -414,5 +442,67 @@ IslandNumericalAssembly(
     list(CommunityAbund[2])
   ),
   ArrivalEvents = 100,
-  ReturnValues = c("Sequence", "Abundance")
-))
+  ReturnValues = c("Sequence", "Abundance",
+                   "Uninvadable", "Steady", "Events"),
+  seed = 1
+)) -> temp
+
+tempabund <- lapply(
+  list(temp$Abundance),
+  function(listtib, islandsNum) {
+    speciesNum <- (ncol(listtib) - 1) / islandsNum
+
+    retval <- tidyr::pivot_longer(
+      listtib %>% as.data.frame,
+      cols = !"Time",
+      names_to = "Species",
+      values_to = "Abundance"
+    ) %>% dplyr::mutate(
+      Species = as.numeric(Species),
+      Island = floor((Species - 1) / speciesNum) + 1,
+      Species = ((Species - 1) %% speciesNum) + 1 # maps 1,2,3,4 %% 4 -> 1:4
+    ) %>% dplyr::group_by(
+      Species, Island
+    ) %>% dplyr::mutate(
+      Native = dplyr::first(Abundance > 0),
+      Invasive = !Native
+    ) %>% dplyr::ungroup() %>% dplyr::group_by(
+      Species, Time
+    ) %>% dplyr::mutate(
+      IslandsOccupied = sum(Abundance > 0) / 2
+    ) %>% dplyr::ungroup() %>% dplyr::group_by(
+      Species, Island
+    ) %>% dplyr::mutate(
+      Endemic = Native & dplyr::first(IslandsOccupied) == 1,
+      Type = dplyr::case_when(
+        Endemic ~ "Endemic",
+        Native ~ "Native",
+        Invasive ~ "Invasive",
+        TRUE ~ "Oops"
+      )
+    )
+
+    return(retval)
+  }, islandsNum = 3
+)
+
+tempplot <- lapply(
+  tempabund,
+  function(tib) {
+    ggplot2::ggplot(
+      tib,
+      ggplot2::aes(
+        x = Time,
+        y = Abundance,
+        color = as.factor(Species),
+        # linetype = Type,
+        group = interaction(Species, Island)
+      )
+    ) + ggplot2::geom_point(
+    ) + ggplot2::facet_grid(
+      Island ~ Type
+    ) + ggplot2::scale_y_log10(
+      limits = c(10^-12, 10^4.5)
+    )
+  }
+)
