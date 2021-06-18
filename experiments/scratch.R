@@ -3,7 +3,7 @@ IslandNumericalAssembly <- function(
   InteractionMatrix,
   Communities, # List containing each Community on each island.
   Populations, # List containing each Population on each island.
-  DispersalPool, # Species related dispersal rates
+  # DispersalPool, # Species related dispersal rates
   # Should have length == nrow(Pool). Multiplied by entries of
   DispersalIsland, # Island related dispersal rates. Is a matrix, row = to.
   Dynamics = GeneralisedLotkaVolterra,
@@ -238,7 +238,7 @@ IslandNumericalAssembly <- function(
       # Run the system.
       abundance <- with(
         preprocessed,
-        deSolve::ode(
+        RMTRCode2::quiet(deSolve::ode(
           abundance,
           times = c(0, #IntegratorTimeStep/2,
                     IntegratorTimeStep),
@@ -251,7 +251,7 @@ IslandNumericalAssembly <- function(
                         by = if (!is.null(ExtinctionTimeSteps))
                           ExtinctionTimeSteps
                         else IntegratorTimeStep))
-        )
+        ))
       )
 
       if ("Abundance" %in% ReturnValues) {
@@ -374,13 +374,13 @@ IslandNumericalAssembly <- function(
         method = "runsteady"
       )
 
-      if (attr(steady, "steady") == TRUE &&
-          all(# Double check that the abundances do match...
-            (steady$y == 0 & abundance == 0) |
+      if (attr(steady, "steady") == TRUE){
+        steadycheck <- all(# Double check that the abundances do match...
+          (steady$y == 0 & abundance == 0) |
             (round((abundance - steady$y)/abundance,
                    digits = -log10(Tolerance)) == 0)
-          )){
-        break
+        )
+        if (steadycheck) break
       }
     }
   }
@@ -410,6 +410,7 @@ IslandNumericalAssembly <- function(
   }
   if ("Steady" %in% ReturnValues) {
     retval$Steady <- steady
+    retval$SteadyCheck <- steadycheck
   }
   if ("Events" %in% ReturnValues) {
     retval$Events <- event
@@ -430,7 +431,8 @@ with(communitiesEX[[5]],
 IslandNumericalAssembly(
   Pool = pools[[DatasetID[1]]][[CombnNum[1]]],
   InteractionMatrix = mats[[DatasetID[1]]][[CombnNum[1]]],
-  DispersalPool = 0.001, DispersalIsland = dmat,
+  # DispersalPool = 0.001,
+  DispersalIsland = dmat,
   Communities = c(
     list(Communities[1]),
     rep("", nrow(dmat) - 2),
@@ -441,7 +443,9 @@ IslandNumericalAssembly(
     rep("", nrow(dmat) - 2),
     list(CommunityAbund[2])
   ),
-  ArrivalEvents = 100,
+  IntegratorTimeStep = 10,
+  ExtinctionTimeSteps = 1,
+  ArrivalEvents = 1000,
   ReturnValues = c("Sequence", "Abundance",
                    "Uninvadable", "Steady", "Events"),
   seed = 1
