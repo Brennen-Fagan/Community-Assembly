@@ -136,7 +136,7 @@ communitiesEX <- list(
 ```{r islandFUN}
 islandFUN <- function(i, dat, pool, mat, dmat, abund = NULL) {
   temp <- dat[i, ]
-  RMTRCode2::IslandDynamicsSTODE(
+  RMTRCode2::IslandDynamics(
     Pool = pool,
     InteractionMatrix = mat,
     Communities = c(
