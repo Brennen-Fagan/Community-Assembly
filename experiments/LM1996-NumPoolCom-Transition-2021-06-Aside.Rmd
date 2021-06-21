@@ -88,6 +88,8 @@ communitiesEX <- list(
   "Colonies"       = communitiesAll[c( 1,  2),], # They Colonise each other.
   "Domination"     = communitiesAll[c( 7,  8),]  # One community Dominates.
 )
+
+communityChosen <- 4
 ```
 
 ```{r islandFUN3}
@@ -193,10 +195,61 @@ islandFUNStiffTolerant <- function(i, dat, pool, mat, dmat, times, abund = NULL)
     Tolerance = 1E-4
   )
 }
+
+islandFUNNumAssembleIntolerant <- function(i, dat, pool, mat, dmat, times, abund = NULL) {
+  temp <- dat[i, ]
+  RMTRCode2::IslandNumericalAssembly(
+    Pool = pool,
+    InteractionMatrix = mat,
+    Communities = c(
+      list(temp$Communities[1]),
+      rep("", nrow(dmat) - 2),
+      temp$Communities[2]
+    ),
+    Populations = if (is.null(abund)) c(
+      list(temp$CommunityAbund[1]),
+      rep("", nrow(dmat) - 2),
+      list(temp$CommunityAbund[2])
+    ) else {
+      abund
+    },
+    DispersalIsland = dmat,
+    IntegratorTimeStep = mean(diff(times)),
+    ArrivalEvents = length(times),
+    Tolerance = 1E-1,
+    ReturnValues = c("Abundance", "Steady"),
+    seed = 1
+  )
+}
+islandFUNNumAssembleTolerant <- function(i, dat, pool, mat, dmat, times, abund = NULL) {
+  temp <- dat[i, ]
+  RMTRCode2::IslandNumericalAssembly(
+    Pool = pool,
+    InteractionMatrix = mat,
+    Communities = c(
+      list(temp$Communities[1]),
+      rep("", nrow(dmat) - 2),
+      temp$Communities[2]
+    ),
+    Populations = if (is.null(abund)) c(
+      list(temp$CommunityAbund[1]),
+      rep("", nrow(dmat) - 2),
+      list(temp$CommunityAbund[2])
+    ) else {
+      abund
+    },
+    DispersalIsland = dmat,
+    IntegratorTimeStep = mean(diff(times)),
+    ArrivalEvents = length(times),
+    Tolerance = 1E-4,
+    ReturnValues = c("Abundance", "Steady"),
+    seed = 1
+  )
+}
 ```
 
-## Case 5, Big Time Steps, Long Length {.tabset}
 ```{r}
+# Inspired from:
 # communitiesEXIslands <- lapply(communitiesEX, function(tib, pools, mats, dmat) {
 #   combn(
 #     nrow(tib), 2, 
@@ -217,98 +270,167 @@ islandFUNStiffTolerant <- function(i, dat, pool, mat, dmat, times, abund = NULL)
 #   0, 1, 0  # Island 2 -> 3
 # ), nrow = 3, ncol = 3, byrow = TRUE))
 
-communitiesEXIslands <- lapply(list(
-  islandFUNAdaptiveIntolerant,
-  islandFUNStiffIntolerant,
-  islandFUNAdaptiveTolerant,
-  islandFUNStiffTolerant
-), function(fun, tib, pools, mats, dmat, times) {
-  combn(
-    nrow(tib), 2, 
-    fun,
-    dat = tib, 
-    pool = pools[[
-      tib$DatasetID[1]
-    ]][[tib$CombnNum[1]]],
-    mat = mats[[
-      tib$DatasetID[1]
-    ]][[tib$CombnNum[1]]],
-    dmat = dmat,
-    simplify = FALSE,
-    times = times
+processExperiment <- function(times = seq(from = 0, to = 20000, by = 500),
+                              communityChoice = communityChosen,
+                              pool = pools, mat = mats) {
+  lapply(list(
+    islandFUNAdaptiveIntolerant,
+    islandFUNStiffIntolerant,
+    islandFUNAdaptiveTolerant,
+    islandFUNStiffTolerant,
+    islandFUNNumAssembleIntolerant,
+    islandFUNNumAssembleTolerant
+  ), function(fun, tib, pool, mat, dmat, times) {
+    combn(
+      nrow(tib), 2, 
+      fun,
+      dat = tib, 
+      pool = pool[[
+        tib$DatasetID[1]
+      ]][[tib$CombnNum[1]]],
+      mat = mat[[
+        tib$DatasetID[1]
+      ]][[tib$CombnNum[1]]],
+      dmat = dmat,
+      simplify = FALSE,
+      times = times
+    )
+  }, pool = pool, mat = mat, dmat = matrix(c(
+    0, 1, 0, # Island 2 -> 1
+    1, 0, 1, # Island 1 -> 2, Island 3 -> 2
+    0, 1, 0  # Island 2 -> 3
+  ), nrow = 3, ncol = 3, byrow = TRUE), 
+  tib = communitiesEX[[communityChoice]],
+  times = times)
+}
+```
+
+```{r}
+processToLong <- function(communitiesEXIslands, islandsNum = 3) {
+  communitiesEXIslandsLong <- lapply(
+    communitiesEXIslands[1:4], 
+    function(listtib, islandsNum) {
+      speciesNum <- (ncol(listtib[[1]]) - 1) / islandsNum
+      
+      retval <- tidyr::pivot_longer(
+        listtib[[1]] %>% as.data.frame, 
+        cols = !"time", 
+        names_to = "Species",
+        values_to = "Abundance"
+      ) %>% dplyr::mutate(
+        Species = as.numeric(Species),
+        Island = floor((Species - 1) / speciesNum),
+        Species = ((Species - 1) %% speciesNum) + 1 # maps 1,2,3,4 %% 4 -> 1:4
+      ) %>% dplyr::group_by(
+        Species, Island
+      ) %>% dplyr::mutate(
+        Native = dplyr::first(Abundance > 0),
+        Invasive = !Native
+      ) %>% dplyr::ungroup() %>% dplyr::group_by(
+        Species, time
+      ) %>% dplyr::mutate(
+        IslandsOccupied = sum(Abundance > 0)
+      ) %>% dplyr::ungroup() %>% dplyr::group_by(
+        Species, Island
+      ) %>% dplyr::mutate(
+        Endemic = Native & dplyr::first(IslandsOccupied) == 1,
+        Type = dplyr::case_when(
+          Endemic ~ "Endemic",
+          Native ~ "Native",
+          Invasive ~ "Invasive",
+          TRUE ~ "Oops"
+        )
+      )
+      
+      return(retval)
+    }, islandsNum = islandsNum
   )
-}, pools = pools, mats = mats, dmat = matrix(c(
-  0, 1, 0, # Island 2 -> 1
-  1, 0, 1, # Island 1 -> 2, Island 3 -> 2
-  0, 1, 0  # Island 2 -> 3
-), nrow = 3, ncol = 3, byrow = TRUE), tib = communitiesEX[[5]],
-times = seq(from = 0, to = 20000, by = 500))
+  
+  communitiesEXIslandsLong[5:6] <- lapply(
+    communitiesEXIslands[5:6],
+    function(listtib, islandsNum) {
+      speciesNum <- (ncol(listtib[[1]]$Abundance) - 1) / islandsNum
+      
+      retval <- tidyr::pivot_longer(
+        listtib[[1]]$Abundance %>% as.data.frame,
+        cols = !"Time",
+        names_to = "Species",
+        values_to = "Abundance"
+      ) %>% dplyr::mutate(
+        time = Time,
+        Species = as.numeric(Species),
+        Island = floor((Species - 1) / speciesNum) + 1,
+        Species = ((Species - 1) %% speciesNum) + 1 # maps 1,2,3,4 %% 4 -> 1:4
+      ) %>% dplyr::group_by(
+        Species, Island
+      ) %>% dplyr::mutate(
+        Native = dplyr::first(Abundance > 0),
+        Invasive = !Native
+      ) %>% dplyr::ungroup() %>% dplyr::group_by(
+        Species, time
+      ) %>% dplyr::mutate(
+        IslandsOccupied = sum(Abundance > 0) / 2
+      ) %>% dplyr::ungroup() %>% dplyr::group_by(
+        Species, Island
+      ) %>% dplyr::mutate(
+        Endemic = Native & dplyr::first(IslandsOccupied) == 1,
+        Type = dplyr::case_when(
+          Endemic ~ "Endemic",
+          Native ~ "Native",
+          Invasive ~ "Invasive",
+          TRUE ~ "Oops"
+        )
+      )
+      
+      return(retval)
+    }, islandsNum = islandsNum
+  )
+  
+  return(communitiesEXIslandsLong)
+}
+
 ```
 
 ```{r}
-communitiesEXIslandsLong <- lapply(
-  communitiesEXIslands, 
-  function(listtib, islandsNum) {
-    speciesNum <- (ncol(listtib[[1]]) - 1) / islandsNum
-    
-    retval <- tidyr::pivot_longer(
-      listtib[[1]] %>% as.data.frame, 
-      cols = !"time", 
-      names_to = "Species",
-      values_to = "Abundance"
-    ) %>% dplyr::mutate(
-      Species = as.numeric(Species),
-      Island = floor((Species - 1) / speciesNum),
-      Species = ((Species - 1) %% speciesNum) + 1 # maps 1,2,3,4 %% 4 -> 1:4
-    ) %>% dplyr::group_by(
-      Species, Island
-    ) %>% dplyr::mutate(
-      Native = dplyr::first(Abundance > 0),
-      Invasive = !Native
-    ) %>% dplyr::ungroup() %>% dplyr::group_by(
-      Species, time
-    ) %>% dplyr::mutate(
-      IslandsOccupied = sum(Abundance > 0)
-    ) %>% dplyr::ungroup() %>% dplyr::group_by(
-      Species, Island
-    ) %>% dplyr::mutate(
-      Endemic = Native & dplyr::first(IslandsOccupied) == 1,
-      Type = dplyr::case_when(
-        Endemic ~ "Endemic",
-        Native ~ "Native",
-        Invasive ~ "Invasive",
-        TRUE ~ "Oops"
+processToImages <- function(communitiesEXIslandsLong) {
+  communitiesEXIslandsImages <- lapply(
+    communitiesEXIslandsLong,
+    function(tib) {
+      ggplot2::ggplot(
+        tib,
+        ggplot2::aes(
+          x = time,
+          y = Abundance,
+          color = as.factor(Species),
+          # linetype = Type,
+          group = interaction(Species, Island)
+        )
+      ) + ggplot2::geom_point(
+      ) + ggplot2::facet_grid(
+        Island ~ Type
+      ) + ggplot2::scale_y_log10(
+        limits = c(10^-12, 10^4.5)
       )
-    )
-    
-    return(retval)
-  }, islandsNum = 3
+    }  
+  )
+  return(communitiesEXIslandsImages)
+}
+```
+
+## Case `r communityChosen`, Big Time Steps, Long Length {.tabset}
+```{r}
+communitiesEXIslands <- processExperiment(
+  times = seq(from = 0, to = 20000, by = 500)
 )
 ```
 
 ```{r}
-communitiesEXIslandsImages <- lapply(
-  communitiesEXIslandsLong,
-  function(tib) {
-    ggplot2::ggplot(
-      tib,
-      ggplot2::aes(
-        x = time,
-        y = Abundance,
-        color = as.factor(Species),
-        # linetype = Type,
-        group = interaction(Species, Island)
-      )
-    ) + ggplot2::geom_point(
-    ) + ggplot2::facet_grid(
-      Island ~ Type
-    ) + ggplot2::scale_y_log10(
-      limits = c(10^-12, 10^4.5)
-    )
-  }  
-)
+communitiesEXIslandsLong <- processToLong(communitiesEXIslands)
 ```
 
+```{r}
+communitiesEXIslandsImages <- processToImages(communitiesEXIslandsLong)
+```
 
 ### Adaptive Intolerant
 ```{r}
@@ -330,464 +452,195 @@ communitiesEXIslandsImages[[3]]
 communitiesEXIslandsImages[[4]]
 ```
 
-## Case 5, Big Time Steps {.tabset}
+### Assembly Intolerant
 ```{r}
-communitiesEXIslands <- lapply(list(
-  islandFUNAdaptiveIntolerant,
-  islandFUNStiffIntolerant,
-  islandFUNAdaptiveTolerant,
-  islandFUNStiffTolerant
-), function(fun, tib, pools, mats, dmat, times) {
-  combn(
-    nrow(tib), 2, 
-    fun,
-    dat = tib, 
-    pool = pools[[
-      tib$DatasetID[1]
-    ]][[tib$CombnNum[1]]],
-    mat = mats[[
-      tib$DatasetID[1]
-    ]][[tib$CombnNum[1]]],
-    dmat = dmat,
-    simplify = FALSE,
-    times = times
-  )
-}, pools = pools, mats = mats, dmat = matrix(c(
-  0, 1, 0, # Island 2 -> 1
-  1, 0, 1, # Island 1 -> 2, Island 3 -> 2
-  0, 1, 0  # Island 2 -> 3
-), nrow = 3, ncol = 3, byrow = TRUE), tib = communitiesEX[[5]],
-times = seq(from = 0, to = 5000, by = 500))
+communitiesEXIslandsImages[[5]]
 ```
 
+### Assembly Tolerant
 ```{r}
-communitiesEXIslandsLong <- lapply(
-  communitiesEXIslands, 
-  function(listtib, islandsNum) {
-    speciesNum <- (ncol(listtib[[1]]) - 1) / islandsNum
-    
-    retval <- tidyr::pivot_longer(
-      listtib[[1]] %>% as.data.frame, 
-      cols = !"time", 
-      names_to = "Species",
-      values_to = "Abundance"
-    ) %>% dplyr::mutate(
-      Species = as.numeric(Species),
-      Island = floor((Species - 1) / speciesNum),
-      Species = ((Species - 1) %% speciesNum) + 1 # maps 1,2,3,4 %% 4 -> 1:4
-    ) %>% dplyr::group_by(
-      Species, Island
-    ) %>% dplyr::mutate(
-      Native = dplyr::first(Abundance > 0),
-      Invasive = !Native
-    ) %>% dplyr::ungroup() %>% dplyr::group_by(
-      Species, time
-    ) %>% dplyr::mutate(
-      IslandsOccupied = sum(Abundance > 0)
-    ) %>% dplyr::ungroup() %>% dplyr::group_by(
-      Species, Island
-    ) %>% dplyr::mutate(
-      Endemic = Native & dplyr::first(IslandsOccupied) == 1,
-      Type = dplyr::case_when(
-        Endemic ~ "Endemic",
-        Native ~ "Native",
-        Invasive ~ "Invasive",
-        TRUE ~ "Oops"
-      )
-    )
-    
-    return(retval)
-  }, islandsNum = 3
+communitiesEXIslandsImages[[6]]
+```
+
+## Case `r communityChosen`, Big Time Steps {.tabset}
+
+```{r}
+communitiesEXIslands <- processExperiment(
+  times = seq(from = 0, to = 5000, by = 500)
 )
 ```
 
 ```{r}
-communitiesEXIslandsImages2 <- lapply(
-  communitiesEXIslandsLong,
-  function(tib) {
-    ggplot2::ggplot(
-      tib,
-      ggplot2::aes(
-        x = time,
-        y = Abundance,
-        color = as.factor(Species),
-        # linetype = Type,
-        group = interaction(Species, Island)
-      )
-    ) + ggplot2::geom_point(
-    ) + ggplot2::facet_grid(
-      Island ~ Type
-    ) + ggplot2::scale_y_log10(
-      limits = c(10^-12, 10^4.5)
-    )
-    }  
-)
-```
-
-  
-### Adaptive Intolerant
-```{r}
-communitiesEXIslandsImages2[[1]]
-```
-  
-### Stiff Intolerant
-```{r}
-communitiesEXIslandsImages2[[2]]
-```
-  
-### Adaptive Tolerant
-```{r}
-communitiesEXIslandsImages2[[3]]
-```
-  
-### Stiff Tolerant
-```{r}
-communitiesEXIslandsImages2[[4]]
-```
-
-
-## Case 5, Medium Time Steps {.tabset}
-```{r}
-communitiesEXIslands <- lapply(list(
-  islandFUNAdaptiveIntolerant,
-  islandFUNStiffIntolerant,
-  islandFUNAdaptiveTolerant,
-  islandFUNStiffTolerant
-), function(fun, tib, pools, mats, dmat, times) {
-  combn(
-    nrow(tib), 2, 
-    fun,
-    dat = tib, 
-    pool = pools[[
-      tib$DatasetID[1]
-    ]][[tib$CombnNum[1]]],
-    mat = mats[[
-      tib$DatasetID[1]
-    ]][[tib$CombnNum[1]]],
-    dmat = dmat,
-    simplify = FALSE,
-    times = times
-  )
-}, pools = pools, mats = mats, dmat = matrix(c(
-  0, 1, 0, # Island 2 -> 1
-  1, 0, 1, # Island 1 -> 2, Island 3 -> 2
-  0, 1, 0  # Island 2 -> 3
-), nrow = 3, ncol = 3, byrow = TRUE), tib = communitiesEX[[5]],
-times = seq(from = 0, to = 5000, by = 100))
+communitiesEXIslandsLong <- processToLong(communitiesEXIslands)
 ```
 
 ```{r}
-communitiesEXIslandsLong <- lapply(
-  communitiesEXIslands, 
-  function(listtib, islandsNum) {
-    speciesNum <- (ncol(listtib[[1]]) - 1) / islandsNum
-    
-    retval <- tidyr::pivot_longer(
-      listtib[[1]] %>% as.data.frame, 
-      cols = !"time", 
-      names_to = "Species",
-      values_to = "Abundance"
-    ) %>% dplyr::mutate(
-      Species = as.numeric(Species),
-      Island = floor((Species - 1) / speciesNum),
-      Species = ((Species - 1) %% speciesNum) + 1 # maps 1,2,3,4 %% 4 -> 1:4
-    ) %>% dplyr::group_by(
-      Species, Island
-    ) %>% dplyr::mutate(
-      Native = dplyr::first(Abundance > 0),
-      Invasive = !Native
-    ) %>% dplyr::ungroup() %>% dplyr::group_by(
-      Species, time
-    ) %>% dplyr::mutate(
-      IslandsOccupied = sum(Abundance > 0)
-    ) %>% dplyr::ungroup() %>% dplyr::group_by(
-      Species, Island
-    ) %>% dplyr::mutate(
-      Endemic = Native & dplyr::first(IslandsOccupied) == 1,
-      Type = dplyr::case_when(
-        Endemic ~ "Endemic",
-        Native ~ "Native",
-        Invasive ~ "Invasive",
-        TRUE ~ "Oops"
-      )
-    )
-    
-    return(retval)
-  }, islandsNum = 3
-)
-```
-
-```{r}
-communitiesEXIslandsImages3 <- lapply(
-  communitiesEXIslandsLong,
-  function(tib) {
-    ggplot2::ggplot(
-      tib,
-      ggplot2::aes(
-        x = time,
-        y = Abundance,
-        color = as.factor(Species),
-        # linetype = Type,
-        group = interaction(Species, Island)
-      )
-    ) + ggplot2::geom_point(
-    ) + ggplot2::facet_grid(
-      Island ~ Type
-    ) + ggplot2::scale_y_log10(
-      limits = c(10^-12, 10^4.5)
-    )
-  }  
-)
-```
-  
-### Adaptive Intolerant
-```{r}
-communitiesEXIslandsImages3[[1]]
-```
-  
-### Stiff Intolerant
-```{r}
-communitiesEXIslandsImages3[[2]]
-```
-  
-### Adaptive Tolerant
-```{r}
-communitiesEXIslandsImages3[[3]]
-```
-  
-### Stiff Tolerant
-```{r}
-communitiesEXIslandsImages3[[4]]
-```
-
-## Case 5, Short Time Steps {.tabset}
-  
-```{r}
-communitiesEXIslands <- lapply(list(
-  islandFUNAdaptiveIntolerant,
-  islandFUNStiffIntolerant,
-  islandFUNAdaptiveTolerant,
-  islandFUNStiffTolerant
-), function(fun, tib, pools, mats, dmat, times) {
-  combn(
-    nrow(tib), 2, 
-    fun,
-    dat = tib, 
-    pool = pools[[
-      tib$DatasetID[1]
-    ]][[tib$CombnNum[1]]],
-    mat = mats[[
-      tib$DatasetID[1]
-    ]][[tib$CombnNum[1]]],
-    dmat = dmat,
-    simplify = FALSE,
-    times = times
-  )
-}, pools = pools, mats = mats, dmat = matrix(c(
-  0, 1, 0, # Island 2 -> 1
-  1, 0, 1, # Island 1 -> 2, Island 3 -> 2
-  0, 1, 0  # Island 2 -> 3
-), nrow = 3, ncol = 3, byrow = TRUE), tib = communitiesEX[[5]],
-times = seq(from = 0, to = 5000, by = 10))
-```
-
-```{r}
-communitiesEXIslandsLong <- lapply(
-  communitiesEXIslands, 
-  function(listtib, islandsNum) {
-    speciesNum <- (ncol(listtib[[1]]) - 1) / islandsNum
-    
-    retval <- tidyr::pivot_longer(
-      listtib[[1]] %>% as.data.frame, 
-      cols = !"time", 
-      names_to = "Species",
-      values_to = "Abundance"
-    ) %>% dplyr::mutate(
-      Species = as.numeric(Species),
-      Island = floor((Species - 1) / speciesNum),
-      Species = ((Species - 1) %% speciesNum) + 1 # maps 1,2,3,4 %% 4 -> 1:4
-    ) %>% dplyr::group_by(
-      Species, Island
-    ) %>% dplyr::mutate(
-      Native = dplyr::first(Abundance > 0),
-      Invasive = !Native
-    ) %>% dplyr::ungroup() %>% dplyr::group_by(
-      Species, time
-    ) %>% dplyr::mutate(
-      IslandsOccupied = sum(Abundance > 0)
-    ) %>% dplyr::ungroup() %>% dplyr::group_by(
-      Species, Island
-    ) %>% dplyr::mutate(
-      Endemic = Native & dplyr::first(IslandsOccupied) == 1,
-      Type = dplyr::case_when(
-        Endemic ~ "Endemic",
-        Native ~ "Native",
-        Invasive ~ "Invasive",
-        TRUE ~ "Oops"
-      )
-    )
-    
-    return(retval)
-  }, islandsNum = 3
-)
-```
-
-```{r}
-communitiesEXIslandsImages4 <- lapply(
-  communitiesEXIslandsLong,
-  function(tib) {
-    ggplot2::ggplot(
-      tib,
-      ggplot2::aes(
-        x = time,
-        y = Abundance,
-        color = as.factor(Species),
-        # linetype = Type,
-        group = interaction(Species, Island)
-      )
-    ) + ggplot2::geom_point(
-    ) + ggplot2::facet_grid(
-      Island ~ Type
-    ) + ggplot2::scale_y_log10(
-      limits = c(10^-12, 10^4.5)
-    
-    )
-  }  
-)
+communitiesEXIslandsImages <- processToImages(communitiesEXIslandsLong)
 ```
 
 ### Adaptive Intolerant
 ```{r}
-communitiesEXIslandsImages4[[1]]
+communitiesEXIslandsImages[[1]]
 ```
   
 ### Stiff Intolerant
 ```{r}
-communitiesEXIslandsImages4[[2]]
+communitiesEXIslandsImages[[2]]
 ```
   
 ### Adaptive Tolerant
 ```{r}
-communitiesEXIslandsImages4[[3]]
+communitiesEXIslandsImages[[3]]
 ```
   
 ### Stiff Tolerant
 ```{r}
-communitiesEXIslandsImages4[[4]]
+communitiesEXIslandsImages[[4]]
 ```
 
-
-## Case 5, Very Short Time Steps {.tabset}
+### Assembly Intolerant
 ```{r}
-communitiesEXIslands <- lapply(list(
-  islandFUNAdaptiveIntolerant,
-  islandFUNStiffIntolerant,
-  islandFUNAdaptiveTolerant,
-  islandFUNStiffTolerant
-), function(fun, tib, pools, mats, dmat, times) {
-  combn(
-    nrow(tib), 2, 
-    fun,
-    dat = tib, 
-    pool = pools[[
-      tib$DatasetID[1]
-    ]][[tib$CombnNum[1]]],
-    mat = mats[[
-      tib$DatasetID[1]
-    ]][[tib$CombnNum[1]]],
-    dmat = dmat,
-    simplify = FALSE,
-    times = times
-  )
-}, pools = pools, mats = mats, dmat = matrix(c(
-  0, 1, 0, # Island 2 -> 1
-  1, 0, 1, # Island 1 -> 2, Island 3 -> 2
-  0, 1, 0  # Island 2 -> 3
-), nrow = 3, ncol = 3, byrow = TRUE), tib = communitiesEX[[5]],
-times = seq(from = 0, to = 5000, by = 1))
+communitiesEXIslandsImages[[5]]
 ```
 
+### Assembly Tolerant
 ```{r}
-communitiesEXIslandsLong <- lapply(
-  communitiesEXIslands, 
-  function(listtib, islandsNum) {
-    speciesNum <- (ncol(listtib[[1]]) - 1) / islandsNum
-    
-    retval <- tidyr::pivot_longer(
-      listtib[[1]] %>% as.data.frame, 
-      cols = !"time", 
-      names_to = "Species",
-      values_to = "Abundance"
-    ) %>% dplyr::mutate(
-      Species = as.numeric(Species),
-      Island = floor((Species - 1) / speciesNum),
-      Species = ((Species - 1) %% speciesNum) + 1 # maps 1,2,3,4 %% 4 -> 1:4
-    ) %>% dplyr::group_by(
-      Species, Island
-    ) %>% dplyr::mutate(
-      Native = dplyr::first(Abundance > 0),
-      Invasive = !Native
-    ) %>% dplyr::ungroup() %>% dplyr::group_by(
-      Species, time
-    ) %>% dplyr::mutate(
-      IslandsOccupied = sum(Abundance > 0)
-    ) %>% dplyr::ungroup() %>% dplyr::group_by(
-      Species, Island
-    ) %>% dplyr::mutate(
-      Endemic = Native & dplyr::first(IslandsOccupied) == 1,
-      Type = dplyr::case_when(
-        Endemic ~ "Endemic",
-        Native ~ "Native",
-        Invasive ~ "Invasive",
-        TRUE ~ "Oops"
-      )
-    )
-    
-    return(retval)
-  }, islandsNum = 3
+communitiesEXIslandsImages[[6]]
+```
+
+## Case `r communityChosen`, Medium Time Steps {.tabset}
+
+```{r}
+communitiesEXIslands <- processExperiment(
+  times = seq(from = 0, to = 5000, by = 100)
 )
 ```
 
 ```{r}
-communitiesEXIslandsImages5 <- lapply(
-  communitiesEXIslandsLong,
-  function(tib) {
-    ggplot2::ggplot(
-      tib,
-      ggplot2::aes(
-        x = time,
-        y = Abundance,
-        color = as.factor(Species),
-        # linetype = Type,
-        group = interaction(Species, Island)
-      )
-    ) + ggplot2::geom_point(
-    ) + ggplot2::facet_grid(
-      Island ~ Type
-    ) + ggplot2::scale_y_log10(
-      limits = c(10^-12, 10^4.5)
-    
-    )
-  }  
-)
+communitiesEXIslandsLong <- processToLong(communitiesEXIslands)
 ```
-  
+
+```{r}
+communitiesEXIslandsImages <- processToImages(communitiesEXIslandsLong)
+```
+
 ### Adaptive Intolerant
 ```{r}
-communitiesEXIslandsImages5[[1]]
+communitiesEXIslandsImages[[1]]
 ```
   
 ### Stiff Intolerant
 ```{r}
-communitiesEXIslandsImages5[[2]]
+communitiesEXIslandsImages[[2]]
 ```
   
 ### Adaptive Tolerant
 ```{r}
-communitiesEXIslandsImages5[[3]]
+communitiesEXIslandsImages[[3]]
 ```
   
 ### Stiff Tolerant
 ```{r}
-communitiesEXIslandsImages5[[4]]
+communitiesEXIslandsImages[[4]]
+```
+
+### Assembly Intolerant
+```{r}
+communitiesEXIslandsImages[[5]]
+```
+
+### Assembly Tolerant
+```{r}
+communitiesEXIslandsImages[[6]]
+```
+
+## Case `r communityChosen`, Short Time Steps {.tabset}
+
+```{r}
+communitiesEXIslands <- processExperiment(
+  times = seq(from = 0, to = 5000, by = 10)
+)
+```
+
+```{r}
+communitiesEXIslandsLong <- processToLong(communitiesEXIslands)
+```
+
+```{r}
+communitiesEXIslandsImages <- processToImages(communitiesEXIslandsLong)
+```
+
+### Adaptive Intolerant
+```{r}
+communitiesEXIslandsImages[[1]]
+```
+  
+### Stiff Intolerant
+```{r}
+communitiesEXIslandsImages[[2]]
+```
+  
+### Adaptive Tolerant
+```{r}
+communitiesEXIslandsImages[[3]]
+```
+  
+### Stiff Tolerant
+```{r}
+communitiesEXIslandsImages[[4]]
+```
+
+### Assembly Intolerant
+```{r}
+communitiesEXIslandsImages[[5]]
+```
+
+### Assembly Tolerant
+```{r}
+communitiesEXIslandsImages[[6]]
+```
+
+## Case `r communityChosen`, Very Short Time Steps {.tabset}
+```{r}
+communitiesEXIslands <- processExperiment(
+  times = seq(from = 0, to = 5000, by = 1)
+)
+```
+
+```{r}
+communitiesEXIslandsLong <- processToLong(communitiesEXIslands)
+```
+
+```{r}
+communitiesEXIslandsImages <- processToImages(communitiesEXIslandsLong)
+```
+
+### Adaptive Intolerant
+```{r}
+communitiesEXIslandsImages[[1]]
+```
+  
+### Stiff Intolerant
+```{r}
+communitiesEXIslandsImages[[2]]
+```
+  
+### Adaptive Tolerant
+```{r}
+communitiesEXIslandsImages[[3]]
+```
+  
+### Stiff Tolerant
+```{r}
+communitiesEXIslandsImages[[4]]
+```
+
+### Assembly Intolerant
+```{r}
+communitiesEXIslandsImages[[5]]
+```
+
+### Assembly Tolerant
+```{r}
+communitiesEXIslandsImages[[6]]
 ```
