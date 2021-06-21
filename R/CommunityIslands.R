@@ -466,7 +466,7 @@ IslandNumericalAssembly <- function(
   # DispersalPool, # Species related dispersal rates
   # Should have length == nrow(Pool). Multiplied by entries of
   DispersalIsland, # Island related dispersal rates. Is a matrix, row = to.
-  Dynamics = GeneralisedLotkaVolterra,
+  Dynamics = IslandLotkaVolterra,
   Tolerance = 1E-1,
   ArrivalDensity = 0.1,
   ArrivalEvents = 10,
@@ -538,6 +538,10 @@ IslandNumericalAssembly <- function(
   abundance <- preprocessed$abundance_init
   speciesNum <- length(abundance) / nrow(DispersalIsland)
 
+  allSpeciesOld <- lapply(1:nrow(DispersalIsland), function(i, s, ab, eps) {
+    which(ab[((i - 1) * s + 1) : (i * s)] > eps)
+  }, s = speciesNum, ab = abundance, eps = Tolerance)
+
   if ("Abundance" %in% ReturnValues) {
     abundanceHistory <- c("Time" = 0, abundance)
   }
@@ -602,10 +606,6 @@ IslandNumericalAssembly <- function(
           }, events = ArrivalEvents)
       )
     )
-
-    allSpeciesOld <- lapply(1:nrow(DispersalIsland), function(i, s, ab, eps) {
-      which(ab[((i - 1) * s + 1) : (i * s)] > eps)
-    }, s = speciesNum, ab = abundance, eps = Tolerance)
 
     SequenceRetVal[1,
                    # Last columns correspond to Communities
@@ -702,7 +702,7 @@ IslandNumericalAssembly <- function(
         abundance,
         times = c(0, #IntegratorTimeStep/2,
                   IntegratorTimeStep),
-        func = IslandLotkaVolterra,
+        func = Dynamics,
         parms = parameters,
         events = list(func = function(t, y, parms) {
           y[y < parms$epsilon] <- 0
@@ -727,10 +727,11 @@ IslandNumericalAssembly <- function(
 
     # Record results.
 
+    allSpecies <- lapply(1:nrow(DispersalIsland), function(i, s, ab, eps) {
+      which(ab[((i - 1) * s + 1) : (i * s)] > eps)
+    }, s = speciesNum, ab = abundance, eps = Tolerance)
+
     if ("Sequence" %in% ReturnValues) {
-      allSpecies <- lapply(1:nrow(DispersalIsland), function(i, s, ab, eps) {
-        which(ab[((i - 1) * s + 1) : (i * s)] > eps)
-      }, s = speciesNum, ab = abundance, eps = Tolerance)
 
       # Record Communities.
       SequenceRetVal[event + 1,
@@ -784,9 +785,9 @@ IslandNumericalAssembly <- function(
           }
         }
       }
-
-      allSpeciesOld <- allSpecies
     }
+
+    allSpeciesOld <- allSpecies
 
     # Check if uninvadable steady-state for each island relative to links.
     # If we are uninvadable AND (approximately) in steady-state, then we are done.
@@ -827,7 +828,7 @@ IslandNumericalAssembly <- function(
         preprocessed,
         rootSolve::steady(
           abundance,
-          func = IslandLotkaVolterra,
+          func = Dynamics,
           parms = parameters
         ),
         time = c(0, 1), # If in steady-state, the duration shouldn't matter.
