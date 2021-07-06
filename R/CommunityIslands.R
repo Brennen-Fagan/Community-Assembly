@@ -348,8 +348,15 @@ Productivity <- function(
 
 IslandLotkaVolterra <- function(t, y, parms) {
   with(as.list(parms), {
-    list(as.numeric(y * (r + a %*% y) + d %*% y))
+    if (exists("Verbose")) {
+      if (Verbose) print(paste(t, "Pre-Present:", which(y > 0)))
+    }
+    retval <- list(as.numeric(y * (r + a %*% y) + d %*% y))
     # as.numeric since the solver doesn't know what Matrix::Matrices are.
+    if (exists("Verbose")) {
+      if (Verbose) print(paste(t, "Post-Present:", which(retval[[1]] > 0)))
+    }
+    return(retval)
   })
 }
 
@@ -370,7 +377,8 @@ IslandDynamics <- function(
   #(NOT species on each island, since that requires the user knowing things in advance...)
   #DispersalRates, # List of matrices: column = species, row = (TO other) island, entry = travel rate
   Method = NULL, # Passed through to deSolve.
-  TimesEvents = NULL
+  TimesEvents = NULL,
+  Verbose = FALSE
 ) {
   preprocessed <- IslandPreprocess(
     Pool = Pool,
@@ -379,7 +387,8 @@ IslandDynamics <- function(
     Populations = Populations,
     DispersalPool = DispersalPool,
     DispersalIsland = DispersalIsland,
-    Tolerance = Tolerance
+    Tolerance = Tolerance,
+    Verbose = Verbose
   )
 
   abundance <- with(
@@ -390,6 +399,9 @@ IslandDynamics <- function(
       func = Dynamics,
       parms = parameters,
       events = list(func = function(t, y, parms) {
+        if (exists("Verbose")) {
+          if (Verbose) print(paste(t, "Zeroing:", which(y < parms$epsilon)))
+        }
         y[y < parms$epsilon] <- 0
         y
       }, time = if(is.null(TimesEvents)) Times else TimesEvents),
@@ -888,7 +900,8 @@ IslandPreprocess <- function(
   DispersalPool, # Species related dispersal rates
   # Should have length == nrow(Pool). Multiplied by entries of
   DispersalIsland,
-  Tolerance
+  Tolerance,
+  Verbose = FALSE
 ) {
   # Sanity check 1. ############################################################
   stopifnot(length(Communities) == length(Populations))
@@ -1007,7 +1020,8 @@ IslandPreprocess <- function(
     r = rep(redPool$ReproductionRate, length(Communities)),
     a = Matrix::bdiag(rep(list(redComMat), length(Communities))),
     d = dispersalMatrix,
-    epsilon = Tolerance
+    epsilon = Tolerance,
+    Verbose = Verbose
   )
 
   # Technically, a bit of extra work being done here since we already copied the
