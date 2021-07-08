@@ -349,12 +349,13 @@ Productivity <- function(
 IslandLotkaVolterra <- function(t, y, parms) {
   with(as.list(parms), {
     if (exists("Verbose")) {
-      if (Verbose) print(paste(t, "Pre-Present:", which(y > 0)))
+      if (Verbose) print(paste(t, "Present:", toString(which(y > 0))))
     }
     retval <- list(as.numeric(y * (r + a %*% y) + d %*% y))
     # as.numeric since the solver doesn't know what Matrix::Matrices are.
     if (exists("Verbose")) {
-      if (Verbose) print(paste(t, "Post-Present:", which(retval[[1]] > 0)))
+      if (Verbose) print(paste(t, "Pos-Derivatives:",
+                               toString(which(retval[[1]] > 0))))
     }
     return(retval)
   })
@@ -399,9 +400,12 @@ IslandDynamics <- function(
       func = Dynamics,
       parms = parameters,
       events = list(func = function(t, y, parms) {
-        if (exists("Verbose")) {
-          if (Verbose) print(paste(t, "Zeroing:", which(y < parms$epsilon)))
-        }
+        with(parms, {
+          if (exists("Verbose")) {
+            if (Verbose) print(paste(t, "Zeroing:",
+                                     toString(which(y < parms$epsilon))))
+          }
+        })
         y[y < parms$epsilon] <- 0
         y
       }, time = if(is.null(TimesEvents)) Times else TimesEvents),
@@ -479,6 +483,7 @@ IslandNumericalAssembly <- function(
   # Should have length == nrow(Pool). Multiplied by entries of
   DispersalIsland, # Island related dispersal rates. Is a matrix, row = to.
   Dynamics = IslandLotkaVolterra,
+  CheckInvadable = TRUE, # If false, we do not check, but also cannot end early.
   Tolerance = 1E-1,
   ArrivalDensity = 0.1,
   ArrivalEvents = 10,
@@ -667,6 +672,7 @@ IslandNumericalAssembly <- function(
 
         # and check that the island is invadable (by that species). (Type 1)
         if (
+          CheckInvadable &
           #length(islandSpecies) & # Is there anyone there?
           (preprocessed$redPool$ReproductionRate[candidate] +
            sum(preprocessed$redComMat[candidate,
@@ -805,55 +811,57 @@ IslandNumericalAssembly <- function(
     # If we are uninvadable AND (approximately) in steady-state, then we are done.
     # If so, we are done, otherwise continue running.
 
-    completelyUninvadable <- TRUE
-    for (island in 1:nrow(DispersalIsland)) {
-      islandIndices <- ((island - 1)  * speciesNum + 1) : (island * speciesNum)
-      islandIDs <- islandIndices[abundance[islandIndices] > Tolerance]
-      islandSpecies <- allSpeciesOld[[island]]
-      for (i in 1:ncol(DispersalIsland)) {
-        # For each invading link,
-        if (DispersalIsland[island, i] <= 0) next
+    if (CheckInvadable) {
+      completelyUninvadable <- TRUE
+      for (island in 1:nrow(DispersalIsland)) {
+        islandIndices <- ((island - 1)  * speciesNum + 1) : (island * speciesNum)
+        islandIDs <- islandIndices[abundance[islandIndices] > Tolerance]
+        islandSpecies <- allSpeciesOld[[island]]
+        for (i in 1:ncol(DispersalIsland)) {
+          # For each invading link,
+          if (DispersalIsland[island, i] <= 0) next
 
-        iSpecies <- allSpeciesOld[[i]]
+          iSpecies <- allSpeciesOld[[i]]
 
-        # Only concerned with species that are not already present.
-        iSpecies <- iSpecies[!(iSpecies %in% islandSpecies)]
+          # Only concerned with species that are not already present.
+          iSpecies <- iSpecies[!(iSpecies %in% islandSpecies)]
 
-        # Check if no-one can invade from i to island.
-        if (
-          # length(islandSpecies) &
-          any(preprocessed$redPool$ReproductionRate[iSpecies] +
-              sum(preprocessed$redComMat[iSpecies,
-                                         islandSpecies] *
-                  abundance[islandIDs],
-                  na.rm = TRUE) > 0)
-        ) {
-          completelyUninvadable <- FALSE
-          break
+          # Check if no-one can invade from i to island.
+          if (
+            # length(islandSpecies) &
+            any(preprocessed$redPool$ReproductionRate[iSpecies] +
+                sum(preprocessed$redComMat[iSpecies,
+                                           islandSpecies] *
+                    abundance[islandIDs],
+                    na.rm = TRUE) > 0)
+          ) {
+            completelyUninvadable <- FALSE
+            break
+          }
         }
       }
-    }
 
-    if (completelyUninvadable) {
-      # Check steady-state
-      steady <- with(
-        preprocessed,
-        rootSolve::steady(
-          abundance,
-          func = Dynamics,
-          parms = parameters
-        ),
-        time = c(0, 1), # If in steady-state, the duration shouldn't matter.
-        method = "runsteady"
-      )
-
-      if (attr(steady, "steady") == TRUE){
-        steadycheck <- all(# Double check that the abundances do match...
-          (steady$y == 0 & abundance == 0) |
-            (round((abundance - steady$y)/abundance,
-                   digits = -log10(Tolerance)) == 0)
+      if (completelyUninvadable) {
+        # Check steady-state
+        steady <- with(
+          preprocessed,
+          rootSolve::steady(
+            abundance,
+            func = Dynamics,
+            parms = parameters
+          ),
+          time = c(0, 1), # If in steady-state, the duration shouldn't matter.
+          method = "runsteady"
         )
-        if (steadycheck) break
+
+        if (attr(steady, "steady") == TRUE){
+          steadycheck <- all(# Double check that the abundances do match...
+            (steady$y == 0 & abundance == 0) |
+              (round((abundance - steady$y)/abundance,
+                     digits = -log10(Tolerance)) == 0)
+          )
+          if (steadycheck) break
+        }
       }
     }
   }
@@ -879,11 +887,21 @@ IslandNumericalAssembly <- function(
     retval$Matrix <- InteractionMatrix
   }
   if ("Uninvadable" %in% ReturnValues) {
-    retval$Uninvadable <- completelyUninvadable
+    if (exists("completelyUninvadable"))
+      retval$Uninvadable <- completelyUninvadable
+    else
+      retval$Uninvadable <- "Not Checked"
   }
   if ("Steady" %in% ReturnValues) {
-    retval$Steady <- steady
-    retval$SteadyCheck <- steadycheck
+    if (exists("steady"))
+      retval$Steady <- steady
+    else
+      retval$Steady <- "Not Checked"
+
+    if (exists("steadycheck"))
+      retval$SteadyCheck <- steadycheck
+    else
+      retval$SteadyCheck <- "Not Checked"
   }
   if ("Events" %in% ReturnValues) {
     retval$Events <- event
