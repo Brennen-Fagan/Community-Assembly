@@ -22,6 +22,10 @@ for (pkg in packages) {
   library(pkg, character.only = TRUE)
 }
 
+timeLong <- 20000 # 20000
+timeShort <- 5000 # 5000
+dispersal <- 0.1 # 0.0001 
+
 # Reserved Names
 communitiesAll <- NULL
 invasionsDirected <- NULL
@@ -89,7 +93,7 @@ communitiesEX <- list(
   "Domination"     = communitiesAll[c( 7,  8),]  # One community Dominates.
 )
 
-communityChosen <- 4
+communityChosen <- 2
 ```
 
 ```{r islandFUN3}
@@ -110,12 +114,13 @@ islandFUNAdaptiveIntolerant <- function(i, dat, pool, mat, dmat, times, abund = 
     ) else {
       abund
     },
-    DispersalPool = 0.0001,
+    DispersalPool = dispersal,
     DispersalIsland = dmat,
     Times = times,
       # c(seq(from = 0, to = 999, by = 1), # Slow high res start
       #         seq(from = 1000, to = 20000, by = 500)) # Faster low res.
-    Method = deSolve::rkMethod("rk45dp7")
+    Method = deSolve::rkMethod("rk45dp7"),
+    Verbose = FALSE
   )
 }
 islandFUNStiffIntolerant <- function(i, dat, pool, mat, dmat, times, abund = NULL) {
@@ -135,12 +140,13 @@ islandFUNStiffIntolerant <- function(i, dat, pool, mat, dmat, times, abund = NUL
     ) else {
       abund
     },
-    DispersalPool = 0.0001,
+    DispersalPool = dispersal,
     DispersalIsland = dmat,
     Times = times,
       # c(seq(from = 0, to = 999, by = 1), # Slow high res start
       #         seq(from = 1000, to = 20000, by = 500)) # Faster low res.
-    Method = NULL # Defaults to LSODA
+    Method = NULL, # Defaults to LSODA,
+    Verbose = FALSE
   )
 }
 islandFUNAdaptiveTolerant <- function(i, dat, pool, mat, dmat, times, abund = NULL) {
@@ -160,13 +166,14 @@ islandFUNAdaptiveTolerant <- function(i, dat, pool, mat, dmat, times, abund = NU
     ) else {
       abund
     },
-    DispersalPool = 0.0001,
+    DispersalPool = dispersal,
     DispersalIsland = dmat,
     Times = times,
       # c(seq(from = 0, to = 999, by = 1), # Slow high res start
       #         seq(from = 1000, to = 20000, by = 500)) # Faster low res.
     Method = deSolve::rkMethod("rk45dp7"),
-    Tolerance = 1E-4
+    Tolerance = 1E-4,
+    Verbose = FALSE
   )
 }
 islandFUNStiffTolerant <- function(i, dat, pool, mat, dmat, times, abund = NULL) {
@@ -186,13 +193,14 @@ islandFUNStiffTolerant <- function(i, dat, pool, mat, dmat, times, abund = NULL)
     ) else {
       abund
     },
-    DispersalPool = 0.0001,
+    DispersalPool = dispersal,
     DispersalIsland = dmat,
     Times = times,
       # c(seq(from = 0, to = 999, by = 1), # Slow high res start
       #         seq(from = 1000, to = 20000, by = 500)) # Faster low res.
     Method = NULL, # Defaults to LSODA
-    Tolerance = 1E-4
+    Tolerance = 1E-4,
+    Verbose = FALSE
   )
 }
 
@@ -272,15 +280,16 @@ islandFUNNumAssembleTolerant <- function(i, dat, pool, mat, dmat, times, abund =
 
 processExperiment <- function(times = seq(from = 0, to = 20000, by = 500),
                               communityChoice = communityChosen,
-                              pool = pools, mat = mats) {
-  lapply(list(
-    islandFUNAdaptiveIntolerant,
-    islandFUNStiffIntolerant,
-    islandFUNAdaptiveTolerant,
-    islandFUNStiffTolerant,
-    islandFUNNumAssembleIntolerant,
-    islandFUNNumAssembleTolerant
-  ), function(fun, tib, pool, mat, dmat, times) {
+                              pool = pools, mat = mats, Verbose = FALSE) {
+  funclist <- list(
+    AdI = islandFUNAdaptiveIntolerant,
+    StI = islandFUNStiffIntolerant,
+    AdT = islandFUNAdaptiveTolerant,
+    StT = islandFUNStiffTolerant,
+    AsI = islandFUNNumAssembleIntolerant,
+    AsT = islandFUNNumAssembleTolerant
+  )
+  lapply(funclist, function(fun, tib, pool, mat, dmat, times) {
     combn(
       nrow(tib), 2, 
       fun,
@@ -420,7 +429,7 @@ processToImages <- function(communitiesEXIslandsLong) {
 ## Case `r communityChosen`, Big Time Steps, Long Length {.tabset}
 ```{r}
 communitiesEXIslands <- processExperiment(
-  times = seq(from = 0, to = 20000, by = 500)
+  times = seq(from = 0, to = timeLong, by = 500)
 )
 ```
 
@@ -466,7 +475,7 @@ communitiesEXIslandsImages[[6]]
 
 ```{r}
 communitiesEXIslands <- processExperiment(
-  times = seq(from = 0, to = 5000, by = 500)
+  times = seq(from = 0, to = timeShort, by = 500)
 )
 ```
 
@@ -512,7 +521,7 @@ communitiesEXIslandsImages[[6]]
 
 ```{r}
 communitiesEXIslands <- processExperiment(
-  times = seq(from = 0, to = 5000, by = 100)
+  times = seq(from = 0, to = timeShort, by = 100)
 )
 ```
 
@@ -558,7 +567,7 @@ communitiesEXIslandsImages[[6]]
 
 ```{r}
 communitiesEXIslands <- processExperiment(
-  times = seq(from = 0, to = 5000, by = 10)
+  times = seq(from = 0, to = timeShort, by = 10)
 )
 ```
 
@@ -603,7 +612,7 @@ communitiesEXIslandsImages[[6]]
 ## Case `r communityChosen`, Very Short Time Steps {.tabset}
 ```{r}
 communitiesEXIslands <- processExperiment(
-  times = seq(from = 0, to = 5000, by = 1)
+  times = seq(from = 0, to = timeShort, by = 1)
 )
 ```
 
