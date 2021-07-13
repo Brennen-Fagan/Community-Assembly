@@ -436,7 +436,7 @@ paramFrame <- dplyr::inner_join(
 )
 ```
 
-## Process Assembly
+### Process Assembly
 Remove the extraneous assembly entries.
 ```{r}
 paramFrame$EndStateAssembly <- lapply(
@@ -459,6 +459,8 @@ paramFrame$EndStateAssembly <- lapply(
 # level y, by run, now contains a list of vectors of strings.
 ```
 
+## Core Analysis {.tabset}
+### Present
 First, we check that the appropriate core occurs in the end state of each run.
 <!--
 Unfortunately, some of the abundances were lost in the first few runs, since I
@@ -473,11 +475,178 @@ all(unlist(lapply(1:nrow(paramFrame), function(i, assembly, core) {
 }, assembly = paramFrame$EndStateAssembly, core = paramFrame$Core)))
 ```
 
-Now check if the core is an explicit part of the simulations and count how many times it occurs explicitly.
+### Explicit Presence
+Now check if the core is an explicit part of the simulations and count in how many simulations it occurs explicitly.
+```{r}
+occurrencesOfCoreExplicit <- lapply(1:nrow(paramFrame), function(row, df) {
+  lapply(df$EndStateAssembly[[row]], function(EndState, core) {
+    lapply(EndState, function(states, core) {core %in% states}, core = core)
+  }, core = df$Core[row])
+}, df = paramFrame)
+```
+```{r}
+lapply(occurrencesOfCoreExplicit, function(row) {
+    lapply(row, function(EndState) {
+        paste(sum(unlist(EndState)), length(EndState), sep = "/")
+    })
+})
+```
+Suffice to say, it is rare to observe the core having assembled and then to have everything else assemble around it.
+Instead, the core appears to arise with other things around it.
+(Note that the exception is the case where the core is the endstate, which is an interesting result in and of itself: an uninvadable proper subset of an uninvadable set.)
 
+### Implicit Presence
 Next, noting that the core must occur at least implicitly, it is more interesting to check how early the core appears in each simulation.
+```{r, warning=FALSE}
+occurrencesOfCoreImplicit <- lapply(1:nrow(paramFrame), function(row, df) {
+  lapply(df$EndStateAssembly[[row]], function(EndState, core) {
+    lapply(EndState, function(states, core) {
+      lapply(states, function(state, core) {
+        all(RMTRCode2::CsvRowSplit(core) %in% RMTRCode2::CsvRowSplit(state))
+      }, core = core)
+    }, core = core)
+  }, core = df$Core[row])
+}, df = paramFrame)
+```
+```{r}
+lapply(occurrencesOfCoreImplicit, function(row) {
+  lapply(row, function(EndState) {
+    data <- lapply(EndState, function(Sequence) { which.max(unlist(Sequence)) / length(Sequence)
+    }) %>% unlist() 
+    data %>% summary})
+})
+```
+It appears that there is not much consistency as to when the thing we have called a core arises. Sometimes its first appearance is quite early, sometimes late.
+Usually, it is in a similar position regardless of end state for a given pool, but this is not always true either.
 
+### System Size
 Similarly, we check to see how complex the community is the first time the core appears.
+```{r, warning = FALSE}
+lapply(1:nrow(paramFrame), function(row, df) {
+  lapply(df$EndStateAssembly[[row]], function(EndState, core) {
+    sizeWhenCoreFirstPresent <- unlist(lapply(EndState, function(Sequence, core) {
+      whereCorePresent <- unlist(lapply(Sequence, function(state, core) {
+        all(RMTRCode2::CsvRowSplit(core) %in% RMTRCode2::CsvRowSplit(state))
+      }, core = core))
+      length(RMTRCode2::CsvRowSplit(Sequence[[which.max(whereCorePresent)]]))
+    }, core = core))
+    summary(sizeWhenCoreFirstPresent)
+  }, core = df$Core[row])
+}, df = paramFrame)
+```
+So, in general, the core appears when one or two other things are there as well.
 
+### Persists Once Present
 We check to see if the core ever disappears after having appeared.
+```{r}
+lapply(
+  occurrencesOfCoreImplicit,
+  function(row) {
+    lapply(row,
+      function(EndState) {
+        data <- unlist(
+        lapply(EndState, function(Sequence)
+          any(diff(unlist(Sequence)) == -1)
+        ))
+        paste(sum(data), length(data), sep = "/")
+      }
+    )
+  }
+)
+```
+So it is not uncommon to have some part of the core disappear after it has been assembled.
 
+## Collapsed Core Analysis {.tabset}
+### Present
+We repeat the previous analysis, but with the core having been run to steady state rather than taken as it is.
+The conjecture is that this trims any non-core parts that should have been discarded but were not due to insufficient exploration of the state space, but it assumes that the core should be a stable subcommunity within the greater communities that it is found in.
+
+First, we check that the appropriate core occurs in the end state of each run.
+```{r}
+all(unlist(lapply(1:nrow(paramFrame), function(i, assembly, core) {
+    states <- lapply(names(assembly[[i]]), RMTRCode2::CsvRowSplit)
+    coreNum <- RMTRCode2::CsvRowSplit(core[i])
+    unlist(lapply(states, function(s) all(coreNum %in% s)))
+}, assembly = paramFrame$EndStateAssembly, core = paramFrame$CorePresentAfterPersist)))
+```
+
+### Explicit Presence
+Now check if the core is an explicit part of the simulations and count in how many simulations it occurs explicitly.
+```{r}
+occurrencesOfCoreExplicit <- lapply(1:nrow(paramFrame), function(row, df) {
+  lapply(df$EndStateAssembly[[row]], function(EndState, core) {
+    lapply(EndState, function(states, core) {core %in% states}, core = core)
+  }, core = df$CorePresentAfterPersist[row])
+}, df = paramFrame)
+```
+```{r}
+lapply(occurrencesOfCoreExplicit, function(row) {
+    lapply(row, function(EndState) {
+        paste(sum(unlist(EndState)), length(EndState), sep = "/")
+    })
+})
+```
+Suffice to say, it is rare to observe the core having assembled and then to have everything else assemble around it.
+Instead, the core appears to arise with other things around it.
+(Note that the exception is the case where the core is the endstate, which is an interesting result in and of itself: an uninvadable proper subset of an uninvadable set.)
+
+### Implicit Presence
+Next, noting that the core must occur at least implicitly, it is more interesting to check how early the core appears in each simulation.
+```{r, warning=FALSE}
+occurrencesOfCoreImplicit <- lapply(1:nrow(paramFrame), function(row, df) {
+  lapply(df$EndStateAssembly[[row]], function(EndState, core) {
+    lapply(EndState, function(states, core) {
+      lapply(states, function(state, core) {
+        all(RMTRCode2::CsvRowSplit(core) %in% RMTRCode2::CsvRowSplit(state))
+      }, core = core)
+    }, core = core)
+  }, core = df$CorePresentAfterPersist[row])
+}, df = paramFrame)
+```
+```{r}
+lapply(occurrencesOfCoreImplicit, function(row) {
+  lapply(row, function(EndState) {
+    data <- lapply(EndState, function(Sequence) { which.max(unlist(Sequence)) / length(Sequence)
+    }) %>% unlist() 
+    data %>% summary})
+})
+```
+It appears that there is not much consistency as to when the thing we have called a core arises. Sometimes its first appearance is quite early, sometimes late.
+Usually, it is in a similar position regardless of end state for a given pool, but this is not always true either.
+
+### System Size
+Similarly, we check to see how complex the community is the first time the core appears.
+```{r, warning = FALSE}
+lapply(1:nrow(paramFrame), function(row, df) {
+  lapply(df$EndStateAssembly[[row]], function(EndState, core) {
+    sizeWhenCoreFirstPresent <- unlist(lapply(EndState, function(Sequence, core) {
+      whereCorePresent <- unlist(lapply(Sequence, function(state, core) {
+        all(RMTRCode2::CsvRowSplit(core) %in% RMTRCode2::CsvRowSplit(state))
+      }, core = core))
+      length(RMTRCode2::CsvRowSplit(Sequence[[which.max(whereCorePresent)]]))
+    }, core = core))
+    summary(sizeWhenCoreFirstPresent)
+  }, core = df$CorePresentAfterPersist[row])
+}, df = paramFrame)
+```
+So, in general, the core appears when one or two other things are there as well.
+
+### Persists Once Present
+We check to see if the core ever disappears after having appeared.
+```{r}
+lapply(
+  occurrencesOfCoreImplicit,
+  function(row) {
+    lapply(row,
+      function(EndState) {
+        data <- unlist(
+        lapply(EndState, function(Sequence)
+          any(diff(unlist(Sequence)) == -1)
+        ))
+        paste(sum(data), length(data), sep = "/")
+      }
+    )
+  }
+)
+```
+So it is not uncommon to have some part of the core disappear after it has been assembled.
