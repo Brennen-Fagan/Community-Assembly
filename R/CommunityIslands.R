@@ -68,14 +68,17 @@ FindSteadyStateFromEstimate <- function(
     if (Verbose) print(paste0(attempt, ":"))
     init_old <- init
 
-    init <- rootSolve::steady(
-      y = init,
-      func = Dynamics,
-      parms = list(a = InteractionMatrix[com, com],
-                   r = Pool$ReproductionRate[com],
-                   epsilon = epsilon),
-      positive = TRUE
-    )$y
+    init <- #rootSolve::runsteady(
+      deSolve::ode(
+        times = c(0, 1E4),
+        y = init,
+        func = Dynamics,
+        parms = list(a = InteractionMatrix[com, com],
+                     r = Pool$ReproductionRate[com],
+                     epsilon = epsilon)#,
+        #positive = TRUE
+      )#$y
+    init <- init[nrow(init), -1]
     if (Verbose) print(init)
 
     if (any(init < epsilon)) {
@@ -154,14 +157,17 @@ FindSteadyStateFromBasal <- function(
     if (Verbose) print(paste0(attempt, ":"))
     init_old <- init
 
-    init <- rootSolve::steady(
-      y = init,
-      func = Dynamics,
-      parms = list(a = InteractionMatrix[com, com],
-                   r = Pool$ReproductionRate[com],
-                   epsilon = epsilon),
-      positive = TRUE
-    )$y
+    init <- #rootSolve::runsteady(
+      deSolve::ode(
+        times = c(0, 1E4),
+        y = init,
+        func = Dynamics,
+        parms = list(a = InteractionMatrix[com, com],
+                     r = Pool$ReproductionRate[com],
+                     epsilon = epsilon)#,
+        #positive = TRUE
+      )#$y
+    init <- init[nrow(init), -1]
     if (Verbose) print(init)
 
     if (any(init < epsilon)) {
@@ -273,14 +279,17 @@ FindSteadyStateFromSize <- function(
     if (Verbose) print(paste0(attempt, ":"))
     init_old <- init
 
-    init <- rootSolve::steady(
-      y = init,
-      func = Dynamics,
-      parms = list(a = InteractionMatrix[com, com],
-                   r = Pool$ReproductionRate[com],
-                   epsilon = epsilon),
-      positive = TRUE
-    )$y
+    init <- #rootSolve::runsteady(
+      deSolve::ode(
+        times = c(0, 1E4),
+        y = init,
+        func = Dynamics,
+        parms = list(a = InteractionMatrix[com, com],
+                     r = Pool$ReproductionRate[com],
+                     epsilon = epsilon)#,
+        #positive = TRUE
+      )#$y
+    init <- init[nrow(init), -1]
     if (Verbose) print(init)
 
     if (any(init < epsilon)) {
