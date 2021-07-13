@@ -521,6 +521,87 @@ Columns are invadeable by rows if the entry is `TRUE`.
 invasionsDirected
 ```
 
+### Running Assembly - 2021-06-21
+One thing we saw in the Transition Asides was that invadability was potentially inaccurate if the system was in a cycling state as opposed to a steady state.
+Hence, we run the system on a three island assembly process for each combination, just to be on the safe side (and see what the empty island does).
+We run it 5 times each to see if there is variation in the response.
+
+```{r islandFUN}
+islandFUNNumAssembleTolerant <- function(
+  i, dat, pool, mat, dmat, times, abund = NULL, seeds = 1:5) {
+  temp <- dat[i, ]
+  retval <- list()
+  for (seed in seeds) {
+    retval[[toString(seed)]] <- RMTRCode2::IslandNumericalAssembly(
+      Pool = pool,
+      InteractionMatrix = mat,
+      Communities = c(
+        list(temp$Communities[1]),
+        rep("", nrow(dmat) - 2),
+        temp$Communities[2]
+      ),
+      Populations = if (is.null(abund)) c(
+        list(temp$CommunityAbund[1]),
+        rep("", nrow(dmat) - 2),
+        list(temp$CommunityAbund[2])
+      ) else {
+        abund
+      },
+      DispersalIsland = dmat,
+      IntegratorTimeStep = mean(diff(times)),
+      ArrivalEvents = length(times),
+      Tolerance = 1E-4,
+      ReturnValues = c("Abundance", "Steady"),
+      seed = seed
+    )
+  }
+  return(retval)
+}
+skip <- TRUE
+```
+
+```{r invasionsIslands3}
+if (!skip) { 
+invasionsIslands3 <- list()
+for (grp in unique(communitiesAll$TotalID)) {
+  communitiesGrp <- communitiesAll %>% dplyr::filter(
+    TotalID == grp, Persists
+  ) %>% dplyr::mutate(
+    CommunityProdAprox = round(CommunityProd, 0)
+  ) %>% dplyr::distinct(
+    Communities, CommunityProdAprox, .keep_all = TRUE
+  )
+  
+  if (nrow(communitiesGrp) <= 1) {
+    invasionsIslands3[[grp]] <- toString(nrow(communitiesGrp))
+    next
+  }
+  
+  invasionsIslands3[[grp]] <- combn(
+    nrow(communitiesGrp), 2, 
+    islandFUNNumAssembleTolerant,
+    dat = communitiesGrp, 
+    pool = pools[[
+      communitiesGrp$DatasetID[1]
+    ]][[communitiesGrp$CombnNum[1]]],
+    mat = mats[[
+      communitiesGrp$DatasetID[1]
+    ]][[communitiesGrp$CombnNum[1]]],
+    dmat = matrix(c(
+      0, 1, 0, # Island 2 -> 1
+      1, 0, 1, # Island 1 -> 2, Island 3 -> 2
+      0, 1, 0  # Island 2 -> 3
+    ), nrow = 3, ncol = 3, byrow = TRUE),
+    times = seq(from = 0, to = 20000, by = 1), # Expect to die before 20000.
+    seeds = c(26550866, 37212390, 57285336, 90820779, 20168193),
+    simplify = FALSE
+  )
+  # > runif(5) * 1E8
+  # [1] 26550866 37212390 57285336 90820779 20168193
+}
+}
+```
+
 ## Indirect Mutualism (or Competition)
 Here, we check to see if the networks created by each community (hybrid or otherwise) has mutualism embedded in it.
 
@@ -622,36 +703,165 @@ for (i in seq_along(foodWebs)[1:5]) {
 }
 ```-->
 
-#### Closed
+#### Code
+```{r gallerycode}
+# From documentation: 
+# https://cran.r-project.org/web/packages/cheddar/vignettes/ImportExport.pdf
+ToIgraph <- function(community, weight=NULL)
+{
+    if(is.null(TLPS(community)))
+    {
+        stop('The community has no trophic links')
+    }
+    else
+    {
+        tlps <- TLPS(community, link.properties=weight)
+        if(!is.null(weight))
+        {
+            tlps$weight <- tlps[,weight]
+        }
+        #? Should be graph_from_data_frame?
+        return (graph.data.frame(tlps, 
+                                 vertices=NPS(community),
+                                 directed=TRUE))
+    }
+}
+
+sideBySideGainLoss <- function(CheddarFoodWeb, 
+                               threshold = 0, # sets to minimal size edges below
+                               nodeSize = c("Abundance", "Size", "None"),
+                               edgeScale = 10) {
+  theG <- ToIgraph(CheddarFoodWeb) 
+  
+  # layout.auto yields a star with basals on the outside.
+  # layout_with_graphopt has repulsion, but does not give great graphs.
+  theLayout <- igraph::layout.circle(theG) 
+  
+  theSize <- match.arg(nodeSize, c("Abundance", "Size", "None"))
+  if (theSize == "Abundance")
+    theVs <- sqrt(igraph::vertex_attr(theG)$N) * 10
+  else if (theSize == "Size") {
+    theVs <- igraph::vertex_attr(theG)$M
+    theVs <- sqrt(theVs / min(theVs)) * 10
+  } else if (theSize == "None") {
+    theVs <- 15
+  }
+  
+  theColors <- ifelse(
+    igraph::vertex_attr(theG)$Type == "Basal", "skyblue", "red"
+  )
+  
+  theGain <- igraph::edge_attr(theG)$gainNormal
+  theLoss <- igraph::edge_attr(theG)$lossNormal
+  
+  theGain[theGain < threshold] <- 0
+  theLoss[theLoss < threshold] <- 0
+  
+  theGain <- theGain * edgeScale
+  theLoss <- theLoss * edgeScale
+  
+  theGG <- theG
+  theLG <- theG
+  
+  theGG <- igraph::delete_edges(theGG, which(theGain == 0))
+  theLG <- igraph::delete_edges(theLG, which(theLoss == 0))
+  theGain <- theGain[theGain > 0]
+  theLoss <- theLoss[theLoss > 0]
+  
+  
+  par(mfrow = c(2, 2), # Two Rows, Two Columns
+      mar = c(0, 1.5, 1, 0), # Margins, bottom, left, top, right
+      oma = c(0.1, 0.1, 0.1, 0.1) # Outer margins.
+      )
+  
+  cheddar::PlotWebByLevel(CheddarFoodWeb, show.level.lines = TRUE, 
+                                level = "LongWeightedTrophicLevel",
+                          main = "Trophic Structure")
+  plot(
+    theG, 
+    layout = theLayout, 
+    vertex.size = theVs, 
+    edge.width = 1, 
+    edge.arrow.size = 0.3, 
+    edge.arrow.width = 1, 
+    vertex.color = theColors, 
+    edge.lty = 2, 
+    edge.color = "grey", 
+    edge.arrow.mode = ">",
+    main = "Consumption"
+  )
+  plot(
+    theGG, 
+    layout = theLayout, 
+    vertex.size = theVs, 
+    edge.width = theGain, 
+    edge.arrow.size = 0.3, 
+    edge.arrow.width = 1, 
+    vertex.color = theColors, 
+    edge.lty = 2, 
+    edge.color = "blue", 
+    edge.arrow.mode = ">",
+    main = "Consumer's Gains"
+  )
+  plot(
+    theLG, 
+    layout = theLayout, 
+    vertex.size = theVs, 
+    edge.width = theLoss, 
+    edge.arrow.size = 0.3, 
+    edge.arrow.width = 2, 
+    vertex.color = theColors, 
+    edge.lty = 3, 
+    edge.color = "darkred", 
+    edge.arrow.mode = "<",
+    main = "Resource's Losses"
+  )
+}
+```
 
 #### Example LM 1
 ```{r gallery1}
-print(cheddar::PlotWebByLevel(foodWebs[[1]], show.level.lines = TRUE, 
-                                level = "LongWeightedTrophicLevel"))
+# print(cheddar::PlotWebByLevel(foodWebs[[1]], show.level.lines = TRUE, 
+#                                 level = "LongWeightedTrophicLevel"))
+sideBySideGainLoss(foodWebs[[1]], nodeSize = "None", threshold = 0.1)
 ```
 
 #### Example LM 2
 ```{r gallery2}
-print(cheddar::PlotWebByLevel(foodWebs[[28]], show.level.lines = TRUE, 
-                                level = "LongWeightedTrophicLevel"))
+# print(cheddar::PlotWebByLevel(foodWebs[[28]], show.level.lines = TRUE, 
+#                                 level = "LongWeightedTrophicLevel"))
+sideBySideGainLoss(foodWebs[[34]], nodeSize = "None", threshold = 0.1)
 ```
 
 #### Invadable
 ```{r gallery3}
-print(cheddar::PlotWebByLevel(foodWebs[[41]], show.level.lines = TRUE, 
-                                level = "LongWeightedTrophicLevel"))
+# print(cheddar::PlotWebByLevel(foodWebs[[41]], show.level.lines = TRUE, 
+#                                 level = "LongWeightedTrophicLevel"))
+sideBySideGainLoss(foodWebs[[49]], nodeSize = "None", threshold = 0.1)
 ```
 
 #### Does Not Persist
 ```{r gallery4}
-print(cheddar::PlotWebByLevel(foodWebs[[61]], show.level.lines = TRUE, 
-                                level = "LongWeightedTrophicLevel"))
+# print(cheddar::PlotWebByLevel(foodWebs[[61]], show.level.lines = TRUE, 
+#                                 level = "LongWeightedTrophicLevel"))
+sideBySideGainLoss(foodWebs[[81]], nodeSize = "None", threshold = 0.1)
 ```
 
 #### Hybrid
 ```{r gallery5}
-print(cheddar::PlotWebByLevel(foodWebs[[81]], show.level.lines = TRUE, 
-                                level = "LongWeightedTrophicLevel"))
+# print(cheddar::PlotWebByLevel(foodWebs[[81]], show.level.lines = TRUE, 
+#                                 level = "LongWeightedTrophicLevel"))
+sideBySideGainLoss(foodWebs[[98]], nodeSize = "None", threshold = 0.1)
+```
+
+#### Largest Assembled
+```{r gallery6}
+sideBySideGainLoss(foodWebs[[38]], nodeSize = "None", threshold = 0.1)
+```
+
+#### Largest Hybrid
+```{r gallery7}
+sideBySideGainLoss(foodWebs[[89]], nodeSize = "None", threshold = 0.1)
 ```
 
 ### Measuring Indirect Interactions

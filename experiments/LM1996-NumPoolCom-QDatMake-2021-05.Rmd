@@ -572,9 +572,39 @@ for (r in 1:nrow(candidateData)) {
 }
 ```
 
+```{r createAbund}
+for (r in 1:nrow(candidateData)) {
+  if (!(candidateData$CommunityAbund[r] == "Failure" |
+      candidateData$CommunityAbund[r] == "")) next
+
+  # Random guesses, starting from structured.
+  temp <- with(
+    candidateData[r, ],
+    RMTRCode2::FindSteadyStateFromEstimate(
+      Pool = pools[[DatasetID]][[CombnNum]],
+      InteractionMatrix = mats[[DatasetID]][[CombnNum]],
+      Community = Communities,
+      Populations = ifelse(
+        pools[[DatasetID]][[CombnNum]]$Type[
+          RMTRCode2::CsvRowSplit(Communities)
+        ] == "Basal",
+        1000, 10)
+    )
+  )
+
+  if (any(temp) < 1E-4) {
+    temp <- "EstimateFailure"
+  } else {
+    temp <- toString(temp)
+  }
+  candidateData$CommunityAbund[r] <- temp
+}
+```
+
 ```{r filterNoAbund}
 candidateData <- candidateData %>% dplyr::filter(CommunityAbund != "",
-                                                 CommunityAbund != "Failure")
+                                                 CommunityAbund != "Failure",
+                                                 CommunityAbund != "EstimateFailure")
 ```
 
 ```{r computeProductivity}
@@ -611,6 +641,7 @@ islandFUN <- function(i, dat, pool, mat, dmat) {
     ),
     DispersalPool = 0.0001,
     DispersalIsland = dmat,
+    Verbose = FALSE
   )
 }
 ```
