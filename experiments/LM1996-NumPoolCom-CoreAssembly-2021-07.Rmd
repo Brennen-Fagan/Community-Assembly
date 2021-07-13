@@ -1,0 +1,483 @@
+---
+title: "Core Assembly"
+output:
+  html_notebook:
+    code_folding: hide
+---
+
+# Tabs {.tabset}
+
+## Load Data
+```{r}
+packages <- c(
+  "dplyr"
+)
+for (pkg in packages) {
+  library(pkg, character.only = TRUE)
+}
+```
+
+### Cores
+Community Cores data:
+```{r Cores}
+load("LM1996-NumPoolCom-FoodWebCores-2021-07.RData")
+```
+
+Base data, from `LM1996-NumPoolCom-QDatMake-2021-05.Rmd`. 
+We need to focus on grabbing as many assembly sequences as we can.
+The conjecture is that the core communities are easily assemblable and thus 
+should appear commonly during assembly in some way shape or form.
+
+### 2021-04 Data
+```{r dirs}
+dirViking <- c(
+  file.path(
+    getwd(), "LCAB_LawMorton1996-NumericalPoolCommunityScaling"
+  ),
+  file.path(
+    getwd(), "LCAB_LawMorton1996-NumericalPoolCommunityScaling2"
+  )
+)
+dirVikingResults <- file.path(
+  dirViking, c("results-2021-04", "save-2021-05-10")
+)
+resultFormat <- paste0(
+  "run-", 
+  "%d", # Combination Number, or CombnNum.
+  "-", 
+  "%s", # Run Seed.
+  ".RDS"
+)
+```
+
+```{r params}
+# Copied from LawMorton1996-NumericalPoolCommunityScaling-Calculation.R
+set.seed(38427042)
+
+basal <- c(3, 10, 30, 100, 300, 1000)
+consumer <- c(3, 10, 30, 100, 300, 1000) * 2
+events <- (max(basal) + max(consumer)) * 2
+runs <- 100
+
+logBodySize <- c(-2, -1, -1, 1) # Morton and Law 1997 version.
+parameters <- c(0.01, 10, 0.5, 0.2, 100, 0.1)
+
+# Need to rerun seedsPrep to get the random number generation right for seedsRun
+seedsPrep <- runif(2 * length(basal) * length(consumer)) * 1E8
+seedsRun <- runif(runs * length(basal) * length(consumer)) * 1E8
+```
+
+```{r organiseParams}
+paramFrame <- with(list(
+  b = rep(basal, times = length(consumer)),
+  c = rep(consumer, each = length(basal)),
+  s1 = seedsPrep[1:(length(basal) * length(consumer))],
+  s2 = seedsPrep[
+    (length(basal) * length(consumer) + 1):(
+      2 * length(basal) * length(consumer))
+  ],
+  sR = seedsRun
+), {
+  temp <- data.frame(
+    CombnNum = 0,
+    Basals = b,
+    Consumers = c,
+    SeedPool = s1,
+    SeedMat = s2,
+    SeedRuns = "",
+    SeedRunsNum = 0,
+    EndStates = I(rep(list(""), length(b))),
+    EndStatesNum = 0,
+    EndStateSizes = I(rep(list(""), length(b))),
+    EndStateSizesNum = NA,
+    EndStateAssembly = I(rep(list(""), length(b))),
+    EndStateAbundance = I(rep(list(""), length(b))),
+    Dataset = "2021-04",
+    DatasetID = 1,
+    stringsAsFactors = FALSE
+  )
+  for (i in 1:nrow(temp)) {
+    seeds <- sR[((i - 1) * runs + 1) : (i * runs)]
+    temp$SeedRuns[i] <- toString(seeds) # CSV
+    temp$SeedRunsNum[i] <- length(seeds)
+  }
+  temp$CombnNum <- 1:nrow(temp)
+  temp
+})
+```
+
+```{r loadResults}
+# Note: n + 2 end states. Failure to finish, failure to obtain state, and state.
+for (i in 1:nrow(paramFrame)) {
+  resultsList <- list(
+    "No Run" = 0,
+    "No State" = 0
+  )
+  resultsSize <- list(
+    "0" = 0
+  )
+  resultsAssembly <- list(
+    "No Run" = data.frame(),
+    "No State" = data.frame()
+  )
+  seeds <- unlist(strsplit(paramFrame$SeedRuns[i], ', '))
+  for (seed in seeds) {
+    fileName <- file.path(
+      dirVikingResults[paramFrame$DatasetID[i]],
+      sprintf(resultFormat, paramFrame$CombnNum[i], seed)
+    )
+    
+    if (file.exists(fileName)) {
+      temp <- load(fileName)
+      temp <- eval(parse(text = temp)) # Get objects.
+      
+      if (is.data.frame(temp)) {
+        community <- toString(
+          temp[[ncol(temp)]][[nrow(temp)]]
+        )
+        size <- toString(length(temp[[ncol(temp)]][[nrow(temp)]]))
+        
+        if (community == "") {
+          resultsList$`No State` <- resultsList$`No State` + 1
+          resultsSize$`0` <- resultsSize$`0` + 1
+          
+        } else if (community %in% names(resultsList)) {
+          resultsList[[community]] <- resultsList[[community]] + 1
+          resultsSize[[size]] <- resultsSize[[size]] + 1
+          resultsAssembly[[community]][[
+            length(resultsAssembly[[community]]) + 1
+            ]] <- temp$Result.Community
+          
+        } else {
+          resultsList[[community]] <- 1
+          resultsAssembly[[community]] <- list(temp$Result.Community)
+          
+          if (size %in% resultsSize) {
+            resultsSize[[size]] <- resultsSize[[size]] + 1
+          } else {
+            resultsSize[[size]] <- 1
+          }
+        }
+      } else {
+        resultsList$`No State` <- resultsList$`No State` + 1
+        resultsSize$`0` <- resultsSize$`0` + 1
+      }
+    } else {
+      resultsList$`No Run` <- resultsList$`No Run` + 1
+      resultsSize$`0` <- resultsSize$`0` + 1
+    }
+  }
+  
+  paramFrame$EndStates[[i]] <- resultsList
+  paramFrame$EndStatesNum[i] <- length(resultsList) - 2 # ! No State, No Run
+  paramFrame$EndStateSizes[[i]] <- resultsSize
+  paramFrame$EndStateSizesNum[i] <- length(resultsSize) - 1 # ! 0
+  paramFrame$EndStateAssembly[[i]] <- resultsAssembly
+}
+```
+
+### 2021-05 Data
+```{r organiseParams2}
+source(
+  file.path(getwd(), 
+            "LawMorton1996-NumericalPoolCommunityScaling-Settings2.R")
+)
+
+oldNrow <- nrow(paramFrame)
+
+paramFrame <- rbind(paramFrame, with(list(
+  b = rep(basal, times = length(consumer)),
+  c = rep(consumer, each = length(basal)),
+  s1 = seedsPrep[1:(length(basal) * length(consumer))],
+  s2 = seedsPrep[
+    (length(basal) * length(consumer) + 1):(
+      2 * length(basal) * length(consumer))
+  ],
+  sR = seedsRun
+), {
+  temp <- data.frame(
+    CombnNum = 0,
+    Basals = b,
+    Consumers = c,
+    SeedPool = s1,
+    SeedMat = s2,
+    SeedRuns = "",
+    SeedRunsNum = 0,
+    EndStates = I(rep(list(""), length(b))),
+    EndStatesNum = 0,
+    EndStateSizes = I(rep(list(""), length(b))),
+    EndStateSizesNum = NA,
+    EndStateAssembly = I(rep(list(""), length(b))),
+    EndStateAbundance = I(rep(list(""), length(b))),
+    Dataset = "2021-05",
+    DatasetID = 2,
+    stringsAsFactors = FALSE
+  )
+  for (i in 1:nrow(temp)) {
+    seeds <- sR[((i - 1) * runs + 1) : (i * runs)]
+    temp$SeedRuns[i] <- toString(seeds) # CSV
+    temp$SeedRunsNum[i] <- length(seeds)
+  }
+  temp$CombnNum <- 1:nrow(temp)
+  temp
+})
+)
+```
+
+```{r loadResults2}
+# Note: n + 2 end states. Failure to finish, failure to obtain state, and state.
+# Modified from above, but with the abundance recorded.
+for (i in (oldNrow + 1):nrow(paramFrame)) {
+  resultsList <- list(
+    "No Run" = 0,
+    "No State" = 0
+  )
+  resultsSize <- list(
+    "0" = 0
+  )
+  resultsAssembly <- list(
+    "No Run" = data.frame(),
+    "No State" = data.frame()
+  )
+  resultsAbund <- list(
+    "No Run" = "",
+    "No State" = ""
+  )
+  seeds <- unlist(strsplit(paramFrame$SeedRuns[i], ', '))
+  for (seed in seeds) {
+    fileName <- file.path(
+      dirVikingResults[paramFrame$DatasetID[i]],
+      sprintf(resultFormat, paramFrame$CombnNum[i], seed)
+    )
+    
+    if (file.exists(fileName)) {
+      temp <- load(fileName)
+      temp <- eval(parse(text = temp)) # Get objects.
+      
+      if (is.list(temp) && "Result" %in% names(temp)) {
+        
+        if (is.data.frame(temp$Result))
+          community <- temp$Result$Community[[nrow(temp$Result)]]
+        else 
+          community <- temp$Result
+        
+        size <- toString(length(community))
+        
+        if (community[1] != "") 
+          abund <- toString(temp$Abund[community + 1])
+        else 
+          abund <- ""
+        
+        community <- toString(community)
+        
+        if (community == "") {
+          resultsList$`No State` <- resultsList$`No State` + 1
+          resultsSize$`0` <- resultsSize$`0` + 1
+          
+        } else if (community %in% names(resultsList)) {
+          resultsList[[community]] <- resultsList[[community]] + 1
+          resultsSize[[size]] <- resultsSize[[size]] + 1
+          resultsAssembly[[community]][[
+            length(resultsAssembly[[community]]) + 1
+            ]] <- temp$Result$Community
+          
+        } else {
+          resultsList[[community]] <- 1
+          resultsAssembly[[community]] <- list(temp$Result$Community)
+          resultsAbund[[community]] <- abund
+          
+          if (size %in% resultsSize) {
+            resultsSize[[size]] <- resultsSize[[size]] + 1
+          } else {
+            resultsSize[[size]] <- 1
+          }
+        }
+      } else {
+        resultsList$`No State` <- resultsList$`No State` + 1
+        resultsSize$`0` <- resultsSize$`0` + 1
+      }
+    } else {
+      resultsList$`No Run` <- resultsList$`No Run` + 1
+      resultsSize$`0` <- resultsSize$`0` + 1
+    }
+  }
+  
+  paramFrame$EndStates[[i]] <- resultsList
+  paramFrame$EndStatesNum[i] <- length(resultsList) - 2 # ! No State, No Run
+  paramFrame$EndStateSizes[[i]] <- resultsSize
+  paramFrame$EndStateSizesNum[i] <- length(resultsSize) - 1 # ! 0
+  paramFrame$EndStateAssembly[[i]] <- resultsAssembly
+  paramFrame$EndStateAbundance[[i]] <- resultsAbund
+}
+```
+
+### Test Data
+
+```{r addTest}
+testRowNums <- nrow(paramFrame)
+testRowsToAdd <- c(2, 6) # Make sure to put in numerical order!
+
+paramFrame <- with(
+  list(
+    basal2 = c(5, 10, 15),
+    consumer2 = c(20, 40, 60),
+    logBodySize = c(-2, -1, -1, 0),
+    parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1)
+  ),
+  {
+    set.seed(3680180)
+    seedsPrep2 <- runif(2 * length(basal2) * length(consumer2)) * 1E8
+    with(list(
+      b = rep(basal2, times = length(consumer2)),
+      c = rep(consumer2, each = length(basal2)),
+      s1 = seedsPrep2[1:(length(basal2) * length(consumer2))],
+      s2 = seedsPrep2[
+        (length(basal2) * length(consumer2) + 1):(
+          2 * length(basal2) * length(consumer2))
+      ]
+    ), {
+      rbind(
+        paramFrame,
+        data.frame(
+          CombnNum = testRowsToAdd,
+          Basals = b[testRowsToAdd],
+          Consumers = c[testRowsToAdd],
+          SeedPool = s1[testRowsToAdd],
+          SeedMat = s2[testRowsToAdd],
+          SeedRuns = "",
+          SeedRunsNum = 0,
+          EndStates = I(rep(list(""), length(testRowsToAdd))),
+          EndStatesNum = 0,
+          EndStateSizes = I(rep(list(""), length(testRowsToAdd))),
+          EndStateSizesNum = NA,
+          EndStateAssembly = I(rep(list(""), length(testRowsToAdd))),
+          EndStateAbundance = I(rep(list(""), length(testRowsToAdd))),
+          Dataset = "Test",
+          DatasetID = max(paramFrame$DatasetID) + 1,
+          stringsAsFactors = FALSE
+        )
+      )
+    }
+    )
+  }
+)
+
+testRowNums <- (testRowNums + 1):nrow(paramFrame)
+resultsList <- list(
+  list(
+    "No Run" = 0,
+    "No State" = 0,
+    "2, 4, 6, 12, 29" = 1,
+    "2, 4, 6, 13, 29" = 1
+  ),
+  list(
+    "No Run" = 0,
+    "No State" = 0,
+    "8, 10, 12, 14, 15, 16, 39, 43" = 1,
+    "8, 12, 14, 15, 16, 38, 39" = 1
+  )
+)
+resultsSize <- list(
+  list(
+    "0" = 0,
+    "5" = 2
+  ),
+  list(
+    "0" = 0,
+    "8" = 1,
+    "7" = 1
+  )
+)
+resultsAbund <- list(
+  list(
+    "No Run" = "",
+    "No State" = "",
+    "2, 4, 6, 12, 29" = "742.88553671712, 80.579233072626, 162.128399850253, 20.2082198699389, 18.8589490510429",
+    "2, 4, 6, 13, 29" = "668.664143581837, 119.024146851052, 127.680269383867, 30.657960866033, 13.4844194707944"
+  ),
+  list(
+    "No Run" = "",
+    "No State" = "",
+    "8, 10, 12, 14, 15, 16, 39, 43" = "20.7665807606491, 32.4461165261454, 80.4033387818895, 817.879722033354, 121.136570782828, 18.0390671088957, 12.3834561177271, 19.9674718543196",
+    "8, 12, 14, 15, 16, 38, 39" = "82.592048492812, 138.267379166014, 938.158436379166, 51.8610963745021, 5.03556251837491, 14.1019343145825, 25.9231062711228"
+  )
+)
+
+for (j in seq_along(testRowNums)) {
+  i <- testRowNums[j]
+  paramFrame$EndStates[[i]] <- resultsList[[j]]
+  paramFrame$EndStatesNum[i] <- length(resultsList[[j]]) - 2 # ! No State, No Run
+  paramFrame$EndStateSizes[[i]] <- resultsSize[[j]]
+  paramFrame$EndStateSizesNum[i] <- length(resultsSize[[j]]) - 1 # ! 0
+  paramFrame$EndStateAbundance[[i]] <- resultsAbund[[j]]
+}
+
+```
+
+### Filter 
+No assembly sequence, no common core.
+```{r}
+paramFrame$TotalID <- with(paramFrame, paste(CombnNum, DatasetID))
+paramFrame <- paramFrame %>% dplyr::filter(
+  TotalID %in% communityCores$TotalID,
+  (lapply(EndStateAssembly, length) %>% unlist()) > 2
+) %>% dplyr::select(-SeedRuns)
+communityCores <- communityCores %>% dplyr::filter(
+  TotalID %in% paramFrame$TotalID
+)
+```
+
+### Join
+```{r}
+paramFrame <- dplyr::inner_join(
+  paramFrame,
+  communityCores,
+  by = c("TotalID", "DatasetID", "CombnNum")
+)
+```
+
+## Process Assembly
+Remove the extraneous assembly entries.
+```{r}
+paramFrame$EndStateAssembly <- lapply(
+  paramFrame$EndStateAssembly, function(x) {
+    x[c(-1, -2)]
+  })
+```
+
+Next, convert the lists to be strings to match the format of the Cores.
+```{r}
+paramFrame$EndStateAssembly <- lapply(
+  paramFrame$EndStateAssembly, function(x) {# By End state
+    lapply(x, function(y) {# By Run
+      lapply(y, function(z) {# By Step
+        unlist(lapply(z, toString))
+      })
+    })
+  }
+)
+# level y, by run, now contains a list of vectors of strings.
+```
+
+First, we check that the appropriate core occurs in the end state of each run.
+<!--
+Unfortunately, some of the abundances were lost in the first few runs, since I
+had not realised how difficult it would be to recreate them.
+Part of the problem is that I could not retrieve steady state values in the case of oscillatory dynamics.
+-->
+```{r}
+all(unlist(lapply(1:nrow(paramFrame), function(i, assembly, core) {
+    states <- lapply(names(assembly[[i]]), RMTRCode2::CsvRowSplit)
+    coreNum <- RMTRCode2::CsvRowSplit(core[i])
+    unlist(lapply(states, function(s) all(coreNum %in% s)))
+}, assembly = paramFrame$EndStateAssembly, core = paramFrame$Core)))
+```
+
+Now check if the core is an explicit part of the simulations and count how many times it occurs explicitly.
+
+Next, noting that the core must occur at least implicitly, it is more interesting to check how early the core appears in each simulation.
+
+Similarly, we check to see how complex the community is the first time the core appears.
+
+We check to see if the core ever disappears after having appeared.
+
