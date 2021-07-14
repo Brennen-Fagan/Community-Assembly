@@ -179,7 +179,7 @@ LawMorton1996_aij <- function(
 }
 
 LawMorton1996_CommunityMat <- function(
-  Pool, Parameters, seed = NULL,
+  Pool, Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1), seed = NULL,
   Competition = 0, Mutualism = 0, # Suggestion from Coyte 2015, in [0, 1]
   CompetitionBasal = 0,
   Connectance = 1, # in [0, 1]
