@@ -16,6 +16,7 @@ packages <- c(
 for (pkg in packages) {
   library(pkg, character.only = TRUE)
 }
+nonUniformDiffusion <- "positive" # in c(FALSE, "positive", "negative")
 ```
 
 # Load
@@ -637,7 +638,8 @@ functionCommunity <- function(
     Diffusion = 1, 
     Verbose = FALSE,
     ExtinctionThreshold = 0, 
-    Circular = FALSE
+    Circular = FALSE,
+    nonUniformDiffusion = FALSE
 ) {
     if(Verbose) print(Concentration)
     
@@ -666,12 +668,32 @@ functionCommunity <- function(
     
     if(Verbose) print(pipeMatrix)
     
+    pipeList <- lapply(1:ncol(pipeMatrix), 
+                       FUN = function(i, m) {m[, i]}, 
+                       m = pipeMatrix)
+    
+    # Take the species columns to be in the same order as the pool.
+    pipeListTran <- lapply(
+      seq_along(pipeList), 
+      FUN = function(i, C, A, D, G, M) {
+        ReacTran::tran.1D(
+          C = C[[i]], A = A,
+          D = D * M ^ (
+            if (nonUniformDiffusion == "positive") 0.62
+            else if (nonUniformDiffusion == "negative") -0.62
+            else 0
+          ),
+          dx = G
+        )$dC
+      }, 
+      C = pipeList, A = Area, D = Diffusion, G = GridThickness, M = Pool$Size)
+    
     # Diffusion
-    pipeMatrixTran <- apply(pipeMatrix, MARGIN = 2, FUN = function(C, A, D, G) {
-      ReacTran::tran.1D(
-        C = C, A = A, D = D, dx = G
-      )$dC
-    }, A = Area, D = Diffusion, G = GridThickness)
+    pipeMatrixTran <- matrix(
+      unlist(pipeListTran),
+      nrow = nrow(pipeMatrix),
+      ncol = ncol(pipeMatrix)
+    )
     
     if(Verbose) print(pipeMatrixTran)
     
@@ -698,7 +720,8 @@ functionCommunity <- function(
 
 pipeFUN <- function(i, dat, pool, mat, 
                     GridL = 1, GridCells = 100,
-                    Time = seq(0, 5000, by = 1)) {
+                    Time = seq(0, 5000, by = 1),
+                    nonUniformDiffusion = FALSE) {
   temp <- dat[i, ]
   
   preprocessed <- RMTRCode2::IslandPreprocess(
@@ -729,6 +752,8 @@ pipeFUN <- function(i, dat, pool, mat,
     matrix(abundance_init[length(redCom) + 1:length(redCom)], ncol = length(redCom))
   ))
   
+  # https://www.jstor.org/stable/3071786 figure 1
+  # suggests size-dispersal should be 10^0.62
   deSolve::ode.1D(
     y = initialCondition, 
     times = Time,
@@ -740,6 +765,7 @@ pipeFUN <- function(i, dat, pool, mat,
     GridThickness = Grid,
     Pool = preprocessed$redPool, 
     Mat = preprocessed$redComMat, 
+    nonUniformDiffusion = nonUniformDiffusion
   )
 }
 ```
@@ -769,7 +795,8 @@ for (grp in unique(candidateData$TotalID)) {
     mat = mats[[
       candidateDataSubset$DatasetID[1]
     ]][[candidateDataSubset$CombnNum[1]]],
-    simplify = FALSE
+    simplify = FALSE,
+    nonUniformDiffusion = FALSE
   )
   
   pairingResultsAbunds <- lapply(
@@ -863,6 +890,10 @@ save(
   paramFrame,
   plotScalingData,
   pools,
-  file = "LM1996-NumPoolCom-QDatDif-2021-07.RData"
+  file = paste0("LM1996-NumPoolCom-QDatDif",
+                if (nonUniformDiffusion != FALSE) {
+                  paste0("nUD", nonUniformDiffusion)
+                },
+                "-2021-07.RData")
 )
 ```
