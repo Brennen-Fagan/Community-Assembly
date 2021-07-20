@@ -41,7 +41,7 @@ library(dplyr)
 library(tidyr)
 
 export_calculation <- TRUE
-vers <- 8# of 1, 2.
+vers <- 10# of 1:10
 ```
 
 ```{r parameters2}
