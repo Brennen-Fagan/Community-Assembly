@@ -16,7 +16,6 @@ packages <- c(
 for (pkg in packages) {
   library(pkg, character.only = TRUE)
 }
-nonUniformDiffusion <- "positive" # in c(FALSE, "positive", "negative")
 ```
 
 # Load
@@ -625,7 +624,8 @@ for (r in 1:nrow(candidateData)) {
 }
 ```
 
-## Simple Pipe Results
+## Simple Pipe Results {.tabset}
+### Setup
 ```{r pipeFUN}
 functionCommunity <- function(
     time, 
@@ -720,7 +720,7 @@ functionCommunity <- function(
 
 pipeFUN <- function(i, dat, pool, mat, 
                     GridL = 1, GridCells = 100,
-                    Time = seq(0, 5000, by = 1),
+                    Time = seq(0, 10000, by = 2),
                     nonUniformDiffusion = FALSE) {
   temp <- dat[i, ]
   
@@ -779,47 +779,65 @@ candidateData$TotalID <- paste(candidateData$CombnNum, candidateData$DatasetID)
 
 pipeInteractions <- list()
 pipeInteractionsFull <- list()
+pipeInteractionsP <- list()
+pipeInteractionsPFull <- list()
+pipeInteractionsN <- list()
+pipeInteractionsNFull <- list()
+pipeInteractionsTemp <- list()
+pipeInteractionsTempFull <- list()
 
 for (grp in unique(candidateData$TotalID)) {
   candidateDataSubset <- candidateData %>% dplyr::filter(TotalID == grp)
   
   if (nrow(candidateDataSubset) == 1) next()
   
-  pairingResults <- combn(
-    nrow(candidateDataSubset), 2, 
-    pipeFUN,
-    dat = candidateDataSubset, 
-    pool = pools[[
-      candidateDataSubset$DatasetID[1]
-    ]][[candidateDataSubset$CombnNum[1]]],
-    mat = mats[[
-      candidateDataSubset$DatasetID[1]
-    ]][[candidateDataSubset$CombnNum[1]]],
-    simplify = FALSE,
-    nonUniformDiffusion = FALSE
-  )
-  
-  pairingResultsAbunds <- lapply(
-    pairingResults, function(mat, cells = 100) {
-      # Final outcomes, without time.
-      mat <- mat[nrow(mat), -1]
-      retVal <- list()
-      species <- length(mat) / cells
-      # The results are copies of the pipe by species
-      # We want the end points.
-      for (i in c(1, cells)) {
-        retVal[[toString(i)]] <- mat[i + cells * ((1:species) - 1)]
+  for (nonUniformDiffusion in c(FALSE, "positive", "negative")) {
+    pairingResults <- combn(
+      nrow(candidateDataSubset), 2, 
+      pipeFUN,
+      dat = candidateDataSubset, 
+      pool = pools[[
+        candidateDataSubset$DatasetID[1]
+      ]][[candidateDataSubset$CombnNum[1]]],
+      mat = mats[[
+        candidateDataSubset$DatasetID[1]
+      ]][[candidateDataSubset$CombnNum[1]]],
+      simplify = FALSE,
+      nonUniformDiffusion = nonUniformDiffusion
+    )
+    
+    pairingResultsAbunds <- lapply(
+      pairingResults, function(mat, cells = 100) {
+        # Final outcomes, without time.
+        mat <- mat[nrow(mat), -1]
+        retVal <- list()
+        species <- length(mat) / cells
+        # The results are copies of the pipe by species
+        # We want the end points.
+        for (i in c(1, cells)) {
+          retVal[[toString(i)]] <- mat[i + cells * ((1:species) - 1)]
+        }
+        retVal
       }
-      retVal
-    }
-  )
+    )
   
-  pipeInteractionsFull[[grp]] <- pairingResults
-  pipeInteractions[[grp]] <- pairingResultsAbunds
+    pipeInteractionsTempFull[[
+      toString(nonUniformDiffusion)]][[grp]] <- pairingResults
+    pipeInteractionsTemp[[
+      toString(nonUniformDiffusion)]][[grp]] <- pairingResultsAbunds
+  }
 }
+
+pipeInteractionsFull <- pipeInteractionsTempFull[["FALSE"]]
+pipeInteractions <- pipeInteractionsTemp[["FALSE"]]
+pipeInteractionsPFull <- pipeInteractionsTempFull[["positive"]]
+pipeInteractionsP <- pipeInteractionsTemp[["positive"]]
+pipeInteractionsNFull <- pipeInteractionsTempFull[["negative"]]
+pipeInteractionsN <- pipeInteractionsTemp[["negative"]]
 ```
 
-```{r comparePipeDynamics}
+### Results Size-Negative
+```{r comparePipeDynamicsN}
 # Format of table should be:
 # ID, Community 1, Community 2, Outcomes 1-2, Outcomes 1-0-2
 # For outcomes, species presence will be used.
@@ -845,6 +863,43 @@ for (grp in unique(candidateData$TotalID)) {
 
 minThresh <- lapply(candidateData$CommunityAbund, function(x) min(RMTRCode2::CsvRowSplit(x)) * 0.1) %>% unlist %>% min
 
+pipeInteractionsNWhich <- unlist(lapply(
+  seq_along(pipeInteractionsN), function(i, byID, communities) {
+    lapply(byID[[i]], function(system, comms) {
+      lapply(system, function(pipeEnd, comms) {
+        toString(RMTRCode2::CsvRowSplit(comms)[
+          which(pipeEnd > minThresh)
+        ])
+      }, comms = comms)
+    }, comms = communities[[i]])
+  }, byID = pipeInteractionsN, communities = totalCommunities
+))
+
+pipeInteractionNResults <- data.frame(
+  DatasetID = rep(names(pipeInteractionsN), 
+                  unlist(lapply(pipeInteractionsN, length))),
+  Community1 = communities[seq(from = 1, to = length(communities), by = 2)],
+  Community2 = communities[seq(from = 2, to = length(communities), by = 2)],
+  Outcome_Pipe1 = pipeInteractionsNWhich[
+    seq(from = 1, to = length(pipeInteractionsNWhich), by = 2)],
+  Outcome_Pipe2 = pipeInteractionsNWhich[
+    seq(from = 1, to = length(pipeInteractionsNWhich), by = 2)]
+)
+
+pipeInteractionNResults
+```
+
+```{r matchesN}
+pipeInteractionNResults %>% dplyr::mutate(
+  C1Invaded = Community1 != Outcome_Pipe1,
+  C2Invaded = Community2 != Outcome_Pipe2,
+  Stalemate = !C1Invaded & !C2Invaded,
+  Hybrid = C1Invaded & C2Invaded,
+) %>% dplyr::select(-dplyr::starts_with("Outcome"))
+```
+
+### Results Size-Neutral
+```{r comparePipeDynamics}
 pipeInteractionsWhich <- unlist(lapply(
   seq_along(pipeInteractions), function(i, byID, communities) {
     lapply(byID[[i]], function(system, comms) {
@@ -879,6 +934,42 @@ pipeInteractionResults %>% dplyr::mutate(
   Hybrid = C1Invaded & C2Invaded,
 ) %>% dplyr::select(-dplyr::starts_with("Outcome"))
 ```
+### Results Size-Positive
+```{r comparePipeDynamicsP}
+pipeInteractionsPWhich <- unlist(lapply(
+  seq_along(pipeInteractionsP), function(i, byID, communities) {
+    lapply(byID[[i]], function(system, comms) {
+      lapply(system, function(pipeEnd, comms) {
+        toString(RMTRCode2::CsvRowSplit(comms)[
+          which(pipeEnd > minThresh)
+        ])
+      }, comms = comms)
+    }, comms = communities[[i]])
+  }, byID = pipeInteractionsP, communities = totalCommunities
+))
+
+pipeInteractionPResults <- data.frame(
+  DatasetID = rep(names(pipeInteractionsP), 
+                  unlist(lapply(pipeInteractionsP, length))),
+  Community1 = communities[seq(from = 1, to = length(communities), by = 2)],
+  Community2 = communities[seq(from = 2, to = length(communities), by = 2)],
+  Outcome_Pipe1 = pipeInteractionsPWhich[
+    seq(from = 1, to = length(pipeInteractionsPWhich), by = 2)],
+  Outcome_Pipe2 = pipeInteractionsPWhich[
+    seq(from = 1, to = length(pipeInteractionsPWhich), by = 2)]
+)
+
+pipeInteractionPResults
+```
+
+```{r matchesP}
+pipeInteractionPResults %>% dplyr::mutate(
+  C1Invaded = Community1 != Outcome_Pipe1,
+  C2Invaded = Community2 != Outcome_Pipe2,
+  Stalemate = !C1Invaded & !C2Invaded,
+  Hybrid = C1Invaded & C2Invaded,
+) %>% dplyr::select(-dplyr::starts_with("Outcome"))
+```
 
 # Save workspace
 ```{r save}
@@ -886,14 +977,23 @@ save(
   candidateData,
   pipeInteractions,
   pipeInteractionsWhich,
+  pipeInteractionsP,
+  pipeInteractionsPWhich,
+  pipeInteractionsN,
+  pipeInteractionsNWhich,
   mats,
   paramFrame,
   plotScalingData,
   pools,
   file = paste0("LM1996-NumPoolCom-QDatDif",
-                if (nonUniformDiffusion != FALSE) {
-                  paste0("nUD", nonUniformDiffusion)
-                },
                 "-2021-07.RData")
+)
+
+save(
+  pipeInteractionsNFull,
+  pipeInteractionsFull,
+  pipeInteractionsPFull,
+  file = paste0("LM1996-NumPoolCom-QDatDif",
+                "FULL-2021-07.RData")
 )
 ```
