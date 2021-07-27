@@ -232,35 +232,6 @@ Microbiome_ExampleFunctionalResponseType2 <- function(
   (InteractionMatrix * Type2) %*% Abundance
 }
 
-# Should we put a sum on the lower xj?
-# Simple experiment with two identical species.
-# egAbund <- c(1, 1)
-# egHalf <- 1
-# egGain <- c(1,1)
-# egValsU <- c(
-#   egGain[1] * egAbund[1] / (egAbund[1] + egHalf),
-#   egGain[2] * egAbund[2] / (egAbund[2] + egHalf)
-# )
-# egValsN <- c(
-#   egGain[1] * egAbund[1] / (sum(egAbund) + egHalf),
-#   egGain[2] * egAbund[2] / (sum(egAbund) + egHalf)
-# )
-# egValsO <- c(
-#   egGain[1] * sum(egAbund) / (sum(egAbund) + egHalf),
-#   egGain[2] * sum(egAbund) / (sum(egAbund) + egHalf)
-# )
-# egValsU is if we do not put a sum.
-# egValsN is if we do put a sum.
-# egValsO is if we had all of the mass in one species or the other.
-#              [,1]      [,2]
-# egValsU 0.5000000 0.5000000
-# egValsN 0.3333333 0.3333333
-# egValsO 0.6666667 0.6666667
-# From this, we conclude that putting a sum means we treat each species
-# that we receive benefit from as the same, such that having all mass in one
-# species or the other is the same as evenly divided between the two.
-# So, which is preferable? We'll start with the latter case.
-
 Microbiome_DynamicsBasic <- function(
   # The intention of this function is that we will call it inside of a solver,
   # such as the deSolve family of functions.
@@ -336,35 +307,6 @@ Microbiome_DynamicsNormalisedCapacity <- function(
   # reached so that the system does not exceed it too much.
 
   return(list(Change))
-
-  # OLD IDEA: USE SPACE.
-  # PosR <- ifelse(Reproduction > 0, Reproduction, 0)
-  # PosI <- ifelse(InteractionStrengths > 0, InteractionStrengths, 0)
-  # NegR <- ifelse(Reproduction < 0, Reproduction, 0)
-  # NegI <- ifelse(InteractionStrengths < 0, InteractionStrengths, 0)
-  #
-  # # Determine Density Losses.
-  # Loss <- NegR + Abundance %*% NegI
-  #
-  # # Determine Density Gains.
-  # Gain <- PosR + Abundance %*% PosI
-  #
-  # #TODO The Gain and Loss are derivatives, but Space is a
-  # # density, so the units do not make sense here.
-  #
-  # # Determine amount of space left in simulation.
-  # Space <- (
-  #   CarryingCapacity
-  #   - sum(Pool$Size * Abundance)
-  #   + sum(Loss$Size * Abundance)
-  # )
-  #
-  # # If space gains (density * size) > space left, normalise.
-  # if (sum(Pool$Size * Gain) > Space) {
-  #   Gain * sum(Gain)/Space + Loss
-  # } else {
-  #   Gain + Loss
-  # }
 }
 
 Microbiome_NumericalAssembly <- function(
