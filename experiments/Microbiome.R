@@ -1,3 +1,8 @@
+Microbiome_ExampleReproductionRate <- function(df, ...) {
+  df$ReproductionRate <- runif(n = nrow(df))
+  df
+}
+
 Microbiome_Species <- function(
   Species,
   #Numeric.
@@ -5,10 +10,7 @@ Microbiome_Species <- function(
   # Either a function or numeric.
   # Function receives dataframe of species IDs.
   # Should return an augmented dataframe with a Size column.
-  ReproductionRate = function(df, ...) {
-    df$ReproductionRate <- runif(n = nrow(df))
-    df
-  },
+  ReproductionRate = Microbiome_ExampleReproductionRate,
   # Either a function or numeric.
   # Function receives dataframe of species IDs and sizes.
   # Should return an augmented dataframe with ReproductionRate column.
@@ -58,41 +60,45 @@ Microbiome_Species <- function(
   retval
 }
 
+Microbiome_ExampleEffectSize <- function(Pool, Matrix, ...) {
+  #stopifnot("CarryingCapacity" %in% names(list(...)))
+
+  vals <- rnorm(sum(Matrix > 1), 0, 0.5)
+  counter <- 1
+  Matrix[Matrix == 1] <- 0
+
+  Matrix[Matrix == 2 | Matrix == 3] <-
+    vals[counter - 1 + 1:sum(Matrix == 2 | Matrix == 3)]
+  counter <- counter + sum(Matrix == 2 | Matrix == 3)
+
+  Matrix[Matrix == 4] <-
+    -abs(vals[counter - 1 + 1:sum(Matrix == 4)]) #/ list(...)$CarryingCapacity
+  counter <- counter + sum(Matrix == 4)
+
+  Matrix[Matrix == 5] <-
+    abs(vals[counter - 1 + 1:sum(Matrix == 5)])
+  counter <- counter + sum(Matrix == 5)
+
+  Matrix
+}
+
+Microbiome_ExampleSelfRegulation <- function(Pool, Matrix, ...) {
+  diag(Matrix) <- rnorm(nrow(Matrix), -1, 0.5)
+  Matrix
+}
+
 Microbiome_InteractionMat <- function(
   Pool = Microbiome_Species(10),
   FracExploit = 0.5, # Numeric.
   FracCompete = 0.25, # Numeric.
   FracMutual = 0.25, # Numeric.
   Connectance = 1, # Numeric.
-  EffectSize = function(Pool, Matrix, ...) {
-    stopifnot("CarryingCapacity" %in% names(list(...)))
-
-    vals <- rnorm(sum(Matrix > 1), 0, 0.5)
-    counter <- 1
-    Matrix[Matrix == 1] <- 0
-
-    Matrix[Matrix == 2 | Matrix == 3] <-
-      vals[counter - 1 + 1:sum(Matrix == 2 | Matrix == 3)]
-    counter <- counter + sum(Matrix == 2 | Matrix == 3)
-
-    Matrix[Matrix == 4] <-
-      -abs(vals[counter - 1 + 1:sum(Matrix == 4)]) / list(...)$CarryingCapacity
-    counter <- counter + sum(Matrix == 4)
-
-    Matrix[Matrix == 5] <-
-      abs(vals[counter - 1 + 1:sum(Matrix == 5)])
-    counter <- counter + sum(Matrix == 5)
-
-    Matrix
-  },
+  EffectSize = Microbiome_ExampleEffectSize,
   # Either a function or numeric.
   # Function receives Pool and 5-types case matrix.
   # 1: 0/0, 2: +/-, 3: -/+, 4: -/-, 5: +/+, first entry is lower triangular.
   # Returns a Matrix with filled entries.
-  SelfRegulation = function(Pool, Matrix, ...) {
-    diag(Matrix) <- rnorm(nrow(Matrix), -1, 0.5)
-    Matrix
-  },
+  SelfRegulation = Microbiome_ExampleSelfRegulation,
   # Either a function or numeric.
   # Function receives Pool and Effects Matrix with a zero diagonal.
   # Returns an effects Matrix with modifications to the diagonal.
@@ -159,21 +165,113 @@ Microbiome_InteractionMat <- function(
   retval
 }
 
-Microbiome_Dynamics <- function(
-  CarryingCapacity,
-  FunctionalResponse = function(x, sum, ...) {x/(20 + sum)}, # Generic type 2.
-  FunctionalSum = c("Unique", "SameType", "All")
+Microbiome_ExampleFunctionalResponseLinear <- function(
+  Abundance, InteractionMatrix, CarryingCapacity, ...
 ) {
-  # Parameter checks.
-  stopifnot(CarryingCapacity > 0)
-  FunctionalSum <- match.arg(FunctionalSum[1], c("Unique", "SameType", "All"))
 
 }
 
+Microbiome_ExampleFunctionalResponseType2 <- function(
+  Abundance, InteractionMatrix, CarryingCapacity, ...
+) {
+
+}
+
+Microbiome_DynamicsBasic <- function(
+  # The intention of this function is that we will call it inside of a solver,
+  # such as the deSolve family of functions.
+  times,
+  # Not used, maintained for deSolve compatibility.
+  Abundance,
+  # (Column) Vector of the abundance densities.
+  parameters,
+  # Not used, maintained for deSolve compatibility.
+  Pool,
+  # Used for the ReproductionRate argument.
+  # This exposes more than wanted security-wise, but make sense generically.
+  InteractionMatrix,
+  # length(Abundance) x length(Abundance), diag = self-regulation
+  FunctionalResponse = Microbiome_ExampleFunctionalResponse,
+  # Example is a generic type 2.
+  # Function receives abundance, interaction matrix, and optional args.
+  # The function then returns the effect of each population on the others in
+  # a matrix.
+  ...
+) {
+  with(as.list(parameters), {list(
+    Abundance * (
+      Pool$ReproductionRate + FunctionalResponse(
+        Abundance, InteractionMatrix, ...
+      ) # %*% Abundance # Incorporated into the Functional Response
+    )
+  )})
+}
+
+Microbiome_DynamicsNormalisedCapacity <- function(
+  # The intention of this function is that we will call it inside of a solver,
+  # such as the deSolve family of functions.
+  times,
+  # Not used, maintained for deSolve compatibility.
+  Abundance,
+  # (Column) Vector of the abundance densities.
+  parameters,
+  # Not used, maintained for deSolve compatibility.
+  Pool,
+  # Used for the ReproductionRate and Size arguments.
+  # This exposes more than wanted security-wise, but make sense generically.
+  InteractionMatrix,
+  # length(Abundance) x length(Abundance), diag = self-regulation
+  CarryingCapacity,
+  # Density above which the size-biased abundance cannot increase.
+  # At that point, we normalise growth by decay.
+  FunctionalResponse = Microbiome_ExampleFunctionalResponse,
+  # Function receives abundance, interaction matrix, and carrying capacity.
+  # The function then returns the effect of each population on the others in
+  # a matrix.
+  ...
+) {
+  # Parameter checks.
+  stopifnot(CarryingCapacity > 0)
+
+  # Gather calculations.
+  Reproduction <- Abundance * Pool$ReproductionRate
+  InteractionStrengths <- FunctionalResponse(
+    Abundance, InteractionMatrix, CarryingCapacity
+    )
+
+  PosR <- ifelse(Reproduction > 0, Reproduction, 0)
+  PosI <- ifelse(InteractionStrengths > 0, InteractionStrengths, 0)
+  NegR <- ifelse(Reproduction < 0, Reproduction, 0)
+  NegI <- ifelse(InteractionStrengths < 0, InteractionStrengths, 0)
+
+  # Determine Density Losses.
+  Loss <- NegR + Abundance %*% NegI
+
+  # Determine Density Gains.
+  Gain <- PosR + Abundance %*% PosI
+
+  #TODO The Gain and Loss are derivatives, but Space is a
+  # density, so the units do not make sense here.
+
+  # Determine amount of space left in simulation.
+  Space <- (
+    CarryingCapacity
+    - sum(Pool$Size * Abundance)
+    + sum(Loss$Size * Abundance)
+  )
+
+  # If space gains (density * size) > space left, normalise.
+  if (sum(Pool$Size * Gain) > Space) {
+    Gain * sum(Gain)/Space + Loss
+  } else {
+    Gain + Loss
+  }
+}
+
 Microbiome_NumericalAssembly <- function(
-  Pool = Microbiome_Species(),
-  Interactions = Microbiome_InteractionMat(),
-  Dynamics = Microbiome_Dynamics(),
+  Pool = Microbiome_Species(10),
+  Interactions = Microbiome_InteractionMat,
+  Dynamics = Microbiome_Dynamics,
   Verbose = FALSE
 ) {
 
