@@ -82,6 +82,8 @@ LawMorton1996_aij <- function(
   }
 
   # i != j
+  # This is not quite fair; this implements amensalism and commensalism
+  # rather than proper connectance reduction in the undirected graph.
   if (runif(1) > Connectance) {
     return(0)
   }
