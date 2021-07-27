@@ -69,17 +69,17 @@ Microbiome_ExampleEffectSize <- function(Pool, Matrix, sd = 0.5, ...) {
 
   Matrix[matTypes[[1]]] <- 0
 
-  lower.tri(Matrix[matTypes[[2]]]) <-
+  Matrix[matTypes[[2]] & lower.tri(Matrix)] <-
     +vals[counter - 1 + 1:(sum(matTypes[[2]])/2)]
   counter <- counter + sum(matTypes[[2]])/2
-  upper.tri(Matrix[matTypes[[2]]]) <-
+  Matrix[matTypes[[2]] & upper.tri(Matrix)] <-
     -vals[counter - 1 + 1:(sum(matTypes[[2]])/2)]
   counter <- counter + sum(matTypes[[2]])/2
 
-  lower.tri(Matrix[matTypes[[3]]]) <-
+  Matrix[matTypes[[3]] & lower.tri(Matrix)] <-
     -vals[counter - 1 + 1:(sum(matTypes[[3]])/2)]
   counter <- counter + sum(matTypes[[3]])/2
-  upper.tri(Matrix[matTypes[[3]]]) <-
+  Matrix[matTypes[[3]] & upper.tri(Matrix)] <-
     +vals[counter - 1 + 1:(sum(matTypes[[3]])/2)]
   counter <- counter + sum(matTypes[[3]])/2
 
@@ -124,9 +124,9 @@ Microbiome_InteractionMat <- function(
             "ReproductionRate" %in% names(Pool))
   stopifnot(nrow(Pool) > 1)
 
-  stopifnot(FracExploit > 0)
-  stopifnot(FracCompete > 0)
-  stopifnot(FracMutual > 0)
+  stopifnot(FracExploit >= 0)
+  stopifnot(FracCompete >= 0)
+  stopifnot(FracMutual >= 0)
   stopifnot(Connectance >= 0, Connectance <= 1)
 
   # Normalise parameters. This allows ratio specification as well.
@@ -178,32 +178,104 @@ Microbiome_InteractionMat <- function(
 }
 
 Microbiome_ExampleFunctionalResponseLinear <- function(
-  Abundance, InteractionMatrix, CarryingCapacity, ...
+  Abundance, InteractionMatrix, ...
 ) {
-
+  InteractionMatrix %*% Abundance
 }
 
 Microbiome_ExampleFunctionalResponseType2 <- function(
-  Abundance, InteractionMatrix, CarryingCapacity, ...
+  Abundance, InteractionMatrix,
+  TypeIndices = NULL,
+  # List of boolean indices by type: Exploit+, Exploit-, Compete, Mutual.
+  # Note this is column indexed.
+  # We do not consider intra- and inter-specific competition to be the same.
+  HalfResponse = 1, ...
 ) {
+  # Interpret Competition and Mutualism as the same, but opposite sign.
+  # Mutualism: The Benefit i derives from j is
+  #   aij * xj / (h + sum(x_sametype))
+  # for abundance x, interaction matrix a, half response h.
 
+  # Break into positive/negative exploitation, competition, mutualism.
+  if (is.null(TypeIndices)) {
+    TypeIndices <- InteractionMatrix
+    TypeIndices[TypeIndices == 0] <- NA
+    TypeIndices <- sign(TypeIndices)
+    TypeIndices <- 2 * TypeIndices + t(TypeIndices)
+    # Exploitation+ = 1, Exploitation- = -1, Competition = -3, Mutualism = 3.
+    diag(TypeIndices) <- 0 # Exclude diagonal from Competition.
+    TypeIndices <- lapply(c(1, -1, # In practice, do not need E-.
+                            -3, 3), function(i, m) {
+      !is.na(m) & m == i
+    }, m = TypeIndices)
+    # Note this is column indexed.
+  }
+
+  # Type2 is a matrix of entries that scale the Interaction Matrix.
+  # For each type, for each row, compute denominator and place in position.
+  Type2 <- lapply(
+    TypeIndices[c(1, 3, 4)], function(inds, m, orientation) {
+    retmat <- apply(matrix(inds, nrow = length(m), ncol = length(m)),
+          MARGIN = 1, FUN = function(ind, m, h) {
+            val <- sum(m[ind]) + h
+            ind[ind] <- 1 / val
+            ind
+          },
+          m = m,
+          h = HalfResponse)
+  }, m = Abundance)
+
+  # Condense Type2 into a single matrix.
+  Type2 <- t(Type2[[1]]) + Type2[[1]] + t(Type2[[2]]) + t(Type2[[3]])
+  Type2[Type2 == 0] <- 1 # Do not rescale things that do not have rescalings.
+
+  (InteractionMatrix * Type2) %*% Abundance
 }
+
+# Should we put a sum on the lower xj?
+# Simple experiment with two identical species.
+# egAbund <- c(1, 1)
+# egHalf <- 1
+# egGain <- c(1,1)
+# egValsU <- c(
+#   egGain[1] * egAbund[1] / (egAbund[1] + egHalf),
+#   egGain[2] * egAbund[2] / (egAbund[2] + egHalf)
+# )
+# egValsN <- c(
+#   egGain[1] * egAbund[1] / (sum(egAbund) + egHalf),
+#   egGain[2] * egAbund[2] / (sum(egAbund) + egHalf)
+# )
+# egValsO <- c(
+#   egGain[1] * sum(egAbund) / (sum(egAbund) + egHalf),
+#   egGain[2] * sum(egAbund) / (sum(egAbund) + egHalf)
+# )
+# egValsU is if we do not put a sum.
+# egValsN is if we do put a sum.
+# egValsO is if we had all of the mass in one species or the other.
+#              [,1]      [,2]
+# egValsU 0.5000000 0.5000000
+# egValsN 0.3333333 0.3333333
+# egValsO 0.6666667 0.6666667
+# From this, we conclude that putting a sum means we treat each species
+# that we receive benefit from as the same, such that having all mass in one
+# species or the other is the same as evenly divided between the two.
+# So, which is preferable? We'll start with the latter case.
 
 Microbiome_DynamicsBasic <- function(
   # The intention of this function is that we will call it inside of a solver,
   # such as the deSolve family of functions.
-  times,
+  times = NULL,
   # Not used, maintained for deSolve compatibility.
   Abundance,
   # (Column) Vector of the abundance densities.
-  parameters,
+  parameters = NULL,
   # Not used, maintained for deSolve compatibility.
   Pool,
   # Used for the ReproductionRate argument.
   # This exposes more than wanted security-wise, but make sense generically.
   InteractionMatrix,
   # length(Abundance) x length(Abundance), diag = self-regulation
-  FunctionalResponse = Microbiome_ExampleFunctionalResponse,
+  FunctionalResponse = Microbiome_ExampleFunctionalResponseLinear,
   # Example is a generic type 2.
   # Function receives abundance, interaction matrix, and optional args.
   # The function then returns the effect of each population on the others in
@@ -236,7 +308,7 @@ Microbiome_DynamicsNormalisedCapacity <- function(
   CarryingCapacity,
   # Density above which the size-biased abundance cannot increase.
   # At that point, we normalise growth by decay.
-  FunctionalResponse = Microbiome_ExampleFunctionalResponse,
+  FunctionalResponse = Microbiome_ExampleFunctionalResponseLinear,
   # Function receives abundance, interaction matrix, and carrying capacity.
   # The function then returns the effect of each population on the others in
   # a matrix.
@@ -248,7 +320,10 @@ Microbiome_DynamicsNormalisedCapacity <- function(
   # Gather calculations.
   Reproduction <- Abundance * Pool$ReproductionRate
   InteractionStrengths <- FunctionalResponse(
-    Abundance, InteractionMatrix, CarryingCapacity
+    Abundance = Abundance,
+    InteractionMatrix = InteractionMatrix,
+    CarryingCapacity = CarryingCapacity,
+    ...
     )
 
   # NEW IDEA: Normalise a la Coyte et al. 2021.
