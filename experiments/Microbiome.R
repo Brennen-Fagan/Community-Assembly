@@ -60,24 +60,36 @@ Microbiome_Species <- function(
   retval
 }
 
-Microbiome_ExampleEffectSize <- function(Pool, Matrix, ...) {
+Microbiome_ExampleEffectSize <- function(Pool, Matrix, sd = 0.5, ...) {
   #stopifnot("CarryingCapacity" %in% names(list(...)))
 
-  vals <- rnorm(sum(Matrix > 1), 0, 0.5)
+  vals <- abs(rnorm(sum(Matrix > 1), 0, sd))
+  matTypes <- lapply(1:5, function(i, m) {m == i}, m = Matrix)
   counter <- 1
-  Matrix[Matrix == 1] <- 0
 
-  Matrix[Matrix == 2 | Matrix == 3] <-
-    vals[counter - 1 + 1:sum(Matrix == 2 | Matrix == 3)]
-  counter <- counter + sum(Matrix == 2 | Matrix == 3)
+  Matrix[matTypes[[1]]] <- 0
 
-  Matrix[Matrix == 4] <-
-    -abs(vals[counter - 1 + 1:sum(Matrix == 4)]) #/ list(...)$CarryingCapacity
-  counter <- counter + sum(Matrix == 4)
+  lower.tri(Matrix[matTypes[[2]]]) <-
+    +vals[counter - 1 + 1:(sum(matTypes[[2]])/2)]
+  counter <- counter + sum(matTypes[[2]])/2
+  upper.tri(Matrix[matTypes[[2]]]) <-
+    -vals[counter - 1 + 1:(sum(matTypes[[2]])/2)]
+  counter <- counter + sum(matTypes[[2]])/2
 
-  Matrix[Matrix == 5] <-
-    abs(vals[counter - 1 + 1:sum(Matrix == 5)])
-  counter <- counter + sum(Matrix == 5)
+  lower.tri(Matrix[matTypes[[3]]]) <-
+    -vals[counter - 1 + 1:(sum(matTypes[[3]])/2)]
+  counter <- counter + sum(matTypes[[3]])/2
+  upper.tri(Matrix[matTypes[[3]]]) <-
+    +vals[counter - 1 + 1:(sum(matTypes[[3]])/2)]
+  counter <- counter + sum(matTypes[[3]])/2
+
+  Matrix[matTypes[[4]]] <-
+    -(vals[counter - 1 + 1:sum(matTypes[[4]])]) #/ list(...)$CarryingCapacity
+  counter <- counter + sum(matTypes[[4]])
+
+  Matrix[matTypes[[5]]] <-
+    +(vals[counter - 1 + 1:sum(matTypes[[5]])])
+  counter <- counter + sum(matTypes[[5]])
 
   Matrix
 }
@@ -239,33 +251,45 @@ Microbiome_DynamicsNormalisedCapacity <- function(
     Abundance, InteractionMatrix, CarryingCapacity
     )
 
-  PosR <- ifelse(Reproduction > 0, Reproduction, 0)
-  PosI <- ifelse(InteractionStrengths > 0, InteractionStrengths, 0)
-  NegR <- ifelse(Reproduction < 0, Reproduction, 0)
-  NegI <- ifelse(InteractionStrengths < 0, InteractionStrengths, 0)
-
-  # Determine Density Losses.
-  Loss <- NegR + Abundance %*% NegI
-
-  # Determine Density Gains.
-  Gain <- PosR + Abundance %*% PosI
-
-  #TODO The Gain and Loss are derivatives, but Space is a
-  # density, so the units do not make sense here.
-
-  # Determine amount of space left in simulation.
-  Space <- (
-    CarryingCapacity
-    - sum(Pool$Size * Abundance)
-    + sum(Loss$Size * Abundance)
-  )
-
-  # If space gains (density * size) > space left, normalise.
-  if (sum(Pool$Size * Gain) > Space) {
-    Gain * sum(Gain)/Space + Loss
-  } else {
-    Gain + Loss
+  # NEW IDEA: Normalise a la Coyte et al. 2021.
+  Change <- Abundance * (Reproduction + InteractionStrengths)
+  if (CarryingCapacity - sum(Pool$Size * Abundance) <= 0) {
+    Change <- Change - mean(Change)
   }
+
+  # Note that we should use an event triggered when the carrying capacity is
+  # reached so that the system does not exceed it too much.
+
+  return(list(Change))
+
+  # OLD IDEA: USE SPACE.
+  # PosR <- ifelse(Reproduction > 0, Reproduction, 0)
+  # PosI <- ifelse(InteractionStrengths > 0, InteractionStrengths, 0)
+  # NegR <- ifelse(Reproduction < 0, Reproduction, 0)
+  # NegI <- ifelse(InteractionStrengths < 0, InteractionStrengths, 0)
+  #
+  # # Determine Density Losses.
+  # Loss <- NegR + Abundance %*% NegI
+  #
+  # # Determine Density Gains.
+  # Gain <- PosR + Abundance %*% PosI
+  #
+  # #TODO The Gain and Loss are derivatives, but Space is a
+  # # density, so the units do not make sense here.
+  #
+  # # Determine amount of space left in simulation.
+  # Space <- (
+  #   CarryingCapacity
+  #   - sum(Pool$Size * Abundance)
+  #   + sum(Loss$Size * Abundance)
+  # )
+  #
+  # # If space gains (density * size) > space left, normalise.
+  # if (sum(Pool$Size * Gain) > Space) {
+  #   Gain * sum(Gain)/Space + Loss
+  # } else {
+  #   Gain + Loss
+  # }
 }
 
 Microbiome_NumericalAssembly <- function(
