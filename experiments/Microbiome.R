@@ -265,11 +265,11 @@ Microbiome_DynamicsBasic <- function(
 Microbiome_DynamicsNormalisedCapacity <- function(
   # The intention of this function is that we will call it inside of a solver,
   # such as the deSolve family of functions.
-  times,
+  times = NULL,
   # Not used, maintained for deSolve compatibility.
   Abundance,
   # (Column) Vector of the abundance densities.
-  parameters,
+  parameters = NULL,
   # Not used, maintained for deSolve compatibility.
   Pool,
   # Used for the ReproductionRate and Size arguments.
@@ -289,7 +289,7 @@ Microbiome_DynamicsNormalisedCapacity <- function(
   stopifnot(CarryingCapacity > 0)
 
   # Gather calculations.
-  Reproduction <- Abundance * Pool$ReproductionRate
+  Reproduction <- Pool$ReproductionRate
   InteractionStrengths <- FunctionalResponse(
     Abundance = Abundance,
     InteractionMatrix = InteractionMatrix,
@@ -309,25 +309,353 @@ Microbiome_DynamicsNormalisedCapacity <- function(
   return(list(Change))
 }
 
+Microbiome_CheckInvadability <- function(
+  Pool, Dynamics, InteractionMatrix, CurrentAbundance, ...
+) {
+  speciesNum <- nrow(Pool)
+  SpeciesPresent <- which(CurrentAbundance > 0)
+
+  # Invadable if any per capita growth rate larger than 0.
+  any((Dynamics(Pool = Pool, InteractionMatrix = InteractionMatrix,
+                 Abundance = CurrentAbundance + .Machine$double.eps,
+                 ...)[[1]]/(
+                   CurrentAbundance + .Machine$double.eps
+                 ))[!(1:speciesNum %in% SpeciesPresent)] > 0)
+}
+
 Microbiome_NumericalAssembly <- function(
-  Pool = Microbiome_Species(10),
-  Interactions = Microbiome_InteractionMat,
-  Dynamics = Microbiome_Dynamics,
-  Verbose = FALSE
+  Pool = NULL,
+  InteractionMatrix = NULL,
+  Dynamics = Microbiome_DynamicsBasic,
+  Verbose = FALSE,
+  seed = NULL,
+
+  InitialAbundance = NULL,
+  EliminationThreshold = 10^-4, # Eliminate if drops by.
+  InnerEliminationThreshold = 10^-12, # Eliminate if drops below.
+  IntegratorTimeStep = 1000, #
+  ArrivalDensity = 0.1, # Note, this can really matter for determining what steady state we go to.
+  ArrivalEvents = 60,
+  ArrivalSampler = c("rearrange", "iid"),
+  InnerTimeStepSize = 100,
+  ReturnValues = c("Community", "Equilibrium",
+                   "Abundance", "Sequence",
+                   "Pool", "Matrix",
+                   "Steadystate", "Uninvadable"),
+
+  CheckInvadability = FALSE,
+  ...
 ) {
 
-  # Create a pool.
-  # Create interaction matrix.
-  # While community non-empty, community invadable, and community not steady...
-  # Draw species from pool and add to community.
-  # Run community.
-  # Note the carrying capacity addresses the mutual benefaction problem.
-  # To address the carrying capacity, one normalises the total abundance gain
-  # by the total abundance loss so that the sum of the two is zero.
-  # Note we are implicitly assuming that everything is the same size.
-  # One cannot replace the space occupied by one microbe with two new microbes.
-  # Evaluate community size, invadability, and steady-state.
+  # Parameters: ################################################################
+  if (!is.null(seed)) {
+    if (exists(".Random.seed"))
+      oldSeed <- .Random.seed
+    set.seed(seed)
+  }
 
+  # Create a pool.
+  if (is.null(Pool)) {
+    if (Verbose) print("Creating Pool.")
+    Pool <- Microbiome_Species(30)
+  }
+
+  speciesNum <- nrow(Pool)
+
+  # Create interaction matrix.
+  if (is.null(InteractionMatrix)) {
+    if (Verbose) print("Creating Interaction Matrix.")
+    InteractionMatrix <- Microbiome_InteractionMat(Pool)
+  } else {
+    stopifnot(nrow(InteractionMatrix) == speciesNum,
+              ncol(InteractionMatrix) == speciesNum)
+  }
+
+  ##### Setup: #################################################################
+  if (is.null(InitialAbundance)) {
+    CurrentAbundance <- rep(0, speciesNum)
+  } else {
+    stopifnot(length(InitialAbundance) == speciesNum)
+    CurrentAbundance <- InitialAbundance
+  }
+
+  SpeciesPresent <- which(CurrentAbundance > 0)
+  if (!is.null(InnerTimeStepSize)) {
+    stopifnot(InnerTimeStepSize < IntegratorTimeStep)
+    # Store Time and Abundances for plotting.
+    TimeAbundances <- rbind(
+      matrix(
+        data = 0, nrow = 1, ncol = 1 + length(CurrentAbundance)
+      ),
+      matrix(
+        nrow = (IntegratorTimeStep / InnerTimeStepSize + 1) * ArrivalEvents,
+        ncol = 1 + length(CurrentAbundance)
+      )
+    )
+    TimeAbundances_row <- 2
+    TimeAbundances_time <- 0
+  }
+
+  # Generate arrival events.
+  arrivalSampler <- match.arg(ArrivalSampler, c("rearrange", "iid"))
+  if (arrivalSampler == "iid") {
+    if (Verbose) print("Randomising Order.")
+    ArrivalIDs <- sample.int(speciesNum, size = ArrivalEvents, replace = TRUE)
+  } else if (arrivalSampler == "rearrange") {
+    if (Verbose) print("Shuffling Order.")
+    ArrivalIDs <- replicate(
+      n = ceiling(ArrivalEvents / speciesNum),
+      sample.int(speciesNum, replace = FALSE)
+    )[
+      1:ArrivalEvents
+    ]
+  }
+
+
+  if ("Sequence" %in% ReturnValues) {
+    SequenceRetVal <- data.frame(
+      Events = c(0, (IntegratorTimeStep + 1) * 0:(ArrivalEvents - 1)),
+      Addition = c(NA, ArrivalIDs),
+      Outcome = factor(NA, levels = c(
+        "Present",
+        "Type 1 (Failure)",
+        "Type 2 (Invade)",
+        "Type 3 (Contract)",
+        "Error (Benefaction)")),
+      Community = NA
+    )
+  }
+
+  eventNumber <- 1
+  rejections <- 0
+
+  ##### Perform Algorithm: #####################################################
+  # Resolve each arrival.
+  for (ID in ArrivalIDs) {
+    if (Verbose) print(paste("Event:", eventNumber, ID, "arriving."))
+
+    SpeciesPresent_Old <- SpeciesPresent
+
+    if (!(ID %in% SpeciesPresent)) {
+      SpeciesPresent[length(SpeciesPresent) + 1] <- ID
+    }
+
+    #TODO There is a serious difference between
+    # Microbiome_NumericalAssembly(
+    #   seed = 1, Verbose = TRUE, ArrivalEvents = 240, IntegratorTimeStep = 10,
+    #   InnerTimeStepSize = 1, CheckInvadability = TRUE)
+    # and
+    # Microbiome_NumericalAssembly(
+    #   seed = 1, Verbose = TRUE, ArrivalEvents = 240, IntegratorTimeStep = 10,
+    #   InnerTimeStepSize = 1, CheckInvadability = FALSE)
+    # Despite only checking cases where uninvadability should be the result!
+    # After that is resolved...
+    #TODO Make sure the Microbiome_DynamicsNormalisedCapacity case is handled.
+    if (CheckInvadability) {
+      # Check Invadability
+      # Note, we check to prevent cases where the new species dies off.
+      # This is a problem when using Microbiome_DynamicsNormalisedCapacity,
+      # since the dying off can yield a "reverse" benefaction numerically.
+      if (
+        !Microbiome_CheckInvadability(
+          Pool = Pool[SpeciesPresent, ],
+          InteractionMatrix = InteractionMatrix[SpeciesPresent, SpeciesPresent],
+          Dynamics = Dynamics,
+          CurrentAbundance = CurrentAbundance[SpeciesPresent], ...)
+      ) {
+        if (Verbose) print("Uninvadable")
+        # Undo the previous operation.
+        SpeciesPresent <- SpeciesPresent[-length(SpeciesPresent)]
+      } else {
+        if (Verbose) print("Invadable.")
+        # Insert the invader.
+        CurrentAbundance[ID] <- CurrentAbundance[ID] + ArrivalDensity
+      }
+    } else {
+      CurrentAbundance[ID] <- CurrentAbundance[ID] + ArrivalDensity
+    }
+
+    # Use TryCatch if we start seeing errors out the Wazoo.
+    # Note we only pass through the relevant information.
+    Run_GLV <- deSolve::ode(
+      y = CurrentAbundance[SpeciesPresent],
+      times = seq(from = 0, to = IntegratorTimeStep, by = InnerTimeStepSize),
+      func = Dynamics,
+      parms = list(epsilon = InnerEliminationThreshold),
+      events = list(func = function(t, y, parms, ...) {
+        y[y < parms$epsilon] <- 0
+        y
+      }, time = seq(from = 0, to = IntegratorTimeStep, by = InnerTimeStepSize)),
+      Pool = Pool[SpeciesPresent, ],
+      InteractionMatrix = InteractionMatrix[SpeciesPresent, SpeciesPresent],
+      ...
+    )
+
+    if (any(is.nan(Run_GLV) | is.infinite(Run_GLV) |
+            is.na(Run_GLV) | Run_GLV > 1E10)) {
+      warning(paste("NAN, Inf, NA or Abundance > 10^10 detected.",
+                    "Mutual Benefaction likely.",
+                    paste0("Rejecting step ", eventNumber, ".")))
+      if (Verbose) print(paste("NAN, Inf, NA or Abundance > 10^10 detected.",
+                               "Mutual Benefaction likely.",
+                               paste0("Rejecting step ", eventNumber, ".")))
+
+      if (SpeciesPresent[length(SpeciesPresent)] == ID)
+        SpeciesPresent <- SpeciesPresent[-length(SpeciesPresent)]
+      CurrentAbundance[ID] <- CurrentAbundance[ID] - ArrivalDensity
+
+      eventNumber <- eventNumber + 1
+
+      if ("Sequence" %in% ReturnValues) {
+        SequenceRetVal$Outcome[eventNumber] <- "Error (Benefaction)"
+        SequenceRetVal$Community[eventNumber] <- I(list(SpeciesPresent))
+      }
+
+      atSteadyState <- FALSE
+
+      rejections <- rejections + 1
+
+      next()
+    }
+
+    CurrentAbundance_New <- Run_GLV[nrow(Run_GLV), 2:(ncol(Run_GLV))]
+
+    CurrentAbundance_New <- ifelse(
+      CurrentAbundance_New > EliminationThreshold * CurrentAbundance[SpeciesPresent] &
+        CurrentAbundance_New > 0,
+      CurrentAbundance_New,
+      0
+    )
+
+    # Record Run_GLV if we need to before we update the SpeciesPresent.
+    if (!is.null(InnerTimeStepSize)) {
+      #TODO Consider if this matrix might benefit from being sparse or similar.
+      TimeAbundances[
+        TimeAbundances_row:(TimeAbundances_row + nrow(Run_GLV) - 1),
+        SpeciesPresent + 1
+      ] <- Run_GLV[, 2:ncol(Run_GLV)]
+
+      TimeAbundances[
+        TimeAbundances_row:(TimeAbundances_row + nrow(Run_GLV) - 1), 1
+      ] <- Run_GLV[, 1] + TimeAbundances_time
+
+      TimeAbundances_row <- TimeAbundances_row + nrow(Run_GLV)
+      TimeAbundances_time <- TimeAbundances_time + Run_GLV[nrow(Run_GLV), 1] + 1
+    }
+
+    # We ignore the new addition if the new addition died out.
+    if (Verbose) print(paste("Checking steadystate."))
+    if (CurrentAbundance_New[length(CurrentAbundance_New)] == 0 &&
+        length(CurrentAbundance_New) > 1 && SpeciesPresent[length(SpeciesPresent)] == ID) {
+      atSteadyState <- all(
+        round(CurrentAbundance_New[-length(CurrentAbundance_New)] /
+                CurrentAbundance[SpeciesPresent][-length(CurrentAbundance_New)],
+              -log10(EliminationThreshold)) == 1
+      )
+    } else {
+      atSteadyState <- all(
+        round(CurrentAbundance_New / CurrentAbundance[SpeciesPresent],
+              -log10(EliminationThreshold)) == 1
+      )
+    }
+    if (Verbose) print(paste(atSteadyState))
+
+    CurrentAbundance[SpeciesPresent] <- CurrentAbundance_New
+
+    SpeciesPresent <- which(CurrentAbundance > 0)
+    eventNumber <- eventNumber + 1
+
+    if (Verbose) print(paste("Species present:", paste(SpeciesPresent,
+                             collapse = ", ")))
+
+    if ("Sequence" %in% ReturnValues) {
+      if (all(SpeciesPresent_Old %in% SpeciesPresent) &&
+          ID %in% SpeciesPresent_Old) {
+        SequenceRetVal$Outcome[eventNumber] <- "Present"
+      } else if (all(SpeciesPresent_Old %in% SpeciesPresent) &&
+                 !(ID %in% SpeciesPresent)
+      ) {
+        SequenceRetVal$Outcome[eventNumber] <- "Type 1 (Failure)"
+      } else if (all(SpeciesPresent_Old %in% SpeciesPresent) &&
+                 (ID %in% SpeciesPresent)
+      ) {
+        SequenceRetVal$Outcome[eventNumber] <- "Type 2 (Invade)"
+      } else {
+        SequenceRetVal$Outcome[eventNumber] <- "Type 3 (Contract)"
+      }
+      SequenceRetVal$Community[eventNumber] <- I(list(SpeciesPresent))
+    }
+
+    # We can add a check when ``sufficiently many'' species have been added.
+    # Or, if it is cheap, we can just check immediately if a community is invadable.
+    # The check only works if the system is essentially at steady state.
+    if (eventNumber > nrow(Pool) &&
+        atSteadyState &&
+        length(SpeciesPresent) > 1 &&
+        # RMTRCode2::LawMorton1996_CheckUninvadable(
+        #   AbundanceRow = c(NA, CurrentAbundance),
+        #   Pool = Pool, CommunityMatrix = InteractionMatrix
+        # )
+        !Microbiome_CheckInvadability(
+          Pool = Pool, InteractionMatrix = InteractionMatrix,
+          Dynamics = Dynamics, CurrentAbundance = CurrentAbundance, ...)
+        # !any((Dynamics(Pool = Pool, InteractionMatrix = InteractionMatrix,
+        #               Abundance = CurrentAbundance + .Machine$double.eps,
+        #               ...)[[1]]/(
+        #                 CurrentAbundance + .Machine$double.eps
+        #               ))[!(1:speciesNum %in% SpeciesPresent)] > 0)
+    ) {
+      break()
+    }
+  }
+
+  ##### Return: ################################################################
+  retval <- list()
+  if ("Community" %in% ReturnValues) {
+    retval$Community <- SpeciesPresent
+  }
+  if ("Equilibrium" %in% ReturnValues) {
+    retval$Equilibrium <- CurrentAbundance
+    retval$Equilibrium[is.na(retval$Equilibrium)] <- 0
+  }
+  if ("Abundance" %in% ReturnValues) {
+    if (!is.null(InnerTimeStepSize)) {
+      lastRow <- sum(apply(TimeAbundances, MARGIN = 1, FUN = function(x) {
+        !all(is.na(x[-1]))
+      }))
+      retval$Abundance <- TimeAbundances[1:lastRow, ]
+    } else {
+      retval$Abundance <- c((IntegratorTimeStep + 1) * ArrivalEvents - 1,
+                            CurrentAbundance)
+    }
+  }
+  if ("Sequence" %in% ReturnValues) {
+    retval$Sequence <- SequenceRetVal
+  }
+  if ("Pool" %in% ReturnValues) {
+    retval$Pool <- Pool
+  }
+  if ("Matrix" %in% ReturnValues) {
+    retval$Matrix <- InteractionMatrix
+  }
+  if ("Steadystate" %in% ReturnValues) {
+    retval$Steadystate <- atSteadyState
+  }
+  if ("Uninvadable" %in% ReturnValues) {
+    retval$Uninvadable <-
+      !Microbiome_CheckInvadability(
+        Pool = Pool, InteractionMatrix = InteractionMatrix,
+        Dynamics = Dynamics, CurrentAbundance = CurrentAbundance, ...)
+  }
+
+  retval$Rejections <- rejections
+
+  if (!is.null(seed)) {
+    if (exists("oldSeed"))
+      set.seed(oldSeed)
+  }
+
+  return(retval)
 }
 
 Microbiome_PermanenceAssembly <- function(
