@@ -497,12 +497,12 @@ Microbiome_NumericalAssembly <- function(
 
     if (any(is.nan(Run_GLV) | is.infinite(Run_GLV) |
             is.na(Run_GLV) | Run_GLV > 1E10)) {
-      warning(paste("NAN, Inf, NA or Abundance > 10^10 detected.",
-                    "Mutual Benefaction likely.",
-                    paste0("Rejecting step ", eventNumber, ".")))
-      if (Verbose) print(paste("NAN, Inf, NA or Abundance > 10^10 detected.",
-                               "Mutual Benefaction likely.",
-                               paste0("Rejecting step ", eventNumber, ".")))
+      warnmsg <- paste("NAN, Inf, NA or Abundance > 10^10 detected.",
+                       "Mutual Benefaction likely.",
+                       paste0("Rejecting step ", eventNumber, "."),
+                       "Consider reducing InnerTimeStepSize.")
+      warning(warnmsg)
+      if (Verbose) print(warnmsg)
 
       if (SpeciesPresent[length(SpeciesPresent)] == ID)
         SpeciesPresent <- SpeciesPresent[-length(SpeciesPresent)]
