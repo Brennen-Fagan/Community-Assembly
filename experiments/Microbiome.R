@@ -300,7 +300,7 @@ Microbiome_DynamicsNormalisedCapacity <- function(
   # NEW IDEA: Normalise a la Coyte et al. 2021.
   Change <- Abundance * (Reproduction + InteractionStrengths)
   if (CarryingCapacity - sum(Pool$Size * Abundance) <= 0) {
-    Change <- Change - mean(Change)
+    Change[Abundance != 0] <- Change[Abundance != 0] - mean(Change[Abundance != 0])
   }
 
   # Note that we should use an event triggered when the carrying capacity is
@@ -334,7 +334,11 @@ Microbiome_NumericalAssembly <- function(
   EliminationThreshold = 10^-4, # Eliminate if drops by.
   InnerEliminationThreshold = 10^-12, # Eliminate if drops below.
   IntegratorTimeStep = 1000, #
-  ArrivalDensity = 0.1, # Note, this can really matter for determining what steady state we go to.
+  ArrivalDensity = 0.1,
+  # Note, this can really matter for determining what steady state we go to.
+  # Further, setting it too low can make it species persist longer, as they
+  # do not decline as precipitously (i.e. succeeding EliminationThreshold)
+  # even if they do eventually die (i.e. fail InnerEliminationThreshold).
   ArrivalEvents = 60,
   ArrivalSampler = c("rearrange", "iid"),
   InnerTimeStepSize = 100,
@@ -343,7 +347,7 @@ Microbiome_NumericalAssembly <- function(
                    "Pool", "Matrix",
                    "Steadystate", "Uninvadable"),
 
-  CheckInvadability = FALSE,
+  CheckInvadability = FALSE, # Setting this to TRUE forbids species rescue.
   ...
 ) {
 
