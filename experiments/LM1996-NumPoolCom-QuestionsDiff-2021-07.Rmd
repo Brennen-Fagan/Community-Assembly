@@ -341,29 +341,29 @@ communitiesAll <- rbind(
   ) %>% dplyr::select(
     -AfterSepAbund, -AfterSepCommunity, -AfterSepCommunitySize, 
     -AfterSepProduction, -ProdChange, -AfterSepCommunityAlreadyPresent
-  ) ,
-  with(
-    communitiesHybrids[
-      !communitiesHybrids$AfterSepCommunityAlreadyPresent, 
-    ] %>% dplyr::distinct(CombnNum, AfterSepCommunity, .keep_all = TRUE),
-    data.frame(
-      CombnNum = CombnNum,
-      Basals = Basals,
-      Consumers = Consumers,
-      Dataset = Dataset,
-      DatasetID = DatasetID,
-      TotalID = TotalID,
-      Communities = AfterSepCommunity,
-      CommunitySize = AfterSepCommunitySize,
-      CommunityAbund = AfterSepAbund,
-      CommunityProd = AfterSepProduction,
-      IslandsUsed = IslandsUsed,
-      OtherSteadyStates = 0,
-      Islands1 = FALSE,
-      HybridCollapse = TRUE,
-      Persists = TRUE,
-      stringsAsFactors = FALSE
-    ))
+  ) #,
+  # with(
+  #   communitiesHybrids[
+  #     !communitiesHybrids$AfterSepCommunityAlreadyPresent, 
+  #   ] %>% dplyr::distinct(CombnNum, AfterSepCommunity, .keep_all = TRUE),
+  #   data.frame(
+  #     CombnNum = CombnNum,
+  #     Basals = Basals,
+  #     Consumers = Consumers,
+  #     Dataset = Dataset,
+  #     DatasetID = DatasetID,
+  #     TotalID = TotalID,
+  #     Communities = AfterSepCommunity,
+  #     CommunitySize = AfterSepCommunitySize,
+  #     CommunityAbund = AfterSepAbund,
+  #     CommunityProd = AfterSepProduction,
+  #     IslandsUsed = IslandsUsed,
+  #     OtherSteadyStates = 0,
+  #     Islands1 = FALSE,
+  #     HybridCollapse = TRUE,
+  #     Persists = TRUE,
+  #     stringsAsFactors = FALSE
+  #   ))
 )
 ```
 

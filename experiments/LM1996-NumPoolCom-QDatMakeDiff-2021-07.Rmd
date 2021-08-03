@@ -864,15 +864,15 @@ for (grp in unique(candidateData$TotalID)) {
 minThresh <- lapply(candidateData$CommunityAbund, function(x) min(RMTRCode2::CsvRowSplit(x)) * 0.1) %>% unlist %>% min
 
 pipeInteractionsNWhich <- unlist(lapply(
-  seq_along(pipeInteractionsN), function(i, byID, communities) {
-    lapply(byID[[i]], function(system, comms) {
-      lapply(system, function(pipeEnd, comms) {
-        toString(RMTRCode2::CsvRowSplit(comms)[
-          which(pipeEnd > minThresh)
-        ])
-      }, comms = comms)
-    }, comms = communities[[i]])
-  }, byID = pipeInteractionsN, communities = totalCommunities
+    seq_along(pipeInteractionsN), function(i, byID, communities) {
+        lapply(seq_along(byID[[i]]), function(j, system, comms) {
+            lapply(system[[j]], function(pipeEnd, comms) {
+                toString(RMTRCode2::CsvRowSplit(comms)[
+                    which(pipeEnd > minThresh)
+                ])
+            }, comms = comms[[j]])
+        }, system = byID[[i]], comms = communities[[i]])
+    }, byID = pipeInteractionsN, communities = totalCommunities
 ))
 
 pipeInteractionNResults <- data.frame(
@@ -901,15 +901,15 @@ pipeInteractionNResults %>% dplyr::mutate(
 ### Results Size-Neutral
 ```{r comparePipeDynamics}
 pipeInteractionsWhich <- unlist(lapply(
-  seq_along(pipeInteractions), function(i, byID, communities) {
-    lapply(byID[[i]], function(system, comms) {
-      lapply(system, function(pipeEnd, comms) {
-        toString(RMTRCode2::CsvRowSplit(comms)[
-          which(pipeEnd > minThresh)
-        ])
-      }, comms = comms)
-    }, comms = communities[[i]])
-  }, byID = pipeInteractions, communities = totalCommunities
+    seq_along(pipeInteractions), function(i, byID, communities) {
+        lapply(seq_along(byID[[i]]), function(j, system, comms) {
+            lapply(system[[j]], function(pipeEnd, comms) {
+                toString(RMTRCode2::CsvRowSplit(comms)[
+                    which(pipeEnd > minThresh)
+                ])
+            }, comms = comms[[j]])
+        }, system = byID[[i]], comms = communities[[i]])
+    }, byID = pipeInteractions, communities = totalCommunities
 ))
 
 pipeInteractionResults <- data.frame(
@@ -937,15 +937,15 @@ pipeInteractionResults %>% dplyr::mutate(
 ### Results Size-Positive
 ```{r comparePipeDynamicsP}
 pipeInteractionsPWhich <- unlist(lapply(
-  seq_along(pipeInteractionsP), function(i, byID, communities) {
-    lapply(byID[[i]], function(system, comms) {
-      lapply(system, function(pipeEnd, comms) {
-        toString(RMTRCode2::CsvRowSplit(comms)[
-          which(pipeEnd > minThresh)
-        ])
-      }, comms = comms)
-    }, comms = communities[[i]])
-  }, byID = pipeInteractionsP, communities = totalCommunities
+    seq_along(pipeInteractionsP), function(i, byID, communities) {
+        lapply(seq_along(byID[[i]]), function(j, system, comms) {
+            lapply(system[[j]], function(pipeEnd, comms) {
+                toString(RMTRCode2::CsvRowSplit(comms)[
+                    which(pipeEnd > minThresh)
+                ])
+            }, comms = comms[[j]])
+        }, system = byID[[i]], comms = communities[[i]])
+    }, byID = pipeInteractionsP, communities = totalCommunities
 ))
 
 pipeInteractionPResults <- data.frame(

@@ -739,6 +739,24 @@ for (grp in unique(candidateData$TotalID)) {
 # ID, Community 1, Community 2, Outcomes 1-2, Outcomes 1-0-2
 # For outcomes, species presence will be used.
 
+# communities <- NULL
+# totalCommunities <- NULL
+# for (grp in unique(candidateData$TotalID)) {
+#   candidateDataSubset <- candidateData %>% dplyr::filter(TotalID == grp)
+#   
+#   if (nrow(candidateDataSubset) > 1) {
+#     newCommunities <- combn(
+#       candidateDataSubset$Communities, 2, 
+#     )
+#     communities <- c(communities, newCommunities)
+#     totalCommunities <- c(
+#       totalCommunities,
+#       toString(sort(unique(unlist(lapply(newCommunities, 
+#                                          RMTRCode2::CsvRowSplit)))))
+#     )
+#   }
+# }
+
 communities <- NULL
 totalCommunities <- NULL
 for (grp in unique(candidateData$TotalID)) {
@@ -749,38 +767,63 @@ for (grp in unique(candidateData$TotalID)) {
       candidateDataSubset$Communities, 2, 
     )
     communities <- c(communities, newCommunities)
-    totalCommunities <- c(
+    totalCommunities <- c( # Labelling is wrong here. Need tC from pairs of nC.
       totalCommunities,
-      toString(sort(unique(unlist(lapply(newCommunities, 
-                                         RMTRCode2::CsvRowSplit)))))
+      list(apply(newCommunities, 2, function(coms) {
+        toString(sort(unique(RMTRCode2::CsvRowSplit(coms))))
+      }))
     )
   }
 }
 
+minThresh <- 1E-6
 islandInteractionsOneTwoWhich <- unlist(lapply(
-  seq_along(islandInteractionsOneTwo), function(i, x, tC) {
-    lapply(x[[i]], function(y, tC) {
-      lapply(y, function(z, tC) {
-        toString(RMTRCode2::CsvRowSplit(tC)[which(z > 1E-6)])
-      }, tC = tC)
-    },
-    tC = tC[i])
-  },
-  x = islandInteractionsOneTwo,
-  tC = totalCommunities))
+    seq_along(islandInteractionsOneTwo), function(i, byID, communities) {
+        lapply(seq_along(byID[[i]]), function(j, system, comms) {
+            lapply(system[[j]], function(pipeEnd, comms) {
+                toString(RMTRCode2::CsvRowSplit(comms)[
+                    which(pipeEnd > minThresh)
+                ])
+            }, comms = comms[[j]])
+        }, system = byID[[i]], comms = communities[[i]])
+    }, byID = islandInteractionsOneTwo, communities = totalCommunities
+))
 
 islandInteractionsOneEmptyTwoWhich <- unlist(lapply(
-  seq_along(islandInteractionsOneEmptyTwo), function(i, x, tC) {
-    lapply(x[[i]], function(y, tC) {
-      lapply(y, function(z, tC) {
-        toString(RMTRCode2::CsvRowSplit(tC)[which(z > 1E-6)])
-      }, tC = tC)
-    },
-    tC = tC[i])
-  },
-  x = islandInteractionsOneEmptyTwo,
-  tC = totalCommunities))
+    seq_along(islandInteractionsOneEmptyTwo), function(i, byID, communities) {
+        lapply(seq_along(byID[[i]]), function(j, system, comms) {
+            lapply(system[[j]], function(pipeEnd, comms) {
+                toString(RMTRCode2::CsvRowSplit(comms)[
+                    which(pipeEnd > minThresh)
+                ])
+            }, comms = comms[[j]])
+        }, system = byID[[i]], comms = communities[[i]])
+    }, byID = islandInteractionsOneEmptyTwo, communities = totalCommunities
+))
 
+# islandInteractionsOneTwoWhich <- unlist(lapply(
+#   seq_along(islandInteractionsOneTwo), function(i, x, tC) {
+#     lapply(x[[i]], function(y, tC) {
+#       lapply(y, function(z, tC) {
+#         toString(RMTRCode2::CsvRowSplit(tC)[which(z > 1E-6)])
+#       }, tC = tC)
+#     },
+#     tC = tC[i])
+#   },
+#   x = islandInteractionsOneTwo,
+#   tC = totalCommunities))
+# 
+# islandInteractionsOneEmptyTwoWhich <- unlist(lapply(
+#   seq_along(islandInteractionsOneEmptyTwo), function(i, x, tC) {
+#     lapply(x[[i]], function(y, tC) {
+#       lapply(y, function(z, tC) {
+#         toString(RMTRCode2::CsvRowSplit(tC)[which(z > 1E-6)])
+#       }, tC = tC)
+#     },
+#     tC = tC[i])
+#   },
+#   x = islandInteractionsOneEmptyTwo,
+#   tC = totalCommunities))
 
 islandInteractionResults <- data.frame(
   DatasetID = rep(names(islandInteractionsOneTwo), 
@@ -801,8 +844,21 @@ islandInteractionResults <- data.frame(
 
 islandInteractionResults
 ```
-
+original outcomes before fix.
 ```{r matches}
+islandInteractionResults %>% dplyr::mutate(
+  C1WOInvaded = Community1 != OutcomeWOEmpty_Island1,
+  C2WOInvaded = Community2 != OutcomeWOEmpty_Island2,
+  C1WInvaded = Community1 != OutcomeWEmpty_Island1,
+  C2WInvaded = Community2 != OutcomeWEmpty_Island3,
+  StalemateWO = !C1WOInvaded & !C2WOInvaded,
+  StalemateW = !C1WInvaded & !C2WInvaded,
+  HybridWO = C1WOInvaded & C2WOInvaded,
+  HybridW = C1WInvaded & C2WInvaded,
+) %>% dplyr::select(-dplyr::starts_with("Outcome"))
+```
+Outcomes after fix. Note the differences in the last column for easiest comparison.
+```{r matches2}
 islandInteractionResults %>% dplyr::mutate(
   C1WOInvaded = Community1 != OutcomeWOEmpty_Island1,
   C2WOInvaded = Community2 != OutcomeWOEmpty_Island2,
