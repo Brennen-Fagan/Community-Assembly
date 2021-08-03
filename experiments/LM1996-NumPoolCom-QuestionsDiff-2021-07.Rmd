@@ -581,7 +581,7 @@ Here, we check to see if the networks created by each community (hybrid or other
 The first obvious step is to make a gallery of the food webs.
 The reader will notice the upside-down 'T' shape to the plots.
 
-We will also need to recreate code from the file `LawMorton1996-NumericalTables-Parallel.Rmd`.
+We will also need to recreate code from the file `LM1996-NumPoolCom-FoodWebs-2021-07.Rmd`.
 ```{r createGraphs}
 foodWebs <- list()
 
@@ -615,11 +615,6 @@ for (r in 1:nrow(communitiesAll)) {
       redPool$Intraspecific <- diag(redMat)
       
       GraphAsDataFrame <- igraph::as_data_frame(Graph)
-    
-      # cheddar does not like cannibals.
-      GraphAsDataFrame <- GraphAsDataFrame[
-        GraphAsDataFrame$to != GraphAsDataFrame$from,
-      ]
   
       # Add in abundances for calculating abundance * (gain or loss)
       GraphAsDataFrame <- dplyr::left_join(
@@ -634,33 +629,69 @@ for (r in 1:nrow(communitiesAll)) {
       
       # Reorder and rename variables.
       ResCon <- dplyr::select(ResCon, 
-                                 resource = to, consumer = from, 
-                                 gainPerUnit = weight, resourceAbund = N)
+                                 to, from, # resource = to, consumer = from, 
+                                 effectPerUnit = weight, resourceAbund = N)
       ConRes <- dplyr::select(ConRes, 
-                                 resource = from, consumer = to, 
-                                 lossPerUnit = weight, consumerAbund = N)
+                                 to, from, # resource = from, consumer = to, 
+                                 effectPerUnit = weight, consumerAbund = N)
+      ResCon <- dplyr::mutate(dplyr::group_by(ResCon, from),
+                              effectActual = effectPerUnit * resourceAbund,
+                              Type = "Exploit+")
+      ConRes <- dplyr::mutate(dplyr::group_by(ConRes, from),
+                              effectActual = effectPerUnit * consumerAbund,
+                              Type = ifelse(from == to,
+                                            "SelfReg-",
+                                            "Exploit-"))
       
-      ResCon <- dplyr::mutate(dplyr::group_by(ResCon, consumer),
-                                 gainEfficiency = gainPerUnit / sum(gainPerUnit),
-                                 gainActual = gainPerUnit * resourceAbund,
-                                 gainNormal = gainActual / sum(gainActual))
-      ConRes <- dplyr::mutate(dplyr::group_by(ConRes, resource),
-                                 lossEfficiency = lossPerUnit / sum(lossPerUnit),
-                                 lossActual = lossPerUnit * consumerAbund,
-                                 lossNormal = lossActual / sum(lossActual))
+      IntriG <- with(redPool, data.frame(
+                              from = node, #resource = node,
+                              to = node, #consumer = node,
+                              effectPerUnit = ifelse(ReproductionRate > 0,
+                                                   ReproductionRate, 0),
+                              effectActual = ifelse(ReproductionRate > 0,
+                                                  N * ReproductionRate, 0),
+                              Type = "Intrisc+")) 
+      IntriL <- with(redPool, data.frame(
+                              from = node, #resource = node,
+                              to = node, #consumer = node,
+                              effectPerUnit = ifelse(ReproductionRate < 0,
+                                                   ReproductionRate, 0),
+                              effectActual = ifelse(ReproductionRate < 0,
+                                                  N * ReproductionRate, 0),
+                              Type = "Intrisc-"))
       
-      cheddarCommunity <- cheddar::Community(
-        redPool,
-        properties = list(
-          title = paste(TotalID, ":", Communities, ": row", r),
-          M.units = "masses",
-          N.units = "abund"
-        ),
-        trophic.links = dplyr::full_join(ResCon, ConRes, 
-                                         by = c("resource", "consumer"))
+      EdgeDataFrame <- dplyr::bind_rows(
+        dplyr::select(ResCon, -resourceAbund), 
+        dplyr::select(ConRes, -consumerAbund),
+        IntriG, IntriL
       )
       
-      cheddarCommunity
+      EdgeDataFrame <- EdgeDataFrame %>% dplyr::rename(
+        # Empirically speaking, to and from appear reversed.
+        # A consumer (from) should have a negative effect on resource (to),
+        # but the organisation so far marks it as positive. We fix this.
+        tempname = to,
+        to = from
+      ) %>% dplyr::rename(
+        from = tempname
+      ) %>% dplyr::filter(
+        # Remove placeholder entries
+        effectPerUnit != 0
+      ) %>% dplyr::mutate(
+        # Useful to keep effects separate
+        effectSign = sign(effectPerUnit)
+      ) %>% group_by(
+        to, effectSign
+      ) %>% dplyr::mutate(
+        # Perform the post mortem of the most influential from's
+        effectEfficiency = effectPerUnit / sum(effectPerUnit), 
+        effectNormalised = effectActual / sum(effectActual)
+      ) %>% dplyr::arrange(to)
+      
+      list(
+        Edges = EdgeDataFrame,
+        Vertices = redPool
+      )
     }
   )
 }
@@ -678,163 +709,230 @@ for (i in seq_along(foodWebs)[1:5]) {
 
 #### Code
 ```{r gallerycode}
-# From documentation: 
-# https://cran.r-project.org/web/packages/cheddar/vignettes/ImportExport.pdf
-ToIgraph <- function(community, weight=NULL)
-{
-    if(is.null(TLPS(community)))
-    {
-        stop('The community has no trophic links')
-    }
-    else
-    {
-        tlps <- TLPS(community, link.properties=weight)
-        if(!is.null(weight))
-        {
-            tlps$weight <- tlps[,weight]
-        }
-        #? Should be graph_from_data_frame?
-        return (graph.data.frame(tlps, 
-                                 vertices=NPS(community),
-                                 directed=TRUE))
-    }
+toCheddar <- function(EVList, name = "") {# Edges Vertices List
+  links <- EVList$Edges
+
+  # cheddar does not like "cannibalism".
+  links <- links[
+    links$to != links$from,
+  ]
+
+  # "[C]olumns called ‘resource’ and ‘consumer’ must be given."
+  links <- dplyr::bind_rows(
+    links %>% dplyr::filter(effectSign == 1) %>% dplyr::rename(
+      resource = from, consumer = to),
+    links %>% dplyr::filter(effectSign == -1) %>% dplyr::rename(
+      resource = to, consumer = from),
+  ) %>% dplyr::select(-Type) # Cheddar confuses node Type and edge Type.
+
+  cheddar::Community(
+    nodes = EVList$Vertices,
+    properties = list(
+      title = name,
+      M.units = "masses",
+      N.units = "abund"
+    ),
+    trophic.links = links
+  )
 }
 
-sideBySideGainLoss <- function(CheddarFoodWeb, 
-                               threshold = 0, # sets to minimal size edges below
-                               nodeSize = c("Abundance", "Size", "None"),
-                               edgeScale = 10) {
-  theG <- ToIgraph(CheddarFoodWeb) 
-  
-  # layout.auto yields a star with basals on the outside.
-  # layout_with_graphopt has repulsion, but does not give great graphs.
-  theLayout <- igraph::layout.circle(theG) 
-  
+toIGraph <- function(EVList, sign = 0) {
+  igraph::graph_from_data_frame(
+    d = if(sign == 0) {
+      EVList$Edges
+    } else {
+      EVList$Edges[EVList$Edges$effectSign == sign, ]
+    },
+    directed = TRUE,
+    vertices = EVList$Vertices
+  )
+}
+
+
+toPostMortem <- function(EVList,
+                         threshold = 0, # sets to minimal size edges below
+                         nodeSize = c("None", "Abundance", "Size"),
+                         edgeScale = 10,
+                         reducedTrophic = TRUE) {
+  if (tolower(threshold) == "adaptive") {
+    threshold = EVList$Edges %>% group_by(
+      to, effectSign
+    ) %>% summarise(
+      max = max(effectNormalised), .groups = "drop"
+    ) %>% ungroup %>% pull(max) %>% min
+  }
+
+  theGc <- toCheddar(EVList, name = "Trophic Levels")
+  theGi <- toIGraph(EVList)
+
+  theGiGain <- toIGraph(EVList, sign = 1)
+  theGiLoss <- toIGraph(EVList, sign = -1)
+
+  theLayout <- igraph::layout.circle(theGi)
+
   theSize <- match.arg(nodeSize, c("Abundance", "Size", "None"))
   if (theSize == "Abundance")
-    theVs <- sqrt(igraph::vertex_attr(theG)$N) * 10
+    theVs <- sqrt(igraph::vertex_attr(theGi)$N) * 10
   else if (theSize == "Size") {
-    theVs <- igraph::vertex_attr(theG)$M
+    theVs <- igraph::vertex_attr(theGi)$M
     theVs <- sqrt(theVs / min(theVs)) * 10
   } else if (theSize == "None") {
     theVs <- 15
   }
-  
+
   theColors <- ifelse(
-    igraph::vertex_attr(theG)$Type == "Basal", "skyblue", "red"
+    igraph::vertex_attr(theGi)$Type == "Basal", "skyblue", "red"
   )
-  
-  theGain <- igraph::edge_attr(theG)$gainNormal
-  theLoss <- igraph::edge_attr(theG)$lossNormal
-  
+  if ("Core" %in% names(igraph::vertex_attr(theGi))) {
+    theShapes <- ifelse(igraph::vertex_attr(theGi)$Core,
+                        0,
+                        1)
+  } else {
+    theShapes <- 1 
+    # Note Igraph uses "circle" then "rectangle",
+    # but R and cheddar use "rectangle" then "circle", so we will use a !.
+  }
+
+  theBoth <- igraph::edge_attr(theGi)$effectNormalised
+  theGain <- igraph::edge_attr(theGiGain)$effectNormalised
+  theLoss <- igraph::edge_attr(theGiLoss)$effectNormalised
+
+  theBoth[theBoth < threshold] <- 0
   theGain[theGain < threshold] <- 0
   theLoss[theLoss < threshold] <- 0
-  
-  theGain <- theGain * edgeScale
-  theLoss <- theLoss * edgeScale
-  
-  theGG <- theG
-  theLG <- theG
-  
-  theGG <- igraph::delete_edges(theGG, which(theGain == 0))
-  theLG <- igraph::delete_edges(theLG, which(theLoss == 0))
+
+  # Inform the graphs of which edges are not needed.
+  theGi <- igraph::delete_edges(theGi, which(theBoth == 0))
+  theGiGain <- igraph::delete_edges(theGiGain, which(theGain == 0))
+  theGiLoss <- igraph::delete_edges(theGiLoss, which(theLoss == 0))
+
+  # Remove the same entries so that lengths match.
   theGain <- theGain[theGain > 0]
   theLoss <- theLoss[theLoss > 0]
-  
-  
+
+  theGain <- theGain * edgeScale
+  theLoss <- theLoss * edgeScale
+
+  parold <- par(no.readonly = TRUE)
   par(mfrow = c(2, 2), # Two Rows, Two Columns
       mar = c(0, 1.5, 1, 0), # Margins, bottom, left, top, right
       oma = c(0.1, 0.1, 0.1, 0.1) # Outer margins.
-      )
-  
-  cheddar::PlotWebByLevel(CheddarFoodWeb, show.level.lines = TRUE, 
-                                level = "LongWeightedTrophicLevel",
-                          main = "Trophic Structure")
-  plot(
-    theG, 
-    layout = theLayout, 
-    vertex.size = theVs, 
-    edge.width = 1, 
-    edge.arrow.size = 0.3, 
-    edge.arrow.width = 1, 
-    vertex.color = theColors, 
-    edge.lty = 2, 
-    edge.color = "grey", 
-    edge.arrow.mode = ">",
-    main = "Consumption"
   )
+
+  cheddar::PlotWebByLevel(
+    theGc,
+    show.level.lines = TRUE,
+    level = "LongWeightedTrophicLevel",
+      col = theColors,
+      pch = theShapes
+  )
+
+  if (!reducedTrophic) {
+    plot(
+      theGi,
+      layout = theLayout,
+      vertex.size = theVs,
+      edge.width = 1,
+      edge.arrow.size = 0.3,
+      edge.arrow.width = 1,
+      vertex.color = theColors,
+      vertex.shape = igraph::shapes()[as.numeric(!theShapes) + 1],
+      edge.lty = 2,
+      edge.color = "grey",
+      edge.arrow.mode = ">",
+      main = "Consumption"
+    )
+  } else {
+    EVListRed <- EVList
+    EVListRed$Edges <- EVListRed$Edges %>% dplyr::filter(
+      effectNormalised >= threshold
+    )
+    theGc2 <- toCheddar(EVListRed, name = "Strongest Trophic Levels")
+    cheddar::PlotWebByLevel(
+      theGc2,
+      show.level.lines = TRUE,
+      level = "LongWeightedTrophicLevel",
+      col = theColors,
+      pch = theShapes
+    )
+  }
+
   plot(
-    theGG, 
-    layout = theLayout, 
-    vertex.size = theVs, 
-    edge.width = theGain, 
-    edge.arrow.size = 0.3, 
-    edge.arrow.width = 1, 
-    vertex.color = theColors, 
-    edge.lty = 2, 
-    edge.color = "blue", 
+    theGiGain,
+    layout = theLayout,
+    vertex.size = theVs,
+    edge.width = theGain,
+    edge.arrow.size = 0.3,
+    edge.arrow.width = 1,
+    vertex.color = theColors,
+      vertex.shape = igraph::shapes()[as.numeric(!theShapes) + 1],
+    edge.lty = 2,
+    edge.color = "blue",
     edge.arrow.mode = ">",
     main = "Consumer's Gains"
   )
+
   plot(
-    theLG, 
-    layout = theLayout, 
-    vertex.size = theVs, 
-    edge.width = theLoss, 
-    edge.arrow.size = 0.3, 
-    edge.arrow.width = 2, 
-    vertex.color = theColors, 
-    edge.lty = 3, 
-    edge.color = "darkred", 
+    theGiLoss,
+    layout = theLayout,
+    vertex.size = theVs,
+    edge.width = theLoss,
+    edge.arrow.size = 0.3,
+    edge.arrow.width = 2,
+    vertex.color = theColors,
+      vertex.shape = igraph::shapes()[as.numeric(!theShapes) + 1],
+    edge.lty = 3,
+    edge.color = "darkred",
     edge.arrow.mode = "<",
     main = "Resource's Losses"
+  )
+  
+  par(parold)
+  
+  EVList$Edges %>% dplyr::ungroup() %>% dplyr::filter(
+    effectNormalised >= threshold
+  ) %>% dplyr::select(
+    -effectSign
+  ) %>% dplyr::arrange(
+    to, -effectNormalised
   )
 }
 ```
 
 #### Example LM 1
 ```{r gallery1}
-# print(cheddar::PlotWebByLevel(foodWebs[[1]], show.level.lines = TRUE, 
-#                                 level = "LongWeightedTrophicLevel"))
-sideBySideGainLoss(foodWebs[[1]], nodeSize = "None", threshold = 0.1)
+toPostMortem(foodWebs[[1]], nodeSize = "None", threshold = "Adaptive") -> temp
+
 ```
 
 #### Example LM 2
 ```{r gallery2}
-# print(cheddar::PlotWebByLevel(foodWebs[[28]], show.level.lines = TRUE, 
-#                                 level = "LongWeightedTrophicLevel"))
-sideBySideGainLoss(foodWebs[[34]], nodeSize = "None", threshold = 0.1)
+toPostMortem(foodWebs[[34]], nodeSize = "None", threshold = "Adaptive") -> temp
 ```
 
 #### Invadable
 ```{r gallery3}
-# print(cheddar::PlotWebByLevel(foodWebs[[41]], show.level.lines = TRUE, 
-#                                 level = "LongWeightedTrophicLevel"))
-sideBySideGainLoss(foodWebs[[49]], nodeSize = "None", threshold = 0.1)
+toPostMortem(foodWebs[[43]], nodeSize = "None", threshold = "Adaptive") -> temp
 ```
 
 #### Does Not Persist
 ```{r gallery4}
-# print(cheddar::PlotWebByLevel(foodWebs[[61]], show.level.lines = TRUE, 
-#                                 level = "LongWeightedTrophicLevel"))
-sideBySideGainLoss(foodWebs[[81]], nodeSize = "None", threshold = 0.1)
+toPostMortem(foodWebs[[46]], nodeSize = "None", threshold = "Adaptive") -> temp
 ```
 
 #### Hybrid
 ```{r gallery5}
-# print(cheddar::PlotWebByLevel(foodWebs[[81]], show.level.lines = TRUE, 
-#                                 level = "LongWeightedTrophicLevel"))
-sideBySideGainLoss(foodWebs[[98]], nodeSize = "None", threshold = 0.1)
+toPostMortem(foodWebs[[42]], nodeSize = "None", threshold = "Adaptive") -> temp
 ```
 
 #### Largest Assembled
 ```{r gallery6}
-sideBySideGainLoss(foodWebs[[38]], nodeSize = "None", threshold = 0.1)
+toPostMortem(foodWebs[[33]], nodeSize = "None", threshold = "Adaptive") -> temp
 ```
 
 #### Largest Hybrid
 ```{r gallery7}
-sideBySideGainLoss(foodWebs[[89]], nodeSize = "None", threshold = 0.1)
+toPostMortem(foodWebs[[49]], nodeSize = "None", threshold = "Adaptive") -> temp
 ```
 
 ### Measuring Indirect Interactions
@@ -1315,41 +1413,54 @@ for (i in 1:length(foodWebs)) {
   
   Leontief[[i]] <- with(
     foodwebsThe, {
-      flow.mat <- matrix(data = 0, nrow = nrow(nodes), ncol = nrow(nodes))
-      rownames(flow.mat) <- colnames(flow.mat) <- nodes$node
-      if (!is.null(trophic.links)) {
-      for (link in 1:nrow(trophic.links)) {
-        linkRow <- trophic.links[link, ]
-        # NOTE: from-row-to-column
-        flow.mat[linkRow$resource, linkRow$consumer] <-
-          # Note: mass gained by consumer < mass lost by resource (Thermodynamics)
-          # The amount of mass flowing (from the resource) to the consumer
-          # is the gainPerUnit multiplied by the resourceAbund and consumerAbund
-          # (i.e. the abundance generated multiplied by number of interactions)
-          # multiplied by the proxy for mass generated, consumerSize.
-          linkRow$gainPerUnit * 
-          linkRow$resourceAbund * linkRow$consumerAbund *
-          nodes[linkRow$consumer, ]$M
-        
-        
-        flow.mat[linkRow$consumer, linkRow$resource] <-
-          # The amount of mass flowing from the resource (to the consumer)
-          # is the lossPerUnit multiplied by the resourceAbund and consumerAbund
-          # (i.e. the abundance lost multiplied by number of interactions)
-          # multiplied by the proxy for mass lost, resourceSize.
-          linkRow$lossPerUnit * 
-          linkRow$resourceAbund * linkRow$consumerAbund *
-          nodes[linkRow$resource, ]$M
-        
-        stopifnot(abs(flow.mat[linkRow$consumer, linkRow$resource]) >
-                    abs(flow.mat[linkRow$resource, linkRow$consumer]))
-      }
+      flow.mat <- matrix(data = 0, nrow = nrow(Vertices), ncol = nrow(Vertices))
+      rownames(flow.mat) <- colnames(flow.mat) <- Vertices$node
+      if (!is.null(Edges)) {
+        for (link in 1:nrow(Edges)) {
+          linkRow <- Edges[link, ]
+          # NOTE: from-row-to-column
+          speciesThe <- c(which(Vertices$node %in% linkRow$from),
+                          which(Vertices$node %in% linkRow$to))
+          flow.mat[linkRow$from, linkRow$to] <-
+            linkRow$effectPerUnit * 
+            Vertices$N[speciesThe[1]] * Vertices$N[speciesThe[2]] * 
+            Vertices$M[speciesThe[2]]
+          # flow.mat[linkRow$resource, linkRow$consumer] <-
+          #   # Note: mass gained by consumer < mass lost by resource (Thermodynamics)
+          #   # The amount of mass flowing (from the resource) to the consumer
+          #   # is the gainPerUnit multiplied by the resourceAbund and consumerAbund
+          #   # (i.e. the abundance generated multiplied by number of interactions)
+          #   # multiplied by the proxy for mass generated, consumerSize.
+          #   linkRow$gainPerUnit * 
+          #   linkRow$resourceAbund * linkRow$consumerAbund *
+          #   Vertices[linkRow$consumer, ]$M
+          # 
+          # 
+          # flow.mat[linkRow$consumer, linkRow$resource] <-
+          #   # The amount of mass flowing from the resource (to the consumer)
+          #   # is the lossPerUnit multiplied by the resourceAbund and consumerAbund
+          #   # (i.e. the abundance lost multiplied by number of interactions)
+          #   # multiplied by the proxy for mass lost, resourceSize.
+          #   linkRow$lossPerUnit * 
+          #   linkRow$resourceAbund * linkRow$consumerAbund *
+          #   Vertices[linkRow$resource, ]$M
+          # 
+          # stopifnot(abs(flow.mat[linkRow$consumer, linkRow$resource]) >
+          #             abs(flow.mat[linkRow$resource, linkRow$consumer]))
+        }
+        #print(flow.mat)
+        stopifnot(
+          # Effect on resource (-) should be larger than effect on consumer (+).
+          # Note: diag trivially satisfies for consumers (0 <= abs(-val)).
+          #       Unfortunately, not for basals.
+          ifelse(flow.mat > 0, abs(flow.mat), 0) - t(ifelse(flow.mat < 0, abs(flow.mat), 0)) - diag(diag(flow.mat)) <= 0
+        )
       }
       
       # Amount of mass flowing into the system: basal generated.
       flow.input <- ifelse(
-        nodes$Type == "Basal",
-        nodes$M * nodes$ReproductionRate * nodes$N,
+        Vertices$Type == "Basal",
+        Vertices$M * Vertices$ReproductionRate * Vertices$N,
         0
       )
       
@@ -1375,15 +1486,15 @@ for (i in 1:length(foodWebs)) {
       
       # Change in abundance multiplied by size.
       flow.export <- ifelse(
-        nodes$Type == "Basal",
-        nodes$N^2 * nodes$Intraspecific * nodes$M,
-        nodes$ReproductionRate * nodes$N * nodes$M
+        Vertices$Type == "Basal",
+        Vertices$N^2 * Vertices$Intraspecific * Vertices$M,
+        Vertices$ReproductionRate * Vertices$N * Vertices$M
       )
       
       flow.output <- flow.respiration + flow.export
       
-      storage <- nodes$N
-      living <- rep(TRUE, nrow(nodes))
+      storage <- Vertices$N
+      living <- rep(TRUE, nrow(Vertices))
       
       enaR::pack(
         flow.mat, flow.input, 
@@ -1481,6 +1592,6 @@ save(
   paramFrame, # Contains run information, outcomes. Row is by settings.
   plotScalingData, # Contains assembly outcomes in a one per row format.
   pools, # The system pools
-  file = "LM1996-NumPoolCom-QOut-2021-05.RData"
+  file = "LM1996-NumPoolCom-QOutDif-2021-07.RData"
 ) # Community: an assembly outcome or hybrid or a hybrid's collapse.
 ```
