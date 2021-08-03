@@ -844,24 +844,24 @@ sideBySideGainLoss(foodWebs[[49]], nodeSize = "None", threshold = 0.1)
 ```{r gallery4}
 # print(cheddar::PlotWebByLevel(foodWebs[[61]], show.level.lines = TRUE, 
 #                                 level = "LongWeightedTrophicLevel"))
-sideBySideGainLoss(foodWebs[[81]], nodeSize = "None", threshold = 0.1)
+sideBySideGainLoss(foodWebs[[86]], nodeSize = "None", threshold = 0.1)
 ```
 
 #### Hybrid
 ```{r gallery5}
 # print(cheddar::PlotWebByLevel(foodWebs[[81]], show.level.lines = TRUE, 
 #                                 level = "LongWeightedTrophicLevel"))
-sideBySideGainLoss(foodWebs[[98]], nodeSize = "None", threshold = 0.1)
+sideBySideGainLoss(foodWebs[[92]], nodeSize = "None", threshold = 0.1)
 ```
 
 #### Largest Assembled
 ```{r gallery6}
-sideBySideGainLoss(foodWebs[[38]], nodeSize = "None", threshold = 0.1)
+sideBySideGainLoss(foodWebs[[33]], nodeSize = "None", threshold = 0.1)
 ```
 
 #### Largest Hybrid
 ```{r gallery7}
-sideBySideGainLoss(foodWebs[[89]], nodeSize = "None", threshold = 0.1)
+sideBySideGainLoss(foodWebs[[87]], nodeSize = "None", threshold = 0.1)
 ```
 
 ### Measuring Indirect Interactions

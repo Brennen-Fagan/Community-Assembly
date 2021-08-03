@@ -776,6 +776,21 @@ for (grp in unique(candidateData$TotalID)) {
   }
 }
 
+# Make sure that the entries match in terms of lengths.
+stopifnot(
+  isTRUE(all.equal(
+    lapply(islandInteractionsOneEmptyTwo, length), 
+    lapply(totalCommunities, length), 
+    check.names = FALSE
+    )),
+  isTRUE(all.equal(
+    lapply(islandInteractionsOneEmptyTwo, function(d) {lapply(d, function(v) length(v[[1]]))}), 
+    lapply(totalCommunities, function(d) {lapply(d, function(s) length(RMTRCode2::CsvRowSplit(s)))}), 
+    check.names = FALSE
+  ))
+  
+)
+
 minThresh <- 1E-6
 islandInteractionsOneTwoWhich <- unlist(lapply(
     seq_along(islandInteractionsOneTwo), function(i, byID, communities) {
@@ -844,20 +859,21 @@ islandInteractionResults <- data.frame(
 
 islandInteractionResults
 ```
-original outcomes before fix.
-```{r matches}
-islandInteractionResults %>% dplyr::mutate(
-  C1WOInvaded = Community1 != OutcomeWOEmpty_Island1,
-  C2WOInvaded = Community2 != OutcomeWOEmpty_Island2,
-  C1WInvaded = Community1 != OutcomeWEmpty_Island1,
-  C2WInvaded = Community2 != OutcomeWEmpty_Island3,
-  StalemateWO = !C1WOInvaded & !C2WOInvaded,
-  StalemateW = !C1WInvaded & !C2WInvaded,
-  HybridWO = C1WOInvaded & C2WOInvaded,
-  HybridW = C1WInvaded & C2WInvaded,
-) %>% dplyr::select(-dplyr::starts_with("Outcome"))
-```
-Outcomes after fix. Note the differences in the last column for easiest comparison.
+
+<!-- original outcomes before fix. 
+ ```{r matches} 
+ islandInteractionResults %>% dplyr::mutate( 
+   C1WOInvaded = Community1 != OutcomeWOEmpty_Island1, 
+   C2WOInvaded = Community2 != OutcomeWOEmpty_Island2, 
+   C1WInvaded = Community1 != OutcomeWEmpty_Island1, 
+   C2WInvaded = Community2 != OutcomeWEmpty_Island3, 
+   StalemateWO = !C1WOInvaded & !C2WOInvaded, 
+  StalemateW = !C1WInvaded & !C2WInvaded, 
+  HybridWO = C1WOInvaded & C2WOInvaded, 
+  HybridW = C1WInvaded & C2WInvaded, 
+ ) %>% dplyr::select(-dplyr::starts_with("Outcome")) 
+ ``` 
+ Outcomes after fix. Note the differences in the last column for easiest comparison. -->
 ```{r matches2}
 islandInteractionResults %>% dplyr::mutate(
   C1WOInvaded = Community1 != OutcomeWOEmpty_Island1,
