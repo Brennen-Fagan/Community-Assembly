@@ -1,0 +1,220 @@
+---
+title: "Size Analysis, 2021-08-04"
+output: html_notebook
+---
+
+It occurs to me that I have not looked at the sizes of the species that are present in the final assembled communities as a whole.
+I have previously looked at those who occurred in at least two communities from the same pool, but those should be compared to see if they are reasonably representative of each other.
+
+# Tabs {.tabset}
+
+## Load Data
+```{r libs, message=FALSE, warning=FALSE}
+# Check requisite packages are installed.
+packages <- c(
+  "dplyr",
+  "RMTRCode2",
+  "ggplot2"
+)
+for (pkg in packages) {
+  library(pkg, character.only = TRUE)
+}
+
+# Reserved Names
+communitiesAll <- NULL
+invasionsDirected <- NULL
+islandInteractionsOneEmptyTwo <- NULL
+islandInteractionsOneEmptyTwoWhich <- NULL
+islandInteractionsOneTwo <- NULL
+islandInteractionsOneTwoWhich <- NULL
+mats <- NULL
+paramFrame <- NULL
+plotScalingData <- NULL
+pools <- NULL
+```
+
+```{r loadDat}
+ellipsisApply <- function(..., FUN) {
+  lapply(as.list(...), FUN)
+}
+
+load("LM1996-NumPoolCom-QOut-2021-05.RData")
+# Stop if not all are not null
+stopifnot(all(unlist(ellipsisApply(
+  FUN = function(bool) {!is.null(bool)},
+  communitiesAll,
+  invasionsDirected,
+  islandInteractionsOneEmptyTwo,
+  islandInteractionsOneEmptyTwoWhich,
+  islandInteractionsOneTwo,
+  islandInteractionsOneTwoWhich,
+  mats,
+  paramFrame,
+  plotScalingData,
+  pools
+))))
+```
+
+```{r retrieveSpecies}
+sizeTypes <- NULL
+for (row in 1:nrow(paramFrame)) {
+  paramRow <- paramFrame[row, ]
+  endStates <- names(paramRow$EndStates[[1]])[-(1:2)]
+  if (length(endStates) < 1) next
+  endSpecies <- lapply(endStates, RMTRCode2::CsvRowSplit)
+  
+  poolRow <- pools[[paramRow$DatasetID]][[paramRow$CombnNum]]
+  
+  endStates <- unlist(lapply(seq_along(endStates), function(i, st, sp) {
+        rep(st[i], length(sp[[i]]))
+      }, st = endStates, sp = endSpecies))
+  
+  endSpecies <- unlist(endSpecies)
+    
+  sizeTypes <- rbind(
+    sizeTypes,
+    data.frame(
+      ID = paste(paramRow$CombnNum, paramRow$DatasetID),
+      Species = endSpecies, # Duplicates!
+      State = endStates,
+      Size = poolRow$Size[endSpecies],
+      Type = poolRow$Type[endSpecies],
+      stringsAsFactors = FALSE
+    ))
+}
+
+sizeTypes <- sizeTypes %>% dplyr::group_by(
+  ID, Species, Size, Type
+) %>% dplyr::summarise(
+  States = list(State), .groups = "drop"
+) %>% dplyr::mutate(
+  Source = "Simulation"
+)
+```
+
+```{r genericPool}
+genericPool <- RMTRCode2::LawMorton1996_species(1E4, 1E4, seed = 1)
+
+combined <- rbind(
+  sizeTypes %>% dplyr::mutate(
+    ID = paste(ID, Species)
+  ) %>% dplyr::select(
+    -States, -Species,
+    ID, Type, Size, Source
+  ),
+  genericPool %>% dplyr::mutate(
+    ID = as.character(ID),
+    Source = "Generic, Seed 1"
+  ) %>% dplyr::select(
+    -ReproductionRate,
+    ID, Type, Size, Source
+  )
+)
+
+combined2 <- rbind(
+  sizeTypes %>% dplyr::filter(
+    lapply(States, length) > 1
+  ) %>% dplyr::mutate(
+    ID = paste(ID, Species)
+  ) %>% dplyr::select(
+    -States, -Species,
+    ID, Type, Size, Source
+  ),
+  genericPool %>% dplyr::mutate(
+    ID = as.character(ID),
+    Source = "Generic, Seed 1"
+  ) %>% dplyr::select(
+    -ReproductionRate,
+    ID, Type, Size, Source
+  )
+)
+```
+
+## Sizes
+```{r regSizes1}
+ggplot2::ggplot(
+  combined,
+  ggplot2::aes(
+    x = Size,
+    fill = Type
+  )
+) + ggplot2::geom_histogram(
+  bins = 100
+) + ggplot2::facet_wrap(
+  ~ Source, scales = "free_y", nrow = 2
+)
+```
+
+```{r logSizes1}
+ggplot2::ggplot(
+  combined,
+  ggplot2::aes(
+    x = log10(Size),
+    fill = Type
+  )
+) + ggplot2::geom_histogram(
+  bins = 100
+) + ggplot2::facet_wrap(
+  ~ Source, scales = "free_y", nrow = 2
+)
+```
+## Amongst pools with at least 2 communities
+```{r regSizes2}
+ggplot2::ggplot(
+  combined2,
+  ggplot2::aes(
+    x = Size,
+    fill = Type
+  )
+) + ggplot2::geom_histogram(
+  bins = 100
+) + ggplot2::facet_wrap(
+  ~ Source, scales = "free_y", nrow = 2
+)
+```
+
+```{r logSizes2}
+ggplot2::ggplot(
+  combined2,
+  ggplot2::aes(
+    x = log10(Size),
+    fill = Type
+  )
+) + ggplot2::geom_histogram(
+  bins = 100
+) + ggplot2::facet_wrap(
+  ~ Source, scales = "free_y", nrow = 2
+)
+```
+## Largest Sizes
+```{r regSizes3}
+ggplot2::ggplot(
+  sizeTypes %>% dplyr::group_by(
+    ID, Type
+  ) %>% dplyr::summarise(
+    Size = max(Size), .groups = "drop"
+  ),
+  ggplot2::aes(
+    x = Size,
+    fill = Type
+  )
+) + ggplot2::geom_histogram(
+  bins = 100
+)
+```
+
+```{r logSizes3}
+ggplot2::ggplot(
+  sizeTypes %>% dplyr::group_by(
+    ID, Type
+  ) %>% dplyr::summarise(
+    Size = max(Size), .groups = "drop"
+  ),
+  ggplot2::aes(
+    x = log10(Size),
+    fill = Type
+  )
+) + ggplot2::geom_histogram(
+  bins = 100
+)
+```
