@@ -307,7 +307,11 @@ toPostMortem <- function(EVList,
   cheddar::PlotWebByLevel(
     theGc,
     show.level.lines = TRUE,
-    level = "LongWeightedTrophicLevel",
+    # Had been using LongWeighted, but that seems to give the upside down T.
+    # Flow based seems to be more what we are expecting, given the usage of
+    # thresholding and what that shows. The flows here are expected to be
+    # flows of energy through the food web.
+    level = cheddar::FlowBasedTrophicLevel(theGc, weight.by = "effectNormalised"),
       col = theColors,
       pch = theShapes
   )
@@ -336,7 +340,7 @@ toPostMortem <- function(EVList,
     cheddar::PlotWebByLevel(
       theGc2,
       show.level.lines = TRUE,
-      level = "LongWeightedTrophicLevel",
+    level = cheddar::FlowBasedTrophicLevel(theGc2, weight.by = "effectNormalised"),
       col = theColors,
       pch = theShapes
     )
