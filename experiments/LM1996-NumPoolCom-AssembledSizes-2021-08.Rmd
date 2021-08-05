@@ -1,10 +1,9 @@
 ---
 title: "Size Analysis, 2021-08-04"
-output: html_notebook
+output:
+  html_notebook:
+    code_folding: hide
 ---
-
-It occurs to me that I have not looked at the sizes of the species that are present in the final assembled communities as a whole.
-I have previously looked at those who occurred in at least two communities from the same pool, but those should be compared to see if they are reasonably representative of each other.
 
 # Tabs {.tabset}
 
@@ -14,7 +13,10 @@ I have previously looked at those who occurred in at least two communities from 
 packages <- c(
   "dplyr",
   "RMTRCode2",
-  "ggplot2"
+  "ggplot2",
+  "tidyr",
+  "BiodiversityR",
+  "ggrepel"
 )
 for (pkg in packages) {
   library(pkg, character.only = TRUE)
@@ -69,6 +71,24 @@ for (row in 1:nrow(paramFrame)) {
         rep(st[i], length(sp[[i]]))
       }, st = endStates, sp = endSpecies))
   
+  endAbundancesRel <- unlist(lapply(paramRow$EndStateAbundance[[1]][-(1:2)], 
+                                 function(s) {
+                                   temp <- RMTRCode2::CsvRowSplit(s)
+                                   temp / sum(temp)
+                                   }))
+  
+  endAbundances <- unlist(lapply(paramRow$EndStateAbundance[[1]][-(1:2)], 
+                                 RMTRCode2::CsvRowSplit))
+  
+  if (isTRUE(all.equal(NULL, endAbundances))) {
+    # Might work better than is.null?
+    endAbundances <- NA
+  }
+  if (isTRUE(all.equal(NULL, endAbundancesRel))) {
+    # Might work better than is.null?
+    endAbundancesRel <- NA
+  }
+  
   endSpecies <- unlist(endSpecies)
     
   sizeTypes <- rbind(
@@ -77,6 +97,8 @@ for (row in 1:nrow(paramFrame)) {
       ID = paste(paramRow$CombnNum, paramRow$DatasetID),
       Species = endSpecies, # Duplicates!
       State = endStates,
+      Abundance = endAbundances,
+      RelativeAbundance = endAbundancesRel,
       Size = poolRow$Size[endSpecies],
       Type = poolRow$Type[endSpecies],
       stringsAsFactors = FALSE
@@ -86,7 +108,10 @@ for (row in 1:nrow(paramFrame)) {
 sizeTypes <- sizeTypes %>% dplyr::group_by(
   ID, Species, Size, Type
 ) %>% dplyr::summarise(
-  States = list(State), .groups = "drop"
+  States = list(State), 
+  Abundances = list(Abundance),
+  RelativeAbundances = list(RelativeAbundance),
+  .groups = "drop"
 ) %>% dplyr::mutate(
   Source = "Simulation"
 )
@@ -99,7 +124,7 @@ combined <- rbind(
   sizeTypes %>% dplyr::mutate(
     ID = paste(ID, Species)
   ) %>% dplyr::select(
-    -States, -Species,
+    -States, -Species, -Abundances, -RelativeAbundances, 
     ID, Type, Size, Source
   ),
   genericPool %>% dplyr::mutate(
@@ -117,7 +142,7 @@ combined2 <- rbind(
   ) %>% dplyr::mutate(
     ID = paste(ID, Species)
   ) %>% dplyr::select(
-    -States, -Species,
+    -States, -Species, -Abundances, -RelativeAbundances, 
     ID, Type, Size, Source
   ),
   genericPool %>% dplyr::mutate(
@@ -130,7 +155,8 @@ combined2 <- rbind(
 )
 ```
 
-## Sizes
+## Sizes {.tabset}
+### Raw Axis
 ```{r regSizes1}
 ggplot2::ggplot(
   combined,
@@ -144,7 +170,7 @@ ggplot2::ggplot(
   ~ Source, scales = "free_y", nrow = 2
 )
 ```
-
+### Log Axis
 ```{r logSizes1}
 ggplot2::ggplot(
   combined,
@@ -158,7 +184,8 @@ ggplot2::ggplot(
   ~ Source, scales = "free_y", nrow = 2
 )
 ```
-## Amongst pools with at least 2 communities
+## Amongst pools with at least 2 communities {.tabset}
+### Raw Axis
 ```{r regSizes2}
 ggplot2::ggplot(
   combined2,
@@ -172,7 +199,7 @@ ggplot2::ggplot(
   ~ Source, scales = "free_y", nrow = 2
 )
 ```
-
+### Log Axis
 ```{r logSizes2}
 ggplot2::ggplot(
   combined2,
@@ -186,7 +213,8 @@ ggplot2::ggplot(
   ~ Source, scales = "free_y", nrow = 2
 )
 ```
-## Largest Sizes
+## Largest Sizes {.tabset}
+### Raw Axis
 ```{r regSizes3}
 ggplot2::ggplot(
   sizeTypes %>% dplyr::group_by(
@@ -202,7 +230,7 @@ ggplot2::ggplot(
   bins = 100
 )
 ```
-
+### Log Axis
 ```{r logSizes3}
 ggplot2::ggplot(
   sizeTypes %>% dplyr::group_by(
@@ -217,4 +245,324 @@ ggplot2::ggplot(
 ) + ggplot2::geom_histogram(
   bins = 100
 )
+```
+
+## Size Raw Abundance {.tabset}
+### Overall
+```{r sAoverall, warning=FALSE} 
+ggplot2::ggplot(
+  sizeTypes %>% dplyr::mutate(
+    Abundance = unlist(lapply(Abundances, max, na.rm = TRUE))
+  ) %>% dplyr::filter(
+    Abundance > 0
+  ) %>% dplyr::mutate(
+    Rank = rank(-Abundance)
+  ),
+  ggplot2::aes(
+    x = Size,
+    y = Abundance,
+    color = Type,
+    linetype = Type
+  )
+) + ggplot2::geom_line(
+) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+)
+```
+### Dataset
+```{r sAdataset, warning=FALSE} 
+ggplot2::ggplot(
+  sizeTypes %>% dplyr::mutate(
+    Abundance = unlist(lapply(Abundances, max, na.rm = TRUE))
+  ) %>% dplyr::filter(
+    Abundance > 0
+  ) %>% dplyr::group_by(
+    ID
+  ) %>% dplyr::mutate(
+    Rank = rank(-Abundance)
+  ),
+  ggplot2::aes(
+    x = Size,
+    y = Abundance,
+    color = Type,
+    #linetype = Type,
+    group = ID
+  )
+) + ggplot2::geom_line(
+) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+)
+```
+### Community
+```{r sAcommunity, warning=FALSE} 
+ggplot2::ggplot(
+  tidyr::unnest(
+    sizeTypes, cols = c("States", "Abundances")
+  ) %>% dplyr::filter(
+    !is.na(Abundances)
+  ) %>% dplyr::group_by(
+    ID, States
+  ) %>% dplyr::mutate(
+    Rank = rank(-Abundances)
+  ),
+  ggplot2::aes(
+    x = Size,
+    y = Abundances,
+    color = Type,
+    #linetype = Type,
+    group = paste(ID, States)
+  )
+) + ggplot2::geom_line(
+) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+)
+```
+
+## Size Rel. Abundance {.tabset}
+### Overall
+```{r sRA, warning=FALSE} 
+ggplot2::ggplot(
+  sizeTypes %>% dplyr::mutate(
+    RelativeAbundance = unlist(lapply(RelativeAbundances, max, na.rm = TRUE))
+  ) %>% dplyr::filter(
+    RelativeAbundance > 0
+  ) %>% dplyr::mutate(
+    Rank = rank(-RelativeAbundance)
+  ),
+  ggplot2::aes(
+    x = Size,
+    y = RelativeAbundance,
+    color = Type,
+    linetype = Type
+  )
+) + ggplot2::geom_line(
+) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+)
+```
+### Dataset
+```{r sRAdataset, warning=FALSE} 
+ggplot2::ggplot(
+  sizeTypes %>% dplyr::mutate(
+    RelativeAbundance = unlist(lapply(RelativeAbundances, max, na.rm = TRUE))
+  ) %>% dplyr::filter(
+    RelativeAbundance > 0
+  ) %>% dplyr::group_by(
+    ID
+  ) %>% dplyr::mutate(
+    Rank = rank(-RelativeAbundance)
+  ),
+  ggplot2::aes(
+    x = Size,
+    y = RelativeAbundance,
+    color = Type,
+    #linetype = Type,
+    group = ID
+  )
+) + ggplot2::geom_line(
+) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+)
+```
+
+### Community
+```{r sRAcommunity, warning=FALSE} 
+ggplot2::ggplot(
+  tidyr::unnest(
+    sizeTypes, cols = c("States", "RelativeAbundances")
+  ) %>% dplyr::filter(
+    !is.na(RelativeAbundances)
+  ) %>% dplyr::group_by(
+    ID, States
+  ) %>% dplyr::mutate(
+    Rank = rank(-RelativeAbundances)
+  ),
+  ggplot2::aes(
+    x = Size,
+    y = RelativeAbundances,
+    color = Type,
+    #linetype = Type,
+    group = paste(ID, States)
+  )
+) + ggplot2::geom_line(
+) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+)
+```
+
+## Rank Raw Abundance {.tabset}
+### Overall
+```{r rAoverall, warning=FALSE} 
+ggplot2::ggplot(
+  sizeTypes %>% dplyr::mutate(
+    Abundance = unlist(lapply(Abundances, max, na.rm = TRUE))
+  ) %>% dplyr::filter(
+    Abundance > 0
+  ) %>% dplyr::mutate(
+    Rank = rank(-Abundance)
+  ),
+  ggplot2::aes(
+    x = Rank,
+    y = Abundance,
+    color = Type,
+    linetype = Type
+  )
+) + ggplot2::geom_line(
+# ) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+)
+```
+### Dataset
+```{r rAdataset, warning=FALSE} 
+ggplot2::ggplot(
+  sizeTypes %>% dplyr::mutate(
+    Abundance = unlist(lapply(Abundances, max, na.rm = TRUE))
+  ) %>% dplyr::filter(
+    Abundance > 0
+  ) %>% dplyr::group_by(
+    ID
+  ) %>% dplyr::mutate(
+    Rank = rank(-Abundance)
+  ),
+  ggplot2::aes(
+    x = Rank,
+    y = Abundance,
+    color = Type,
+    #linetype = Type,
+    group = ID
+  )
+) + ggplot2::geom_line(
+# ) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+)
+```
+### Community
+```{r rAcommunity, warning=FALSE} 
+ggplot2::ggplot(
+  tidyr::unnest(
+    sizeTypes, cols = c("States", "Abundances")
+  ) %>% dplyr::filter(
+    !is.na(Abundances)
+  ) %>% dplyr::group_by(
+    ID, States
+  ) %>% dplyr::mutate(
+    Rank = rank(-Abundances)
+  ),
+  ggplot2::aes(
+    x = Rank,
+    y = Abundances,
+    color = Type,
+    #linetype = Type,
+    group = paste(ID, States)
+  )
+) + ggplot2::geom_line(
+# ) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+)
+```
+
+## Rank Rel. Abundance {.tabset}
+### Overall
+```{r rRA, warning=FALSE} 
+ggplot2::ggplot(
+  sizeTypes %>% dplyr::mutate(
+    RelativeAbundance = unlist(lapply(RelativeAbundances, max, na.rm = TRUE))
+  ) %>% dplyr::filter(
+    RelativeAbundance > 0
+  ) %>% dplyr::mutate(
+    Rank = rank(-RelativeAbundance)
+  ),
+  ggplot2::aes(
+    x = Rank,
+    y = RelativeAbundance,
+    color = Type,
+    linetype = Type
+  )
+) + ggplot2::geom_line(
+# ) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+)
+```
+### Dataset
+```{r rRAdataset, warning=FALSE} 
+ggplot2::ggplot(
+  sizeTypes %>% dplyr::mutate(
+    RelativeAbundance = unlist(lapply(RelativeAbundances, max, na.rm = TRUE))
+  ) %>% dplyr::filter(
+    RelativeAbundance > 0
+  ) %>% dplyr::group_by(
+    ID
+  ) %>% dplyr::mutate(
+    Rank = rank(-RelativeAbundance)
+  ),
+  ggplot2::aes(
+    x = Rank,
+    y = RelativeAbundance,
+    color = Type,
+    #linetype = Type,
+    group = ID
+  )
+) + ggplot2::geom_line(
+# ) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+)
+```
+
+### Community
+```{r rRAcommunity, warning=FALSE} 
+ggplot2::ggplot(
+  tidyr::unnest(
+    sizeTypes, cols = c("States", "RelativeAbundances")
+  ) %>% dplyr::filter(
+    !is.na(RelativeAbundances)
+  ) %>% dplyr::group_by(
+    ID, States
+  ) %>% dplyr::mutate(
+    Rank = rank(-RelativeAbundances)
+  ),
+  ggplot2::aes(
+    x = Rank,
+    y = RelativeAbundances,
+    color = Type,
+    #linetype = Type,
+    group = paste(ID, States)
+  )
+) + ggplot2::geom_line(
+# ) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+)
+```
+## BiodiversityR Approach {.tabset}
+### Overall
+```{r BiodiversityR, warning=FALSE}
+# Reformat: 
+# Community data frame with sites as rows, species as columns and species abundance as cell values.
+bdR <- tidyr::unnest(
+    sizeTypes, cols = c("States", "Abundances")
+) %>% dplyr::filter(
+    !is.na(Abundances)
+) %>% dplyr::mutate(
+    Species = paste(ID, Species),
+    Site = paste(ID, States, sep = ": ")
+) %>% dplyr::select(
+  -ID, -Size, -Type, -States, -RelativeAbundances, -Source
+) %>% tidyr::pivot_wider(
+  names_from = Species,
+  values_from = Abundances,
+  values_fill = 0
+)
+
+bdRrankabundance <- BiodiversityR::rankabundance(as.data.frame(bdR[, -1]))
+
+# BiodiversityR::rankabunplot(bdRrankabundance, scale = "logabun")
+
+# From documentation
+ggplot(
+  data=as.data.frame(bdRrankabundance), 
+  aes(x = rank, y = abundance)) + 
+    scale_x_continuous(expand=c(0, 1), sec.axis = dup_axis(labels=NULL, name=NULL)) +
+    scale_y_log10(expand=c(0, 1), sec.axis = dup_axis(labels=NULL, name=NULL)) +
+    geom_line(size=1) +
+    geom_point(size=5, alpha=0.7) +
+    labs(x = "rank", y = "abundance")
 ```
