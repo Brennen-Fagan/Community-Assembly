@@ -1,0 +1,945 @@
+---
+title: "Answering Questions; Gather Data, Viking 9:10, 2021-08"
+output:
+  html_notebook:
+    code_folding: hide
+---
+
+```{r libs, message=FALSE}
+# Check requisite packages are installed.
+packages <- c(
+  "plotly", 
+  "dplyr"
+)
+for (pkg in packages) {
+  library(pkg, character.only = TRUE)
+}
+```
+
+# Tabs {.tabset}
+
+## Load
+Pulling code almost directly from `LM1996-NumPoolComScaling-Results-2021-05.Rmd`.
+```{r dirs}
+dirViking <- c(
+  file.path(
+    getwd(), "LCAB_LawMorton1996-NumericalPoolCommunityScaling9"
+  ),
+  file.path(
+    getwd(), "LCAB_LawMorton1996-NumericalPoolCommunityScaling10"
+  )
+)
+dirVikingResults <- file.path(
+  dirViking, c("save-2021-08-03") # Latter not 100% yet.
+)
+resultFormat <- paste0(
+  "run-", 
+  "%d", # Combination Number, or CombnNum.
+  "-", 
+  "%s", # Run Seed.
+  ".RDS"
+)
+```
+
+```{r organiseParams}
+source(
+  file.path(getwd(), 
+            "LawMorton1996-NumericalPoolCommunityScaling-Settings9.R")
+)
+
+paramFrame <- with(list(
+  b = rep(basal, times = length(consumer)),
+  c = rep(consumer, each = length(basal)),
+  s1 = seedsPrep[1:(length(basal) * length(consumer))],
+  s2 = seedsPrep[
+    (length(basal) * length(consumer) + 1):(
+      2 * length(basal) * length(consumer))
+  ],
+  sR = seedsRun
+), {
+  temp <- data.frame(
+    CombnNum = 0,
+    Basals = b,
+    Consumers = c,
+    SeedPool = s1,
+    SeedMat = s2,
+    SeedRuns = "",
+    SeedRunsNum = 0,
+    EndStates = I(rep(list(""), length(b))),
+    EndStatesNum = 0,
+    EndStateSizes = I(rep(list(""), length(b))),
+    EndStateSizesNum = NA,
+    EndStateAssembly = I(rep(list(""), length(b))),
+    EndStateAbundance = I(rep(list(""), length(b))),
+    Dataset = "Viking9",
+    DatasetID = 1,
+    stringsAsFactors = FALSE
+  )
+  for (i in 1:nrow(temp)) {
+    seeds <- sR[((i - 1) * runs + 1) : (i * runs)]
+    temp$SeedRuns[i] <- toString(seeds) # CSV
+    temp$SeedRunsNum[i] <- length(seeds)
+  }
+  temp$CombnNum <- 1:nrow(temp)
+  temp
+})
+```
+
+```{r loadResults}
+# Note: n + 2 end states. Failure to finish, failure to obtain state, and state.
+for (i in 1:nrow(paramFrame)) {
+  resultsList <- list(
+    "No Run" = 0,
+    "No State" = 0
+  )
+  resultsSize <- list(
+    "0" = 0
+  )
+  resultsAssembly <- list(
+    "No Run" = data.frame(),
+    "No State" = data.frame()
+  )
+  resultsAbund <- list(
+    "No Run" = "",
+    "No State" = ""
+  )
+  seeds <- unlist(strsplit(paramFrame$SeedRuns[i], ', '))
+  for (seed in seeds) {
+    fileName <- file.path(
+      dirVikingResults[paramFrame$DatasetID[i]],
+      sprintf(resultFormat, paramFrame$CombnNum[i], seed)
+    )
+    
+    if (file.exists(fileName)) {
+      temp <- load(fileName)
+      temp <- eval(parse(text = temp)) # Get objects.
+      
+      if (is.list(temp) && "Result" %in% names(temp)) {
+        
+        if (is.data.frame(temp$Result))
+          community <- temp$Result$Community[[nrow(temp$Result)]]
+        else 
+          community <- temp$Result
+        
+        size <- toString(length(community))
+        
+        if (community[1] != "") 
+          abund <- toString(temp$Abund[community + 1])
+        else 
+          abund <- ""
+        
+        community <- toString(community)
+        
+        if (community == "") {
+          resultsList$`No State` <- resultsList$`No State` + 1
+          resultsSize$`0` <- resultsSize$`0` + 1
+          
+        } else if (community %in% names(resultsList)) {
+          resultsList[[community]] <- resultsList[[community]] + 1
+          resultsSize[[size]] <- resultsSize[[size]] + 1
+          
+        } else {
+          resultsList[[community]] <- 1
+          resultsAssembly[[community]] <- temp
+          resultsAbund[[community]] <- abund
+          
+          if (size %in% resultsSize) {
+            resultsSize[[size]] <- resultsSize[[size]] + 1
+          } else {
+            resultsSize[[size]] <- 1
+          }
+        }
+      } else {
+        resultsList$`No State` <- resultsList$`No State` + 1
+        resultsSize$`0` <- resultsSize$`0` + 1
+      }
+    } else {
+      resultsList$`No Run` <- resultsList$`No Run` + 1
+      resultsSize$`0` <- resultsSize$`0` + 1
+    }
+  }
+  
+  paramFrame$EndStates[[i]] <- resultsList
+  paramFrame$EndStatesNum[i] <- length(resultsList) - 2 # ! No State, No Run
+  paramFrame$EndStateSizes[[i]] <- resultsSize
+  paramFrame$EndStateSizesNum[i] <- length(resultsSize) - 1 # ! 0
+  paramFrame$EndStateAssembly[[i]] <- resultsAssembly
+  paramFrame$EndStateAbundance[[i]] <- resultsAbund
+}
+```
+
+```{r organiseParams2}
+source(
+  file.path(getwd(), 
+            "LawMorton1996-NumericalPoolCommunityScaling-Settings10.R")
+)
+
+oldNrow <- nrow(paramFrame)
+
+paramFrame <- rbind(paramFrame, with(list(
+  b = rep(basal, times = length(consumer)),
+  c = rep(consumer, each = length(basal)),
+  s1 = seedsPrep[1:(length(basal) * length(consumer))],
+  s2 = seedsPrep[
+    (length(basal) * length(consumer) + 1):(
+      2 * length(basal) * length(consumer))
+  ],
+  sR = seedsRun
+), {
+  temp <- data.frame(
+    CombnNum = 0,
+    Basals = b,
+    Consumers = c,
+    SeedPool = s1,
+    SeedMat = s2,
+    SeedRuns = "",
+    SeedRunsNum = 0,
+    EndStates = I(rep(list(""), length(b))),
+    EndStatesNum = 0,
+    EndStateSizes = I(rep(list(""), length(b))),
+    EndStateSizesNum = NA,
+    EndStateAssembly = I(rep(list(""), length(b))),
+    EndStateAbundance = I(rep(list(""), length(b))),
+    Dataset = "Viking10",
+    DatasetID = 2,
+    stringsAsFactors = FALSE
+  )
+  for (i in 1:nrow(temp)) {
+    seeds <- sR[((i - 1) * runs + 1) : (i * runs)]
+    temp$SeedRuns[i] <- toString(seeds) # CSV
+    temp$SeedRunsNum[i] <- length(seeds)
+  }
+  temp$CombnNum <- 1:nrow(temp)
+  temp
+})
+)
+```
+
+```{r loadResults2}
+# Note: n + 2 end states. Failure to finish, failure to obtain state, and state.
+# Modified from above, but with the abundance recorded.
+for (i in (oldNrow + 1):nrow(paramFrame)) {
+  resultsList <- list(
+    "No Run" = 0,
+    "No State" = 0
+  )
+  resultsSize <- list(
+    "0" = 0
+  )
+  resultsAssembly <- list(
+    "No Run" = data.frame(),
+    "No State" = data.frame()
+  )
+  resultsAbund <- list(
+    "No Run" = "",
+    "No State" = ""
+  )
+  seeds <- unlist(strsplit(paramFrame$SeedRuns[i], ', '))
+  for (seed in seeds) {
+    fileName <- file.path(
+      dirVikingResults[paramFrame$DatasetID[i]],
+      sprintf(resultFormat, paramFrame$CombnNum[i], seed)
+    )
+    
+    if (file.exists(fileName)) {
+      temp <- load(fileName)
+      temp <- eval(parse(text = temp)) # Get objects.
+      
+      if (is.list(temp) && "Result" %in% names(temp)) {
+        
+        if (is.data.frame(temp$Result))
+          community <- temp$Result$Community[[nrow(temp$Result)]]
+        else 
+          community <- temp$Result
+        
+        size <- toString(length(community))
+        
+        if (community[1] != "") 
+          abund <- toString(temp$Abund[community + 1])
+        else 
+          abund <- ""
+        
+        community <- toString(community)
+        
+        if (community == "") {
+          resultsList$`No State` <- resultsList$`No State` + 1
+          resultsSize$`0` <- resultsSize$`0` + 1
+          
+        } else if (community %in% names(resultsList)) {
+          resultsList[[community]] <- resultsList[[community]] + 1
+          resultsSize[[size]] <- resultsSize[[size]] + 1
+          
+        } else {
+          resultsList[[community]] <- 1
+          resultsAssembly[[community]] <- temp
+          resultsAbund[[community]] <- abund
+          
+          if (size %in% resultsSize) {
+            resultsSize[[size]] <- resultsSize[[size]] + 1
+          } else {
+            resultsSize[[size]] <- 1
+          }
+        }
+      } else {
+        resultsList$`No State` <- resultsList$`No State` + 1
+        resultsSize$`0` <- resultsSize$`0` + 1
+      }
+    } else {
+      resultsList$`No Run` <- resultsList$`No Run` + 1
+      resultsSize$`0` <- resultsSize$`0` + 1
+    }
+  }
+  
+  paramFrame$EndStates[[i]] <- resultsList
+  paramFrame$EndStatesNum[i] <- length(resultsList) - 2 # ! No State, No Run
+  paramFrame$EndStateSizes[[i]] <- resultsSize
+  paramFrame$EndStateSizesNum[i] <- length(resultsSize) - 1 # ! 0
+  paramFrame$EndStateAssembly[[i]] <- resultsAssembly
+  paramFrame$EndStateAbundance[[i]] <- resultsAbund
+}
+```
+
+### Plot Preparation
+
+```{r plot3D}
+# X, Y, Basal and Consumer.
+# Z = Sizes of the Endstates.
+
+plotScalingData <- data.frame(
+  CombnNum = rep(paramFrame$CombnNum, paramFrame$EndStatesNum),
+  Basals = rep(paramFrame$Basals, paramFrame$EndStatesNum),
+  Consumers = rep(paramFrame$Consumers, paramFrame$EndStatesNum),
+  Dataset = rep(paramFrame$Dataset, paramFrame$EndStatesNum),
+  DatasetID = rep(paramFrame$DatasetID, paramFrame$EndStatesNum)
+)
+
+# Communities
+comms <- unlist(lapply(paramFrame$EndStates, names))
+freqs <- unlist(paramFrame$EndStates)
+asmbl <- unlist(paramFrame$EndStateAssembly, recursive = FALSE)
+asmbl <- asmbl[comms != "No Run" & comms != "No State"]
+freqs <- freqs[comms != "No Run" & comms != "No State"]
+comms <- comms[comms != "No Run" & comms != "No State"]
+
+asmbl <- lapply(asmbl, function(d) {
+  if (is.null(d)) return(NA)
+  if ("Result.Outcome" %in% names(d))
+    d %>% dplyr::filter(Result.Outcome != "Type 1 (Failure)" & 
+                          Result.Outcome != "Present")
+  else
+    d$Result %>% dplyr::filter(Outcome != "Type 1 (Failure)" & 
+                                 Outcome != "Present")
+})
+
+plotScalingData$Communities <- comms
+plotScalingData$CommunityFreq <- freqs
+plotScalingData$CommunitySeq <- asmbl
+
+# Community Size
+temp <- unlist(lapply(strsplit(plotScalingData$Communities, ','), length))
+plotScalingData$CommunitySize <- temp
+
+candidateData <- plotScalingData %>% dplyr::group_by(
+  CombnNum, Dataset
+) %>% dplyr::mutate(
+  OtherSteadyStates = dplyr::n() - 1
+)
+```
+
+### Pools and Matrices
+```{r}
+mats <- list()
+poolsall <- list() # name pools used in save data; be careful!
+
+for (i in 1:length(dirViking)) {
+  temp <- load(file.path(
+    dirViking[i], 
+    paste0("LawMorton1996-NumericalPoolCommunityScaling-PoolMats", 
+           c(9, 10)[i], 
+           ".RDS")
+  ))
+  mats[[i]] <- eval(parse(text = temp[1]))
+  poolsall[[i]] <- eval(parse(text = temp[2]))
+}
+pools <- poolsall
+```
+
+### Abundances
+```{r loadAbundances}
+# First, check if it is in the paramFrame.
+# Second, check if it is in the saved data from the previous.
+# Otherwise, ignore it, we'll figure out what it is and why it is missing later.
+
+candidateData$CommunityAbund <- ""
+
+for (r in 1:nrow(candidateData)) {
+  # ID 1:4 are used to identify paramFrame, 5 used to identify abundance
+  ID <- candidateData[r, 1:6]
+  paramFrameRow <- paramFrame %>% dplyr::filter(
+    CombnNum == ID$CombnNum,
+    Basals == ID$Basals,
+    Consumers == ID$Consumers,
+    Dataset == ID$Dataset
+  )
+  
+  if (is.list(paramFrameRow$EndStateAbundance[[1]])) {
+    entry <- which(ID$Communities == names(paramFrameRow$EndStateAbundance[[1]]))
+    if (length(entry)) {
+      candidateData$CommunityAbund[r] <- paramFrameRow$EndStateAbundance[[1]][[entry]]
+      next()
+    }
+  }
+}
+```
+
+```{r filterNoAbund}
+print(paste("Failures:", 
+            sum(candidateData$CommunityAbund %in% 
+                  c("", "Failure", "EstimatedFailure"))))
+candidateData <- candidateData %>% dplyr::filter(CommunityAbund != "",
+                                                 CommunityAbund != "Failure",
+                                                 CommunityAbund != "EstimateFailure")
+```
+
+```{r computeProductivity}
+candidateData$CommunityProd <- NA
+for (r in 1:nrow(candidateData)) {
+  candidateData$CommunityProd[r] <- with(
+    candidateData[r, ], 
+    RMTRCode2::Productivity(
+      Pool = pools[[DatasetID]][[CombnNum]], 
+      InteractionMatrix = mats[[DatasetID]][[CombnNum]], 
+      Community = Communities, 
+      Populations = CommunityAbund
+    )
+  )
+}
+```
+
+```{r filterNumericallyUnstable}
+print(paste("Numerically Unstable:", 
+            sum(candidateData$CommunityProd > 10^10 
+                  )))
+candidateData <- candidateData %>% dplyr::filter(CommunityProd < 10^10)
+```
+
+## Communities
+```{r whatremains, out.width="100%"}
+# For usage by the reader.
+
+plotScaling <- plotly::plot_ly(
+  candidateData,
+  x = ~Basals,
+  y = ~Consumers,
+  z = ~CommunitySize,
+  color = ~Dataset,
+  colors = c("red", "blue", "black")
+)
+
+plotScaling <- plotly::add_markers(plotScaling)
+
+plotScaling <- plotly::layout(
+  plotScaling,
+  scene = list(
+    xaxis = list(type = "log"),
+    yaxis = list(type = "log"),
+    camera = list(
+      eye = list(
+        x = -1.25, y = -1.25, z = .05
+      )
+    )
+  )
+)
+
+plotScaling
+```
+
+## Communities Data
+```{r}
+candidateData
+```
+
+## Foodwebs, Prep
+```{r createGraphs}
+foodWebs <- list()
+
+for (r in 1:nrow(candidateData)) {
+  foodWebs[[r]] <- with(
+    candidateData[r, ],
+    {
+      redCom <- RMTRCode2::CsvRowSplit(Communities)
+      redMat <- mats[[DatasetID]][[CombnNum]][redCom, redCom]
+      redPool <- pools[[DatasetID]][[CombnNum]][redCom, ]
+      
+      colnames(redMat) <- paste0('s',as.character(redCom))
+      rownames(redMat) <- colnames(redMat)
+      
+      names(redPool)[1] <- "node"
+      redPool$node <- colnames(redMat)
+      names(redPool)[3] <- "M"
+      
+      Graph <- igraph::graph_from_adjacency_matrix(
+        redMat, weighted = TRUE
+      )
+      
+      Graph <- igraph::set.vertex.attribute(
+        Graph, "name", value = colnames(redMat)
+      )
+      
+      redPool$N <- RMTRCode2::CsvRowSplit(CommunityAbund)
+      
+      # For later analysis, take the matrix diagonal.
+      
+      redPool$Intraspecific <- diag(redMat)
+      
+      GraphAsDataFrame <- igraph::as_data_frame(Graph)
+  
+      # Add in abundances for calculating abundance * (gain or loss)
+      GraphAsDataFrame <- dplyr::left_join(
+        GraphAsDataFrame,
+        dplyr::select(redPool, node, N),
+        by = c("to" = "node")
+      )
+  
+      # Split data frame.
+      ResCon <- GraphAsDataFrame[GraphAsDataFrame$weight > 0,]
+      ConRes <- GraphAsDataFrame[GraphAsDataFrame$weight < 0,]
+      
+      # Reorder and rename variables.
+      ResCon <- dplyr::select(ResCon, 
+                                 to, from, # resource = to, consumer = from, 
+                                 effectPerUnit = weight, resourceAbund = N)
+      ConRes <- dplyr::select(ConRes, 
+                                 to, from, # resource = from, consumer = to, 
+                                 effectPerUnit = weight, consumerAbund = N)
+      ResCon <- dplyr::mutate(dplyr::group_by(ResCon, from),
+                              effectActual = effectPerUnit * resourceAbund,
+                              Type = "Exploit+")
+      ConRes <- dplyr::mutate(dplyr::group_by(ConRes, from),
+                              effectActual = effectPerUnit * consumerAbund,
+                              Type = ifelse(from == to,
+                                            "SelfReg-",
+                                            "Exploit-"))
+      
+      IntriG <- with(redPool, data.frame(
+                              from = node, #resource = node,
+                              to = node, #consumer = node,
+                              effectPerUnit = ifelse(ReproductionRate > 0,
+                                                   ReproductionRate, 0),
+                              effectActual = ifelse(ReproductionRate > 0,
+                                                  N * ReproductionRate, 0),
+                              Type = "Intrisc+")) 
+      IntriL <- with(redPool, data.frame(
+                              from = node, #resource = node,
+                              to = node, #consumer = node,
+                              effectPerUnit = ifelse(ReproductionRate < 0,
+                                                   ReproductionRate, 0),
+                              effectActual = ifelse(ReproductionRate < 0,
+                                                  N * ReproductionRate, 0),
+                              Type = "Intrisc-"))
+      
+      EdgeDataFrame <- dplyr::bind_rows(
+        dplyr::select(ResCon, -resourceAbund), 
+        dplyr::select(ConRes, -consumerAbund),
+        IntriG, IntriL
+      )
+      
+      EdgeDataFrame <- EdgeDataFrame %>% dplyr::rename(
+        # Empirically speaking, to and from appear reversed.
+        # A consumer (from) should have a negative effect on resource (to),
+        # but the organisation so far marks it as positive. We fix this.
+        tempname = to,
+        to = from
+      ) %>% dplyr::rename(
+        from = tempname
+      ) %>% dplyr::filter(
+        # Remove placeholder entries
+        effectPerUnit != 0
+      ) %>% dplyr::mutate(
+        # Useful to keep effects separate
+        effectSign = sign(effectPerUnit)
+      ) %>% group_by(
+        to, effectSign
+      ) %>% dplyr::mutate(
+        # Perform the post mortem of the most influential from's
+        effectEfficiency = effectPerUnit / sum(effectPerUnit), 
+        effectNormalised = effectActual / sum(effectActual)
+      ) %>% dplyr::arrange(to)
+      
+      list(
+        Edges = EdgeDataFrame,
+        Vertices = redPool
+      )
+    }
+  )
+}
+```
+
+```{r functions}
+toCheddar <- function(EVList, name = "") {# Edges Vertices List
+  links <- EVList$Edges
+
+  # cheddar does not like "cannibalism".
+  links <- links[
+    links$to != links$from,
+  ]
+
+  # "[C]olumns called ‘resource’ and ‘consumer’ must be given."
+  links <- dplyr::bind_rows(
+    links %>% dplyr::filter(effectSign == 1) %>% dplyr::rename(
+      resource = from, consumer = to),
+    links %>% dplyr::filter(effectSign == -1) %>% dplyr::rename(
+      resource = to, consumer = from),
+  ) %>% dplyr::select(-Type) # Cheddar confuses node Type and edge Type.
+
+  cheddar::Community(
+    nodes = EVList$Vertices,
+    properties = list(
+      title = name,
+      M.units = "masses",
+      N.units = "abund"
+    ),
+    trophic.links = links
+  )
+}
+
+toIGraph <- function(EVList, sign = 0) {
+  igraph::graph_from_data_frame(
+    d = if(sign == 0) {
+      EVList$Edges
+    } else {
+      EVList$Edges[EVList$Edges$effectSign == sign, ]
+    },
+    directed = TRUE,
+    vertices = EVList$Vertices
+  )
+}
+
+
+toPostMortem <- function(EVList,
+                         threshold = 0, # sets to minimal size edges below
+                         nodeSize = c("None", "Abundance", "Size"),
+                         edgeScale = 10,
+                         reducedTrophic = TRUE) {
+  if (tolower(threshold) == "adaptive") {
+    threshold = EVList$Edges %>% group_by(
+      to, effectSign
+    ) %>% summarise(
+      max = max(effectNormalised), .groups = "drop"
+    ) %>% ungroup %>% pull(max) %>% min
+  }
+
+  theGc <- toCheddar(EVList, name = "Trophic Levels")
+  theGi <- toIGraph(EVList)
+
+  theGiGain <- toIGraph(EVList, sign = 1)
+  theGiLoss <- toIGraph(EVList, sign = -1)
+
+  theLayout <- igraph::layout.circle(theGi)
+
+  theSize <- match.arg(nodeSize, c("Abundance", "Size", "None"))
+  if (theSize == "Abundance")
+    theVs <- sqrt(igraph::vertex_attr(theGi)$N) * 10
+  else if (theSize == "Size") {
+    theVs <- igraph::vertex_attr(theGi)$M
+    theVs <- sqrt(theVs / min(theVs)) * 10
+  } else if (theSize == "None") {
+    theVs <- 15
+  }
+
+  theColors <- ifelse(
+    igraph::vertex_attr(theGi)$Type == "Basal", "skyblue", "red"
+  )
+  if ("Core" %in% names(igraph::vertex_attr(theGi))) {
+    theShapes <- ifelse(igraph::vertex_attr(theGi)$Core,
+                        0,
+                        1)
+  } else {
+    theShapes <- 1 
+    # Note Igraph uses "circle" then "rectangle",
+    # but R and cheddar use "rectangle" then "circle", so we will use a !.
+  }
+
+  theBoth <- igraph::edge_attr(theGi)$effectNormalised
+  theGain <- igraph::edge_attr(theGiGain)$effectNormalised
+  theLoss <- igraph::edge_attr(theGiLoss)$effectNormalised
+
+  theBoth[theBoth < threshold] <- 0
+  theGain[theGain < threshold] <- 0
+  theLoss[theLoss < threshold] <- 0
+
+  # Inform the graphs of which edges are not needed.
+  theGi <- igraph::delete_edges(theGi, which(theBoth == 0))
+  theGiGain <- igraph::delete_edges(theGiGain, which(theGain == 0))
+  theGiLoss <- igraph::delete_edges(theGiLoss, which(theLoss == 0))
+
+  # Remove the same entries so that lengths match.
+  theGain <- theGain[theGain > 0]
+  theLoss <- theLoss[theLoss > 0]
+
+  theGain <- theGain * edgeScale
+  theLoss <- theLoss * edgeScale
+
+  parold <- par(no.readonly = TRUE)
+  par(mfrow = c(2, 2), # Two Rows, Two Columns
+      mar = c(0, 1.5, 1, 0), # Margins, bottom, left, top, right
+      oma = c(0.1, 0.1, 0.1, 0.1) # Outer margins.
+  )
+
+  cheddar::PlotWebByLevel(
+    theGc,
+    show.level.lines = TRUE,
+    # Had been using LongWeighted, but that seems to give the upside down T.
+    # Flow based seems to be more what we are expecting, given the usage of
+    # thresholding and what that shows. The flows here are expected to be
+    # flows of energy through the food web.
+    level = cheddar::FlowBasedTrophicLevel(theGc, weight.by = "effectNormalised"),
+      col = theColors,
+      pch = theShapes
+  )
+
+  if (!reducedTrophic) {
+    plot(
+      theGi,
+      layout = theLayout,
+      vertex.size = theVs,
+      edge.width = 1,
+      edge.arrow.size = 0.3,
+      edge.arrow.width = 1,
+      vertex.color = theColors,
+      vertex.shape = igraph::shapes()[as.numeric(!theShapes) + 1],
+      edge.lty = 2,
+      edge.color = "grey",
+      edge.arrow.mode = ">",
+      main = "Consumption"
+    )
+  } else {
+    EVListRed <- EVList
+    EVListRed$Edges <- EVListRed$Edges %>% dplyr::filter(
+      effectNormalised >= threshold
+    )
+    theGc2 <- toCheddar(EVListRed, name = "Strongest Trophic Levels")
+    cheddar::PlotWebByLevel(
+      theGc2,
+      show.level.lines = TRUE,
+    level = cheddar::FlowBasedTrophicLevel(theGc2, weight.by = "effectNormalised"),
+      col = theColors,
+      pch = theShapes
+    )
+  }
+
+  plot(
+    theGiGain,
+    layout = theLayout,
+    vertex.size = theVs,
+    edge.width = theGain,
+    edge.arrow.size = 0.3,
+    edge.arrow.width = 1,
+    vertex.color = theColors,
+      vertex.shape = igraph::shapes()[as.numeric(!theShapes) + 1],
+    edge.lty = 2,
+    edge.color = "blue",
+    edge.arrow.mode = ">",
+    main = "Consumer's Gains"
+  )
+
+  plot(
+    theGiLoss,
+    layout = theLayout,
+    vertex.size = theVs,
+    edge.width = theLoss,
+    edge.arrow.size = 0.3,
+    edge.arrow.width = 2,
+    vertex.color = theColors,
+      vertex.shape = igraph::shapes()[as.numeric(!theShapes) + 1],
+    edge.lty = 3,
+    edge.color = "darkred",
+    edge.arrow.mode = "<",
+    main = "Resource's Losses"
+  )
+  
+  par(parold)
+  
+  EVList$Edges %>% dplyr::ungroup() %>% dplyr::filter(
+    effectNormalised >= threshold
+  ) %>% dplyr::select(
+    -effectSign
+  ) %>% dplyr::arrange(
+    to, -effectNormalised
+  )
+}
+
+```
+
+
+## Foodwebs, Overlapping {.tabset}
+### 1
+```{r gallery1}
+i <- 1
+toPostMortem(foodWebs[[i]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### 2
+```{r gallery2}
+i <- 2
+toPostMortem(foodWebs[[i]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### 3
+```{r gallery3}
+i <- 3
+toPostMortem(foodWebs[[i]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### 4
+```{r gallery4}
+i <- 4
+toPostMortem(foodWebs[[i]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### 5
+```{r gallery5}
+i <- 5
+toPostMortem(foodWebs[[i]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### 6
+```{r gallery6}
+i <- 6
+toPostMortem(foodWebs[[i]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### 7
+```{r gallery7}
+i <- 7
+toPostMortem(foodWebs[[i]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### 8
+```{r gallery8}
+i <- 8
+toPostMortem(foodWebs[[i]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+## Foodwebs, Larger Food Preference {.tabset}
+### 9
+```{r gallery9}
+i <- 9
+toPostMortem(foodWebs[[i]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### 10
+```{r gallery10}
+i <- 10
+toPostMortem(foodWebs[[i]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### 11
+```{r gallery11}
+i <- 11
+toPostMortem(foodWebs[[i]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### 12
+```{r gallery12}
+i <- 12
+toPostMortem(foodWebs[[i]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### 13
+```{r gallery13}
+i <- 13
+toPostMortem(foodWebs[[i]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### 14
+```{r gallery14}
+i <- 14
+toPostMortem(foodWebs[[i]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### 15
+```{r gallery15}
+i <- 15
+toPostMortem(foodWebs[[i]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### 16
+```{r gallery16}
+i <- 16
+toPostMortem(foodWebs[[i]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### 17
+```{r gallery17}
+i <- 17
+toPostMortem(foodWebs[[i]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### 18
+```{r gallery18}
+i <- 18
+toPostMortem(foodWebs[[i]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### 19
+```{r gallery19}
+i <- 19
+toPostMortem(foodWebs[[i]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
