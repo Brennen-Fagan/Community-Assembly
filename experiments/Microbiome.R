@@ -348,6 +348,17 @@ Microbiome_NumericalAssembly <- function(
                    "Steadystate", "Uninvadable"),
 
   CheckInvadability = FALSE, # Setting this to TRUE forbids species rescue.
+  # Note: There is a serious difference between
+  # Microbiome_NumericalAssembly(
+  #   seed = 1, Verbose = TRUE, ArrivalEvents = 240, IntegratorTimeStep = 10,
+  #   InnerTimeStepSize = 1, CheckInvadability = TRUE)
+  # and
+  # Microbiome_NumericalAssembly(
+  #   seed = 1, Verbose = TRUE, ArrivalEvents = 240, IntegratorTimeStep = 10,
+  #   InnerTimeStepSize = 1, CheckInvadability = FALSE)
+  # Despite only checking cases where uninvadability should be the result!
+  # The "problem" appears to be a result of the time taken for an invader to
+  # actually reach an elimination threshold, during which rescue can occur.
   ...
 ) {
 
@@ -444,16 +455,6 @@ Microbiome_NumericalAssembly <- function(
       SpeciesPresent[length(SpeciesPresent) + 1] <- ID
     }
 
-    #TODO There is a serious difference between
-    # Microbiome_NumericalAssembly(
-    #   seed = 1, Verbose = TRUE, ArrivalEvents = 240, IntegratorTimeStep = 10,
-    #   InnerTimeStepSize = 1, CheckInvadability = TRUE)
-    # and
-    # Microbiome_NumericalAssembly(
-    #   seed = 1, Verbose = TRUE, ArrivalEvents = 240, IntegratorTimeStep = 10,
-    #   InnerTimeStepSize = 1, CheckInvadability = FALSE)
-    # Despite only checking cases where uninvadability should be the result!
-    # After that is resolved...
     #TODO Make sure the Microbiome_DynamicsNormalisedCapacity case is handled.
     if (CheckInvadability) {
       # Check Invadability
