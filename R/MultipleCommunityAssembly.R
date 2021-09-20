@@ -5,7 +5,7 @@ ExtinctFUN_Example <- ArrivalFUN_Example
 
 MultipleNumericalAssembly <- function(
   Pool, # Required from outside function.
-  Environments, # Number of environments
+  NumEnvironments, # Number of environments
   ComputeInteractionMatrix, # Required outside function.
 
   Dynamics, # The dynamical system governing the ecosystem interactions.
@@ -28,8 +28,10 @@ MultipleNumericalAssembly <- function(
   Verbose = FALSE,
   ... # Arguments to pass through to ComputeInteractionMatrix or for Spatials.
 
-  # Total run length is determined by the last arrival/extinction event + a
-  # characteristic time length.
+  # Total run length is determined by the last arrival/extinction event +
+  # 3 characteristic time lengths. We use three since exp(-3) < 0.05.
+  # > 1/exp(3)
+  # [1] 0.04978707
 ) {
 
   # System Setup: ##############################################################
@@ -38,15 +40,15 @@ MultipleNumericalAssembly <- function(
 
   ### Generate EnvironmentSeeds if either NULL nor of correct length. ##########
   if (!is.null(EnvironmentSeeds)) {
-    EnvironmentSeeds <- 1E8 * runif(Environments)
+    EnvironmentSeeds <- 1E8 * runif(NumEnvironments)
   }
 
-  if (length(EnvironmentSeeds) != Environments) {
+  if (length(EnvironmentSeeds) != NumEnvironments) {
     if (exists(".Random.seed")) {
       oldSeed <- .Random.seed
     }
     set.seed(EnvironmentSeeds)
-    EnvironmentSeeds <- 1E8 * runif(Environments)
+    EnvironmentSeeds <- 1E8 * runif(NumEnvironments)
     if (exists("oldSeed")) {
       set.seed(oldSeed)
     }
@@ -54,7 +56,7 @@ MultipleNumericalAssembly <- function(
 
   ### Generate InteractionMatrices for each Environment. #######################
   InteractionMatrices <- lapply(
-    1:Environments,
+    1:NumEnvironments,
     function(i, seed, pool, ...) {
       if (!is.null(seed[i])) {
         if (exists(".Random.seed"))
@@ -76,6 +78,10 @@ MultipleNumericalAssembly <- function(
   )
 
   ### Setup the History, i.e. arrival and extinction events. ###################
+  if (is.null(HistorySeed)) {
+    HistorySeed <- 1E8 * runif(1)
+  }
+
   if (!is.null(HistorySeed)) {
     if (exists(".Random.seed")) {
       oldSeed <- .Random.seed
@@ -110,11 +116,12 @@ MultipleNumericalAssembly <- function(
                                size = ArrivalEvents + ExtinctEvents,
                                replace = TRUE),
       Type = c(rep("Arrival", ArrivalEvents),
-               rep("Extinct", ExtinctEvents))
+               rep("Extinct", ExtinctEvents)),
+      Invadable = NA
     )
 
     # Place in temporal order.
-    Events <- Events[order(Times), ]
+    Events <- with(Events, Events[order(Times), ])
 
     if (exists("oldSeed")) {
       set.seed(oldSeed)
@@ -128,12 +135,12 @@ MultipleNumericalAssembly <- function(
   # then we possibly have environments that are multiple units long that connect
   # with each other.
 
-  SpatialArrangement <- match.args(
-    toLower(SpatialArrangement),
-    toLower(c("none", "assembly", "dispersal", "diffusion"))
+  SpatialArrangement <- match.arg(
+    tolower(SpatialArrangement),
+    tolower(c("none", "assembly", "dispersal", "diffusion"))
   )
 
-  ### Event and Root setup: ####################################################
+  ### Event and Root Set Up: ###################################################
   # Note that this is contingent on space. When in diffusion, need to consider
   # the grid size as well as remove it from all appropriate grid cells.
   # We might be able to add a property to the grid that tells us which
@@ -146,6 +153,9 @@ MultipleNumericalAssembly <- function(
   # is diffusing insufficiently to pass the threshold in "one go".
   # The problem comes in that this might block all non-assembly species movement
   # so we need to check to see what happens.
+
+  # NOTE: The function in deEvents probably should be converted to a closure.
+  # Let's getting a working model up first though.
   deRootFun <- function (t, y, pars) {
     return(y - EliminationThreshold)
   }
@@ -153,7 +163,10 @@ MultipleNumericalAssembly <- function(
     root = TRUE,
     func = if (SpatialArrangement == "diffusion") {
 
-    } else {function(t, y, parms, Events = Events) {
+    } else {function(t, y, parms,
+                     Events = Events,
+                     Environments = InteractionMatrices,
+                     Pool = Pool) {
       y <- ifelse(y <= EliminationThreshold, 0, y)
       event <- which(t == Events$Times)
       if (length(event)) {
@@ -162,7 +175,24 @@ MultipleNumericalAssembly <- function(
         if (Events$Type[event] == "Extinct") {
           y[abundanceIndex] <- 0
         } else if (Events$Type[event] == "Arrival") {
-          y[abundanceIndex] <- y[abundanceIndex] + ArrivalDensity
+          # Check if Uninvadable
+          # <=> per capita growth rate > 0
+          # <=> lim (epsilon -> 0) Dynamics(y + epsilon) > 0
+          if (
+            # Pool$ReproductionRate[Events$Species[event]] +
+            # Environments[[Events$Environment[event]]] %*% y[
+            #   (Events$Environment[event] - 1) * Species + 1:Species
+            # ] > 0
+            y[abundanceIndex] > 0 ||
+            Dynamics(y + c(rep(0, abundanceIndex - 1),
+                           .Machine$double.eps,
+                           rep(0, length(y) - abundanceIndex)))[abundanceIndex]
+          ) {
+            y[abundanceIndex] <- y[abundanceIndex] + ArrivalDensity
+            Events$Invadable[event] <<- TRUE
+          } else {
+            Events$Invadable[event] <<- FALSE
+          }
         }
       }
       return(y)
@@ -171,6 +201,7 @@ MultipleNumericalAssembly <- function(
     maxroot = 10000
   )
 
+  abundance <-
 }
 
 
