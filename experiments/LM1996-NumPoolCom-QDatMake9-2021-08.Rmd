@@ -121,6 +121,10 @@ for (i in 1:nrow(paramFrame)) {
         else 
           community <- temp$Result
         
+        if (length(community) > 100) {
+          print(paste(i, length(community), seed))
+        }
+        
         size <- toString(length(community))
         
         if (community[1] != "") 
@@ -251,6 +255,10 @@ for (i in (oldNrow + 1):nrow(paramFrame)) {
           community <- temp$Result$Community[[nrow(temp$Result)]]
         else 
           community <- temp$Result
+        
+        if (length(community) > 100) {
+          print(paste(i, length(community), seed))
+        }
         
         size <- toString(length(community))
         

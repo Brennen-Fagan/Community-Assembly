@@ -463,7 +463,7 @@ ggplot2::ggplot(
 
 ## Rank Rel. Abundance {.tabset}
 ### Overall
-```{r rRA, warning=FALSE} 
+```{r RrA, warning=FALSE} 
 ggplot2::ggplot(
   sizeTypes %>% dplyr::mutate(
     RelativeAbundance = unlist(lapply(RelativeAbundances, max, na.rm = TRUE))
@@ -484,7 +484,7 @@ ggplot2::ggplot(
 )
 ```
 ### Dataset
-```{r rRAdataset, warning=FALSE} 
+```{r RrAdataset, warning=FALSE} 
 ggplot2::ggplot(
   sizeTypes %>% dplyr::mutate(
     RelativeAbundance = unlist(lapply(RelativeAbundances, max, na.rm = TRUE))
@@ -509,7 +509,7 @@ ggplot2::ggplot(
 ```
 
 ### Community
-```{r rRAcommunity, warning=FALSE} 
+```{r RrAcommunity, warning=FALSE} 
 ggplot2::ggplot(
   tidyr::unnest(
     sizeTypes, cols = c("States", "RelativeAbundances")
@@ -533,6 +533,158 @@ ggplot2::ggplot(
 )
 ```
 ## BiodiversityR Approach {.tabset}
+
+## Rel. Rank Raw Abundance {.tabset}
+### Overall
+```{r rRAoverall, warning=FALSE} 
+ggplot2::ggplot(
+  sizeTypes %>% dplyr::mutate(
+    Abundance = unlist(lapply(Abundances, max, na.rm = TRUE))
+  ) %>% dplyr::filter(
+    Abundance > 0
+  ) %>% dplyr::mutate(
+    Rank = rank(-Abundance),
+    RelativeRank = (Rank - 1) / (max(Rank) - 1)
+  ),
+  ggplot2::aes(
+    x = RelativeRank,
+    y = Abundance,
+    color = Type,
+    linetype = Type
+  )
+) + ggplot2::geom_line(
+# ) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+)
+```
+### Dataset
+```{r rRAdataset, warning=FALSE} 
+ggplot2::ggplot(
+  sizeTypes %>% dplyr::mutate(
+    Abundance = unlist(lapply(Abundances, max, na.rm = TRUE))
+  ) %>% dplyr::filter(
+    Abundance > 0
+  ) %>% dplyr::group_by(
+    ID
+  ) %>% dplyr::mutate(
+    Rank = rank(-Abundance),
+    RelativeRank = (Rank - 1) / (max(Rank) - 1)
+  ),
+  ggplot2::aes(
+    x = RelativeRank,
+    y = Abundance,
+    color = Type,
+    #linetype = Type,
+    group = ID
+  )
+) + ggplot2::geom_line(
+# ) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+)
+```
+### Community
+```{r rRAcommunity, warning=FALSE} 
+ggplot2::ggplot(
+  tidyr::unnest(
+    sizeTypes, cols = c("States", "Abundances")
+  ) %>% dplyr::filter(
+    !is.na(Abundances)
+  ) %>% dplyr::group_by(
+    ID, States
+  ) %>% dplyr::mutate(
+    Rank = rank(-Abundances),
+    RelativeRank = (Rank - 1) / (max(Rank) - 1)
+  ),
+  ggplot2::aes(
+    x = RelativeRank,
+    y = Abundances,
+    color = Type,
+    #linetype = Type,
+    group = paste(ID, States)
+  )
+) + ggplot2::geom_line(
+# ) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+)
+```
+
+## Rel. Rank Rel. Abundance {.tabset}
+### Overall
+```{r rRrA, warning=FALSE} 
+ggplot2::ggplot(
+  sizeTypes %>% dplyr::mutate(
+    RelativeAbundance = unlist(lapply(RelativeAbundances, max, na.rm = TRUE))
+  ) %>% dplyr::filter(
+    RelativeAbundance > 0
+  ) %>% dplyr::mutate(
+    Rank = rank(-RelativeAbundance),
+    RelativeRank = (Rank - 1) / (max(Rank) - 1)
+  ),
+  ggplot2::aes(
+    x = RelativeRank,
+    y = RelativeAbundance,
+    color = Type,
+    linetype = Type
+  )
+) + ggplot2::geom_line(
+# ) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+)
+```
+### Dataset
+```{r rRrAdataset, warning=FALSE} 
+ggplot2::ggplot(
+  sizeTypes %>% dplyr::mutate(
+    RelativeAbundance = unlist(lapply(RelativeAbundances, max, na.rm = TRUE))
+  ) %>% dplyr::filter(
+    RelativeAbundance > 0
+  ) %>% dplyr::group_by(
+    ID
+  ) %>% dplyr::mutate(
+    Rank = rank(-RelativeAbundance),
+    RelativeRank = (Rank - 1) / (max(Rank) - 1)
+  ),
+  ggplot2::aes(
+    x = RelativeRank,
+    y = RelativeAbundance,
+    color = Type,
+    #linetype = Type,
+    group = ID
+  )
+) + ggplot2::geom_line(
+# ) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+)
+```
+
+### Community
+```{r rRrAcommunity, warning=FALSE} 
+ggplot2::ggplot(
+  tidyr::unnest(
+    sizeTypes, cols = c("States", "RelativeAbundances")
+  ) %>% dplyr::filter(
+    !is.na(RelativeAbundances)
+  ) %>% dplyr::group_by(
+    ID, States
+  ) %>% dplyr::mutate(
+    Rank = rank(-RelativeAbundances),
+    RelativeRank = (Rank - 1) / (max(Rank) - 1)
+  ),
+  ggplot2::aes(
+    x = RelativeRank,
+    y = RelativeAbundances,
+    color = Type,
+    #linetype = Type,
+    group = paste(ID, States)
+  )
+) + ggplot2::geom_line(
+# ) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+)
+```
+
+## BiodiversityR Approach {.tabset}
+
 ### Overall
 ```{r BiodiversityR, warning=FALSE}
 # Reformat: 
