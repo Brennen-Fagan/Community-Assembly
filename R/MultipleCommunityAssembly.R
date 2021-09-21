@@ -65,10 +65,10 @@ CreateEnvironmentInteractions <- function(
 CreateAssemblySequence <- function(
   Species, NumEnvironments,
   # See https://en.wikipedia.org/wiki/Coupon_collector%27s_problem#Extensions_and_generalizations
-  ArrivalEvents = 10, # Recommend, n = nrow(Pool), n (ln n + 5)
+  ArrivalEvents = NULL, # Recommend, n = nrow(Pool), n (ln n + 5)
   ArrivalRate = NULL, # If NULL, characteristic time of average interaction matrix.
   ArrivalFUN = NULL, # Takes Events and Rate, Returns Event Times.
-  ExtinctEvents = ArrivalEvents, # Note it is very possible to have misses.
+  ExtinctEvents = NULL, # Note it is very possible to have misses.
   ExtinctRate = NULL, # If NULL, set to arrival rate.
   ExtinctFUN = NULL, # Takes Events and Rate, Returns Event Times.
   HistorySeed = NULL # Use only one seed, this controls all "external" dynamics.
@@ -84,6 +84,13 @@ CreateAssemblySequence <- function(
     }
 
     set.seed(HistorySeed)
+
+    if (is.null(ArrivalEvents)) {
+      ArrivalEvents <- 10
+    }
+    if (is.null(ExtinctEvents)) {
+      ExtinctEvents <- ArrivalEvents
+    }
 
     if (is.null(ArrivalRate)) { # Roughly
       ArrivalRate <- 1 # / min(abs(Re(eigen(mean(InteractionMatrices)))))
@@ -236,7 +243,8 @@ CreateDispersalMatrix <- function(
 MultipleNumericalAssembly_Dispersal <- function(
   Pool, # Required from outside function.
   NumEnvironments, # Number of environments
-  ComputeInteractionMatrix, # Required outside function.
+  InteractionMatrices, # List of Environemt specific matrices
+  Events, # Dataframe of Times, Species, Environment, Type, and Success.
 
   PerCapitaDynamics, # The dynamical system governing the ecosystem interactions.
   DispersalMatrix, # Matrix, abundance-conserving species-environ.-travel rates.
@@ -244,19 +252,23 @@ MultipleNumericalAssembly_Dispersal <- function(
   EliminationThreshold = 10^-4, # Below which species are removed from internals
   ArrivalDensity = EliminationThreshold * 4 * 10 ^ 3, # Traill et al. 2007
 
-  # See https://en.wikipedia.org/wiki/Coupon_collector%27s_problem#Extensions_and_generalizations
-  ArrivalEvents = 10, # Recommend, n = nrow(Pool), n (ln n + 5)
-  ArrivalRate = NULL, # If NULL, characteristic time of average interaction matrix.
-  ArrivalFUN = NULL, # Takes Events and Rate, Returns Event Times.
-  ExtinctEvents = ArrivalEvents, # Note it is very possible to have misses.
-  ExtinctRate = NULL, # If NULL, set to arrival rate.
-  ExtinctFUN = NULL, # Takes Events and Rate, Returns Event Times.
-
+  MaximumTimeStep = 1, # Maximum time solver can proceed without elimination.
   BetweenEventSteps = 10, # Number of steps to reach next event to smooth.
   EnvironmentSeeds = NULL, # If one seed, used to generate seeds for the system.
   # Otherwise, we can use seeds equal to the number of environments
   HistorySeed = NULL, # Use only one seed, this controls all "external" dynamics.
-  Verbose = FALSE,
+
+  # ARGUMENTS REQUIRED IF ALTERNATIVES NOT PROVIDED:
+  # See https://en.wikipedia.org/wiki/Coupon_collector%27s_problem#Extensions_and_generalizations
+  ArrivalEvents = NULL, # Recommend, n = nrow(Pool), n (ln n + 5)
+  ArrivalRate = NULL, # If NULL, characteristic time of average interaction matrix.
+  ArrivalFUN = NULL, # Takes Events and Rate, Returns Event Times.
+  ExtinctEvents = NULL, # Note it is very possible to have misses.
+  ExtinctRate = NULL, # If NULL, set to arrival rate.
+  ExtinctFUN = NULL, # Takes Events and Rate, Returns Event Times.
+
+  ComputeInteractionMatrix = NULL, # Required if InteractionMatrices not provided
+
   ... # Arguments to pass through to ComputeInteractionMatrix or for Spatials.
 
   # Total run length is determined by the last arrival/extinction event +
@@ -267,23 +279,25 @@ MultipleNumericalAssembly_Dispersal <- function(
 
   # System Set Up: #############################################################
   # List of per environment interaction matrices.
-  InteractionMatrices <- CreateEnvironmentInteractions(
-    Pool = Pool, NumEnvironments = NumEnvironments,
-    ComputeInteractionMatrix = ComputeInteractionMatrix,
-    EnvironmentSeeds = EnvironmentSeeds, ...
-  )
+  if (is.null(InteractionMatrices))
+    InteractionMatrices <- CreateEnvironmentInteractions(
+      Pool = Pool, NumEnvironments = NumEnvironments,
+      ComputeInteractionMatrix = ComputeInteractionMatrix,
+      EnvironmentSeeds = EnvironmentSeeds, ...
+    )
   # Dataframe of Times, Species, Environment, Type, and Success.
-  Events <- CreateAssemblySequence(
-    Species = nrow(Pool),
-    NumEnvironments = NumEnvironments,
-    ArrivalEvents = ArrivalEvents,
-    ArrivalRate = ArrivalRate,
-    ArrivalFUN = ArrivalFUN,
-    ExtinctEvents = ExtinctEvents,
-    ExtinctRate = ExtinctRate,
-    ExtinctFUN = ExtinctFUN,
-    HistorySeed = HistorySeed
-  )
+  if (is.null(Events))
+    Events <- CreateAssemblySequence(
+      Species = nrow(Pool),
+      NumEnvironments = NumEnvironments,
+      ArrivalEvents = ArrivalEvents,
+      ArrivalRate = ArrivalRate,
+      ArrivalFUN = ArrivalFUN,
+      ExtinctEvents = ExtinctEvents,
+      ExtinctRate = ExtinctRate,
+      ExtinctFUN = ExtinctFUN,
+      HistorySeed = HistorySeed
+    )
 
   ### Event and Root Set Up: ###################################################
   # Note that this is contingent on space.
@@ -324,10 +338,19 @@ MultipleNumericalAssembly_Dispersal <- function(
     tail(Events$Events$Times, n = 1) + ReactionTime * 3
   )
 
-  # Identify and divide the inter distances, then recombine.
-  Timings <- cumsum(c(
-    0, rep(diff(Timings) / BetweenEventSteps, each = BetweenEventSteps)
-  ))
+  # # Identify and divide the inter distances, then recombine.
+  # Timings <- cumsum(c(
+  #   0, rep(diff(Timings) / BetweenEventSteps, each = BetweenEventSteps)
+  # ))
+  Timings <- c(0, unlist(lapply(
+    2:length(Timings),
+    function(i, ts) {
+      seq(from = ts[i - 1], to = ts[i],
+          by = min((ts[i] - ts[i - 1]) / BetweenEventSteps, MaximumTimeStep)
+      )
+    },
+    ts = Timings
+  )))
 
   deEvents$time <- Timings
 
@@ -339,10 +362,33 @@ MultipleNumericalAssembly_Dispersal <- function(
     events = deEvents
   )
 
-  return(list(
-    Events = deEvents$func(ReturnEvents = TRUE),
-    Abundance = abundance,
-    EnvironmentSeeds = InteractionMatrices$Seeds,
-    HistorySeed = Events$Seed
-    ))
+  # Return values ##############################################################
+  retval <- list()
+  retval$Events <- deEvents$func(ReturnEvents = TRUE)
+  retval$Abundance <- abundance
+  retval$NumEnvironments <- NumEnvironments
+  retval$EnvironmentSeeds <- InteractionMatrices$Seeds
+  retval$HistorySeed <- Events$Seed
+  retval$Parameters <- list(
+    EliminationThreshold = EliminationThreshold,
+    ArrivalDensity = ArrivalDensity,
+    MaximumTimeStep = MaximumTimeStep,
+    BetweenEventSteps = BetweenEventSteps
+  )
+  retval$Ellipsis <- list(...)
+
+  if (!is.null(ArrivalEvents))
+    retval$Parameters$ArrivalEvents <- ArrivalEvents
+  if (!is.null(ArrivalRate))
+    retval$Parameters$ArrivalRate <- ArrivalRate
+  if (!is.null(ArrivalFUN))
+    retval$Parameters$ArrivalFUN <- ArrivalFUN
+  if (!is.null(ExtinctEvents))
+    retval$Parameters$ExtinctEvents <- ExtinctEvents
+  if (!is.null(ExtinctRate))
+    retval$Parameters$ExtinctRate <- ExtinctRate
+  if (!is.null(ExtinctFUN))
+    retval$Parameters$ExtinctFUN <- ExtinctFUN
+
+  return(retval)
 }

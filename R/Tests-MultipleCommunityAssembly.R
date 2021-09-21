@@ -189,4 +189,14 @@ egResults_Dispersal <- MultipleNumericalAssembly_Dispersal(
   HistorySeed = egEvents$Seed
 )
 
+egResults_Dispersal2 <- MultipleNumericalAssembly_Dispersal(
+  Pool = egPool,
+  NumEnvironments = numEnviron,
+  InteractionMatrices = egInteractions,
+  Events = egEvents,
+  PerCapitaDynamics = egDynamics,
+  DispersalMatrix = egDispersal,
+  EliminationThreshold = 10^-4, ArrivalDensity = 0.4
+)
+
 print("Success.")
