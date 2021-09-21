@@ -2,6 +2,7 @@ print("Script stops early if a test fails.")
 
 numBasal <- 3; numConsum <- 2; numEnviron <- 5
 print(paste("Settings", paste(numBasal, numConsum, numEnviron)))
+egArrivalRate <- 0.1
 
 # CreateEnvironmentInteractions ################################################
 print("Environment Seed Check")
@@ -19,8 +20,10 @@ egMatrix <- Matrix::bdiag(egInteractions$Mats)
 
 # CreateAssemblySequence #######################################################
 print("History Seed Check")
-CreateAssemblySequence(numBasal + numConsum, numEnviron) -> egEvents
 CreateAssemblySequence(numBasal + numConsum, numEnviron,
+                       ArrivalRate = egArrivalRate) -> egEvents
+CreateAssemblySequence(numBasal + numConsum, numEnviron,
+                       ArrivalRate = egArrivalRate,
                        HistorySeed = egEvents$Seed) -> egEvents2
 stopifnot(identical(egEvents, egEvents2))
 
@@ -180,7 +183,7 @@ egResults_Dispersal <- MultipleNumericalAssembly_Dispersal(
   PerCapitaDynamics = egDynamics,
   DispersalMatrix = egDispersal,
   EliminationThreshold = 10^-4, ArrivalDensity = 0.4,
-  ArrivalEvents = 10, ArrivalRate = NULL, ArrivalFUN = NULL,
+  ArrivalEvents = 10, ArrivalRate = egArrivalRate, ArrivalFUN = NULL,
   ExtinctEvents = 10, ExtinctRate = NULL, ExtinctFUN = NULL,
   EnvironmentSeeds = egInteractions$Seeds,
   HistorySeed = egEvents$Seed
