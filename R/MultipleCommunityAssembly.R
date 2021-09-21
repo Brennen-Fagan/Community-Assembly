@@ -3,6 +3,15 @@ ArrivalFUN_Example <- function(Events, Rate) {
 }
 ExtinctFUN_Example <- ArrivalFUN_Example
 
+PerCapitaDynamics_Type1 <- function(
+  ReproductionRate, InteractionMatrix, NumEnvironments
+  ) {
+  # Parms contains r = ReproductionRate, a = InteractionMatrix
+  function(t, y, parms = NULL) {
+    rep(ReproductionRate, NumEnvironments) + InteractionMatrix %*% y
+  }
+}
+
 CreateEnvironmentInteractions <- function(
   Pool, # Required from outside function.
   NumEnvironments, # Number of environments
@@ -12,7 +21,7 @@ CreateEnvironmentInteractions <- function(
   ...
 ) {
   ### Generate EnvironmentSeeds if either NULL nor of correct length. ##########
-  if (!is.null(EnvironmentSeeds)) {
+  if (is.null(EnvironmentSeeds)) {
     EnvironmentSeeds <- 1E8 * runif(NumEnvironments)
   }
 
@@ -34,7 +43,7 @@ CreateEnvironmentInteractions <- function(
       if (!is.null(seed[i])) {
         if (exists(".Random.seed"))
           oldSeed <- .Random.seed
-        set.seed(seed)
+        set.seed(seed[i])
       }
 
       retval <- ComputeInteractionMatrix(pool, ...)
@@ -50,10 +59,11 @@ CreateEnvironmentInteractions <- function(
     ... = ...
   )
 
-  return(InteractionMatrices)
+  return(list(Mats = InteractionMatrices, Seeds = EnvironmentSeeds))
 }
 
 CreateAssemblySequence <- function(
+  Species, NumEnvironments,
   # See https://en.wikipedia.org/wiki/Coupon_collector%27s_problem#Extensions_and_generalizations
   ArrivalEvents = 10, # Recommend, n = nrow(Pool), n (ln n + 5)
   ArrivalRate = NULL, # If NULL, characteristic time of average interaction matrix.
@@ -63,7 +73,7 @@ CreateAssemblySequence <- function(
   ExtinctFUN = NULL, # Takes Events and Rate, Returns Event Times.
   HistorySeed = NULL # Use only one seed, this controls all "external" dynamics.
 ) {
-  ### Setup the History, i.e. arrival and extinction events. ###################
+  ### Set up the History, i.e. arrival and extinction events. ##################
   if (is.null(HistorySeed)) {
     HistorySeed <- 1E8 * runif(1)
   }
@@ -76,7 +86,7 @@ CreateAssemblySequence <- function(
     set.seed(HistorySeed)
 
     if (is.null(ArrivalRate)) { # Roughly
-      ArrivalRate <- 1 / min(abs(Re(eigen(mean(InteractionMatrices)))))
+      ArrivalRate <- 1 # / min(abs(Re(eigen(mean(InteractionMatrices)))))
     }
     if (is.null(ExtinctRate)) {
       ExtinctRate <- ArrivalRate
@@ -98,12 +108,16 @@ CreateAssemblySequence <- function(
       Species = sample.int(Species,
                            size = ArrivalEvents + ExtinctEvents,
                            replace = TRUE),
-      Environment = sample.int(Environments,
+      Environment = sample.int(NumEnvironments,
                                size = ArrivalEvents + ExtinctEvents,
                                replace = TRUE),
       Type = c(rep("Arrival", ArrivalEvents),
                rep("Extinct", ExtinctEvents)),
-      Invadable = NA
+      Success = NA
+      # Arrival AND Invadable <- TRUE
+      # Arrival AND Uninvadable <- FALSE
+      # Extinct AND Present     (immediately before extinction) <- TRUE
+      # Extinct AND Not Present (immediately before extinction) <- FALSE
     )
 
     # Place in temporal order.
@@ -114,40 +128,44 @@ CreateAssemblySequence <- function(
     }
   }
 
-  return(Events)
+  return(list(Events = Events, Seed = HistorySeed))
 }
 
 # Note: This is a function that returns a function!
 EliminationAndNeutralEvents <- function(
-  Events, InteractionMatrices, Pool, PerCapitaDynamics, EliminationThreshold,
-  ArrivalDensity, Species = nrow(Pool)
+  EventsAndSeed, Species, #InteractionMatrices, #Pool,
+  PerCapitaDynamics, EliminationThreshold,
+  ArrivalDensity
 ) {
+  EventDF <- EventsAndSeed$Events # Other list entry is seed.
+  PerCapitaDynams <- PerCapitaDynamics
+  ArrivalDens <- ArrivalDensity
   function(t, y, parms,
-           Events = Events,
-           Environments = InteractionMatrices,
-           Pool = Pool,
-           PerCapitaDynamics = PerCapitaDynamics,
-           ArrivalDensity = ArrivalDensity) {
+           ReturnEvents = FALSE) {
+    if (ReturnEvents) {return(EventDF)}
+
     y <- ifelse(y <= EliminationThreshold, 0, y)
-    event <- which(t == Events$Times)
+    event <- which(t == EventDF$Times)
     if (length(event)) {
-      abundanceIndex <- (Events$Environment[event] - 1) * Species +
-        Events$Species[event]
-      if (Events$Type[event] == "Extinct") {
+      abundanceIndex <- (EventDF$Environment[event] - 1) * Species +
+        EventDF$Species[event]
+      if (EventDF$Type[event] == "Extinct") {
+        # Check if already present for records purposes.
+        EventDF$Success[event] <<- y[abundanceIndex] > 0
         y[abundanceIndex] <- 0
-      } else if (Events$Type[event] == "Arrival") {
+      } else if (EventDF$Type[event] == "Arrival") {
         # Check if Uninvadable
         # <=> per capita growth rate > 0
         # <=> lim (epsilon -> 0) Dynamics(y + epsilon) > 0
         # <=> PerCapitaDynamics > 0.
         if (
           y[abundanceIndex] > 0 ||
-          PerCapitaDynamics(y)[abundanceIndex] > 0
+          PerCapitaDynams(0, y, NULL)[abundanceIndex] > 0
         ) {
-          y[abundanceIndex] <- y[abundanceIndex] + ArrivalDensity
-          Events$Invadable[event] <<- TRUE
+          y[abundanceIndex] <- y[abundanceIndex] + ArrivalDens
+          EventDF$Success[event] <<- TRUE
         } else {
-          Events$Invadable[event] <<- FALSE
+          EventDF$Success[event] <<- FALSE
         }
       }
     }
@@ -156,28 +174,31 @@ EliminationAndNeutralEvents <- function(
 }
 
 CreateDispersalMatrix <- function(
-  EnvironmentDistances, # Distances, which we will invert. Matrix >= 0.
-  # Entries are zero if two environments are not connected.
+  EnvironmentDistances, # Distances, which we will invert. Square Matrix >= 0.
+  # Entries are zero if two environments are not connected. No self-loops.
   SpeciesSpeeds # Distances/Times.
   # Result is a matrix of frequencies (1/Times) which will be %*% Abundance.
 ) {
-  # So the question is how to format the diagonals then.
+  NumEnvironments <- nrow(EnvironmentDistances)
+  stopifnot(NumEnvironments == ncol(EnvironmentDistances))
+
   dispersalDiags <- NULL
-  for (i in (length(Communities) - 1):-(length(Communities) - 1)) {
+  # Take i to be the (super/sub) diagonal index, aka "band".
+  for (i in (NumEnvironments - 1):-(NumEnvironments - 1)) {
     if (i == 0) next
     # Start in top right band, move to bottom left.
     dispersalDiags <- c(
       dispersalDiags,
       list(c(
         unlist(lapply(
-          1:length(Communities),
+          1:NumEnvironments,
           function(index, offset, mat, vec) {
             if (offset != 0 &&
                 nrow(mat) >= index + offset &&
                 index + offset >= 1)
-              mat[index, index + offset] * vec
+              1/mat[index, index + offset] * vec
           },
-          offset = i, mat = DispersalIsland, vec = redDisPool
+          offset = i, mat = EnvironmentDistances, vec = SpeciesSpeeds
         ))
       ))
     )
@@ -191,9 +212,9 @@ CreateDispersalMatrix <- function(
   # normalisation that I do not think is strictly necessary.
   # The matrix is sparse and has colsum = 0, diag < 0, offdiag >= 0.
   dispersalMatrix <- Matrix::bandSparse(
-    n = length(redCom) * length(Communities),
-    k = length(redCom) * c((length(Communities) - 1):1,
-                           -(1:(length(Communities) - 1))),
+    n = length(redCom) * NumEnvironments,
+    k = length(redCom) * c((NumEnvironments - 1):1,
+                           -(1:(NumEnvironments - 1))),
     diagonals = dispersalDiags# c(
     # list(c(rep(0.0001, length(redCom)),   # Island 2 -> Island 1
     #        rep(0.0001, length(redCom)))), # Island 3 -> Island 2
@@ -206,6 +227,8 @@ CreateDispersalMatrix <- function(
   stopifnot(all(dispersalMatrix >= 0))
   diag(dispersalMatrix) <- -Matrix::colSums(dispersalMatrix)
   stopifnot(all(Matrix::colSums(dispersalMatrix) == 0))
+
+  return(dispersalMatrix)
 }
 
 MultipleNumericalAssembly_Dispersal <- function(
@@ -245,8 +268,9 @@ MultipleNumericalAssembly_Dispersal <- function(
     Pool, NumEnvironments, ComputeInteractionMatrix,
     EnvironmentSeeds, ...
   )
-  # Dataframe of Times, Species, Environment, Type, and Invadable.
+  # Dataframe of Times, Species, Environment, Type, and Success.
   Events <- CreateAssemblySequence(
+    Species = nrow(Pool),
     ArrivalEvents, ArrivalRate, ArrivalFUN,
     ExtinctEvents, ExtinctRate, ExtinctFUN,
     HistorySeed

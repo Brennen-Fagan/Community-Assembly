@@ -195,6 +195,11 @@ LawMorton1996_CommunityMat <- function(
       if (exists(".Random.seed")) {
         oldSeed <- .Random.seed
       }
+      # NOTE: THIS IS BAD DESIGN.
+      # IF WE REDO EXPERIMENTS, CHANGE TO
+      # GENERATE NEW SEEDS BASED ON INITIAL SEED
+      # AS NEEDED INSTEAD OF SIMPLE ADDITION,
+      # WHICH CREATES CORRELATIONS.
       set.seed(seed + i$ID + j$ID)
     }
     p <- LawMorton1996_aij(i, j, Parameters, CompetitionBasal,
