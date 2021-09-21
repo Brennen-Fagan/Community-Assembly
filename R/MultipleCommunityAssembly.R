@@ -181,6 +181,7 @@ CreateDispersalMatrix <- function(
 ) {
   NumEnvironments <- nrow(EnvironmentDistances)
   stopifnot(NumEnvironments == ncol(EnvironmentDistances))
+  stopifnot(diag(EnvironmentDistances) == 0)
 
   dispersalDiags <- NULL
   # Take i to be the (super/sub) diagonal index, aka "band".
@@ -212,8 +213,8 @@ CreateDispersalMatrix <- function(
   # normalisation that I do not think is strictly necessary.
   # The matrix is sparse and has colsum = 0, diag < 0, offdiag >= 0.
   dispersalMatrix <- Matrix::bandSparse(
-    n = length(redCom) * NumEnvironments,
-    k = length(redCom) * c((NumEnvironments - 1):1,
+    n = length(SpeciesSpeeds) * NumEnvironments,
+    k = length(SpeciesSpeeds) * c((NumEnvironments - 1):1,
                            -(1:(NumEnvironments - 1))),
     diagonals = dispersalDiags# c(
     # list(c(rep(0.0001, length(redCom)),   # Island 2 -> Island 1
@@ -226,7 +227,8 @@ CreateDispersalMatrix <- function(
   )
   stopifnot(all(dispersalMatrix >= 0))
   diag(dispersalMatrix) <- -Matrix::colSums(dispersalMatrix)
-  stopifnot(all(Matrix::colSums(dispersalMatrix) == 0))
+  stopifnot(isTRUE(all.equal(Matrix::colSums(dispersalMatrix),
+                             rep(0, ncol(dispersalMatrix)))))
 
   return(dispersalMatrix)
 }
@@ -250,6 +252,7 @@ MultipleNumericalAssembly_Dispersal <- function(
   ExtinctRate = NULL, # If NULL, set to arrival rate.
   ExtinctFUN = NULL, # Takes Events and Rate, Returns Event Times.
 
+  BetweenEventSteps = 2, # Number of steps to inject between events to smooth.
   EnvironmentSeeds = NULL, # If one seed, used to generate seeds for the system.
   # Otherwise, we can use seeds equal to the number of environments
   HistorySeed = NULL, # Use only one seed, this controls all "external" dynamics.
@@ -265,15 +268,21 @@ MultipleNumericalAssembly_Dispersal <- function(
   # System Set Up: #############################################################
   # List of per environment interaction matrices.
   InteractionMatrices <- CreateEnvironmentInteractions(
-    Pool, NumEnvironments, ComputeInteractionMatrix,
-    EnvironmentSeeds, ...
+    Pool = Pool, NumEnvironments = NumEnvironments,
+    ComputeInteractionMatrix = ComputeInteractionMatrix,
+    EnvironmentSeeds = EnvironmentSeeds, ...
   )
   # Dataframe of Times, Species, Environment, Type, and Success.
   Events <- CreateAssemblySequence(
     Species = nrow(Pool),
-    ArrivalEvents, ArrivalRate, ArrivalFUN,
-    ExtinctEvents, ExtinctRate, ExtinctFUN,
-    HistorySeed
+    NumEnvironments = NumEnvironments,
+    ArrivalEvents = ArrivalEvents,
+    ArrivalRate = ArrivalRate,
+    ArrivalFUN = ArrivalFUN,
+    ExtinctEvents = ExtinctEvents,
+    ExtinctRate = ExtinctRate,
+    ExtinctFUN = ExtinctFUN,
+    HistorySeed = HistorySeed
   )
 
   ### Event and Root Set Up: ###################################################
@@ -294,15 +303,18 @@ MultipleNumericalAssembly_Dispersal <- function(
   deEvents <- list(
     root = TRUE,
     func = EliminationAndNeutralEvents(
-      Events, InteractionMatrices, Pool,
-      PerCapitaDynamics, EliminationThreshold, ArrivalDensity
+      EventsAndSeed = Events, Species = nrow(Pool),
+      PerCapitaDynamics = PerCapitaDynamics,
+      EliminationThreshold = EliminationThreshold,
+      ArrivalDensity = ArrivalDensity
     ),
+    times = Events$Events$Times,
     maxroot = 10000
   )
 
   # Computation Times: #########################################################
   # Arrange the InteractionMatrices into a sparse matrix.
-  Reactions <- Matrix::bdiag(InteractionMatrices)
+  Reactions <- Matrix::bdiag(InteractionMatrices$Mats)
   # We'll take a guess as to how the eigenvalues of Reactions relate to the
   # characteristic time of the system.
   ReactionTime <- 1/max(abs(eigen(Reactions)$values))
@@ -310,25 +322,39 @@ MultipleNumericalAssembly_Dispersal <- function(
   # Dynamics: ##################################################################
   Dynamics <- function(t, y, parms) {
      list( # Reaction: PerCapitaDynamics includes interactions and reproduction.
-       y * PerCapitaDynamics(y)
+       y * PerCapitaDynamics(t, y, parms)
        # Transport: Dispersal means movement of abundance between nodes.
        + DispersalMatrix %*% y
      )
   }
 
+  # Timings: ###################################################################
+  # Basic Targets: Start time, Event Times, and Final Settling Time.
+  Timings <- c(
+    0,
+    Events$Events$Times,
+    tail(Events$Events$Times, n = 1) + ReactionTime * 3
+  )
+
+  # Identify and divide the inter distances, then recombine.
+  Timings <- cumsum(c(
+    0, rep(diff(Timings) / BetweenEventSteps, each = BetweenEventSteps)
+  ))
+
   # Evaluation: ################################################################
   abundance <- deSolve::lsoda(
     y = rep(0, nrow(Pool) * NumEnvironments),
-    times = seq(from = 0, by = ReactionTime,
-                to = max(Events$Times) + ReactionTime * 3),
+    times = Timings,
     func = Dynamics,
     rootfunc = deRootFun,
     events = deEvents
   )
 
   return(list(
-    Events = Events,
-    Abundance = abundance
+    Events = deEvents$func(ReturnEvents = TRUE),
+    Abundance = abundance,
+    EnvironmentSeeds = InteractionMatrices$Seeds,
+    HistorySeed = Events$Seed
     ))
 }
 
