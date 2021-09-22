@@ -172,6 +172,51 @@ stopifnot(
   ])] == 0
   )
 
+print("Test less than fully connected dispersal.")
+egDists <- matrix(1:numEnviron^2, nrow = numEnviron)
+diag(egDists) <- 0
+egDists[numEnviron - 1, numEnviron] <- Inf # Curiosity
+egDists[1:2,4:5] <- 0
+egDists[4:5,1:2] <- 0
+egDispersal <- CreateDispersalMatrix(
+  egDists, SpeciesSpeeds = 1:(numBasal + numConsum)
+)
+
+stopifnot(
+  nrow(egDispersal) == numEnviron * (numBasal + numConsum),
+  ncol(egDispersal) == nrow(egDispersal),
+  isTRUE(all.equal(Matrix::colSums(egDispersal), rep(0, ncol(egDispersal)))),
+  Matrix::diag(egDispersal) <= 0,
+  # Check travel from last environment to second last is 0.
+  isTRUE(Matrix::all.equal(egDispersal[
+    (numEnviron - 2) * (numBasal + numConsum) + 1:(numBasal + numConsum),
+    (numEnviron - 1) * (numBasal + numConsum) + 1:(numBasal + numConsum)
+  ], as(as(Matrix::Diagonal(n = (numBasal + numConsum),
+                            x = rep(0, (numBasal + numConsum))),
+           "CsparseMatrix"), "dgCMatrix"),
+  check.attributes = FALSE
+  )),
+  # Check only diagonal of the opposite block is non-zero
+  Matrix::diag(egDispersal[
+    (numEnviron - 1) * (numBasal + numConsum) + 1:(numBasal + numConsum),
+    (numEnviron - 2) * (numBasal + numConsum) + 1:(numBasal + numConsum)
+  ]) > 0,
+  egDispersal[
+    (numEnviron - 1) * (numBasal + numConsum) + 1:(numBasal + numConsum),
+    (numEnviron - 2) * (numBasal + numConsum) + 1:(numBasal + numConsum)
+  ][upper.tri(egDispersal[
+    (numEnviron - 1) * (numBasal + numConsum) + 1:(numBasal + numConsum),
+    (numEnviron - 2) * (numBasal + numConsum) + 1:(numBasal + numConsum)
+  ])] == 0,
+  egDispersal[
+    (numEnviron - 1) * (numBasal + numConsum) + 1:(numBasal + numConsum),
+    (numEnviron - 2) * (numBasal + numConsum) + 1:(numBasal + numConsum)
+  ][lower.tri(egDispersal[
+    (numEnviron - 1) * (numBasal + numConsum) + 1:(numBasal + numConsum),
+    (numEnviron - 2) * (numBasal + numConsum) + 1:(numBasal + numConsum)
+  ])] == 0
+)
+
 # MultipleNumericalAssembly_Dispersal ##########################################
 print("Testing Main Function: Dispersal")
 
