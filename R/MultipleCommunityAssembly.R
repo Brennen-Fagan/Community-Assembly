@@ -188,7 +188,11 @@ CreateDispersalMatrix <- function(
 ) {
   NumEnvironments <- nrow(EnvironmentDistances)
   stopifnot(NumEnvironments == ncol(EnvironmentDistances))
-  stopifnot(diag(EnvironmentDistances) == 0)
+  stopifnot(
+    tryCatch(diag(EnvironmentDistances), error = function(e) {
+      Matrix::diag(EnvironmentDistances)
+    }) == 0
+    )
 
   dispersalDiags <- NULL
   # Take i to be the (super/sub) diagonal index, aka "band".
