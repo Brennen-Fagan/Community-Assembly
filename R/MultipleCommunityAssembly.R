@@ -207,8 +207,13 @@ CreateDispersalMatrix <- function(
           function(index, offset, mat, vec) {
             if (offset != 0 &&
                 nrow(mat) >= index + offset &&
-                index + offset >= 1)
-              1/mat[index, index + offset] * vec
+                index + offset >= 1
+                )
+              if (mat[index, index + offset] != 0) { # To prevent Diffusive Infs.
+                1/mat[index, index + offset] * vec
+              } else {
+                0 * vec
+              }
           },
           offset = i, mat = EnvironmentDistances, vec = SpeciesSpeeds
         ))
@@ -223,10 +228,15 @@ CreateDispersalMatrix <- function(
   # Characterising this as proportions of a population, but that is assuming a
   # normalisation that I do not think is strictly necessary.
   # The matrix is sparse and has colsum = 0, diag < 0, offdiag >= 0.
+  ns <- length(SpeciesSpeeds) * NumEnvironments
+  ks <- length(SpeciesSpeeds) * c((NumEnvironments - 1):1,
+                                  -(1:(NumEnvironments - 1)))
+  ks <- ks[!unlist(lapply(dispersalDiags, is.null))]
+  dispersalDiags <- dispersalDiags[!unlist(lapply(dispersalDiags, is.null))]
+
   dispersalMatrix <- Matrix::bandSparse(
-    n = length(SpeciesSpeeds) * NumEnvironments,
-    k = length(SpeciesSpeeds) * c((NumEnvironments - 1):1,
-                           -(1:(NumEnvironments - 1))),
+    n = ns,
+    k = ks,
     diagonals = dispersalDiags# c(
     # list(c(rep(0.0001, length(redCom)),   # Island 2 -> Island 1
     #        rep(0.0001, length(redCom)))), # Island 3 -> Island 2
