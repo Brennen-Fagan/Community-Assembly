@@ -243,8 +243,8 @@ CreateDispersalMatrix <- function(
 MultipleNumericalAssembly_Dispersal <- function(
   Pool, # Required from outside function.
   NumEnvironments, # Number of environments
-  InteractionMatrices, # List of Environemt specific matrices
-  Events, # Dataframe of Times, Species, Environment, Type, and Success.
+  InteractionMatrices = NULL, # List of Environemt specific matrices
+  Events = NULL, # Dataframe of Times, Species, Environment, Type, and Success.
 
   PerCapitaDynamics, # The dynamical system governing the ecosystem interactions.
   DispersalMatrix, # Matrix, abundance-conserving species-environ.-travel rates.

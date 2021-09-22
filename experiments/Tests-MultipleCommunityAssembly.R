@@ -198,5 +198,7 @@ egResults_Dispersal2 <- MultipleNumericalAssembly_Dispersal(
   DispersalMatrix = egDispersal,
   EliminationThreshold = 10^-4, ArrivalDensity = 0.4
 )
+stopifnot(isTRUE(all.equal(egResults_Dispersal$Abundance,
+                           egResults_Dispersal2$Abundance)))
 
 print("Success.")
