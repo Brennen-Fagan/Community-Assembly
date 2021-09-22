@@ -12,7 +12,7 @@ LMLogBodySize <- c(-2, -1, -1, 0)
 
 PerIslandDistance <- 1
 SpeciesSpeeds <- 1
-Space <- match.arg("None", c("None", "Ring", "Line"))
+Space <- match.arg("Line", c("None", "Ring", "Line"))
 
 EliminationThreshold <- 10^-4 # Below which species are removed from internals
 ArrivalDensity <- EliminationThreshold * 4 * 10 ^ 3 # Traill et al. 2007
