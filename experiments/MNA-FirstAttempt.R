@@ -4,7 +4,7 @@ source('~/Random-Matrix-Theory/RMTRCode2/R/MultipleCommunityAssembly.R', echo=FA
 
 # Parameters: ##################################################################
 Species <- c(Basal = 34, Consumer = 66)
-Environments <- 25
+Environments <- 10
 EventsEach <- Environments * ceiling(sum(Species) * (log(sum(Species) + 5)))
 
 LMParameters <- c(0.01, 10, 0.5, 0.2, 100, 0.1)
@@ -76,6 +76,9 @@ Events <- CreateAssemblySequence(
   HistorySeed = HistorySeed
 )
 
+print(table(Events$Events$Species,
+            Events$Events$Environment))
+
 IntMat <- Matrix::bdiag(InteractionMatrices$Mats)
 PerCapitaDynamics <- PerCapitaDynamics_Type1(
   Pool$ReproductionRate, IntMat,
@@ -115,3 +118,7 @@ result <- MultipleNumericalAssembly_Dispersal(
   BetweenEventSteps = BetweenEventSteps,
   Verbose = TRUE
 )
+
+save(result,
+     file = file.path(dir, paste0(
+       "MNA-FirstAttempt-Result-Env", Environments, ".RData")))
