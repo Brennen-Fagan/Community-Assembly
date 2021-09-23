@@ -4,7 +4,7 @@ source('~/Random-Matrix-Theory/RMTRCode2/R/MultipleCommunityAssembly.R', echo=FA
 
 # Parameters: ##################################################################
 Species <- c(Basal = 34, Consumer = 66)
-Environments <- 2
+Environments <- 75
 EventsEach <- Environments * ceiling(sum(Species) * (log(sum(Species) + 5)))
 
 LMParameters <- c(0.01, 10, 0.5, 0.2, 100, 0.1)
