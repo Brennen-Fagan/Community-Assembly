@@ -341,7 +341,9 @@ MultipleNumericalAssembly_Dispersal <- function(
   Reactions <- Matrix::bdiag(InteractionMatrices$Mats)
   # We'll take a guess as to how the eigenvalues of Reactions relate to the
   # characteristic time of the system.
-  ReactionTime <- 1/max(abs(eigen(Reactions)$values))
+  # ReactionTime <- 1/max(abs(eigen(Reactions)$values))
+  ReactionTime <- 1/max(abs(eigen(InteractionMatrices$Mats[[1]])$values))
+
 
   # Dynamics: ##################################################################
   Dynamics <- function(t, y, parms) {

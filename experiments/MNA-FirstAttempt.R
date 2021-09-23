@@ -77,7 +77,7 @@ Events <- CreateAssemblySequence(
 IntMat <- Matrix::bdiag(InteractionMatrices$Mats)
 PerCapitaDynamics <- PerCapitaDynamics_Type1(
   Pool$ReproductionRate, IntMat,
-  NumEnvironments = numEnviron
+  NumEnvironments = Environments
 )
 
 if (Space == "None") {
