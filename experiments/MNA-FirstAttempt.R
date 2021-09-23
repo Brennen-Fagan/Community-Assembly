@@ -4,7 +4,7 @@ source('~/Random-Matrix-Theory/RMTRCode2/R/MultipleCommunityAssembly.R', echo=FA
 
 # Parameters: ##################################################################
 Species <- c(Basal = 34, Consumer = 66)
-Environments <- 100
+Environments <- 2
 EventsEach <- Environments * ceiling(sum(Species) * (log(sum(Species) + 5)))
 
 LMParameters <- c(0.01, 10, 0.5, 0.2, 100, 0.1)
@@ -20,7 +20,7 @@ ArrivalDensity <- EliminationThreshold * 4 * 10 ^ 3 # Traill et al. 2007
 MaximumTimeStep <- 1 # Maximum time solver can proceed without elimination.
 BetweenEventSteps <- 10 # Number of steps to reach next event to smooth.
 
-CalculatePoolAndMatrices <- FALSE
+CalculatePoolAndMatrices <- TRUE
 dir <- getSrcDirectory(function(){})
 
 # > runif(1) * 1e8
@@ -50,9 +50,11 @@ if (CalculatePoolAndMatrices) {
     EnvironmentSeeds = EnvironmentSeed
   )
   save(Pool, InteractionMatrices,
-       file = file.path(dir, "MNA-FirstAttempt-PoolMats.RData"))
+       file = file.path(dir, paste0(
+         "MNA-FirstAttempt-PoolMats-Env", Environments, ".RData")))
 } else {
-  load(file = file.path(dir, "MNA-FirstAttempt-PoolMats.RData"))
+  load(file = file.path(dir, paste0(
+    "MNA-FirstAttempt-PoolMats-Env", Environments, ".RData")))
 }
 
 # Technically, not quite right, but should be good enough.
