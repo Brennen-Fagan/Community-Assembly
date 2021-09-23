@@ -1,0 +1,105 @@
+---
+title: "Multiple Numerical Assembly"
+output:
+  html_notebook:
+    code_folding: hide
+---
+
+# Sections {.tabset}
+
+## Abstract
+
+In this document, I want to provide a write-up of how this model is similar to and different from the versions previously implemented.
+This model is meant to provide assembly of multiple sites at the same time, that may, or may not, be connected in some fashion. 
+Along the way, I will mention some of the input and output format that I am expect as documentation.
+At the end, I will be presenting some preliminary results.
+I especially want to use this as a vehicle to think about how to analyse those results.
+
+## Functions
+
+## Results, No Spatial Structure
+
+First, we load up the preliminary results.
+In this case, we are loading a system in which 
+34 basal species and 66 consumer species form the pool for 10 unconnected environments.
+The pool and interaction matrix were assembled with the default parameters from Law and Morton's 1996 work.
+
+```{r}
+load(file.path(
+  "..", "experiments", "MNA-FirstAttempt-Result-Env10-None.RData")
+)
+```
+
+### Events
+In total, `r nrow(result$Events)` events were used in these environments, with the species and environment invasion both randomly assigned.
+The number of arrival and extinction events were controlled to both be half of this number.
+We chose this number due to the coupon collecting problem.
+In particular, we use the result that [the probability of encountering each species is bounded:](https://en.wikipedia.org/wiki/Coupon_collector%27s_problem#Extensions_and_generalizations)
+$$\text{Pr}(\text{Draws} < n \log_{e} n + c n) \rightarrow \exp(-\exp(-c)) \text{ as } n \rightarrow \infty$$
+where $n$ is the number of species and $c$ is a constant.
+For our purposes, we choose $c = 5$ so that we have a probability of about $99.3\%$ of seeing each species in each environment. 
+In practice, we failed to observe `r sum(with(result$Events, table(Species, Environment)) == 0)` species-environment combinations.
+Notably, nearly every species had at least one successful invasion;
+`r sum(rowSums(with(result$Events %>% filter(Type == "Arrival"), table(Species, Environment, Success))[, , 2]) == 0)` did not.
+
+The initial abundance was set to be 4000 times the elimination threshold, in line with work on minimum viable populations (Traill et al. 2007).
+The elimination threshold is admittedly more arbitrary, since it sets an effective individual-area relationship.
+For this calculation, I set it to $10^{-4}$, in line with our previous calculations.
+This is large enough to avoid numerical difficulties from precision, while being low enough to represent a decent sized region.
+
+Since each population is assembling simultaneously, I chose to use exponential waiting times for the inter-species arrival and extinction times.
+Note that these rates are shared between species and environments, but arrival and extinction are fully independent of each other.
+Species and environment affected in each event was chosen uniformly at random.
+The question then is how to set the rate.
+
+To set the rate in this case, I chose to set it to the largest eigenvalue magnitude of the per-environment interaction matrices.
+This magnitude corresponds to the strongest response we can see from the interaction matrix and, if the interaction matrix is a good approximation for the Jacobian around a stable fixed point (which is not guaranteed), indicates the characteristic time scale of the decay to equilibrium.
+Hence, (overall) arrival rates and (overall) extinction rates should happen on the same timescale as the (largest) dynamics in the system.
+Since there are 10 environments, we should then expect that 10 characteristic time scales, on average, should occur in between arrival events in the same environment.
+
+### Abundance
+
+With 10 environments, it is probably not helpful to check 10 individual abundance curves, but looking at the first one might be helpful.
+```{r}
+library(RMTRCode2)
+LawMorton1996_PlotAbundance(result$Abundance[, c(1, 2:101)]) -> obj;
+```
+```{r}
+obj + ggplot2::scale_y_log10() + ggplot2::guides(color = FALSE)
+```
+Every vertical line is a species introduction or extinction by neutral dynamics.
+
+Perhaps more intriguing might be some sense of the biodiversity that we have in each system.
+We break the abundance results up by environment, then calculate the number of non-zero abundance curves at each time point.
+We also calculate the Shannon entropy.
+```{r}
+Diversity <- lapply(
+  1:result$NumEnvironments,
+  function(i, abund) {
+    time <- abund[, 1]
+    env <- abund[, 1 + 1:100 + 100 * (i - 1)]
+    richness <- rowSums(env != 0)
+    abundSum <- rowSums(env)
+    entropy <- env / abundSum
+    entropy <- - apply(
+      entropy, MARGIN = 1,
+      FUN = function(x) {
+        - sum(ifelse(x != 0, x * log(x), 0))
+      })
+    data.frame(Time = time, Richness = richness, Entropy = entropy, Environment = i)
+  },
+  abund = result$Abundance
+)
+```
+
+```{r}
+Diversity <- dplyr::bind_rows(Diversity)
+```
+
+```{r}
+ggplot2::ggplot(Diversity, ggplot2::aes(x = Time, y = Richness, color = factor(Environment))) + ggplot2::geom_line(alpha = 0.3)
+```
+
+```{r}
+ggplot2::ggplot(Diversity, ggplot2::aes(x = Time, y = Entropy, color = factor(Environment))) + ggplot2::geom_line(alpha = 0.3)
+```

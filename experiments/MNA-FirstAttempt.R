@@ -12,7 +12,7 @@ LMLogBodySize <- c(-2, -1, -1, 0)
 
 PerIslandDistance <- 1
 SpeciesSpeeds <- 1
-Space <- match.arg("None", c("None", "Ring", "Line"))
+Space <- match.arg("Ring", c("None", "Ring", "Line"))
 
 EliminationThreshold <- 10^-4 # Below which species are removed from internals
 ArrivalDensity <- EliminationThreshold * 4 * 10 ^ 3 # Traill et al. 2007
@@ -20,7 +20,7 @@ ArrivalDensity <- EliminationThreshold * 4 * 10 ^ 3 # Traill et al. 2007
 MaximumTimeStep <- 1 # Maximum time solver can proceed without elimination.
 BetweenEventSteps <- 10 # Number of steps to reach next event to smooth.
 
-CalculatePoolAndMatrices <- TRUE
+CalculatePoolAndMatrices <- FALSE
 dir <- getSrcDirectory(function(){})
 
 # > runif(1) * 1e8
@@ -121,4 +121,7 @@ result <- MultipleNumericalAssembly_Dispersal(
 
 save(result,
      file = file.path(dir, paste0(
-       "MNA-FirstAttempt-Result-Env", Environments, ".RData")))
+       "MNA-FirstAttempt-Result-Env", Environments,
+       "-", Space, ".RData")
+     )
+)
