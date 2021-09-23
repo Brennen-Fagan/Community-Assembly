@@ -12,7 +12,7 @@ LMLogBodySize <- c(-2, -1, -1, 0)
 
 PerIslandDistance <- 1
 SpeciesSpeeds <- 1
-Space <- match.arg("Line", c("None", "Ring", "Line"))
+Space <- match.arg("None", c("None", "Ring", "Line"))
 
 EliminationThreshold <- 10^-4 # Below which species are removed from internals
 ArrivalDensity <- EliminationThreshold * 4 * 10 ^ 3 # Traill et al. 2007
@@ -74,8 +74,9 @@ Events <- CreateAssemblySequence(
   HistorySeed = HistorySeed
 )
 
+IntMat <- Matrix::bdiag(InteractionMatrices$Mats)
 PerCapitaDynamics <- PerCapitaDynamics_Type1(
-  egPool$ReproductionRate, egMatrix,
+  Pool$ReproductionRate, IntMat,
   NumEnvironments = numEnviron
 )
 
@@ -84,11 +85,11 @@ if (Space == "None") {
     i = Environments, j = Environments, x = 0)
 }
 if (Space == "Ring" || Space == "Line")
-DistanceMatrix <- Matrix::bandSparse(
-  Environments, k = c(-1, 1),
-  diagonals = list(rep(PerIslandDistance, Environments - 1),
-                rep(PerIslandDistance, Environments - 1))
-)
+  DistanceMatrix <- Matrix::bandSparse(
+    Environments, k = c(-1, 1),
+    diagonals = list(rep(PerIslandDistance, Environments - 1),
+                     rep(PerIslandDistance, Environments - 1))
+  )
 if (Space == "Ring") {
   DistanceMatrix[Environments, 1] <- PerIslandDistance
   DistanceMatrix[1, Environments] <- PerIslandDistance
@@ -99,6 +100,7 @@ DispersalMatrix <- CreateDispersalMatrix(
   SpeciesSpeeds = rep(SpeciesSpeeds, nrow(Pool))
 )
 
+print(Sys.time())
 result <- MultipleNumericalAssembly_Dispersal(
   Pool = Pool, NumEnvironments = Environments,
   InteractionMatrices = InteractionMatrices,
@@ -108,5 +110,6 @@ result <- MultipleNumericalAssembly_Dispersal(
   EliminationThreshold = EliminationThreshold,
   ArrivalDensity = ArrivalDensity,
   MaximumTimeStep = MaximumTimeStep,
-  BetweenEventSteps = BetweenEventSteps
+  BetweenEventSteps = BetweenEventSteps,
+  Verbose = TRUE
 )

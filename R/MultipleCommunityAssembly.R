@@ -5,7 +5,7 @@ ExtinctFUN_Example <- ArrivalFUN_Example
 
 PerCapitaDynamics_Type1 <- function(
   ReproductionRate, InteractionMatrix, NumEnvironments
-  ) {
+) {
   # Parms contains r = ReproductionRate, a = InteractionMatrix
   function(t, y, parms = NULL) {
     rep(ReproductionRate, NumEnvironments) + InteractionMatrix %*% y
@@ -142,14 +142,22 @@ CreateAssemblySequence <- function(
 EliminationAndNeutralEvents <- function(
   EventsAndSeed, Species, #InteractionMatrices, #Pool,
   PerCapitaDynamics, EliminationThreshold,
-  ArrivalDensity
+  ArrivalDensity, Verbose = FALSE
 ) {
   EventDF <- EventsAndSeed$Events # Other list entry is seed.
   PerCapitaDynams <- PerCapitaDynamics
   ArrivalDens <- ArrivalDensity
+  Verb <- Verbose
   function(t, y, parms,
            ReturnEvents = FALSE) {
     if (ReturnEvents) {return(EventDF)}
+    if (Verb > 0) {
+      if (Verb == 1) {
+        print(paste("t:", t))
+      } else if (Verb > 1) {
+        print(paste(Sys.time(), "t:", t))
+      }
+    }
 
     y <- ifelse(y <= EliminationThreshold, 0, y)
     event <- which(t == EventDF$Times)
@@ -192,7 +200,7 @@ CreateDispersalMatrix <- function(
     tryCatch(diag(EnvironmentDistances), error = function(e) {
       Matrix::diag(EnvironmentDistances)
     }) == 0
-    )
+  )
 
   dispersalDiags <- NULL
   # Take i to be the (super/sub) diagonal index, aka "band".
@@ -208,7 +216,7 @@ CreateDispersalMatrix <- function(
             if (offset != 0 &&
                 nrow(mat) >= index + offset &&
                 index + offset >= 1
-                )
+            )
               if (mat[index, index + offset] != 0) { # To prevent Diffusive Infs.
                 1/mat[index, index + offset] * vec
               } else {
@@ -271,6 +279,7 @@ MultipleNumericalAssembly_Dispersal <- function(
   EnvironmentSeeds = NULL, # If one seed, used to generate seeds for the system.
   # Otherwise, we can use seeds equal to the number of environments
   HistorySeed = NULL, # Use only one seed, this controls all "external" dynamics.
+  Verbose = FALSE,
 
   # ARGUMENTS REQUIRED IF ALTERNATIVES NOT PROVIDED:
   # See https://en.wikipedia.org/wiki/Coupon_collector%27s_problem#Extensions_and_generalizations
@@ -322,7 +331,8 @@ MultipleNumericalAssembly_Dispersal <- function(
       EventsAndSeed = Events, Species = nrow(Pool),
       PerCapitaDynamics = PerCapitaDynamics,
       EliminationThreshold = EliminationThreshold,
-      ArrivalDensity = ArrivalDensity
+      ArrivalDensity = ArrivalDensity,
+      Verbose = Verbose
     )
   )
 
@@ -335,13 +345,13 @@ MultipleNumericalAssembly_Dispersal <- function(
 
   # Dynamics: ##################################################################
   Dynamics <- function(t, y, parms) {
-     list( # Reaction: PerCapitaDynamics includes interactions and reproduction.
-       as.numeric(
-         y * PerCapitaDynamics(t, y, parms)
-         # Transport: Dispersal means movement of abundance between nodes.
-         + DispersalMatrix %*% y
-       )
-     )
+    list( # Reaction: PerCapitaDynamics includes interactions and reproduction.
+      as.numeric(
+        y * PerCapitaDynamics(t, y, parms)
+        # Transport: Dispersal means movement of abundance between nodes.
+        + DispersalMatrix %*% y
+      )
+    )
   }
 
   # Timings: ###################################################################
@@ -369,6 +379,7 @@ MultipleNumericalAssembly_Dispersal <- function(
   deEvents$time <- Timings
 
   # Evaluation: ################################################################
+  if (Verbose > 0) {print("Beginning Evaluation.")}
   abundance <- deSolve::lsoda(
     y = rep(0, nrow(Pool) * NumEnvironments),
     times = Timings,
