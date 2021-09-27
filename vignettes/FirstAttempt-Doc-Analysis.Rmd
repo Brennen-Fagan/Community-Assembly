@@ -33,6 +33,14 @@ library(ggfortify) # used for biplots of PCAs
 load(file.path(
   "..", "experiments", "MNA-FirstAttempt-Result-Env10-None.RData")
 )
+
+# https://stackoverflow.com/a/7172832
+ifrm <- function(obj, env = globalenv()) {
+    obj <- deparse(substitute(obj))
+    if(exists(obj, envir = env)) {
+        rm(list = obj, envir = env)
+    }
+}
 ```
 
 ### Events
@@ -350,7 +358,9 @@ so little of the variance is explained that is probably not worth further
 examination.
 
 ```{r}
-ggplot2::autoplot(PCA, loadings = TRUE)
+ggplot2::autoplot(PCA, loadings = TRUE, 
+                  data = AveragedAbundance %>% dplyr::select_if(~ any(. > 0)),
+                  colour = "time")
 ```
 
 We can try again with presence-absence data instead.
@@ -378,7 +388,9 @@ head(summary(PCAPA)$importance[2, ])
 So it is a bit better, but not by much.
 
 ```{r}
-ggplot2::autoplot(PCAPA, loadings = TRUE)
+ggplot2::autoplot(PCAPA, loadings = TRUE, 
+                  data = AveragedPA %>% dplyr::select_if(~ any(. > 0)),
+                  colour = "time")
 ```
 
 I should note that this is not a failure of the method persay. 
@@ -392,6 +404,12 @@ suggest that the majority of the change in environments can be described by abou
 My initial hypothesis for when the systems are coupled is that, as coupling increases, the number of principal components should decrease, since one system's changes will be better predictors of the next system's changes.
 (An interesting related question; do the number of principal components correlate with the amount of biodiversity in the system?
 
+```{r cleanup}
+ifrm(AveragedAbundance)
+ifrm(AveragedPA)
+ifrm(PCA)
+ifrm(PCAPA)
+```
 
 ##### Beta Diversity Over Time
 Since trying to reduce the system dimensionally does not work (well enough) a
@@ -400,6 +418,8 @@ the course of the simulation.
 Initial problems include that there are quite a few measures of beta diversity 
 as well as that the (square of the) number of environments will determine how
 many entries we need to consider.
+
+To try this, we are going to 
 
 ##### Cluster Analysis Over Time
 One perhaps interesting idea is to try to group the environments by cluster
@@ -413,6 +433,8 @@ majority of the system's fate, while if they instead wander more randomly, then
 they would appear to be dominated by the neutral mechanisms.
 (Of course, this is affected by the rate of the neutral mechanisms, so it exists
 on a definite continuum.)
+(Note, of course, that cluster analysis usually includes something like PCA,
+so we would not necessarily expect a different result.)
 
 ##### State Network
 An additional idea that might be worth an initial look over is whether we can
