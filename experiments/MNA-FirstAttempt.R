@@ -12,7 +12,7 @@ LMLogBodySize <- c(-2, -1, -1, 0)
 
 PerIslandDistance <- 1
 SpeciesSpeeds <- 1
-Space <- match.arg("Ring", c("None", "Ring", "Line"))
+Space <- match.arg("Full", c("None", "Ring", "Line", "Full"))
 
 EliminationThreshold <- 10^-4 # Below which species are removed from internals
 ArrivalDensity <- EliminationThreshold * 4 * 10 ^ 3 # Traill et al. 2007
@@ -98,6 +98,15 @@ if (Space == "Ring" || Space == "Line")
 if (Space == "Ring") {
   DistanceMatrix[Environments, 1] <- PerIslandDistance
   DistanceMatrix[1, Environments] <- PerIslandDistance
+}
+if (Space == "Grid") {
+  # Given matrix(1:4, nrow = 2), trying 1 <-> 2, 1 <-> 3, 2 <-> 4, 3 <-> 4.
+  # I.e. matrix(c(0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0), nrow = 4)
+  # Use divisor closest to but <= square root for number of rows.
+}
+if (Space == "Full") {
+  DistanceMatrix <- matrix(1, nrow = Environments, ncol = Environments)
+  diag(DistanceMatrix) <- 0
 }
 
 DispersalMatrix <- CreateDispersalMatrix(

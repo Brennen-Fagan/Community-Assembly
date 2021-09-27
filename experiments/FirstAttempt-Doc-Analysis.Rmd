@@ -16,6 +16,23 @@ At the end, I will be presenting some preliminary results.
 I especially want to use this as a vehicle to think about how to analyse those results.
 
 ## Functions
+```{r}
+library(dplyr)     # Data Manipulation
+library(ggplot2)   # 2-D Plot
+library(plotly)    # 3-D Plot
+library(ggfortify) # used for biplots of PCAs
+library(vegan)     # Ecological analysis mega-package
+# library(RMTRCode2)
+
+# https://stackoverflow.com/a/7172832
+ifrm <- function(obj, env = globalenv()) {
+    obj <- deparse(substitute(obj))
+    if(exists(obj, envir = env)) {
+        rm(list = obj, envir = env)
+    }
+}
+```
+
 
 ## Results, No Spatial Structure {.tabset}
 
@@ -25,23 +42,9 @@ In this case, we are loading a system in which
 The pool and interaction matrix were assembled with the default parameters from Law and Morton's 1996 work.
 
 ```{r}
-library(dplyr)     # Data Manipulation
-library(ggplot2)   # 2-D Plot
-library(plotly)    # 3-D Plot
-library(ggfortify) # used for biplots of PCAs
-library(vegan)     # Ecological analysis mega-package
-# library(RMTRCode2)
 load(file.path(
   "..", "experiments", "MNA-FirstAttempt-Result-Env10-None.RData")
 )
-
-# https://stackoverflow.com/a/7172832
-ifrm <- function(obj, env = globalenv()) {
-    obj <- deparse(substitute(obj))
-    if(exists(obj, envir = env)) {
-        rm(list = obj, envir = env)
-    }
-}
 ```
 
 ### Events
@@ -527,7 +530,7 @@ EnvDistClustPA <- hclust(EnvironmentDistancePA)
 plot(EnvDistClustPA, labels = FALSE)
 ```
 
-##### State Network
+<!--##### State Network
 An additional idea that might be worth an initial look over is whether we can
 create the subspace of the graph explored by the simulation set. 
 This is probably of the lowest priority of the things described above, but this
@@ -536,4 +539,356 @@ measures.
 Such a map would usually be visualised with columns representing richness and
 edges representing moves along the system.
 We can colour the edges to represent whether they were via arrival, dynamic
-extinction, or neutral extinction as well.
+extinction, or neutral extinction as well. -->
+
+## Results, Line Spatial Structure {.tabset}
+
+We repeat the procedures above for the linear set.
+We use the same pool and interaction matrices, but change the space so that
+``adjacent'' communities can disperse (e.g. 1 <-> 2 <-> 3 <->...<-> 9 <-> 10).
+Similarly, the history is the same in terms of arrivals and extinctions.
+
+```{r}
+load(file.path(
+  "..", "experiments", "MNA-FirstAttempt-Result-Env10-Line.RData")
+)
+```
+
+### Abundance {.tabset}
+
+With 10 environments, it is probably not helpful to check 10 individual abundance curves, but looking at the first one might be helpful.
+```{r}
+LawMorton1996_PlotAbundance(result$Abundance[, c(1, 2:101)]) -> obj;
+```
+```{r}
+obj + ggplot2::scale_y_log10() + ggplot2::guides(color = FALSE)
+```
+Every vertical line is a species introduction or extinction by neutral dynamics.
+
+#### Alpha Diversity plots {.tabset}
+
+##### Intro
+```{r}
+Diversity <- lapply(
+  1:result$NumEnvironments,
+  function(i, abund, numSpecies) {
+    time <- abund[, 1]
+    env <- abund[, 1 + 1:numSpecies + numSpecies * (i - 1)]
+    richness <- rowSums(env != 0)
+    abundSum <- rowSums(env)
+    entropy <- env / abundSum
+    entropy <- - apply(
+      entropy, MARGIN = 1,
+      FUN = function(x) {
+        sum(ifelse(x != 0, x * log(x), 0))
+      })
+    species <- apply(
+      env, MARGIN = 1,
+      FUN = function(x) {
+        toString(which(x > 0))
+      }
+    )
+    data.frame(Time = time, 
+               Richness = richness, 
+               Entropy = entropy,
+               Species = species,
+               Environment = i)
+  },
+  abund = result$Abundance,
+  numSpecies = (ncol(result$Abundance) - 1) / result$NumEnvironments
+)
+
+
+Diversity <- dplyr::bind_rows(Diversity)
+Diversity <- Diversity %>% dplyr::mutate(
+  Evenness = Entropy / log(Richness)
+)
+```
+
+
+##### Richness
+```{r}
+ggplot2::ggplot(
+  Diversity, 
+  ggplot2::aes(
+    x = Time,
+    y = Richness,
+    color = factor(Environment),
+    alpha = ifelse(Environment == 1, 1, 0.3)
+  )
+) + ggplot2::geom_line(
+) + ggplot2::geom_line(
+  data = Diversity %>% dplyr::group_by(
+    Time
+    ) %>% dplyr::summarise(
+      Richness = mean(Richness)
+    ),
+  mapping = ggplot2::aes(
+    x = Time,
+    y = Richness
+  ),
+  color = "black",
+  inherit.aes = FALSE
+) + ggplot2::guides(
+  alpha = "none"
+) + ggplot2::scale_color_discrete(
+  "Environment"
+)
+```
+
+##### Entropy
+```{r}
+ggplot2::ggplot(
+  Diversity, 
+  ggplot2::aes(
+    x = Time,
+    y = Entropy,
+    color = factor(Environment),
+    alpha = ifelse(Environment == 1, 1, 0.3)
+  )
+) + ggplot2::geom_line(
+) + ggplot2::geom_line(
+  data = Diversity %>% dplyr::group_by(
+    Time
+    ) %>% dplyr::summarise(
+      Entropy = mean(Entropy)
+    ),
+  mapping = ggplot2::aes(
+    x = Time,
+    y = Entropy
+  ),
+  color = "black",
+  inherit.aes = FALSE
+) + ggplot2::guides(
+  alpha = "none"
+) + ggplot2::scale_color_discrete(
+  "Environment"
+)
+```
+
+##### Entropy-Richness
+```{r}
+plotly::plot_ly(data = Diversity %>% dplyr::filter(Environment < 2),
+                x = ~Richness, y = ~Entropy, z = ~Time, type = "scatter3d",
+                mode = "lines", opacity = 1, line = list(color = ~Time))
+```
+
+##### Evenness
+```{r}
+ggplot2::ggplot(
+  Diversity, 
+  ggplot2::aes(
+    x = Time,
+    y = Evenness,
+    color = factor(Environment),
+    alpha = ifelse(Environment == 1, 1, 0.3)
+  )
+) + ggplot2::geom_line(
+) + ggplot2::geom_line(
+  data = Diversity %>% dplyr::group_by(
+    Time
+    ) %>% dplyr::summarise(
+      Evenness = mean(Evenness)
+    ),
+  mapping = ggplot2::aes(
+    x = Time,
+    y = Evenness
+  ),
+  color = "black",
+  inherit.aes = FALSE
+) + ggplot2::guides(
+  alpha = "none"
+) + ggplot2::scale_color_discrete(
+  "Environment"
+)
+```
+
+##### Environment Diversity
+
+```{r}
+EnvDiversity <- lapply(
+    1:((ncol(result$Abundance) - 1) / result$NumEnvironments),
+    function(i, abund, numSpecies) {
+        time <- abund[, 1]
+        env <- abund[, 1 + i + numSpecies * (1:result$NumEnvironments - 1)]
+        richness <- rowSums(env != 0)
+        abundSum <- rowSums(env)
+        environments <- apply(
+            env, MARGIN = 1,
+            FUN = function(x) {
+                toString(which(x > 0))
+            }
+        )
+        data.frame(Time = time, 
+                   Richness = richness, 
+                   Abundance = abundSum,
+                   Species = i,
+                   Environments = environments)
+    },
+    abund = result$Abundance,
+    numSpecies = (ncol(result$Abundance) - 1) / result$NumEnvironments
+)
+
+EnvDiversity <- dplyr::bind_rows(EnvDiversity)
+```
+
+```{r}
+ggplot2::ggplot(
+  EnvDiversity %>% dplyr::filter(Richness > 1), 
+  aes(x = Time, y = Richness, color = Species)
+) + geom_point(
+  alpha = 0.01, size = 3
+) + guides(
+  color = "none"
+)
+```
+
+```{r}
+with(EnvDiversity %>% mutate(
+  Time = floor(Time)
+  ) %>% group_by(
+    Time, Species
+    ) %>% summarise(
+      Richness = round(mean(Richness)),
+      .groups = "drop"
+      ),
+     table(Species, Richness))
+```
+#### Beta Diversity {.tabset}
+
+##### Principal Components Analysis
+```{r}
+AveragedAbundance <- result$Abundance %>% data.frame(
+) %>% dplyr::mutate(
+  time = floor(time/100)*100
+) %>% dplyr::group_by(
+  time
+) %>% dplyr::summarise(
+  dplyr::across(.fns = ~ mean(.x))
+)
+```
+
+```{r}
+PCA <- prcomp(AveragedAbundance %>% dplyr::select_if(~ any(. > 0)), 
+              center = TRUE, scale. = TRUE, rank. = 25)
+```
+
+```{r}
+head(summary(PCA)$importance[2, ])
+```
+
+```{r} 
+sum(summary(PCA)$importance[2, ])
+```
+
+```{r}
+ggplot2::autoplot(PCA, loadings = TRUE, 
+                  data = AveragedAbundance %>% dplyr::select_if(~ any(. > 0)),
+                  colour = "time")
+```
+
+```{r}
+AveragedPA <- result$Abundance %>% data.frame(
+) %>% dplyr::mutate(
+  time = floor(time/100)*100
+) %>% dplyr::mutate(
+  dplyr::across(.cols = !time, .fns = ~ .x > 0)
+) %>% dplyr::group_by(
+  time
+) %>% dplyr::summarise(
+  dplyr::across(.fns = ~ mean(.x))
+)
+```
+
+```{r}
+PCAPA <- prcomp(AveragedPA %>% dplyr::select_if(~ any(. > 0)), 
+              center = TRUE, scale. = TRUE, rank. = 25)
+```
+
+```{r}
+head(summary(PCAPA)$importance[2, ])
+```
+
+```{r}
+ggplot2::autoplot(PCAPA, loadings = TRUE, 
+                  data = AveragedPA %>% dplyr::select_if(~ any(. > 0)),
+                  colour = "time")
+```
+
+```{r} 
+sum(summary(PCA)$importance[2, ])
+``` 
+
+```{r cleanup2}
+ifrm(AveragedAbundance)
+ifrm(AveragedPA)
+ifrm(PCA)
+ifrm(PCAPA)
+```
+
+##### Beta Diversity Over Time
+```{r}
+Environments <- lapply(
+  1:result$NumEnvironments,
+  function(i, abund, numSpecies) {
+    time <- abund[, 1]
+    env <- abund[, 1 + 1:numSpecies + numSpecies * (i - 1)]
+    
+    retval <- data.frame(Environment = toString(i),
+                         Time = time
+    )
+    
+    retval <- cbind(retval, env)
+    colnames(retval) <- c("Environment", "Time", 
+                          paste0("Basal", 1:34), 
+                          paste0("Consumer", 35:100)
+    )
+    return(retval)
+                          
+  },
+  abund = result$Abundance %>% data.frame(
+  ) %>% dplyr::mutate(
+    time = floor(time/100)*100
+  ) %>% dplyr::group_by(
+    time
+  ) %>% dplyr::summarise(
+    dplyr::across(.fns = ~ mean(.x))
+  ),
+  numSpecies = (ncol(result$Abundance) - 1) / result$NumEnvironments
+)
+
+Environments <- dplyr::bind_rows(Environments)
+Environments <- Environments %>% dplyr::filter(
+  dplyr::if_any(dplyr::starts_with(c("Basal", "Consumer")), ~ (.x != 0)),
+)
+```
+
+##### Cluster Analysis Over Time
+
+```{r}
+EnvironmentDistance <- Environments %>% dplyr::select(
+  -Environment, -Time
+) %>% vegan::vegdist(method = "jaccard")
+```
+
+```{r}
+EnvDistClust <- hclust(EnvironmentDistance)
+```
+
+```{r}
+plot(EnvDistClust, labels = FALSE)
+```
+
+```{r}
+EnvironmentDistancePA <- Environments %>% dplyr::select(
+  -Environment, -Time
+) %>% vegan::vegdist(method = "jaccard", binary = TRUE)
+```
+
+```{r}
+EnvDistClustPA <- hclust(EnvironmentDistancePA)
+```
+
+```{r}
+plot(EnvDistClustPA, labels = FALSE)
+```
