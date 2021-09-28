@@ -947,8 +947,8 @@ load(file.path(
   "..", "experiments", "MNA-FirstAttempt1e+06-Result-Env10-Line.RData")
 )
 toRemove <- result$Abundance <= result$Parameters$EliminationThreshold
-result$Abundance[toRemove[1:(length(toRemove)/2)]] <- 0
-result$Abundance[toRemove[(length(toRemove)/2 + 1):length(toRemove)]] <- 0
+result$Abundance[1:(length(toRemove)/2)][toRemove[1:(length(toRemove)/2)]] <- 0
+result$Abundance[(length(toRemove)/2 + 1):length(toRemove)][toRemove[(length(toRemove)/2 + 1):length(toRemove)]] <- 0
 ifrm(toRemove)
 ```
 
