@@ -149,11 +149,20 @@ ggplot2::ggplot(
   data = Diversity %>% dplyr::group_by(
     Time
     ) %>% dplyr::summarise(
-      Richness = mean(Richness)
+      Mean = mean(Richness),
+      SpeciesTotal = toString(sort(unique(unlist(strsplit(paste(
+        Species, collapse = ", "), split = ", ", fixed = TRUE))))),
+      Gamma = unlist(lapply(strsplit(
+        SpeciesTotal, split = ", ", fixed = TRUE), length))
+    ) %>% tidyr::pivot_longer(
+      cols = c(Mean, Gamma), 
+      names_to = "Aggregation",
+      values_to = "Richness"
     ),
   mapping = ggplot2::aes(
     x = Time,
-    y = Richness
+    y = Richness,
+    linetype = Aggregation
   ),
   color = "black",
   inherit.aes = FALSE
@@ -655,11 +664,20 @@ ggplot2::ggplot(
   data = Diversity %>% dplyr::group_by(
     Time
     ) %>% dplyr::summarise(
-      Richness = mean(Richness)
+      Mean = mean(Richness),
+      SpeciesTotal = toString(sort(unique(unlist(strsplit(paste(
+        Species, collapse = ", "), split = ", ", fixed = TRUE))))),
+      Gamma = unlist(lapply(strsplit(
+        SpeciesTotal, split = ", ", fixed = TRUE), length))
+    ) %>% tidyr::pivot_longer(
+      cols = c(Mean, Gamma), 
+      names_to = "Aggregation",
+      values_to = "Richness"
     ),
   mapping = ggplot2::aes(
     x = Time,
-    y = Richness
+    y = Richness,
+    linetype = Aggregation
   ),
   color = "black",
   inherit.aes = FALSE
@@ -1020,11 +1038,20 @@ ggplot2::ggplot(
   data = Diversity %>% dplyr::group_by(
     Time
     ) %>% dplyr::summarise(
-      Richness = mean(Richness)
+      Mean = mean(Richness),
+      SpeciesTotal = toString(sort(unique(unlist(strsplit(paste(
+        Species, collapse = ", "), split = ", ", fixed = TRUE))))),
+      Gamma = unlist(lapply(strsplit(
+        SpeciesTotal, split = ", ", fixed = TRUE), length))
+    ) %>% tidyr::pivot_longer(
+      cols = c(Mean, Gamma), 
+      names_to = "Aggregation",
+      values_to = "Richness"
     ),
   mapping = ggplot2::aes(
     x = Time,
-    y = Richness
+    y = Richness,
+    linetype = Aggregation
   ),
   color = "black",
   inherit.aes = FALSE
