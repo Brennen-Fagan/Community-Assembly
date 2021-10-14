@@ -250,17 +250,30 @@ stopifnot(isTRUE(all.equal(egResults_Dispersal$Abundance,
 
 # MultipleNumericalAssembly_Dispersal, Trophics ################################
 
-egResults_Dispersal3 <- MultipleNumericalAssembly_Dispersal(
+# egResults_Dispersal3 <- MultipleNumericalAssembly_Dispersal(
+#   Pool = egPool,
+#   NumEnvironments = numEnviron,
+#   InteractionMatrices = egInteractions,
+#   Events = egEvents,
+#   PerCapitaDynamics = egDynamics,
+#   DispersalMatrix = egDispersal,
+#   EliminationThreshold = 10^-4, ArrivalDensity = 0.4,
+#   # MaximumTimeStep = 25, # Unrealistic, but helpful for computations.
+#   # CalculateTrophicStructure = TRUE,
+#   Verbose = TRUE
+# )
+
+egTrophicFunction <- CalculateTrophicStructure(
   Pool = egPool,
   NumEnvironments = numEnviron,
   InteractionMatrices = egInteractions,
-  Events = egEvents,
-  PerCapitaDynamics = egDynamics,
-  DispersalMatrix = egDispersal,
-  EliminationThreshold = 10^-4, ArrivalDensity = 0.4,
-  MaximumTimeStep = 25, # Unrealistic, but helpful for computations.
-  CalculateTrophicStructure = TRUE,
-  Verbose = TRUE
+  EliminationThreshold = 10^-4
+)
+
+egTrophicLevels <- apply(
+  egResults_Dispersal2$Abundance[, -1], # No Time Column
+  MARGIN = 1, # Rows
+  FUN = egTrophicFunction
 )
 
 print("Success.")
