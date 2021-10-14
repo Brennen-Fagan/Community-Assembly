@@ -306,11 +306,6 @@ CalculateTrophicStructure <- function(
 
       names(redPool)[1] <- "node"
       redPool$node <- colnames(redMat)
-      # if ("Size" %in% names(redPool)) {
-      #   # NOTE: implicitly, this means we are working in the LM1996 Size
-      #   # Structure framework.
-      #   names(redPool)[3] <- "M"
-      # }
 
       Graph <- igraph::graph_from_adjacency_matrix(
         redMat, weighted = TRUE
@@ -450,10 +445,6 @@ MultipleNumericalAssembly_Dispersal <- function(
   # Otherwise, we can use seeds equal to the number of environments
   HistorySeed = NULL, # Use only one seed, this controls all "external" dynamics.
 
-  # CalculateTrophicStructure = FALSE, # Turns on computationally intensive
-  # # calculation of trophic network at each point in time.
-  # # This is done strictly within an environment.
-
   Verbose = FALSE,
 
   # ARGUMENTS REQUIRED IF ALTERNATIVES NOT PROVIDED:
@@ -522,33 +513,6 @@ MultipleNumericalAssembly_Dispersal <- function(
 
   # Dynamics: ##################################################################
 
-  # Chris suggested that we try to extract trophic structure on the fly.
-  # if (CalculateTrophicStructure) {
-  #   CalculationTrophic <- CalculateTrophicStructure(
-  #     Pool,
-  #     NumEnvironments,
-  #     InteractionMatrices,
-  #     EliminationThreshold
-  #   )
-  #
-  #   Dynamics <- function(t, y, parms) {
-  #     ydot <- (# Reaction: PerCapitaDynamics includes interactions and reproduction.
-  #       as.numeric(
-  #         y * PerCapitaDynamics(t, y, parms)
-  #         # Transport: Dispersal means movement of abundance between nodes.
-  #         + DispersalMatrix %*% y
-  #       ))
-  #
-  #     trophic <- CalculationTrophic(y)
-  #
-  #     list(
-  #       Derivatives = ydot,
-  #       Biomass = sum(y) # Not actually biomass (needs multiple of m)
-  #       #GraphData = trophic$EdgeVertexLists#,
-  #       #TrophicLevels = trophic$TrophicLevels
-  #     )
-  #   }
-  # } else {
   Dynamics <- function(t, y, parms) {
     list( # Reaction: PerCapitaDynamics includes interactions and reproduction.
       as.numeric(
@@ -558,7 +522,6 @@ MultipleNumericalAssembly_Dispersal <- function(
       )
     )
   }
-  # }
 
   # Timings: ###################################################################
   # Basic Targets: Start time, Event Times, and Final Settling Time.
