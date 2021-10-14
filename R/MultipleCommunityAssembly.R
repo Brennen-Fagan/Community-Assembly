@@ -148,6 +148,7 @@ EliminationAndNeutralEvents <- function(
   PerCapitaDynams <- PerCapitaDynamics
   ArrivalDens <- ArrivalDensity
   Verb <- Verbose
+
   function(t, y, parms,
            ReturnEvents = FALSE) {
     if (ReturnEvents) {return(EventDF)}
@@ -262,6 +263,155 @@ CreateDispersalMatrix <- function(
   return(dispersalMatrix)
 }
 
+CalculateTrophicStructure <- function(
+  Pool,
+  NumEnvironments,
+  InteractionMatrices,
+  EliminationThreshold
+  ) {
+  # Borrowing from LM1996-NumPoolCom-FoodWebs-2021-07.Rmd
+  nrowPool <- nrow(Pool)
+  function(y) {
+    # Clean up anything not present.
+    y <- ifelse(y <= EliminationThreshold, 0, y)
+
+    # Break y up into its environments.
+    EnvsY <- lapply(1:NumEnvironments, function(i, ys) {
+      ys[(i - 1) * nrowPool + 1:nrowPool]
+    }, ys = y)
+
+    EnvsEdgeVertexLists <- lapply(
+      seq_along(EnvsY),
+      function(i, envY, mats) {
+      # "Red"uced "Com"munity; who's present.
+      redCom <- which(envY[[i]] > 0)
+      redPool <- Pool[redCom, ]
+      redMat <- mats[[i]][redCom, redCom]
+
+      colnames(redMat) <- paste0('s',as.character(redCom))
+      rownames(redMat) <- colnames(redMat)
+
+      names(redPool)[1] <- "node"
+      redPool$node <- colnames(redMat)
+      # if ("Size" %in% names(redPool)) {
+      #   # NOTE: implicitly, this means we are working in the LM1996 Size
+      #   # Structure framework.
+      #   names(redPool)[3] <- "M"
+      # }
+
+      Graph <- igraph::graph_from_adjacency_matrix(
+        redMat, weighted = TRUE
+      )
+
+      Graph <- igraph::set.vertex.attribute(
+        Graph, "name", value = colnames(redMat)
+      )
+
+      redPool$N <- envY[[i]][redCom]
+
+      # For later analysis, take the matrix diagonal.
+
+      redPool$Intraspecific <- diag(redMat)
+
+      GraphAsDataFrame <- igraph::as_data_frame(Graph)
+
+      # Add in abundances for calculating abundance * (gain or loss)
+      GraphAsDataFrame <- dplyr::left_join(
+        GraphAsDataFrame,
+        dplyr::select(redPool, node, N),
+        by = c("to" = "node")
+      )
+
+      # Split data frame.
+      ResCon <- GraphAsDataFrame[GraphAsDataFrame$weight > 0,]
+      ConRes <- GraphAsDataFrame[GraphAsDataFrame$weight < 0,]
+
+      # Reorder and rename variables.
+      ResCon <- dplyr::select(ResCon,
+                              to, from, # resource = to, consumer = from,
+                              effectPerUnit = weight, resourceAbund = N)
+      ConRes <- dplyr::select(ConRes,
+                              to, from, # resource = from, consumer = to,
+                              effectPerUnit = weight, consumerAbund = N)
+      ResCon <- dplyr::mutate(dplyr::group_by(ResCon, from),
+                              effectActual = effectPerUnit * resourceAbund,
+                              Type = "Exploit+")
+      ConRes <- dplyr::mutate(dplyr::group_by(ConRes, from),
+                              effectActual = effectPerUnit * consumerAbund,
+                              Type = ifelse(from == to,
+                                            "SelfReg-",
+                                            "Exploit-"))
+
+      IntriG <- with(redPool, data.frame(
+        from = node, #resource = node,
+        to = node, #consumer = node,
+        effectPerUnit = ifelse(ReproductionRate > 0,
+                               ReproductionRate, 0),
+        effectActual = ifelse(ReproductionRate > 0,
+                              N * ReproductionRate, 0),
+        Type = "Intrisc+"))
+      IntriL <- with(redPool, data.frame(
+        from = node, #resource = node,
+        to = node, #consumer = node,
+        effectPerUnit = ifelse(ReproductionRate < 0,
+                               ReproductionRate, 0),
+        effectActual = ifelse(ReproductionRate < 0,
+                              N * ReproductionRate, 0),
+        Type = "Intrisc-"))
+
+      EdgeDataFrame <- dplyr::bind_rows(
+        dplyr::select(ResCon, -resourceAbund),
+        dplyr::select(ConRes, -consumerAbund),
+        IntriG, IntriL
+      )
+
+      EdgeDataFrame <- EdgeDataFrame %>% dplyr::rename(
+        # Empirically speaking, to and from appear reversed.
+        # A consumer (from) should have a negative effect on resource (to),
+        # but the organisation so far marks it as positive. We fix this.
+        tempname = to,
+        to = from
+      ) %>% dplyr::rename(
+        from = tempname
+      ) %>% dplyr::filter(
+        # Remove placeholder entries
+        effectPerUnit != 0
+      ) %>% dplyr::mutate(
+        # Useful to keep effects separate
+        effectSign = sign(effectPerUnit)
+      ) %>% group_by(
+        to, effectSign
+      ) %>% dplyr::mutate(
+        # Perform the post mortem of the most influential from's
+        effectEfficiency = effectPerUnit / sum(effectPerUnit),
+        effectNormalised = effectActual / sum(effectActual)
+      ) %>% dplyr::arrange(to)
+
+      list(
+        Edges = EdgeDataFrame,
+        Vertices = redPool
+      )
+
+    }, mats = InteractionMatrices)
+
+    EnvsCheddar <- lapply(EnvsEdgeVertexLists, RMTRCode2::toCheddar)
+
+    EnvsTrophic <- lapply(EnvsCheddar, cheddar::TrophicLevels,
+                          weight.by = "effectNormalised")
+
+    # In principle, I think these are the two return values.
+    # In practice, it seems more useful to return the EdgeVertexLists and
+    # the Trophic Levels, given the importance of intraspecific interactions.
+    # These are what Cheddar does not capture.
+
+    return(
+      EdgeVertexLists = EnvsEdgeVertexLists,
+      TrophicLevels = EnvsTrophic
+    )
+  }
+
+}
+
 MultipleNumericalAssembly_Dispersal <- function(
   Pool, # Required from outside function.
   NumEnvironments, # Number of environments
@@ -279,6 +429,11 @@ MultipleNumericalAssembly_Dispersal <- function(
   EnvironmentSeeds = NULL, # If one seed, used to generate seeds for the system.
   # Otherwise, we can use seeds equal to the number of environments
   HistorySeed = NULL, # Use only one seed, this controls all "external" dynamics.
+
+  CalculateTrophicStructure = FALSE, # Turns on computationally intensive
+  # calculation of trophic network at each point in time.
+  # This is done strictly within an environment.
+
   Verbose = FALSE,
 
   # ARGUMENTS REQUIRED IF ALTERNATIVES NOT PROVIDED:
@@ -346,14 +501,42 @@ MultipleNumericalAssembly_Dispersal <- function(
 
 
   # Dynamics: ##################################################################
-  Dynamics <- function(t, y, parms) {
-    list( # Reaction: PerCapitaDynamics includes interactions and reproduction.
-      as.numeric(
-        y * PerCapitaDynamics(t, y, parms)
-        # Transport: Dispersal means movement of abundance between nodes.
-        + DispersalMatrix %*% y
-      )
+
+  # Chris suggested that we try to extract trophic structure on the fly.
+  if (CalculateTrophicStructure) {
+    CalculationTrophic <- CalculateTrophicStructure(
+      Pool,
+      NumEnvironments,
+      InteractionMatrices,
+      EliminationThreshold
     )
+
+    Dynamics <- function(t, y, parms) {
+      ydot <- (# Reaction: PerCapitaDynamics includes interactions and reproduction.
+        as.numeric(
+          y * PerCapitaDynamics(t, y, parms)
+          # Transport: Dispersal means movement of abundance between nodes.
+          + DispersalMatrix %*% y
+        ))
+
+      trophic <- CalculationTrophic(y)
+
+      list(
+        Derivatives = ydot,
+        GraphData = trophic$EdgeVertexLists,
+        TrophicLevels = trophic$TrophicLevels
+      )
+    }
+  } else {
+    Dynamics <- function(t, y, parms) {
+      list( # Reaction: PerCapitaDynamics includes interactions and reproduction.
+        as.numeric(
+          y * PerCapitaDynamics(t, y, parms)
+          # Transport: Dispersal means movement of abundance between nodes.
+          + DispersalMatrix %*% y
+        )
+      )
+    }
   }
 
   # Timings: ###################################################################
