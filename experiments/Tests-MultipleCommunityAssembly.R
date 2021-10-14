@@ -247,4 +247,20 @@ egResults_Dispersal2 <- MultipleNumericalAssembly_Dispersal(
 stopifnot(isTRUE(all.equal(egResults_Dispersal$Abundance,
                            egResults_Dispersal2$Abundance)))
 
+
+# MultipleNumericalAssembly_Dispersal, Trophics ################################
+
+egResults_Dispersal3 <- MultipleNumericalAssembly_Dispersal(
+  Pool = egPool,
+  NumEnvironments = numEnviron,
+  InteractionMatrices = egInteractions,
+  Events = egEvents,
+  PerCapitaDynamics = egDynamics,
+  DispersalMatrix = egDispersal,
+  EliminationThreshold = 10^-4, ArrivalDensity = 0.4,
+  MaximumTimeStep = 25, # Unrealistic, but helpful for computations.
+  CalculateTrophicStructure = TRUE,
+  Verbose = TRUE
+)
+
 print("Success.")

@@ -1,7 +1,11 @@
 # For playing with Edge-Vertex Lists, especially plotting.
 # See LM1996-NumPoolCom-FoodWebs-2021-07.Rmd
 
-toCheddar <- function(EVList, name = "") {# Edges Vertices List
+toCheddar <- function(EVList, name = " ") {# Edges Vertices List
+  if (is.na(EVList$Edges) && is.na(EVList$Vertices)) {
+    return(NA)
+  }
+
   links <- EVList$Edges
 
   # cheddar does not like "cannibalism".

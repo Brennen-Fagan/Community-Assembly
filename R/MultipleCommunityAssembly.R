@@ -285,8 +285,18 @@ CalculateTrophicStructure <- function(
       function(i, envY, mats) {
       # "Red"uced "Com"munity; who's present.
       redCom <- which(envY[[i]] > 0)
+
+      if (length(redCom) == 0) {
+        return(list(
+          Edges = NA,
+          Vertices = NA
+        ))
+      }
+
       redPool <- Pool[redCom, ]
-      redMat <- mats[[i]][redCom, redCom]
+      redMat <- matrix(mats[[i]][redCom, redCom],
+                       nrow = length(redCom),
+                       ncol = length(redCom))
 
       colnames(redMat) <- paste0('s',as.character(redCom))
       rownames(redMat) <- colnames(redMat)
@@ -379,7 +389,7 @@ CalculateTrophicStructure <- function(
       ) %>% dplyr::mutate(
         # Useful to keep effects separate
         effectSign = sign(effectPerUnit)
-      ) %>% group_by(
+      ) %>% dplyr::group_by(
         to, effectSign
       ) %>% dplyr::mutate(
         # Perform the post mortem of the most influential from's
@@ -392,11 +402,18 @@ CalculateTrophicStructure <- function(
         Vertices = redPool
       )
 
-    }, mats = InteractionMatrices)
+    },
+    envY = EnvsY,
+    mats = InteractionMatrices$Mats)
 
     EnvsCheddar <- lapply(EnvsEdgeVertexLists, RMTRCode2::toCheddar)
 
-    EnvsTrophic <- lapply(EnvsCheddar, cheddar::TrophicLevels,
+    EnvsTrophic <- lapply(EnvsCheddar,
+                          function(x, weight.by) {
+                            if (all(!is.na(x)))
+                              cheddar::TrophicLevels(x, weight.by = weight.by)
+                            else NA
+                            },
                           weight.by = "effectNormalised")
 
     # In principle, I think these are the two return values.
@@ -404,10 +421,10 @@ CalculateTrophicStructure <- function(
     # the Trophic Levels, given the importance of intraspecific interactions.
     # These are what Cheddar does not capture.
 
-    return(
+    return(list(
       EdgeVertexLists = EnvsEdgeVertexLists,
       TrophicLevels = EnvsTrophic
-    )
+    ))
   }
 
 }
@@ -523,8 +540,9 @@ MultipleNumericalAssembly_Dispersal <- function(
 
       list(
         Derivatives = ydot,
-        GraphData = trophic$EdgeVertexLists,
-        TrophicLevels = trophic$TrophicLevels
+        Biomass = sum(y)
+        #GraphData = trophic$EdgeVertexLists#,
+        #TrophicLevels = trophic$TrophicLevels
       )
     }
   } else {
