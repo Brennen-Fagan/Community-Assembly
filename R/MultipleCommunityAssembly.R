@@ -271,6 +271,9 @@ CalculateTrophicStructure <- function(
   ) {
   # Borrowing from LM1996-NumPoolCom-FoodWebs-2021-07.Rmd
   nrowPool <- nrow(Pool)
+
+  # This function should be appliable row-wise to the results.
+  # One does need to remove the time column, as usual.
   function(y) {
     # Clean up anything not present.
     y <- ifelse(y <= EliminationThreshold, 0, y)
@@ -447,9 +450,9 @@ MultipleNumericalAssembly_Dispersal <- function(
   # Otherwise, we can use seeds equal to the number of environments
   HistorySeed = NULL, # Use only one seed, this controls all "external" dynamics.
 
-  CalculateTrophicStructure = FALSE, # Turns on computationally intensive
-  # calculation of trophic network at each point in time.
-  # This is done strictly within an environment.
+  # CalculateTrophicStructure = FALSE, # Turns on computationally intensive
+  # # calculation of trophic network at each point in time.
+  # # This is done strictly within an environment.
 
   Verbose = FALSE,
 
@@ -520,42 +523,42 @@ MultipleNumericalAssembly_Dispersal <- function(
   # Dynamics: ##################################################################
 
   # Chris suggested that we try to extract trophic structure on the fly.
-  if (CalculateTrophicStructure) {
-    CalculationTrophic <- CalculateTrophicStructure(
-      Pool,
-      NumEnvironments,
-      InteractionMatrices,
-      EliminationThreshold
+  # if (CalculateTrophicStructure) {
+  #   CalculationTrophic <- CalculateTrophicStructure(
+  #     Pool,
+  #     NumEnvironments,
+  #     InteractionMatrices,
+  #     EliminationThreshold
+  #   )
+  #
+  #   Dynamics <- function(t, y, parms) {
+  #     ydot <- (# Reaction: PerCapitaDynamics includes interactions and reproduction.
+  #       as.numeric(
+  #         y * PerCapitaDynamics(t, y, parms)
+  #         # Transport: Dispersal means movement of abundance between nodes.
+  #         + DispersalMatrix %*% y
+  #       ))
+  #
+  #     trophic <- CalculationTrophic(y)
+  #
+  #     list(
+  #       Derivatives = ydot,
+  #       Biomass = sum(y) # Not actually biomass (needs multiple of m)
+  #       #GraphData = trophic$EdgeVertexLists#,
+  #       #TrophicLevels = trophic$TrophicLevels
+  #     )
+  #   }
+  # } else {
+  Dynamics <- function(t, y, parms) {
+    list( # Reaction: PerCapitaDynamics includes interactions and reproduction.
+      as.numeric(
+        y * PerCapitaDynamics(t, y, parms)
+        # Transport: Dispersal means movement of abundance between nodes.
+        + DispersalMatrix %*% y
+      )
     )
-
-    Dynamics <- function(t, y, parms) {
-      ydot <- (# Reaction: PerCapitaDynamics includes interactions and reproduction.
-        as.numeric(
-          y * PerCapitaDynamics(t, y, parms)
-          # Transport: Dispersal means movement of abundance between nodes.
-          + DispersalMatrix %*% y
-        ))
-
-      trophic <- CalculationTrophic(y)
-
-      list(
-        Derivatives = ydot,
-        Biomass = sum(y)
-        #GraphData = trophic$EdgeVertexLists#,
-        #TrophicLevels = trophic$TrophicLevels
-      )
-    }
-  } else {
-    Dynamics <- function(t, y, parms) {
-      list( # Reaction: PerCapitaDynamics includes interactions and reproduction.
-        as.numeric(
-          y * PerCapitaDynamics(t, y, parms)
-          # Transport: Dispersal means movement of abundance between nodes.
-          + DispersalMatrix %*% y
-        )
-      )
-    }
   }
+  # }
 
   # Timings: ###################################################################
   # Basic Targets: Start time, Event Times, and Final Settling Time.
