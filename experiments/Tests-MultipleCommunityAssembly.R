@@ -276,4 +276,23 @@ egTrophicLevels <- apply(
   FUN = egTrophicFunction
 )
 
+stopifnot(
+  sapply(egTrophicLevels, function(lst) {
+    (length(lst$EdgeVertexList) == numEnviron) && # Length is correct
+      all(sapply(lst$EdgeVertexList, function(lst2) # Edgelist is correct
+        (is.na(lst2$Edges) && is.na(lst2$Vertices)) || # No species case
+          (all(lst2$Edges$effectNormalised >= 0) && # Normalisation
+             all(lst2$Edges$effectNormalised <= 1) &&
+             all(lst2$Edges %>% dplyr::group_by( # Check that norm'ed to 1.
+               to, effectSign
+             ) %>% dplyr::summarise(
+               .groups = "drop",
+               test = isTRUE(all.equal(sum(effectNormalised), 1))
+               # Note identical returns FALSE.
+             ) %>% dplyr::pull(test))
+          )
+      ))
+  })
+)
+
 print("Success.")
