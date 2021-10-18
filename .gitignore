@@ -2,6 +2,8 @@
 .Rhistory
 .RData
 .Ruserdata
+experiments/**/*.RDS
+experiments/**/*.knit.md
 src/*.o
 src/*.so
 src/*.dll
