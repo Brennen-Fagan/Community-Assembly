@@ -3,6 +3,7 @@
 .RData
 .Ruserdata
 experiments/**/*.RDS
+experiments/**/*.RData
 experiments/**/*.knit.md
 src/*.o
 src/*.so
