@@ -439,6 +439,10 @@ MultipleNumericalAssembly_Dispersal <- function(
   EliminationThreshold = 10^-4, # Below which species are removed from internals
   ArrivalDensity = EliminationThreshold * 4 * 10 ^ 3, # Traill et al. 2007
 
+  PopulationInitial = NULL, # if NULL, rep(rep(0, nrow(Pool)), NumEnvironments).
+  # Otherwise, should be of length nrow(Pool) * NumEnvironments, ordered as
+  # each species by environment: (Env 1 Spe 1) (Env 1 Spe 2)... (Env 2 Spe 1)...
+
   MaximumTimeStep = 1, # Maximum time solver can proceed without elimination.
   BetweenEventSteps = 10, # Number of steps to reach next event to smooth.
   EnvironmentSeeds = NULL, # If one seed, used to generate seeds for the system.
@@ -548,9 +552,13 @@ MultipleNumericalAssembly_Dispersal <- function(
   deEvents$time <- Timings
 
   # Evaluation: ################################################################
+  if (is.null(PopulationInitial)) {
+    PopulationInitial <- rep(0, nrow(Pool) * NumEnvironments)
+  }
+
   if (Verbose > 0) {print("Beginning Evaluation.")}
   abundance <- deSolve::lsoda(
-    y = rep(0, nrow(Pool) * NumEnvironments),
+    y = PopulationInitial,
     times = Timings,
     func = Dynamics,
     events = deEvents
