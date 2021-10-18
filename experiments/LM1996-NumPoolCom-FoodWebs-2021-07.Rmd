@@ -1,0 +1,1022 @@
+---
+title: "Looking at Food Webs"
+output:
+  html_notebook:
+    code_folding: hide
+---
+
+# Tabs {.tabset}
+
+## Load Data
+Setup:
+```{r libs, message=FALSE, warning=FALSE}
+examples <- c(1, 34, 49, 86, 92, 33, 87)
+
+# Check requisite packages are installed.
+packages <- c(
+  "plotly", 
+  "dplyr",
+  "cheddar",
+  "igraph",
+  "expm",
+  "foreach",
+  "iterators",
+  "rootSolve",
+  "RMTRCode2"
+)
+for (pkg in packages) {
+  library(pkg, character.only = TRUE)
+}
+
+# Reserved Names
+communitiesAll <- NULL
+invasionsDirected <- NULL
+islandInteractionsOneEmptyTwo <- NULL
+islandInteractionsOneEmptyTwoWhich <- NULL
+islandInteractionsOneTwo <- NULL
+islandInteractionsOneTwoWhich <- NULL
+mats <- NULL
+paramFrame <- NULL
+plotScalingData <- NULL
+pools <- NULL
+```
+
+Sanity Check:
+```{r loadDat}
+ellipsisApply <- function(..., FUN) {
+  lapply(as.list(...), FUN)
+}
+
+load("LM1996-NumPoolCom-QOut-2021-05.RData")
+# Stop if not all are not null
+stopifnot(all(unlist(ellipsisApply(
+  FUN = function(bool) {!is.null(bool)},
+  communitiesAll,
+  invasionsDirected,
+  islandInteractionsOneEmptyTwo,
+  islandInteractionsOneEmptyTwoWhich,
+  islandInteractionsOneTwo,
+  islandInteractionsOneTwoWhich,
+  mats,
+  paramFrame,
+  plotScalingData,
+  pools,
+))))
+```
+
+Create graphs.
+Note the central issue here: the previous attempt at creating these graphs 
+obeyed a 'no-cannibalism' rule due to how the `cheddar` package formats food 
+webs.
+This is fine for trophic levels, but not so great for understanding mortality
+and growth in the system, as we are then limited to only exploitation as a 
+source.
+For basal species, there is the positive reproduction/natural growth rate.
+For consumers, this is instead a loss due to maintenance requirements.
+Additionally, there is intra-specific competition 
+(which `cheddar` thinks is cannibalism).
+For our full growth-mortality analysis, we need these in addition to the 
+existing exploitation dynamics.
+```{r createGraphs}
+foodWebs <- list()
+
+for (r in 1:nrow(communitiesAll)) {
+  foodWebs[[r]] <- with(
+    communitiesAll[r, ],
+    {
+      redCom <- RMTRCode2::CsvRowSplit(Communities)
+      redMat <- mats[[DatasetID]][[CombnNum]][redCom, redCom]
+      redPool <- pools[[DatasetID]][[CombnNum]][redCom, ]
+      
+      colnames(redMat) <- paste0('s',as.character(redCom))
+      rownames(redMat) <- colnames(redMat)
+      
+      names(redPool)[1] <- "node"
+      redPool$node <- colnames(redMat)
+      names(redPool)[3] <- "M"
+      
+      Graph <- igraph::graph_from_adjacency_matrix(
+        redMat, weighted = TRUE
+      )
+      
+      Graph <- igraph::set.vertex.attribute(
+        Graph, "name", value = colnames(redMat)
+      )
+      
+      redPool$N <- RMTRCode2::CsvRowSplit(CommunityAbund)
+      
+      # For later analysis, take the matrix diagonal.
+      
+      redPool$Intraspecific <- diag(redMat)
+      
+      GraphAsDataFrame <- igraph::as_data_frame(Graph)
+  
+      # Add in abundances for calculating abundance * (gain or loss)
+      GraphAsDataFrame <- dplyr::left_join(
+        GraphAsDataFrame,
+        dplyr::select(redPool, node, N),
+        by = c("to" = "node")
+      )
+  
+      # Split data frame.
+      ResCon <- GraphAsDataFrame[GraphAsDataFrame$weight > 0,]
+      ConRes <- GraphAsDataFrame[GraphAsDataFrame$weight < 0,]
+      
+      # Reorder and rename variables.
+      ResCon <- dplyr::select(ResCon, 
+                                 to, from, # resource = to, consumer = from, 
+                                 effectPerUnit = weight, resourceAbund = N)
+      ConRes <- dplyr::select(ConRes, 
+                                 to, from, # resource = from, consumer = to, 
+                                 effectPerUnit = weight, consumerAbund = N)
+      ResCon <- dplyr::mutate(dplyr::group_by(ResCon, from),
+                              effectActual = effectPerUnit * resourceAbund,
+                              Type = "Exploit+")
+      ConRes <- dplyr::mutate(dplyr::group_by(ConRes, from),
+                              effectActual = effectPerUnit * consumerAbund,
+                              Type = ifelse(from == to,
+                                            "SelfReg-",
+                                            "Exploit-"))
+      
+      IntriG <- with(redPool, data.frame(
+                              from = node, #resource = node,
+                              to = node, #consumer = node,
+                              effectPerUnit = ifelse(ReproductionRate > 0,
+                                                   ReproductionRate, 0),
+                              effectActual = ifelse(ReproductionRate > 0,
+                                                  N * ReproductionRate, 0),
+                              Type = "Intrisc+")) 
+      IntriL <- with(redPool, data.frame(
+                              from = node, #resource = node,
+                              to = node, #consumer = node,
+                              effectPerUnit = ifelse(ReproductionRate < 0,
+                                                   ReproductionRate, 0),
+                              effectActual = ifelse(ReproductionRate < 0,
+                                                  N * ReproductionRate, 0),
+                              Type = "Intrisc-"))
+      
+      EdgeDataFrame <- dplyr::bind_rows(
+        dplyr::select(ResCon, -resourceAbund), 
+        dplyr::select(ConRes, -consumerAbund),
+        IntriG, IntriL
+      )
+      
+      EdgeDataFrame <- EdgeDataFrame %>% dplyr::rename(
+        # Empirically speaking, to and from appear reversed.
+        # A consumer (from) should have a negative effect on resource (to),
+        # but the organisation so far marks it as positive. We fix this.
+        tempname = to,
+        to = from
+      ) %>% dplyr::rename(
+        from = tempname
+      ) %>% dplyr::filter(
+        # Remove placeholder entries
+        effectPerUnit != 0
+      ) %>% dplyr::mutate(
+        # Useful to keep effects separate
+        effectSign = sign(effectPerUnit)
+      ) %>% group_by(
+        to, effectSign
+      ) %>% dplyr::mutate(
+        # Perform the post mortem of the most influential from's
+        effectEfficiency = effectPerUnit / sum(effectPerUnit), 
+        effectNormalised = effectActual / sum(effectActual)
+      ) %>% dplyr::arrange(to)
+      
+      list(
+        Edges = EdgeDataFrame,
+        Vertices = redPool
+      )
+    }
+  )
+}
+```
+
+Preparatory code:
+```{r functions}
+toCheddar <- function(EVList, name = "") {# Edges Vertices List
+  links <- EVList$Edges
+
+  # cheddar does not like "cannibalism".
+  links <- links[
+    links$to != links$from,
+  ]
+
+  # "[C]olumns called ‘resource’ and ‘consumer’ must be given."
+  links <- dplyr::bind_rows(
+    links %>% dplyr::filter(effectSign == 1) %>% dplyr::rename(
+      resource = from, consumer = to),
+    links %>% dplyr::filter(effectSign == -1) %>% dplyr::rename(
+      resource = to, consumer = from),
+  ) %>% dplyr::select(-Type) # Cheddar confuses node Type and edge Type.
+
+  cheddar::Community(
+    nodes = EVList$Vertices,
+    properties = list(
+      title = name,
+      M.units = "masses",
+      N.units = "abund"
+    ),
+    trophic.links = links
+  )
+}
+
+toIGraph <- function(EVList, sign = 0) {
+  igraph::graph_from_data_frame(
+    d = if(sign == 0) {
+      EVList$Edges
+    } else {
+      EVList$Edges[EVList$Edges$effectSign == sign, ]
+    },
+    directed = TRUE,
+    vertices = EVList$Vertices
+  )
+}
+
+
+toPostMortem <- function(EVList,
+                         threshold = 0, # sets to minimal size edges below
+                         nodeSize = c("None", "Abundance", "Size"),
+                         edgeScale = 10,
+                         reducedTrophic = TRUE) {
+  if (tolower(threshold) == "adaptive") {
+    threshold = EVList$Edges %>% group_by(
+      to, effectSign
+    ) %>% summarise(
+      max = max(effectNormalised), .groups = "drop"
+    ) %>% ungroup %>% pull(max) %>% min
+  }
+
+  theGc <- toCheddar(EVList, name = "Trophic Levels")
+  theGi <- toIGraph(EVList)
+
+  theGiGain <- toIGraph(EVList, sign = 1)
+  theGiLoss <- toIGraph(EVList, sign = -1)
+
+  theLayout <- igraph::layout.circle(theGi)
+
+  theSize <- match.arg(nodeSize, c("Abundance", "Size", "None"))
+  if (theSize == "Abundance")
+    theVs <- sqrt(igraph::vertex_attr(theGi)$N) * 10
+  else if (theSize == "Size") {
+    theVs <- igraph::vertex_attr(theGi)$M
+    theVs <- sqrt(theVs / min(theVs)) * 10
+  } else if (theSize == "None") {
+    theVs <- 15
+  }
+
+  theColors <- ifelse(
+    igraph::vertex_attr(theGi)$Type == "Basal", "skyblue", "red"
+  )
+  if ("Core" %in% names(igraph::vertex_attr(theGi))) {
+    theShapes <- ifelse(igraph::vertex_attr(theGi)$Core,
+                        0,
+                        1)
+  } else {
+    theShapes <- 1 
+    # Note Igraph uses "circle" then "rectangle",
+    # but R and cheddar use "rectangle" then "circle", so we will use a !.
+  }
+
+  theBoth <- igraph::edge_attr(theGi)$effectNormalised
+  theGain <- igraph::edge_attr(theGiGain)$effectNormalised
+  theLoss <- igraph::edge_attr(theGiLoss)$effectNormalised
+
+  theBoth[theBoth < threshold] <- 0
+  theGain[theGain < threshold] <- 0
+  theLoss[theLoss < threshold] <- 0
+
+  # Inform the graphs of which edges are not needed.
+  theGi <- igraph::delete_edges(theGi, which(theBoth == 0))
+  theGiGain <- igraph::delete_edges(theGiGain, which(theGain == 0))
+  theGiLoss <- igraph::delete_edges(theGiLoss, which(theLoss == 0))
+
+  # Remove the same entries so that lengths match.
+  theGain <- theGain[theGain > 0]
+  theLoss <- theLoss[theLoss > 0]
+
+  theGain <- theGain * edgeScale
+  theLoss <- theLoss * edgeScale
+
+  parold <- par(no.readonly = TRUE)
+  par(mfrow = c(2, 2), # Two Rows, Two Columns
+      mar = c(0, 1.5, 1, 0), # Margins, bottom, left, top, right
+      oma = c(0.1, 0.1, 0.1, 0.1) # Outer margins.
+  )
+
+  cheddar::PlotWebByLevel(
+    theGc,
+    show.level.lines = TRUE,
+    # Had been using LongWeighted, but that seems to give the upside down T.
+    # Flow based seems to be more what we are expecting, given the usage of
+    # thresholding and what that shows. The flows here are expected to be
+    # flows of energy through the food web.
+    level = cheddar::FlowBasedTrophicLevel(theGc, weight.by = "effectNormalised"),
+      col = theColors,
+      pch = theShapes
+  )
+
+  if (!reducedTrophic) {
+    plot(
+      theGi,
+      layout = theLayout,
+      vertex.size = theVs,
+      edge.width = 1,
+      edge.arrow.size = 0.3,
+      edge.arrow.width = 1,
+      vertex.color = theColors,
+      vertex.shape = igraph::shapes()[as.numeric(!theShapes) + 1],
+      edge.lty = 2,
+      edge.color = "grey",
+      edge.arrow.mode = ">",
+      main = "Consumption"
+    )
+  } else {
+    EVListRed <- EVList
+    EVListRed$Edges <- EVListRed$Edges %>% dplyr::filter(
+      effectNormalised >= threshold
+    )
+    theGc2 <- toCheddar(EVListRed, name = "Strongest Trophic Levels")
+    cheddar::PlotWebByLevel(
+      theGc2,
+      show.level.lines = TRUE,
+    level = cheddar::FlowBasedTrophicLevel(theGc2, weight.by = "effectNormalised"),
+      col = theColors,
+      pch = theShapes
+    )
+  }
+
+  plot(
+    theGiGain,
+    layout = theLayout,
+    vertex.size = theVs,
+    edge.width = theGain,
+    edge.arrow.size = 0.3,
+    edge.arrow.width = 1,
+    vertex.color = theColors,
+      vertex.shape = igraph::shapes()[as.numeric(!theShapes) + 1],
+    edge.lty = 2,
+    edge.color = "blue",
+    edge.arrow.mode = ">",
+    main = "Consumer's Gains"
+  )
+
+  plot(
+    theGiLoss,
+    layout = theLayout,
+    vertex.size = theVs,
+    edge.width = theLoss,
+    edge.arrow.size = 0.3,
+    edge.arrow.width = 2,
+    vertex.color = theColors,
+      vertex.shape = igraph::shapes()[as.numeric(!theShapes) + 1],
+    edge.lty = 3,
+    edge.color = "darkred",
+    edge.arrow.mode = "<",
+    main = "Resource's Losses"
+  )
+  
+  par(parold)
+  
+  EVList$Edges %>% dplyr::ungroup() %>% dplyr::filter(
+    effectNormalised >= threshold
+  ) %>% dplyr::select(
+    -effectSign
+  ) %>% dplyr::arrange(
+    to, -effectNormalised
+  )
+}
+
+```
+
+### Reading the plots:
+First, I note that we have multiple threshold values used.
+Each set of plots is generated with a threshold value culling the least important edges. 
+Because of the way I have divided the edges, e.g. one edge for the resource-on-consumer effects and one edge for the consumer-on-resource effects, interactions that are important in only one direction have that direction preserved.
+To cull the least important edges, I multiply the interaction effect by the abundance of the species performing the interaction.
+I then normalise amongst all edges grouped by destination and sign (positive/negative), edge effect divided by sum of edge effects, and remove those that do not exceed the threshold.
+
+Top-left: trophic levels if we consider every interaction that is observed.
+This results in a size-structured "radio tower", with basal species on the bottom and consumers increasing in size feeding on each other and those beneath them.
+
+Top-right: trophic levels after culling least important interactions.
+Significant rearrangement can usually be seen between the top-left and top-right arrangements of trophic levels.
+Whereas the former counts the number of consumers in some way, the latter seems to generate approximately three levels more consistently.
+
+Bottom-left: graph/network of most important positive flows in the system.
+Blue nodes/circles represent basal species. 
+Red nodes represent consumers.
+Thicker arrows represent more important flows/heavier weights.
+The "hooks" on each basal species indicate the intrinsic growth rates of those species.
+(Recall that they are normalised, hence the equal sizes.)
+This can be used to trace the consumers' diets and what species are most important to feeding the higher trophic levels.
+
+Bottom-right: graph/network of most important negative flows in the system.
+Description is as above, but the "hooks" on the consumer species now represent negative intrinsic growth rates, and "hooks" on basal species represent intra-specific competition.
+This plot can be used to see how consumers are regulated and regulate their environment.
+
+## Discussion {.tabset}
+
+### Example LM 1
+This is a nice, simple graph to start with.
+There are effectively two subsystems: the s2 - s12 relationship and the s4, s6 - s29 relationships. 
+There is a small amount of significant feeding of s29 on s2 and a small amount of self regulation by s6, but the system appears to predominantly be two standard, separate Lotka-Volterra systems otherwise.
+
+### Example LM 2
+At our lowest threshold, the system has two level 3 apex predators.
+This number is somewhat arguable between the different threshold levels, but we see that self-regulation is highly important for all consumers in this system, with only one consumer also requiring a strong amount of regulation from another consumer at all but the lowest threshold level.
+Furthermore, the regulation of s1535 is critical for all of the basal species. 
+At the low threshold levels, s1535 acts as a generalist, consuming 5 basal species, but 2 of those are below 0.07 of its diet each, and only one is above 0.25 (s270 at 0.37).
+Hence, s1535 acts more as a regulator of all basal species and on consumer s1335.
+The other three consumers are similarly specialist, relying on s439 and s270.
+
+### Invadable
+Our first unassembled system, and this is not particularly surprising from looking at it.
+We observe that the lone competitor is primarily fed off of only two basal species but acts by itself to regulate all of them.
+Given that this system lacks the uninvadability property, one could imagine another consumer arriving to help with regulation, especially of s44, which has enough abundance to undergo intraspecific competition.
+
+### Does Not Persist
+While the other systems are in steady state, this system will collapse in some way.
+At the highest level, there are two subsystems, one of which is formed by s141 and s1, and the other the remainder of the system.
+While I would need to double-check, I believe the entire system goes extinct if uncoupled. 
+The collapse of this system might be related to the size structure combined with the large number of consumers for a small number of basal species.
+
+### Hybrid
+This system is the result of two communities dispersing into the empty third community, decoupling, and then allowing the community to collapse until it finds a steady state. 
+This found steady state does persist, but is not uninvadable (and thus was not found via assembly).
+
+At the highest level threshold I show, there is a slight anomaly: there is a node in the tropbic level plot that appears to have no connections.
+Despite appearing in the basal layer, this node is consumer s351, which consumes 6 species (5 basal) at above the $5\%$ threshold with none of the species amounting to more than $30\%$ of its diet.
+(The highest is $29.3\%$, so it is not too far off.)
+This species is not heavily involved in regulating the other species as a result.
+Instead, this role is fulfilled primarily by s339, which consumes 6 species (again, 5 basal).
+Species s339 has a similar diet to s351, but a more potent effect on the actual amount of the resource lost.
+(Species s339 has nearly three times the abundance of s351.)
+Worth noting is the almost parasitic s350 (which does not appear to regulate anything other than itself at high levels) which otherwise derives benefit from the system that s331 regulates.
+
+### Largest Assembled
+The largest assembled system that we have from a pool that produced at least two such communities has 17 nodes.
+(The other had 13.)
+Despite higher numbers of interactions, it appears that s270 is the basal responsible for 3 consumers, s439 is responsible for another two, and s546 shares with one of the s270 consumers.
+The diets do not seem to greatly expand as the number of nodes increases.
+Instead, the increased number of basal species appears to result in more top-down regulation.
+Lowering the threshold to 0.2 from 0.3 has s546 support all three of s270's consumers.
+Even at the lowest threshold of 0.05, 5 of the basal species do not appear to support the consumers and are instead merely regulated by them.
+
+### Largest Hybrid
+Much of what appears true about the largest assembled system appears to be true about the largest hybrid (22 species).
+Noting that the largest hybrid is uninvadable but does not persist on its own, we can observe the following.
+First, most consumers primarily consume around one or two species which are basals in this instance.
+Second, they regulate more species than they consume by a fair margin.
+Third, none of the basal species self-regulate at greater than 0.1 levels.
+Fourth, most of the regulation of consumers is by the intrinsic negative growth rate.
+Fifth, like the other "does not persist" case, some of the consumers appear to not self regulate to large quantities, perhaps suggesting a common reason as to the collapse of the system.
+
+## Threshold = 0.05 {.tabset}
+```{r}
+thresholdEdges <- 0.05
+```
+
+### Example LM 1
+
+```{r gallery01}
+toPostMortem(foodWebs[[examples[1]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Example LM 2
+
+```{r gallery02}
+toPostMortem(foodWebs[[examples[2]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Invadable
+```{r gallery03}
+toPostMortem(foodWebs[[examples[3]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Does Not Persist
+```{r gallery04}
+toPostMortem(foodWebs[[examples[4]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Hybrid
+```{r gallery05}
+toPostMortem(foodWebs[[examples[5]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Largest Assembled
+```{r gallery06}
+toPostMortem(foodWebs[[examples[6]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Largest Hybrid
+```{r gallery07}
+toPostMortem(foodWebs[[examples[7]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+## Threshold = 0.1 {.tabset}
+```{r}
+thresholdEdges <- 0.1
+```
+
+### Example LM 1
+
+```{r gallery11}
+toPostMortem(foodWebs[[examples[1]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Example LM 2
+
+```{r gallery12}
+toPostMortem(foodWebs[[examples[2]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Invadable
+```{r gallery13}
+toPostMortem(foodWebs[[examples[3]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Does Not Persist
+```{r gallery14}
+toPostMortem(foodWebs[[examples[4]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Hybrid
+```{r gallery15}
+toPostMortem(foodWebs[[examples[5]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Largest Assembled
+```{r gallery16}
+toPostMortem(foodWebs[[examples[6]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Largest Hybrid
+```{r gallery17}
+toPostMortem(foodWebs[[examples[7]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+## Threshold = 0.2 {.tabset}
+```{r}
+thresholdEdges <- 0.2
+```
+
+### Example LM 1
+```{r gallery21}
+toPostMortem(foodWebs[[examples[1]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Example LM 2
+
+```{r gallery22}
+toPostMortem(foodWebs[[examples[2]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Invadable
+```{r gallery23}
+toPostMortem(foodWebs[[examples[3]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Does Not Persist
+```{r gallery24}
+toPostMortem(foodWebs[[examples[4]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Hybrid
+```{r gallery25}
+toPostMortem(foodWebs[[examples[5]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Largest Assembled
+```{r gallery26}
+toPostMortem(foodWebs[[examples[6]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Largest Hybrid
+```{r gallery27}
+toPostMortem(foodWebs[[examples[7]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+## Threshold = 0.3 {.tabset}
+```{r}
+thresholdEdges <- 0.3
+```
+
+### Example LM 1
+
+```{r gallery31}
+toPostMortem(foodWebs[[examples[1]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Example LM 2
+
+```{r gallery32}
+toPostMortem(foodWebs[[examples[2]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Invadable
+```{r gallery33}
+toPostMortem(foodWebs[[examples[3]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Does Not Persist
+```{r gallery34}
+toPostMortem(foodWebs[[examples[4]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Hybrid
+```{r gallery35}
+toPostMortem(foodWebs[[examples[5]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Largest Assembled
+```{r gallery36}
+toPostMortem(foodWebs[[examples[6]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+
+### Largest Hybrid
+```{r gallery37}
+toPostMortem(foodWebs[[examples[7]]], nodeSize = "None", threshold = thresholdEdges) -> temp
+```
+```{r}
+temp
+```
+## Common Core {.tabset}
+### Setup
+```{r}
+listintersect <- function(x) {
+  while(length(x) > 1) {
+    x <- c(list(intersect(x[[1]], x[[2]])), x[c(-1, -2)])
+  }
+  unlist(x)
+}
+```
+
+```{r}
+communityCores <- communitiesAll %>% dplyr::group_by(
+  TotalID, DatasetID, CombnNum
+) %>% dplyr::summarise(
+  Core = toString(lapply(Communities, RMTRCode2::CsvRowSplit) %>% listintersect),
+  All = toString(unique(RMTRCode2::CsvRowSplit(Communities))),
+  FractionCore = length(RMTRCode2::CsvRowSplit(Core)) / length(RMTRCode2::CsvRowSplit(All)),
+  CountRows = n(), 
+  CountRowsUnique = length(unique(Communities)),
+  .groups = "drop"
+) %>% dplyr::mutate(
+  CommunityAbund = "",
+  CorePresentAfterPersist = ""
+)
+```
+
+First, do the cores persist? (Clearly, they are invadable, so we can skip that.)
+
+```{r}
+for (r in 1:nrow(communityCores)) {
+  temp <- with(
+    communityCores[r, ],
+    {    
+      temp <- RMTRCode2::CsvRowSplit(Core)
+      RMTRCode2::LawMorton1996_NumIntegration(
+        A = mats[[DatasetID]][[CombnNum]][temp, temp],
+        R = pools[[DatasetID]][[CombnNum]]$ReproductionRate[temp],
+        X = ifelse(pools[[DatasetID]][[CombnNum]]$Type[temp] == "Basal", 1000, 10), 
+        OuterTimeStepSize = 3E4,
+        Tolerance = 1E-6
+      ) # retrieve the abundance over time matrix
+    }
+  ) 
+  
+  temp <- temp[nrow(temp), -1] # choose last row, remove time column.
+  
+  communityCores$CorePresentAfterPersist[r] <- toString(
+    RMTRCode2::CsvRowSplit(communityCores$Core[r])[which(temp > 1E-6)]
+  )
+  
+  temp <- temp[which(temp > 1E-6)] # remove microfoxes.
+  
+  communityCores$CommunityAbund[r] <- toString(temp)
+}
+```
+
+```{r}
+communityCores %>% dplyr::group_by(TotalID) %>% dplyr::mutate(
+  FractionPersists = length(RMTRCode2::CsvRowSplit(CorePresentAfterPersist)) / length(RMTRCode2::CsvRowSplit(Core))
+)
+```
+Most of the cores persist as they are, but a few of them contract. 
+Some of this might be because of things in the core that do not belong there.
+These species are present anyways due to insufficiently many communities sampled to rule them out.
+Perhaps concerning are the cases where there are only two species present.
+
+Let's see what these cores look like in contrast to the full systems.
+
+```{r createGraphCores}
+foodWebCores <- list()
+
+for (r in 1:nrow(communityCores)) {
+  foodWebCores[[r]] <- with(
+    communityCores[r, ],
+    {
+      redCom <- RMTRCode2::CsvRowSplit(CorePresentAfterPersist)
+      redMat <- as.matrix(mats[[DatasetID]][[CombnNum]][redCom, redCom]) 
+      # Note: should be a matrix, but will error if single entry.
+      redPool <- pools[[DatasetID]][[CombnNum]][redCom, ]
+      
+      colnames(redMat) <- paste0('s',as.character(redCom))
+      rownames(redMat) <- colnames(redMat)
+      
+      names(redPool)[1] <- "node"
+      redPool$node <- colnames(redMat)
+      names(redPool)[3] <- "M"
+      
+      Graph <- igraph::graph_from_adjacency_matrix(
+        redMat, weighted = TRUE
+      )
+      
+      Graph <- igraph::set.vertex.attribute(
+        Graph, "name", value = colnames(redMat)
+      )
+      
+      redPool$N <- RMTRCode2::CsvRowSplit(CommunityAbund)
+      
+      # For later analysis, take the matrix diagonal.
+      
+      redPool$Intraspecific <- diag(redMat)
+      
+      GraphAsDataFrame <- igraph::as_data_frame(Graph)
+  
+      # Add in abundances for calculating abundance * (gain or loss)
+      GraphAsDataFrame <- dplyr::left_join(
+        GraphAsDataFrame,
+        dplyr::select(redPool, node, N),
+        by = c("to" = "node")
+      )
+  
+      # Split data frame.
+      ResCon <- GraphAsDataFrame[GraphAsDataFrame$weight > 0,]
+      ConRes <- GraphAsDataFrame[GraphAsDataFrame$weight < 0,]
+      
+      # Reorder and rename variables.
+      ResCon <- dplyr::select(ResCon, 
+                                 to, from, # resource = to, consumer = from, 
+                                 effectPerUnit = weight, resourceAbund = N)
+      ConRes <- dplyr::select(ConRes, 
+                                 to, from, # resource = from, consumer = to, 
+                                 effectPerUnit = weight, consumerAbund = N)
+      ResCon <- dplyr::mutate(dplyr::group_by(ResCon, from),
+                              effectActual = effectPerUnit * resourceAbund,
+                              Type = "Exploit+")
+      ConRes <- dplyr::mutate(dplyr::group_by(ConRes, from),
+                              effectActual = effectPerUnit * consumerAbund,
+                              Type = ifelse(from == to,
+                                            "SelfReg-",
+                                            "Exploit-"))
+      
+      IntriG <- with(redPool, data.frame(
+                              from = node, #resource = node,
+                              to = node, #consumer = node,
+                              effectPerUnit = ifelse(ReproductionRate > 0,
+                                                   ReproductionRate, 0),
+                              effectActual = ifelse(ReproductionRate > 0,
+                                                  N * ReproductionRate, 0),
+                              Type = "Intrisc+")) 
+      IntriL <- with(redPool, data.frame(
+                              from = node, #resource = node,
+                              to = node, #consumer = node,
+                              effectPerUnit = ifelse(ReproductionRate < 0,
+                                                   ReproductionRate, 0),
+                              effectActual = ifelse(ReproductionRate < 0,
+                                                  N * ReproductionRate, 0),
+                              Type = "Intrisc-"))
+      
+      EdgeDataFrame <- dplyr::bind_rows(
+        dplyr::select(ResCon, -resourceAbund), 
+        dplyr::select(ConRes, -consumerAbund),
+        IntriG, IntriL
+      )
+      
+      EdgeDataFrame <- EdgeDataFrame %>% dplyr::rename(
+        # Empirically speaking, to and from appear reversed.
+        # A consumer (from) should have a negative effect on resource (to),
+        # but the organisation so far marks it as positive. We fix this.
+        tempname = to,
+        to = from
+      ) %>% dplyr::rename(
+        from = tempname
+      ) %>% dplyr::filter(
+        # Remove placeholder entries
+        effectPerUnit != 0
+      ) %>% dplyr::mutate(
+        # Useful to keep effects separate
+        effectSign = sign(effectPerUnit)
+      ) %>% group_by(
+        to, effectSign
+      ) %>% dplyr::mutate(
+        # Perform the post mortem of the most influential from's
+        effectEfficiency = effectPerUnit / sum(effectPerUnit), 
+        effectNormalised = effectActual / sum(effectActual)
+      ) %>% dplyr::arrange(to)
+      
+      list(
+        Edges = EdgeDataFrame,
+        Vertices = redPool
+      )
+    }
+  )
+}
+```
+
+### Example LM 1
+
+```{r gallery41}
+toPostMortem(foodWebCores[[which(communityCores$TotalID == communitiesAll$TotalID[examples[1]])]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### Example LM 2 and Largest
+
+```{r gallery42}
+toPostMortem(foodWebCores[[which(communityCores$TotalID == communitiesAll$TotalID[examples[2]])]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### Invadable
+Surprisingly the core for this group of communities appears to be only Basal species.
+```{r gallery43}
+# which(communityCores$TotalID == communitiesAll$TotalID[examples[3]])
+#toPostMortem(foodWebCores[[14]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+#temp
+foodWebCores[[which(communityCores$TotalID == communitiesAll$TotalID[examples[3]])]]
+```
+
+### Does Not Persist
+Also all basal (after grabbing more data than done on the first run).
+```{r gallery44}
+# which(communityCores$TotalID == communitiesAll$TotalID[examples[4]])
+#toPostMortem(foodWebCores[[4]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+foodWebCores[[which(communityCores$TotalID == communitiesAll$TotalID[examples[4]])]]
+```
+
+### Hybrid
+```{r gallery45}
+toPostMortem(foodWebCores[[which(communityCores$TotalID == communitiesAll$TotalID[examples[5]])]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+## Adaptive Core {.tabset}
+
+### Example LM 1
+
+```{r gallery51}
+foodWebs[[examples[1]]]$Vertices$Core <- foodWebs[[examples[1]]]$Vertices$node %in% foodWebCores[[which(communityCores$TotalID == communitiesAll$TotalID[examples[1]])]]$Vertices$node
+toPostMortem(foodWebs[[examples[1]]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### Example LM 2
+
+```{r gallery52}
+foodWebs[[examples[2]]]$Vertices$Core <- foodWebs[[examples[2]]]$Vertices$node %in% foodWebCores[[which(communityCores$TotalID == communitiesAll$TotalID[examples[2]])]]$Vertices$node
+toPostMortem(foodWebs[[examples[2]]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### Invadable
+```{r gallery53}
+foodWebs[[examples[3]]]$Vertices$Core <- foodWebs[[examples[3]]]$Vertices$node %in% foodWebCores[[which(communityCores$TotalID == communitiesAll$TotalID[examples[3]])]]$Vertices$node
+toPostMortem(foodWebs[[examples[3]]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### Does Not Persist
+```{r gallery54}
+foodWebs[[examples[4]]]$Vertices$Core <- foodWebs[[examples[4]]]$Vertices$node %in% foodWebCores[[which(communityCores$TotalID == communitiesAll$TotalID[examples[4]])]]$Vertices$node
+toPostMortem(foodWebs[[examples[4]]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### Hybrid
+```{r gallery55}
+foodWebs[[examples[5]]]$Vertices$Core <- foodWebs[[examples[5]]]$Vertices$node %in% foodWebCores[[which(communityCores$TotalID == communitiesAll$TotalID[examples[5]])]]$Vertices$node
+toPostMortem(foodWebs[[examples[5]]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### Largest Assembled
+```{r gallery56}
+foodWebs[[examples[6]]]$Vertices$Core <- foodWebs[[examples[6]]]$Vertices$node %in% foodWebCores[[which(communityCores$TotalID == communitiesAll$TotalID[examples[6]])]]$Vertices$node
+toPostMortem(foodWebs[[examples[6]]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+
+### Largest Hybrid
+```{r gallery57}
+foodWebs[[examples[7]]]$Vertices$Core <- foodWebs[[examples[7]]]$Vertices$node %in% foodWebCores[[which(communityCores$TotalID == communitiesAll$TotalID[examples[7]])]]$Vertices$node
+toPostMortem(foodWebs[[examples[7]]], nodeSize = "None", threshold = "Adaptive") -> temp
+```
+```{r}
+temp
+```
+```{r}
+save(communityCores, file = "LM1996-NumPoolCom-FoodWebCores-2021-07.RData")
+```

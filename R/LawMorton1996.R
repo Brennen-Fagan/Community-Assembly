@@ -1,211 +1,26 @@
 # Law and Morton, 1996 #########################################################
-LawMorton1996_species <- function(
-  Basal,
-  Consumer,
-  Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1), # Table 2 values.
-  LogBodySize = c(-2, -1, -1, 0) # c(-2, -1) for Basal, c(-1, 0) for Consumer
-
-) {
-  stopifnot(Basal > 0)
-  stopifnot(Consumer >= 0)
-  stopifnot(length(Parameters) == 6)
-
-  if (Parameters[4] >= 1) {
-    warning("Unrealistic energy consumption efficiency k4: k4 >= 1.")
-  }
-  stopifnot(Parameters[6] > 0)
-
-  # Assign each species in the pool a body size si.
-  # Do so by drawing from a uniform distribution and exponentiating.
-  # For all i, j, if si < sj then i may be eaten by j but not vice versa.
-
-  Species <- data.frame(
-    ID = 1:(Basal + Consumer),
-    Type = c(rep("Basal", Basal), rep("Consumer", Consumer)),
-    Size = exp(c(runif(Basal, min = LogBodySize[1], max = LogBodySize[2]),
-                 runif(Consumer, min = LogBodySize[3], max = LogBodySize[4]))),
-    ReproductionRate = 0
-  )
-
-  # For species i,
-  # if i is basal, set p to 10^(-1 - 0.25 log10 si),
-  # otherwise set p to -0.1.
-  # Draw ri from a truncated normal distribution, mean p, std. p k6.
-  # (Set the sign of ri to that of p).
-
-  Species$ReproductionRate[1:Basal] <- unlist(lapply(
-    Species$Size[1:Basal], function(si, k6) {
-      p <- 10 ^ (-1 - 0.25 * log10(si))
-      return(sign(p) * rtruncnorm(0, Inf, abs(p), abs(p) * k6))
-    },
-    k6 = Parameters[6]
-  ))
-
-  Species$ReproductionRate[(Basal + 1) : (Basal + Consumer)] <- unlist(lapply(
-    Species$Size[(Basal + 1) : (Basal + Consumer)], function(si, k6) {
-      p <- -0.1
-      return(sign(p) * rtruncnorm(0, Inf, abs(p), abs(p) * k6))
-    },
-    k6 = Parameters[6]
-  ))
-
-  Species
-}
-
-LawMorton1996_aij <- function(
-  Species_i, Species_j, k = c(0.01, 10, 0.5, 0.2, 100, 0.1) # Table 2 values.
-) {
-  # returns 'p's for the effect of j on i, aij
-
-  # i == j
-  if (Species_i$ID == Species_j$ID) {
-    if (Species_i$Type == "Basal") {
-      return(- Species_i$ReproductionRate * Species_i$Size / k[5])
-    } else if(Species_i$Type == "Consumer") {
-      return(0)
-    } else {
-      return(NA)
-    }
-  }
-
-  # i != j
-  if (Species_i$Type == "Basal") {
-    if (Species_j$Type == "Basal") {
-
-      # "Basal species are assumed to be independent of one another."
-      return(0)
-
-    } else if (Species_j$Type == "Consumer") {
-
-      # average effect of consumer j on victim i.
-      # aij = -k1 exp( -[ log10 (k2 si / sj) / k3]^2 ) if si < sj,
-      # 0 otherwise
-      if (Species_i$Size < Species_j$Size) {
-        return(
-          - k[1] * exp(-(log10(k[2] * Species_i$Size / Species_j$Size) / k[3]) ^ 2)
-        )
-      } else {
-        return(0)
-      }
-
-    } else {
-      return(NA)
-    }
-  } else if (Species_i$Type == "Consumer") {
-    if (Species_j$Type == "Basal") {
-
-      # Then average effect of victim j on consumer i
-      # aij = - aji k4 sj / si if sj < si, 0 otherwise.
-      if (Species_j$Size < Species_i$Size) {
-        aji <-
-          - k[1] * exp(-(log10(k[2] * Species_j$Size / Species_i$Size) / k[3]) ^ 2)
-        return(
-          - aji * k[4] * Species_j$Size / Species_i$Size
-        )
-      } else {
-        return(0)
-      }
-
-    } else if (Species_j$Type == "Consumer") {
-      # Then it comes down to their sizes.
-
-      if (Species_i$Size < Species_j$Size) {
-        # Predator on Prey
-        return(
-          - k[1] * exp(-(log10(k[2] * Species_i$Size / Species_j$Size) / k[3]) ^ 2)
-        )
-
-      } else if (Species_i$Size > Species_j$Size) {
-        # Prey on Predator
-        aji <-
-          - k[1] * exp(-(log10(k[2] * Species_j$Size / Species_i$Size) / k[3]) ^ 2)
-        return(
-          - aji * k[4] * Species_j$Size / Species_i$Size
-        )
-      } else {
-        return(0)
-      }
-
-    } else {
-      return(NA)
-    }
-  } else {
-    return(NA)
-  }
-}
-
-LawMorton1996_CommunityMat <- function(Pool, Parameters) {
-  foreach::foreach(
-    i = iterators::iter(Pool, by = 'row'), .combine = 'rbind'
-  ) %:% foreach::foreach(
-    j = iterators::iter(Pool, by = 'row'), .combine = 'c'
-  ) %dopar% {
-    p <- LawMorton1996_aij(i, j, Parameters)
-    ifelse(p == 0,
-           0,
-           sign(p) * rtruncnorm(0, Inf, abs(p), abs(p) * Parameters[6]))
-  }
-}
-
-GeneralisedLotkaVolterra <- function(
-  t, y, parms
-) {
-  # t is the current time point in the integration,
-  # y is the current estimate of the variables in the ODE system.
-  # parms is a vector or list of parameters
-  # The return value of func should be a list, whose first element is a vector
-  # containing the derivatives of y with respect to time, and whose next
-  # elements are global values that are required at each point in times.
-  # The derivatives must be specified in the same order as... y.
-  # -- DESolve::rk documentation
-  #
-  # Our parms contains interaction matrix a and reproduction rates r.
-
-  with(as.list(parms), {
-    list(y * (r + a %*% y))
-  })
-}
-
-LawMorton1996_NumIntegration <- function(
-  A, R, X,
-  OuterTimeStepSize = 1000,
-  InnerTimeStepSize = 1
-) {
-  # A = matrix of aij's (community matrix)
-  # R = vector of ri's (basic reproduction rate)
-  # X = vector of initial abundances.
-  # OuterTimeStepSize is the length of the solution,
-  # InnerTimeStepSize is the time in between records of the solution.
-
-  deSolve::rk(
-    X,
-    times = seq(from = 0,
-                to = OuterTimeStepSize,
-                by = InnerTimeStepSize),
-    func = GeneralisedLotkaVolterra,
-    parms = list(a = A, r = R)
-  )
-}
-
-LawMorton1996 <- function(
+### Numerical Assembly: ########################################################
+LawMorton1996_NumericalAssembly <- function(
   Basal = NULL,
   Consumer = NULL,
   Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1), # Table 2 values.
   LogBodySize = c(-2, -1, -1, 0), # c(-2, -1) for Basal, c(-1, 0) for Consumer
-  Integrator = "Numerical",
   EliminationThreshold = 10^-4,
   IntegratorTimeStep = 1000,
-  ArrivalDensity = 1,
+  ArrivalDensity = 0.1, # Note, this can really matter for determining what steady state we go to.
   ArrivalEvents = 10,
   ArrivalSampler = c("rearrange", "iid"),
   InnerTimeStepSize = 100,
   ReturnValues = c("Abundance", "Sequence", "Pool", "Matrix"),
   Pool = NULL,
   CommunityMat = NULL,
-  seed = NULL
+  seed = NULL,
+  InnerEliminationThreshold = 10^-12
 ) {
   # EliminationThreshold = (note: actual threshold is X * Threshold.)
+  # InnerEliminationThreshold is used to remove population inside integration.
 
+  ##### Checks: ################################################################
   if (is.null(Pool) & !is.null(CommunityMat)) {
     stop("CommunityMat should not be specified if Pool is not specified.")
   }
@@ -229,14 +44,16 @@ LawMorton1996 <- function(
   }
 
   if (!is.null(seed)) {
-    oldSeed <- .Random.seed
+    if (exists(".Random.seed"))
+      oldSeed <- .Random.seed
     set.seed(seed)
   }
 
-  # Setup.
+  ##### Setup: #################################################################
   CurrentAbundance <- rep(0, speciesNum)
   SpeciesPresent <- NULL
   if (!is.null(InnerTimeStepSize)) {
+    stopifnot(InnerTimeStepSize < IntegratorTimeStep)
     # Store Time and Abundances for plotting.
     TimeAbundances <- rbind(
       matrix(
@@ -264,28 +81,68 @@ LawMorton1996 <- function(
     ]
   }
 
+
+  if ("Sequence" %in% ReturnValues) {
+    SequenceRetVal <- data.frame(
+      Events = c(0, (IntegratorTimeStep + 1) * 0:(ArrivalEvents - 1)),
+      Addition = c(NA, ArrivalIDs),
+      Outcome = factor(NA, levels = c(
+        "Present",
+        "Type 1 (Failure)",
+        "Type 2 (Invade)",
+        "Type 3 (Contract)")),
+      Community = NA
+    )
+  }
+
+  eventNumber <- 1
+
+  ##### Perform Algorithm: #####################################################
   # Resolve each arrival.
   for (ID in ArrivalIDs) {
+    SpeciesPresent_Old <- SpeciesPresent
     CurrentAbundance[ID] <- CurrentAbundance[ID] + ArrivalDensity
 
     if (!(ID %in% SpeciesPresent)) {
       SpeciesPresent[length(SpeciesPresent) + 1] <- ID
     }
 
-    Run_GLV <- LawMorton1996_NumIntegration(
-      CommunityMat[SpeciesPresent, SpeciesPresent],
-      Pool$ReproductionRate[SpeciesPresent],
-      CurrentAbundance[SpeciesPresent],
-      OuterTimeStepSize = IntegratorTimeStep,
-      InnerTimeStepSize = if(is.null(InnerTimeStepSize)) {
-        IntegratorTimeStep
-      } else {InnerTimeStepSize}
-    )
+    # Run_GLV <- LawMorton1996_NumIntegration(
+    #   CommunityMat[SpeciesPresent, SpeciesPresent],
+    #   Pool$ReproductionRate[SpeciesPresent],
+    #   CurrentAbundance[SpeciesPresent],
+    #   OuterTimeStepSize = IntegratorTimeStep,
+    #   InnerTimeStepSize = if(is.null(InnerTimeStepSize)) {
+    #     IntegratorTimeStep
+    #   } else {InnerTimeStepSize}
+    # )
+
+    rootSolveCounter <- 0
+    Run_GLV <- NA
+    while(rootSolveCounter < 5 && any(is.na(Run_GLV))) {
+      Run_GLV <- tryCatch(
+        LawMorton1996_NumIntegration(
+          A = CommunityMat[SpeciesPresent, SpeciesPresent],
+          R = Pool$ReproductionRate[SpeciesPresent],
+          X = CurrentAbundance[SpeciesPresent] + abs(rnorm(n = length(SpeciesPresent))) * sqrt(rootSolveCounter),
+          OuterTimeStepSize = IntegratorTimeStep,
+          InnerTimeStepSize = if(is.null(InnerTimeStepSize)) {
+            IntegratorTimeStep
+          } else {InnerTimeStepSize},
+          Tolerance = InnerEliminationThreshold
+        ),
+        error = function(e) {
+          return(NA)
+        })
+      rootSolveCounter <- rootSolveCounter + 1
+    }
+    stopifnot(!is.na(Run_GLV))
 
     CurrentAbundance_New <- Run_GLV[nrow(Run_GLV), 2:(ncol(Run_GLV))]
 
     CurrentAbundance_New <- ifelse(
-      CurrentAbundance_New > EliminationThreshold * CurrentAbundance[SpeciesPresent],
+      CurrentAbundance_New > EliminationThreshold * CurrentAbundance[SpeciesPresent] &
+        CurrentAbundance_New > 0,
       CurrentAbundance_New,
       0
     )
@@ -306,25 +163,73 @@ LawMorton1996 <- function(
       TimeAbundances_time <- TimeAbundances_time + Run_GLV[nrow(Run_GLV), 1] + 1
     }
 
+    # We ignore the new addition if the new addition died out.
+    if (CurrentAbundance_New[length(CurrentAbundance_New)] == 0 &&
+        length(CurrentAbundance_New) > 1) {
+      atSteadyState <- all(
+        round(CurrentAbundance_New[-length(CurrentAbundance_New)] /
+                CurrentAbundance[SpeciesPresent][-length(CurrentAbundance_New)],
+              -log10(EliminationThreshold)) == 1
+      )
+    } else {
+      atSteadyState <- all(
+        round(CurrentAbundance_New / CurrentAbundance[SpeciesPresent],
+              -log10(EliminationThreshold)) == 1
+      )
+    }
+
     CurrentAbundance[SpeciesPresent] <- CurrentAbundance_New
 
     SpeciesPresent <- which(CurrentAbundance > 0)
+    eventNumber <- eventNumber + 1
+
+    if ("Sequence" %in% ReturnValues) {
+      if (all(SpeciesPresent_Old %in% SpeciesPresent) &&
+          ID %in% SpeciesPresent_Old) {
+        SequenceRetVal$Outcome[eventNumber] <- "Present"
+      } else if (all(SpeciesPresent_Old %in% SpeciesPresent) &&
+                 !(ID %in% SpeciesPresent)
+      ) {
+        SequenceRetVal$Outcome[eventNumber] <- "Type 1 (Failure)"
+      } else if (all(SpeciesPresent_Old %in% SpeciesPresent) &&
+                 (ID %in% SpeciesPresent)
+      ) {
+        SequenceRetVal$Outcome[eventNumber] <- "Type 2 (Invade)"
+      } else {
+        SequenceRetVal$Outcome[eventNumber] <- "Type 3 (Contract)"
+      }
+      SequenceRetVal$Community[eventNumber] <- I(list(SpeciesPresent))
+    }
+
+    # We can add a check when ``sufficiently many'' species have been added.
+    # Or, if it is cheap, we can just check immediately if a community is invadable.
+    # The check only works if the system is essentially at steady state.
+    if (eventNumber > nrow(Pool) &&
+        atSteadyState &&
+        length(SpeciesPresent) > 1 &&
+        LawMorton1996_CheckUninvadable(
+          AbundanceRow = c(NA, CurrentAbundance),
+          Pool = Pool, CommunityMatrix = CommunityMat
+        )) {
+      break()
+    }
   }
 
+  ##### Return: ################################################################
   retval <- list()
   if ("Abundance" %in% ReturnValues) {
     if (!is.null(InnerTimeStepSize)) {
-      retval$Abundance <- TimeAbundances
+      lastRow <- sum(apply(TimeAbundances, MARGIN = 1, FUN = function(x) {
+        !all(is.na(x[-1]))
+      }))
+      retval$Abundance <- TimeAbundances[1:lastRow, ]
     } else {
       retval$Abundance <- c((IntegratorTimeStep + 1) * ArrivalEvents - 1,
                             CurrentAbundance)
     }
   }
   if ("Sequence" %in% ReturnValues) {
-    retval$Sequence <- data.frame(
-      Time = (IntegratorTimeStep + 1) * 0:(ArrivalEvents - 1),
-      IDs = ArrivalIDs
-    )
+    retval$Sequence <- SequenceRetVal
   }
   if ("Pool" %in% ReturnValues) {
     retval$Pool <- Pool
@@ -334,80 +239,593 @@ LawMorton1996 <- function(
   }
 
   if (!is.null(seed)) {
-    set.seed(oldSeed)
+    if (exists("oldSeed"))
+      set.seed(oldSeed)
   }
 
   return(retval)
 }
 
-LawMorton1996_PlotAbundance <- function(
-  Abundance,
-  Sequence = NULL,
-  guides = FALSE
+LawMorton1996_PermanenceAssembly <- function(
+  Basal = NULL,
+  Consumer = NULL,
+  Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1), # Table 2 values.
+  LogBodySize = c(-2, -1, -1, 0), # c(-2, -1) for Basal, c(-1, 0) for Consumer
+  ArrivalEvents = 10,
+  ArrivalSampler = c("rearrange", "iid"),
+  ReturnValues = c("Community", "Equilibrium",
+                   "Sequence", "States",
+                   "Pool", "Matrix"),
+  Pool = NULL,
+  CommunityMat = NULL,
+  seed = NULL
 ) {
-
-  colnames(Abundance) <- c("Time", format(1:(ncol(Abundance) - 1)))
-
-  long <- tidyr::pivot_longer(
-    as.data.frame(Abundance),
-    2:ncol(Abundance),
-    names_to = "Species",
-    values_to = "Abundance"
-  )
-
-  long <- long[!is.na(long$Abundance), ]
-
-  thePlot <- ggplot2::ggplot(
-    long,
-    ggplot2::aes(
-      x = Time,
-      y = Abundance,
-      color = Species
-    )
-  ) + ggplot2::geom_line(
-  )
-
-  if (!is.null(Sequence)) {
-    thePlot <- thePlot + ggplot2::geom_vline(
-      data = Sequence,
-      mapping = ggplot2::aes(xintercept = Time),
-      linetype = "dashed",
-      color = "black"
-      )
-
-    timeDiff <- mean(diff(Sequence$Time), na.rm = TRUE)
-
-    thePlot <- thePlot + ggplot2::geom_label(
-      data = Sequence,
-      mapping = ggplot2::aes(
-        x = Time + timeDiff/3,
-        label = IDs
-        ),
-      y = max(long$Abundance, na.rm = TRUE) * 0.85,
-      color = "black"
-    )
+  ##### Checks: ################################################################
+  if (is.null(Pool) & !is.null(CommunityMat)) {
+    stop("CommunityMat should not be specified if Pool is not specified.")
   }
 
-  if (guides == FALSE) {
-    thePlot <- thePlot + ggplot2::guides(color = FALSE)
+  if (is.null(Basal) & is.null(Consumer) & is.null(Pool)) {
+    stop("Either number of Basal and Consumer species must be specified or a Pool must be provided.")
   }
 
-  return(invisible(thePlot))
-}
+  if (is.null(Pool)) {
+    # Create species pool.
+    Pool <- LawMorton1996_species(Basal, Consumer, Parameters, LogBodySize)
+    speciesNum <- Basal + Consumer
+  } else {
+    speciesNum <- nrow(Pool)
+  }
 
-LawMorton1996_CheckUninvadable <- function(
-  AbundanceRow,
-  Pool,
-  CommunityMatrix,
-  Threshold = 1E-4
-  ) {
-  # It it is uninvadable by any other species from the pool because the per
-  # capita rate of increase of each species absent from the community is
-  # negative at the equilibrium point.
-  # The per capita rate of increase is the function f_i = r_i + Sum_j(aij xj).
-  Abundance <- AbundanceRow[-1]
-  Abundance[is.na(Abundance)] <- 0
-  notPresent <- !(!is.na(Abundance) & Abundance > Threshold)
-  all(Pool$ReproductionRate[notPresent] +
-        CommunityMatrix[notPresent, ] %*% Abundance < 0)
+  if (is.null(CommunityMat)) {
+    # Create interaction matrix.
+    CommunityMat <- LawMorton1996_CommunityMat(Pool, Parameters)
+    # Constructed so that i is row, j is column.
+  }
+
+  if (!is.null(seed)) {
+    if (exists(".Random.seed"))
+      oldSeed <- .Random.seed
+    set.seed(seed)
+  }
+
+  ##### Setup: #################################################################
+  # Generate arrival events.
+  arrivalSampler <- match.arg(ArrivalSampler, c("rearrange", "iid"))
+  if (arrivalSampler == "iid") {
+    ArrivalIDs <- sample.int(nrow(Pool), size = ArrivalEvents, replace = TRUE)
+  } else if (arrivalSampler == "rearrange") {
+    ArrivalIDs <- replicate(
+      n = ceiling(ArrivalEvents / nrow(Pool)),
+      sample.int(nrow(Pool), replace = FALSE)
+    )[
+      1:ArrivalEvents
+    ]
+  }
+
+  community <- NULL
+  if ("Sequence" %in% ReturnValues) {
+    records <- data.frame(
+      Events = 0:ArrivalEvents,
+      Addition = c(NA, ArrivalIDs),
+      Outcome = factor(NA, levels = c(
+        "Present",
+        "Type 1 (Failure)",
+        "Type 2 (Permanent)",
+        "Type 3 (!Permanent)")),
+      Community = NA
+    )
+  }
+  eventNumber <- 2
+
+  #TODO This really should be some form of object
+  #     In that case, we would have a checkPermanence routine.
+  #     The routine would do what we do on lines 258 - 388 that
+  #     we reproduce effectively starting on line 431.
+  #     (We won't just recursively calculate permanence because
+  #     we may not need it if we are in a permanent state already.)
+  statesEncountered <- list(
+    IDs = list(toString(integer(0))),
+    Equilibria = list(NULL), # If does not exist, use NA.
+    Permanent = TRUE
+    )
+  abundance <- 0
+
+  ##### Perform Algorithm: #####################################################
+  for (ID in ArrivalIDs) {
+    if (!(ID %in% community)) {
+      ####### Process new species: Invade and Equilibrate: #####################
+      # Check if species can increase when rare. Yes -> Add to community.
+      if (Pool$ReproductionRate[ID] +
+          sum(CommunityMat[ID, community] * abundance, na.rm = TRUE) > 0
+          ) { # (Note: 0x0 mat * 0 is 0.)
+        # Add species to the community. Note that we sort for uniqueness.
+        sorted <- sort(c(community, ID), index.return = TRUE)
+        community <- sorted$x
+        if (length(community) == 1) {
+          abundance <- 0.1
+        } else {
+          abundance <- c(abundance, 0.1)[sorted$ix] # 0.1 is initial density.
+        }
+
+        # Store properties.
+        stateNumber <- which(toString(community) == statesEncountered$IDs)
+        if (length(stateNumber) == 0) {
+          stateNumber <- length(statesEncountered$IDs) + 1
+          statesEncountered$IDs[stateNumber] <- toString(community)
+
+          # Best way to avoid ending up at the other boundaries?
+          # In practice, the positive (pos) argument is actually non-negative.
+          # What happens when we have a community without a reassembly path?
+          # Easiest way is to start from the previous equilibrium and run.
+          # Should we divide out the equilibria we do not want?
+          # Should we do anything about negative populations if "runsteady"?
+          rootSolveCounter <- 0
+          rootSolveSteadyResult <- NA
+          # while(rootSolveCounter < 5 && is.na(rootSolveSteadyResult)) {
+          #   rootSolveSteadyResult <- tryCatch(
+          #     rootSolve::steady(
+          #       y = abundance + abs(rnorm(n = length(abundance))) * sqrt(rootSolveCounter),
+          #       func = GeneralisedLotkaVolterra,
+          #       parms = list(a = CommunityMat[community, community],
+          #                    r = Pool$ReproductionRate[community]),
+          #       #pos = TRUE,
+          #       method = "runsteady"
+          #     )$y,
+          #     error = function(e) {
+          #       return(NA)
+          #     })
+          #   rootSolveCounter <- rootSolveCounter + 1
+          # }
+          while(rootSolveCounter < 5 && is.na(rootSolveSteadyResult)) {
+            rootSolveSteadyResult <- tryCatch({
+              tempval <- LawMorton1996_NumIntegration(
+                X = abundance + abs(rnorm(n = length(abundance))) * sqrt(rootSolveCounter),
+                A = CommunityMat[community, community],
+                R = Pool$ReproductionRate[community],
+                OuterTimeStepSize = 10000, InnerTimeStepSize = 10,
+                Tolerance = 1E-12
+              )
+
+              flag <- tempval[nrow(tempval), -1] == 0 |
+                tempval[nrow(tempval), -1] / tempval[nrow(tempval) - 1, -1]
+
+              if (all(flag)) {
+                tempval[nrow(tempval), -1]
+              } else {
+                NA
+              }
+            },
+            error = function(e) {
+              return(NA)
+            })
+            rootSolveCounter <- rootSolveCounter + 1
+          }
+          stopifnot(!is.na(rootSolveSteadyResult))
+
+          statesEncountered$Equilibria[[stateNumber]] <- rootSolveSteadyResult
+
+          statesEncountered$Permanent[stateNumber] <- NA
+        }
+
+        ####### Process new species: Permanence ################################
+        # Calculate permanence if necessary.
+        if (is.na(statesEncountered$Permanent[stateNumber])) {
+          # To calculate permanence, need to consider the powerset of the community.
+          # Then, using each retrieved equilibrium from the powerset, perform:
+          # minimize z using h_i > 0
+          # subject to Sum_i(f_i (x_j) h_i) + z > 0 for each subcommunity j.
+          # where f_i is per capita rate of growth of species i,
+          #       x_j is a retrieved equilibrium
+
+          # Note that the subcommunities generated are sorted.
+          subcommunities <- unlist(
+            lapply(1:length(community), function(m, community, ...) {
+              lapply(combn(m, ...), function(x) community[x])
+            },
+            x = 1:length(community), simplify = FALSE, community = community),
+            recursive = FALSE
+          )
+
+          # Would use lapply, but we may want side effects.
+
+          equilibria <- list()
+          for (i in 1:length(subcommunities)) {
+            set <- subcommunities[[i]]
+            id <- which(toString(set) == statesEncountered$IDs)
+            if (length(id) == 0) {
+              # A subcommunity not yet observed.
+              stateNumberSet <- length(statesEncountered$IDs) + 1
+
+              statesEncountered$IDs[stateNumberSet] <- toString(set)
+
+              parentEquilibrium <- statesEncountered$Equilibria[[stateNumber]]
+              parentEquilibrium <- parentEquilibrium[community %in% set]
+
+              # statesEncountered$Equilibria[[stateNumberSet]] <-
+              #   rootSolve::steady(
+              #     y = parentEquilibrium + 1, # force away from 0's.
+              #     func = GeneralisedLotkaVolterra,
+              #     parms = list(a = CommunityMat[set, set],
+              #                  r = Pool$ReproductionRate[set]),
+              #     #pos = TRUE,
+              #     method = "runsteady"
+              #   )$y
+
+              rootSolveCounter <- 0
+              rootSolveSteadyResult <- NA
+              while(rootSolveCounter < 5 && is.na(rootSolveSteadyResult)) {
+                rootSolveSteadyResult <- tryCatch({
+                  tempval <- LawMorton1996_NumIntegration(
+                    X = parentEquilibrium + 1 +
+                      abs(rnorm(n = length(parentEquilibrium))) * sqrt(rootSolveCounter),
+                    A = CommunityMat[set, set],
+                    R = Pool$ReproductionRate[set],
+                    OuterTimeStepSize = 10000, InnerTimeStepSize = 10,
+                    Tolerance = 1E-12
+                  )
+
+                  flag <- tempval[nrow(tempval), -1] == 0 |
+                    tempval[nrow(tempval), -1] / tempval[nrow(tempval) - 1, -1]
+
+                  if (all(flag)) {
+                    tempval[nrow(tempval), -1]
+                  } else {
+                    NA
+                  }
+                },
+                error = function(e) {
+                  return(NA)
+                })
+                rootSolveCounter <- rootSolveCounter + 1
+              }
+              stopifnot(!is.na(rootSolveSteadyResult))
+
+              statesEncountered$Equilibria[[stateNumberSet]] <- rootSolveSteadyResult
+
+              statesEncountered$Permanent[stateNumberSet] <- NA
+              equilibria[[i]] <- statesEncountered$Equilibria[[stateNumberSet]]
+            } else {
+              # A subcommunity already observed.
+              equilibria[[i]] <- statesEncountered$Equilibria[[id]]
+            }
+          }
+
+          # Adjust equilibria size.
+          equilibria <- lapply(
+            seq_along(subcommunities),
+            function(i, set, nnz, master) {
+              retval <- rep(0, length(master))
+              setInd <- 1
+              masInd <- 1
+              while (setInd <= length(set[[i]])) {
+                if (set[[i]][setInd] == master[masInd]) {
+                  retval[masInd] <- nnz[[i]][setInd]
+                  masInd <- masInd + 1
+                  setInd <- setInd + 1
+                } else if (set[[i]][setInd] < master[masInd]) {
+                  setInd <- setInd + 1
+                } else {
+                  masInd <- masInd + 1
+                }
+              }
+              return(retval)
+            },
+            set = subcommunities,
+            nnz = equilibria,
+            master = community
+          )
+
+
+          # Gather coefficients.
+          # Row: equilibria
+          # Col: per capita growth rate
+          coefficients <- lapply(
+            equilibria,
+            FUN = function(eq, rs, m) {
+              # f_col evaluated at equilibrium_row, col = 1:length(community)
+              # f_col = r_col + sum()
+              rs + m %*% eq
+            },
+            rs = Pool$ReproductionRate[community],
+            m = CommunityMat[community, community]
+          )
+
+          # h_i coefficients
+          coefficientsMatrix <- matrix(
+            unlist(coefficients), byrow = TRUE,
+            nrow = length(equilibria), ncol = length(community)
+            )
+
+          # add z
+          coefficientsMatrix <- cbind(
+            coefficientsMatrix,
+            rep(1, length(equilibria))
+          )
+
+          # add constraint h_i > 0
+          coefficientsMatrix <- rbind(
+            coefficientsMatrix,
+            cbind(diag(ncol = length(community),
+                       nrow = length(community)),
+                  rep(0, length(community)))
+          )
+
+          # add constraint sum(h_i) < 1 (cannot use <=, but equivalent in lp.)
+          # same as -sum(h_i) > -1
+          coefficientsMatrix <- rbind(
+            coefficientsMatrix,
+            c(rep(-1, length(community)), 0)
+          )
+
+          #TODO Due to numerical problems, we round. There must be a better way.
+          # Cannot round without having to round again later, as this has induced
+          # different numerical problems (i.e. a result of 1E-10 instead of 0).
+          coefficientsMatrix <- round(coefficientsMatrix, 8)
+
+
+          # Perform optimisation problem.
+          output <- lpSolve::lp(
+            "min", # minimize
+            c(rep(0, length(community)), 1), # 0 * h_1...h_n + z subject to
+            coefficientsMatrix,
+            ">",
+            c(rep(0, length(equilibria)), #sum(fi(xj) * hi) + z > 0
+              rep(1E-4, length(community)), # h_i should not be 0.
+              -1) # -sum(h_i) > -1
+            )
+
+          output <- round(output$solution, 8)
+
+          statesEncountered$Permanent[stateNumber] <-
+            if (output[length(output)] <= 0) TRUE else FALSE
+        }
+
+        ####### Process new species: Type 2 or 3? ##############################
+        # Check permanence.
+        if (statesEncountered$Permanent[stateNumber]) {
+          abundance <- statesEncountered$Equilibria[[stateNumber]]
+
+          if ("Sequence" %in% ReturnValues) {
+            records$Outcome[eventNumber] <- "Type 2 (Permanent)"
+            records$Community[eventNumber] <- I(list(community))
+          }
+        } else {
+          # Need to find an attracting subcommunity.
+          # Attracting if permanent and
+          # uninvadable by members of the community not in the subcommunity.
+          subcommunities <- unlist(
+            lapply(1:length(community), function(m, community, ...) {
+              lapply(combn(m, ...), function(x) community[x])
+            },
+            x = 1:length(community), simplify = FALSE, community = community),
+            recursive = FALSE
+          )
+
+          subcommunitiesPermanent <- rep(NA, length(subcommunities))
+          for (scIndex in 1:length(subcommunities)) {
+            set <- subcommunities[[scIndex]]
+            id <- which(toString(set) == statesEncountered$IDs)
+
+            # Since we have already written down whether the community
+            # is permanent or not, we should have all subcommunities
+            # listed in the states we have encountered already, alongside
+            # their equilibria.
+            stopifnot(length(id) == 1)
+
+            if (is.na(statesEncountered$Permanent[id])) {
+              # We have not recorded whether this state is permanent or not!
+              # Need to perform the permanence check: retrieve all subcommunities
+              # check their equilibria, use it to build a coefficients matrix
+              # and run a linear program.
+
+              # Note that the subcommunities generated are sorted.
+              subsubcommunities <- unlist(
+                lapply(1:length(set), function(m, community, ...) {
+                  lapply(combn(m, ...), function(x) community[x])
+                },
+                x = 1:length(set), simplify = FALSE, community = set),
+                recursive = FALSE
+              )
+
+              # Would use lapply, but we may want side effects.
+
+              equilibria <- list()
+              for (i in 1:length(subsubcommunities)) {
+                subset <- subsubcommunities[[i]]
+                subid <- which(toString(subset) == statesEncountered$IDs)
+                # A subsubcommunity already observed.
+                equilibria[[i]] <- statesEncountered$Equilibria[[subid]]
+              }
+
+              # Adjust equilibria size.
+              equilibria <- lapply(
+                seq_along(subsubcommunities),
+                addMissingEquilibriaEntries,
+                set = subsubcommunities,
+                nnz = equilibria,
+                master = set
+              )
+
+
+              # Gather coefficients.
+              # Row: equilibria
+              # Col: per capita growth rate
+              coefficients <- lapply(
+                equilibria,
+                FUN = function(eq, rs, m) {
+                  # f_col evaluated at equilibrium_row, col = 1:length(community)
+                  # f_col = r_col + sum()
+                  rs + m %*% eq
+                },
+                rs = Pool$ReproductionRate[set],
+                m = CommunityMat[set, set]
+              )
+
+              # h_i coefficients
+              coefficientsMatrix <- matrix(
+                unlist(coefficients), byrow = TRUE,
+                nrow = length(equilibria), ncol = length(set)
+              )
+
+              # add z
+              coefficientsMatrix <- cbind(
+                coefficientsMatrix,
+                rep(1, length(equilibria))
+              )
+
+              # add constraint h_i > 0
+              coefficientsMatrix <- rbind(
+                coefficientsMatrix,
+                cbind(diag(ncol = length(set),
+                           nrow = length(set)),
+                      rep(0, length(set)))
+              )
+
+              # add constraint sum(h_i) < 1 (cannot use <=, but equivalent in lp.)
+              # same as -sum(h_i) > -1
+              coefficientsMatrix <- rbind(
+                coefficientsMatrix,
+                c(rep(-1, length(set)), 0)
+              )
+
+              #TODO Due to numerical problems, we round. There must be a better way.
+              coefficientsMatrix <- round(coefficientsMatrix, 8)
+
+              # Perform optimisation problem.
+              output <- lpSolve::lp(
+                "min", # minimize
+                c(rep(0, length(set)), 1), # 0 * h_1...h_n + z subject to
+                coefficientsMatrix,
+                ">",
+                c(rep(0, length(equilibria)), #sum(fi(xj) * hi) + z > 0
+                  rep(1E-4, length(set)), # h_i should not be 0.
+                  -1) # -sum(h_i) > -1
+              )
+
+              output <- round(output$solution, 8)
+
+              statesEncountered$Permanent[id] <-
+                if (output[length(output)] <= 0) TRUE else FALSE
+            }
+            subcommunitiesPermanent[scIndex] <- statesEncountered$Permanent[id]
+          }
+
+          # Remove subcommunities that are not permanent.
+          for (scIndex in length(subcommunitiesPermanent):1) {
+            if (!subcommunitiesPermanent[scIndex]) {
+              subcommunities[[scIndex]] <- NULL
+            }
+          }
+
+          # Check for an uninvadable (w.r.t. community) subcommunity.
+          subcommunitiesUninvadable <- rep(NA, length(subcommunities))
+          for (scIndex in 1:length(subcommunities)) {
+            set <- subcommunities[[scIndex]]
+            id <- which(toString(set) == statesEncountered$IDs)
+            abundanceRow <- statesEncountered$Equilibria[[id]]
+            abundanceRow <- addMissingEquilibriaEntries(
+              1, list(set), list(abundanceRow), community
+            )
+
+            # Add a time column to the abundanceRow
+            abundanceRow <- c(NA, abundanceRow)
+
+            subcommunitiesUninvadable[scIndex] <- LawMorton1996_CheckUninvadable(
+              AbundanceRow = abundanceRow,
+              Pool = Pool[community, ],
+              CommunityMatrix = CommunityMat[community, community]
+            )
+          }
+
+          # Cycles might stop this from working: 1 2 3 -> 2 -> 1 2 -> 1 2 3
+          # i.e. if 1 2 3 is not permanent, but all of its subsets are invadable
+          # stopifnot(sum(subcommunitiesUninvadable) >= 1)
+
+          if (sum(subcommunitiesUninvadable) != 1) {
+            # Law and Morton 1996 use numerical integration at this point.
+            # We have already done this with our steady-state calculation.
+            numericalSoln <- which(
+              statesEncountered$Equilibria[[stateNumber]] > abundance * 1E-4
+            )
+            community <- community[numericalSoln]
+            abundance <- statesEncountered$Equilibria[[
+              which(toString(community) == statesEncountered$IDs)
+            ]]
+
+          } else {
+            scIndex <- which(subcommunitiesUninvadable)
+            community <- subcommunities[[scIndex]]
+            abundance <- statesEncountered$Equilibria[[
+              which(toString(community) == statesEncountered$IDs)
+            ]]
+          }
+
+          if ("Sequence" %in% ReturnValues) {
+            records$Outcome[eventNumber] <- "Type 3 (!Permanent)"
+            records$Community[eventNumber] <- I(list(community))
+          }
+        }
+
+      } else {
+        if ("Sequence" %in% ReturnValues) {
+          records$Outcome[eventNumber] <- "Type 1 (Failure)"
+          records$Community[eventNumber] <- I(list(community))
+        }
+      }
+    } else {
+      if ("Sequence" %in% ReturnValues) {
+        records$Outcome[eventNumber] <- "Present"
+        records$Community[eventNumber] <- I(list(community))
+      }
+    }
+
+    # We can add a check when ``sufficiently many'' species have been added.
+    # Or, if it is cheap, we can just check immediately if a community is invadable.
+    eventNumber <- eventNumber + 1
+    uninvadable <- LawMorton1996_CheckUninvadable(
+      AbundanceRow = c(NA, addMissingEquilibriaEntries(
+        1, list(community), list(abundance), 1:nrow(Pool)
+      )),
+      Pool = Pool, CommunityMatrix = CommunityMat
+    )
+    if (eventNumber - 1 > nrow(Pool) &&
+        length(community) > 1 &&
+        uninvadable
+        ) {
+      break()
+    }
+  }
+
+  ##### Return: ################################################################
+  retval <- list()
+
+  if ("Community" %in% ReturnValues) {
+    retval$Community <- community
+  }
+  if ("Equilibrium" %in% ReturnValues) {
+    abundance <- addMissingEquilibriaEntries(
+      1, list(community), list(abundance), 1:nrow(Pool)
+    )
+    retval$Equilibrium <- abundance
+  }
+  if ("Sequence" %in% ReturnValues) {
+    retval$Sequence <- records
+  }
+  if ("States" %in% ReturnValues) {
+    retval$States <- statesEncountered
+  }
+  if ("Pool" %in% ReturnValues) {
+    retval$Pool <- Pool
+  }
+  if ("Matrix" %in% ReturnValues) {
+    retval$Matrix <- CommunityMat
+  }
+
+  if (!is.null(seed)) {
+    if (exists("oldSeed"))
+      set.seed(oldSeed)
+  }
+
+  return(retval)
 }

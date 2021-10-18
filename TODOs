@@ -1,0 +1,14 @@
+TODO:
+Consider refactoring the vignettes (lapply's for example) so that there are
+central functions that we can just call.
+
+Definitely think about if there is a nicer way to handle Table 7's code inside
+of a function.
+
+Fix the parallelisation, since I did not do that very well the first time. This
+might use https://stackoverflow.com/a/15638393 as a general idea, since mine did
+not work.
+
+Write some proper tests of what we are intending?
+  Problem with this one is that I am not a dev team and I have already spent a
+  lot of time on this code base. Maybe for the next project?
