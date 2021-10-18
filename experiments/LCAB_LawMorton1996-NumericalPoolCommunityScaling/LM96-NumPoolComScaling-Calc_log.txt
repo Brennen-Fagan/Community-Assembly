@@ -1,0 +1,45 @@
+Fri 9 Apr 07:00:54 BST 2021: executing task LM96-NumPoolComScaling-Calc
+[1] "Loading libraries"
+Loading required package: foreach
+Loading required package: parallel
+Loading required package: doParallel
+Loading required package: iterators
+Loading required package: dplyr
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+Loading required package: tidyr
+Loading required package: Rcpp
+Loading required package: RMTRCode2
+[1] "Cores detected:  40"
+[1] "Args provided:"
+[1] 10
+slurmstepd: error: *** JOB 14098855 ON node161 CANCELLED AT 2021-04-16T07:00:55 DUE TO TIME LIMIT ***
+
+============================
+ Job utilisation efficiency
+============================
+
+Job ID: 14098855
+Cluster: viking
+User/Group: btf500/clusterusers
+State: TIMEOUT (exit code 0)
+Nodes: 1
+Cores per node: 10
+CPU Utilized: 00:00:05
+CPU Efficiency: 0.00% of 70-00:01:10 core-walltime
+Job Wall-clock time: 7-00:00:07
+Memory Utilized: 451.16 MB
+Memory Efficiency: 1.10% of 40.00 GB
+ Requested wall clock time: 7-00:00:00
+    Actual wall clock time: 7-00:00:07
+Wall clock time efficiency: 100.0%
+           Job queued time: 1-20:36:36

@@ -1,0 +1,1515 @@
+---
+title: "Answering Questions; Gather Data, 2021-05"
+output:
+  html_notebook:
+    code_folding: hide
+---
+
+```{r libs, message=FALSE, warning=FALSE}
+# Check requisite packages are installed.
+packages <- c(
+  "plotly", 
+  "dplyr",
+  "cheddar",
+  "igraph",
+  "expm",
+  "foreach",
+  "iterators",
+  "rootSolve",
+  "RMTRCode2"
+)
+for (pkg in packages) {
+  library(pkg, character.only = TRUE)
+}
+
+# Reserved Names
+candidateData <- NULL
+islandInteractionsOneEmptyTwoWhich <- NULL
+islandInteractionsOneTwo <- NULL
+islandInteractionsOneTwoWhich <- NULL
+mats <- NULL
+paramFrame <- NULL
+plotScalingData <- NULL
+pools <- NULL
+```
+
+# Disentangling Effects on the Viking Data {.tabset}
+
+## Load Data
+```{r loadDat}
+ellipsisApply <- function(..., FUN) {
+  lapply(as.list(...), FUN)
+}
+
+load("LM1996-NumPoolCom-QDat-2021-05.RData")
+# Stop if not all are not null
+stopifnot(all(unlist(ellipsisApply(
+  FUN = function(bool) {!is.null(bool)},
+  candidateData, 
+  islandInteractionsOneEmptyTwo,
+  islandInteractionsOneEmptyTwoWhich,
+  islandInteractionsOneTwo,
+  islandInteractionsOneTwoWhich,
+  mats,
+  paramFrame,
+  plotScalingData,
+  pools
+))))
+```
+
+```{r testPlot}
+plotScaling <- plotly::plot_ly(
+  plotScalingData,
+  x = ~Basals,
+  y = ~Consumers,
+  z = ~CommunitySize,
+  color = ~Dataset,
+  colors = c("red", "blue", "black")
+)
+
+plotScaling <- plotly::add_markers(plotScaling)
+
+plotScaling <- plotly::layout(
+  plotScaling,
+  scene = list(
+    xaxis = list(type = "log"),
+    yaxis = list(type = "log"),
+    camera = list(
+      eye = list(
+        x = -1.25, y = -1.25, z = .05
+      )
+    )
+  )
+)
+
+plotScaling
+```
+
+
+```{r communitiesAllSanityChecks}
+# Check that the Two island and Three island scenarios are set-up the same.
+stopifnot(unlist(lapply(islandInteractionsOneTwo, length)) == 
+            unlist(lapply(islandInteractionsOneEmptyTwo, length)))
+stopifnot(names(islandInteractionsOneTwo) == 
+            names(islandInteractionsOneEmptyTwo))
+# Check that the Which versions correspond correctly.
+stopifnot(
+  unlist(lapply(islandInteractionsOneTwoWhich, function(x) {
+    length(RMTRCode2::CsvRowSplit(x))
+  })) 
+  == unlist(lapply(islandInteractionsOneTwo, function(x) {
+    # We're like onions; we have LAYERS!
+    lapply(x, function(y) {
+      lapply(y, function(z) {
+        sum(z > 1E-6) # How many "large" entries are there?
+      })})}))
+)
+stopifnot(
+  unlist(lapply(islandInteractionsOneEmptyTwoWhich, function(x) {
+    length(RMTRCode2::CsvRowSplit(x))
+  })) 
+  == unlist(lapply(islandInteractionsOneEmptyTwo, function(x) {
+    # We're like onions; we have LAYERS!
+    lapply(x, function(y) {
+      lapply(y, function(z) {
+        sum(z > 1E-6) # How many "large" entries are there?
+      })})}))
+)
+```
+
+```{r communitiesAllAddHybrids}
+# Hybrids
+# Create a count of how many times each entry will be repeated.
+communitiesAllRepeater <- 5 * unlist(lapply(islandInteractionsOneTwo, length))
+
+# Create template.
+communitiesAll <- data.frame(
+  CombnNum = rep(0, sum(communitiesAllRepeater)), # Should repeat all rows.
+  Basals = 0,
+  Consumers = 0,
+  Dataset = "",
+  DatasetID = 0,
+  Communities = "",
+  CommunitySize = 0,
+  OtherSteadyStates = 0, # To be recalculated
+  CommunityAbund = "",
+  CommunityProd = 0,
+  TotalID = "",
+  # Additional Column!, 1 for direct assembly, 0 unused.
+  IslandsUsed = rep(c(2,2,3,3,3), sum(communitiesAllRepeater)/5)
+)
+
+# Retrieve the rows used to make hybrids
+communitiesAllProspects <- candidateData %>% dplyr::group_by(
+  CombnNum, Basals, Consumers, Dataset, DatasetID, TotalID
+) %>% dplyr::select(
+  CombnNum:DatasetID, TotalID
+) %>% dplyr::summarise(
+  Count = dplyr::n(), .groups = "keep"
+) %>% dplyr::filter(
+  Count > 1
+) %>% dplyr::select(
+  -Count
+) %>% dplyr::arrange(
+  DatasetID, CombnNum
+)
+
+# Make sure that the names match.
+stopifnot(communitiesAllProspects$TotalID == names(communitiesAllRepeater))
+
+# Insert repetitions.
+communitiesAll$CombnNum <- rep(communitiesAllProspects$CombnNum, communitiesAllRepeater)
+communitiesAll$Basals <- rep(communitiesAllProspects$Basals, communitiesAllRepeater)
+communitiesAll$Consumers <- rep(communitiesAllProspects$Consumers, communitiesAllRepeater)
+communitiesAll$Dataset <- rep(communitiesAllProspects$Dataset, communitiesAllRepeater)
+communitiesAll$DatasetID <- rep(communitiesAllProspects$DatasetID, communitiesAllRepeater)
+communitiesAll$TotalID <- rep(communitiesAllProspects$TotalID, communitiesAllRepeater)
+
+# To move over from the data.
+# Communities = "",
+# CommunityAbund = ""
+
+communitiesAll[communitiesAll$IslandsUsed == 2, ]$Communities <- 
+  islandInteractionsOneTwoWhich
+communitiesAll[communitiesAll$IslandsUsed == 3, ]$Communities <- 
+  islandInteractionsOneEmptyTwoWhich
+
+communitiesAll[communitiesAll$IslandsUsed == 2, ]$CommunityAbund <- 
+  # We're like onions; we have LAYERS!
+  unlist(lapply(islandInteractionsOneTwo, function(x) {
+    lapply(x, function(y) {
+      lapply(y, function(z) {
+        toString(z[z > 1E-6])
+      })
+    })
+  }))
+  
+communitiesAll[communitiesAll$IslandsUsed == 3, ]$CommunityAbund <- 
+  unlist(lapply(islandInteractionsOneEmptyTwo, function(x) {
+    lapply(x, function(y) {
+      lapply(y, function(z) {
+        toString(z[z > 1E-6])
+      })
+    })
+  }))
+
+# To calculate from the data.
+# CommunitySize = 0, # To be calculated from Communities.
+# OtherSteadyStates = 0, # To be recalculated last after filtering
+# CommunityProd = 0, # To be recalculated after Abund stored.
+communitiesAll$CommunitySize <- unlist(lapply(
+  communitiesAll$Communities, function(x) {
+    length(RMTRCode2::CsvRowSplit(x))
+  })) 
+
+for (r in 1:nrow(communitiesAll)) {
+  communitiesAll$CommunityProd[r] <- with(
+    communitiesAll[r, ], 
+    RMTRCode2::Productivity(
+      Pool = pools[[DatasetID]][[CombnNum]], 
+      InteractionMatrix = mats[[DatasetID]][[CombnNum]], 
+      Community = Communities, 
+      Populations = CommunityAbund
+    )
+  )
+}
+```
+
+```{r communitiesAllAddOriginals}
+# Original systems
+communitiesAll <- rbind(
+  candidateData %>% dplyr::select(
+    -CommunityFreq, -CommunitySeq
+  ) %>% dplyr::mutate(
+    IslandsUsed = 1
+  ), 
+  communitiesAll
+)
+
+```
+
+```{r communitiesAllHash}
+# Treating the Productivity like one might treat a hash,
+# if two rows with the same properties are assigned the same hash, 
+# we only keep one. 
+# One decimal place might be excessive, 
+# but we can reflect on that if results down the line are not interesting.
+# For the record though, it appears that it is a decently good approach at 
+# removing effectively numerical duplicates.
+# Not bothering, sort of, with IslandsUsed, since many times a community is
+# reproduced on varying numbers of islands.
+
+# communitiesAll <- communitiesAll %>% dplyr::mutate(
+#   tempProd = round(CommunityProd, 2)
+# ) %>% dplyr::distinct(
+#   CombnNum, Basals, Consumers, Dataset, DatasetID, TotalID,
+#   Communities, CommunitySize, tempProd, IslandsUsed,
+#   .keep_all = TRUE
+# ) %>% dplyr::select(
+#   -tempProd
+# )
+
+communitiesAll <- communitiesAll %>% dplyr::mutate(
+  tempProd = round(CommunityProd, 2)
+) %>% dplyr::group_by(
+  CombnNum, Basals, Consumers, Dataset, DatasetID, TotalID,
+  Communities, CommunitySize, tempProd,
+) %>% dplyr::summarise(
+  CommunityAbund = dplyr::first(CommunityAbund),
+  CommunityProd = dplyr::first(CommunityProd),
+  IslandsUsed = toString(unique(IslandsUsed)),
+  .groups = "drop"
+) %>% dplyr::select(
+  -tempProd
+) %>% dplyr::group_by(
+  CombnNum, Basals, Consumers, Dataset, DatasetID, TotalID
+) %>% dplyr::mutate(
+  OtherSteadyStates = dplyr::n() - 1,
+  Islands1 = grepl(pattern = "1", IslandsUsed, fixed = TRUE) # Will be useful
+)
+
+```
+
+## Persistence of Hybrid Communities
+The idea is straightforward: after allowing interactions between islands, for islands that are not the same as one of the original communities, isolate the island and check to see what happens.
+
+```{r hybridsOnly}
+communitiesHybrids <- communitiesAll %>% dplyr::filter(
+  !Islands1
+) %>% dplyr::select(-Islands1)
+```
+
+```{r applyDynamics}
+communitiesHybrids$AfterSepAbund <- ""
+communitiesHybrids$AfterSepCommunity <- ""
+communitiesHybrids$AfterSepCommunitySize <- 0
+communitiesHybrids$AfterSepProduction <- 0
+for (r in 1:nrow(communitiesHybrids)) {
+  temp <- with(
+    communitiesHybrids[r, ],
+    {    
+      temp <- RMTRCode2::CsvRowSplit(Communities)
+      RMTRCode2::LawMorton1996_NumIntegration(
+        A = mats[[DatasetID]][[CombnNum]][temp, temp],
+        R = pools[[DatasetID]][[CombnNum]]$ReproductionRate[temp],
+        X = RMTRCode2::CsvRowSplit(CommunityAbund), 
+        OuterTimeStepSize = 3E4,
+        Tolerance = 1E-6
+      ) # retrieve the abundance over time matrix
+    }
+  ) 
+  
+  temp <- temp[nrow(temp), -1] # choose last row, remove time column.
+  
+  communitiesHybrids$AfterSepCommunity[r] <- toString(
+    RMTRCode2::CsvRowSplit(communitiesHybrids$Communities[r])[which(temp > 1E-6)]
+  )
+  
+  temp <- temp[which(temp > 1E-6)] # remove microfoxes.
+  
+  communitiesHybrids$AfterSepAbund[r] <- toString(temp)
+  communitiesHybrids$AfterSepCommunitySize[r] <- length(temp)
+  
+  communitiesHybrids$AfterSepProduction[r] <- with(
+    communitiesHybrids[r, ], 
+    RMTRCode2::Productivity(
+      Pool = pools[[DatasetID]][[CombnNum]], 
+      InteractionMatrix = mats[[DatasetID]][[CombnNum]], 
+      Community = AfterSepCommunity, 
+      Populations = AfterSepAbund
+    )
+  )
+}
+```
+
+```{r hybridsPersist}
+communitiesHybrids <- communitiesHybrids %>% dplyr::mutate(
+  Persists = AfterSepCommunity == Communities,
+  ProdChange = AfterSepProduction - CommunityProd
+)
+```
+
+So after running the dynamics for 3E4 time units (i.e. 3x the length of time the dynamics in the numerical assembly runs in between assembly steps and 1.5x the length of the island dynamics), the communities that persist are `r which(communitiesHybrids$Persists)`.
+Examining the communities themselves, they are all the same community, albeit with different starting points.
+```{r hybridsPersistWhich}
+communitiesHybrids[communitiesHybrids$Persists, ]
+```
+
+An obvious follow-up question: how many of the communities that collapse do so to communities that we have not already seen?
+
+```{r hybridsCollapseTo}
+communitiesHybrids <- communitiesHybrids %>% dplyr::mutate(
+  AfterSepCommunityAlreadyPresent = AfterSepCommunity %in% communitiesAll$Communities
+)
+sum(!communitiesHybrids$AfterSepCommunityAlreadyPresent)
+```
+
+Consolidating down to unique ending states we have the following.
+
+```{r hybridsCollapseWhich}
+communitiesHybrids[
+  !communitiesHybrids$AfterSepCommunityAlreadyPresent, 
+  ] %>% dplyr::distinct(CombnNum, AfterSepCommunity, .keep_all = TRUE)
+```
+
+We will add these new states to our catalogue of communities from the experiments.
+We also take the abundance after separation if the community persists to better reflect steady-state conditions.
+
+```{r hybridsToAll}
+communitiesAll <- rbind(
+  communitiesAll %>% dplyr::filter(
+    Islands1 == TRUE
+  ) %>% dplyr::mutate(
+    HybridCollapse = FALSE, Persists = TRUE
+  ),
+  communitiesHybrids %>% dplyr::mutate(
+    CommunityAbund = ifelse(Persists, AfterSepAbund, CommunityAbund),
+    Islands1 = FALSE, HybridCollapse = FALSE,
+  ) %>% dplyr::select(
+    -AfterSepAbund, -AfterSepCommunity, -AfterSepCommunitySize, 
+    -AfterSepProduction, -ProdChange, -AfterSepCommunityAlreadyPresent
+  ) ,
+  with(
+    communitiesHybrids[
+      !communitiesHybrids$AfterSepCommunityAlreadyPresent, 
+    ] %>% dplyr::distinct(CombnNum, AfterSepCommunity, .keep_all = TRUE),
+    data.frame(
+      CombnNum = CombnNum,
+      Basals = Basals,
+      Consumers = Consumers,
+      Dataset = Dataset,
+      DatasetID = DatasetID,
+      TotalID = TotalID,
+      Communities = AfterSepCommunity,
+      CommunitySize = AfterSepCommunitySize,
+      CommunityAbund = AfterSepAbund,
+      CommunityProd = AfterSepProduction,
+      IslandsUsed = IslandsUsed,
+      OtherSteadyStates = 0,
+      Islands1 = FALSE,
+      HybridCollapse = TRUE,
+      Persists = TRUE,
+      stringsAsFactors = FALSE
+    ))
+)
+```
+
+## Invadability of Hybrid Communities
+Looking at a longer time scale, what happens if/when invasions resume? Do the hybrid communities that emerged retain the uninvadability of the parent communities?
+
+This question should be straightforward as it is testing a step from the assembly process.
+```{r allCommunitiesInvadable}
+communitiesAll$Uninvadable <- NA
+for (r in 1:nrow(communitiesAll)) {
+  communitiesAll$Uninvadable[r] <- with(
+    communitiesAll[r, ],
+    {
+      tempRow <- rep(NA, nrow(pools[[DatasetID]][[CombnNum]]) + 1)
+      tempRow[RMTRCode2::CsvRowSplit(Communities) + 1] <- 
+        RMTRCode2::CsvRowSplit(CommunityAbund)
+      RMTRCode2::LawMorton1996_CheckUninvadable(
+        AbundanceRow = tempRow,
+        Pool = pools[[DatasetID]][[CombnNum]],
+        CommunityMatrix = mats[[DatasetID]][[CombnNum]]
+      )
+    }
+  )
+}
+```
+
+We can compare this property against some of the other properties.
+
+Uninvadability versus whether a community was found via assembly ("on Island 1"):
+```{r tableUninvadableIsland1}
+with(communitiesAll,
+     table(Uninvadable, Islands1))
+```
+Never invadable and assembled (good!), but about half of uninvadables are found without being assembled.
+What about of those that persist?
+```{r tableUninvadableIsland1Persist}
+with(communitiesAll %>% dplyr::filter(Persists),
+     table(Uninvadable, Islands1))
+```
+Which of course fills in some of the blanks.
+So none of the communities that persist are uninvadable if they were not an end state of the assembly process.
+
+## Presence of Mass Effects
+We check to see what happens when we treat each community as a pool for the other and perform assembly. Are the results the same as the diffusion system?
+
+First, update the pairings.
+```{r updateOtherSteadyStates}
+communitiesAll <- communitiesAll %>% dplyr::group_by(
+  CombnNum, Basals, Consumers, Dataset, DatasetID, TotalID
+) %>% dplyr::mutate(
+  OtherSteadyStates = dplyr::n() - 1
+) %>% dplyr::ungroup()
+```
+
+This procedure can be done in two ways: first by directed invasion where one community is a pool for the other, and second with mutual (undirected) invasion where both communities are simultaneously pools for and invaded by each other. 
+Note that in the directed case, we do not need to do any of the communities already marked as uninvadable with respect to the *regional* pools.
+The other communities they would be compared with are subsets of the regional pools, and so would already be checked against.
+We thus have matrices with three possible outcomes for entries: a set of new communities, uninvadability, or `NA` for unevaluated entries. 
+In the directed case we take a row for our invader/pool and column for the invaded community, such that a community is uninvadable with respect to all other communities if its column only contains `FALSE`. 
+(A community is uninvadable by itself for sake of argument.)
+
+```{r invasionDirected}
+invasionsDirected <- list()
+for (grp in unique(communitiesAll$TotalID)) {
+  communitiesGrp <- communitiesAll %>% dplyr::filter(TotalID == grp)
+  
+  invasionsDirected[[grp]] <- matrix(
+    NA, 
+    nrow = nrow(communitiesGrp),
+    ncol = nrow(communitiesGrp)
+  )
+  
+  for (cl in 1:nrow(communitiesGrp)) {
+    if (communitiesGrp$Uninvadable[cl]) {
+      # No point checking, mark FALSE.
+      invasionsDirected[[grp]][, cl] <- FALSE
+    } else {
+      # Check to see if c(o)l(umn) is uninvadable with respect to rows.
+      for (r in 1:nrow(communitiesGrp)) {
+        if (r == cl) {invasionsDirected[[grp]][r, cl] <- FALSE; next()}
+        
+        invasionsDirected[[grp]][r, cl] <- with(
+          communitiesGrp[cl, ],
+          {
+            tempRow <- rep(NA, nrow(pools[[DatasetID]][[CombnNum]]) + 1)
+            tempIDs <- RMTRCode2::CsvRowSplit(Communities)
+            
+            tempRow[tempIDs + 1] <- RMTRCode2::CsvRowSplit(CommunityAbund)
+            
+            # Easiest trick: set reproduction to impossible (-Inf) for species 
+            # not in either the invaders or the invaded.
+            tempPool <- pools[[DatasetID]][[CombnNum]]
+            tempPool$ReproductionRate <- -Inf 
+            tempPool$ReproductionRate[tempIDs] <- 
+              pools[[DatasetID]][[CombnNum]]$ReproductionRate[tempIDs]
+            
+            tempIDs <- RMTRCode2::CsvRowSplit(communitiesGrp$Communities[r])
+            tempPool$ReproductionRate[tempIDs] <- 
+              pools[[DatasetID]][[CombnNum]]$ReproductionRate[tempIDs]
+            
+            # Return FALSE if uninvadable, since no new communities form.
+            !RMTRCode2::LawMorton1996_CheckUninvadable(
+              AbundanceRow = tempRow,
+              Pool = tempPool,
+              CommunityMatrix = mats[[DatasetID]][[CombnNum]]
+            )
+          }
+        )
+      }
+    }
+  }
+  
+  # No TRUEs (== successful invasions)? Go to next set.
+  if (!any(invasionsDirected[[grp]])) {next()}
+  
+  # Any TRUEs are situations in which row can invade column and should be 
+  # checked for what communities appear as a result.
+  for (cl in 1:nrow(communitiesGrp)) {
+    if (!any(invasionsDirected[[grp]][, cl])) {next()}
+    
+    #TODO Develop IslandAssembly function.
+  }
+}
+```
+
+Columns are invadeable by rows if the entry is `TRUE`.
+```{r invadeablematrix}
+invasionsDirected
+```
+
+### Running Assembly - 2021-06-21
+One thing we saw in the Transition Asides was that invadability was potentially inaccurate if the system was in a cycling state as opposed to a steady state.
+Hence, we run the system on a three island assembly process for each combination, just to be on the safe side (and see what the empty island does).
+We run it 5 times each to see if there is variation in the response.
+
+```{r islandFUN}
+islandFUNNumAssembleTolerant <- function(
+  i, dat, pool, mat, dmat, times, abund = NULL, seeds = 1:5) {
+  temp <- dat[i, ]
+  retval <- list()
+  for (seed in seeds) {
+    retval[[toString(seed)]] <- RMTRCode2::IslandNumericalAssembly(
+      Pool = pool,
+      InteractionMatrix = mat,
+      Communities = c(
+        list(temp$Communities[1]),
+        rep("", nrow(dmat) - 2),
+        temp$Communities[2]
+      ),
+      Populations = if (is.null(abund)) c(
+        list(temp$CommunityAbund[1]),
+        rep("", nrow(dmat) - 2),
+        list(temp$CommunityAbund[2])
+      ) else {
+        abund
+      },
+      DispersalIsland = dmat,
+      IntegratorTimeStep = mean(diff(times)),
+      ArrivalEvents = length(times),
+      Tolerance = 1E-4,
+      ReturnValues = c("Abundance", "Steady"),
+      seed = seed
+    )
+  }
+  return(retval)
+}
+skip <- TRUE
+```
+
+```{r invasionsIslands3}
+if (!skip) { 
+invasionsIslands3 <- list()
+for (grp in unique(communitiesAll$TotalID)) {
+  communitiesGrp <- communitiesAll %>% dplyr::filter(
+    TotalID == grp, Persists
+  ) %>% dplyr::mutate(
+    CommunityProdAprox = round(CommunityProd, 0)
+  ) %>% dplyr::distinct(
+    Communities, CommunityProdAprox, .keep_all = TRUE
+  )
+  
+  if (nrow(communitiesGrp) <= 1) {
+    invasionsIslands3[[grp]] <- toString(nrow(communitiesGrp))
+    next
+  }
+  
+  invasionsIslands3[[grp]] <- combn(
+    nrow(communitiesGrp), 2, 
+    islandFUNNumAssembleTolerant,
+    dat = communitiesGrp, 
+    pool = pools[[
+      communitiesGrp$DatasetID[1]
+    ]][[communitiesGrp$CombnNum[1]]],
+    mat = mats[[
+      communitiesGrp$DatasetID[1]
+    ]][[communitiesGrp$CombnNum[1]]],
+    dmat = matrix(c(
+      0, 1, 0, # Island 2 -> 1
+      1, 0, 1, # Island 1 -> 2, Island 3 -> 2
+      0, 1, 0  # Island 2 -> 3
+    ), nrow = 3, ncol = 3, byrow = TRUE),
+    times = seq(from = 0, to = 20000, by = 1), # Expect to die before 20000.
+    seeds = c(26550866, 37212390, 57285336, 90820779, 20168193),
+    simplify = FALSE
+  )
+  # > runif(5) * 1E8
+  # [1] 26550866 37212390 57285336 90820779 20168193
+}
+}
+```
+
+## Indirect Mutualism (or Competition)
+Here, we check to see if the networks created by each community (hybrid or otherwise) has mutualism embedded in it.
+
+The first obvious step is to make a gallery of the food webs.
+The reader will notice the upside-down 'T' shape to the plots.
+
+We will also need to recreate code from the file `LawMorton1996-NumericalTables-Parallel.Rmd`.
+```{r createGraphs}
+foodWebs <- list()
+
+for (r in 1:nrow(communitiesAll)) {
+  foodWebs[[r]] <- with(
+    communitiesAll[r, ],
+    {
+      redCom <- RMTRCode2::CsvRowSplit(Communities)
+      redMat <- mats[[DatasetID]][[CombnNum]][redCom, redCom]
+      redPool <- pools[[DatasetID]][[CombnNum]][redCom, ]
+      
+      colnames(redMat) <- paste0('s',as.character(redCom))
+      rownames(redMat) <- colnames(redMat)
+      
+      names(redPool)[1] <- "node"
+      redPool$node <- colnames(redMat)
+      names(redPool)[3] <- "M"
+      
+      Graph <- igraph::graph_from_adjacency_matrix(
+        redMat, weighted = TRUE
+      )
+      
+      Graph <- igraph::set.vertex.attribute(
+        Graph, "name", value = colnames(redMat)
+      )
+      
+      redPool$N <- RMTRCode2::CsvRowSplit(CommunityAbund)
+      
+      # For later analysis, take the matrix diagonal.
+      
+      redPool$Intraspecific <- diag(redMat)
+      
+      GraphAsDataFrame <- igraph::as_data_frame(Graph)
+    
+      # cheddar does not like cannibals.
+      GraphAsDataFrame <- GraphAsDataFrame[
+        GraphAsDataFrame$to != GraphAsDataFrame$from,
+      ]
+  
+      # Add in abundances for calculating abundance * (gain or loss)
+      GraphAsDataFrame <- dplyr::left_join(
+        GraphAsDataFrame,
+        dplyr::select(redPool, node, N),
+        by = c("to" = "node")
+      )
+  
+      # Split data frame.
+      ResCon <- GraphAsDataFrame[GraphAsDataFrame$weight > 0,]
+      ConRes <- GraphAsDataFrame[GraphAsDataFrame$weight < 0,]
+      
+      # Reorder and rename variables.
+      ResCon <- dplyr::select(ResCon, 
+                                 resource = to, consumer = from, 
+                                 gainPerUnit = weight, resourceAbund = N)
+      ConRes <- dplyr::select(ConRes, 
+                                 resource = from, consumer = to, 
+                                 lossPerUnit = weight, consumerAbund = N)
+      
+      ResCon <- dplyr::mutate(dplyr::group_by(ResCon, consumer),
+                                 gainEfficiency = gainPerUnit / sum(gainPerUnit),
+                                 gainActual = gainPerUnit * resourceAbund,
+                                 gainNormal = gainActual / sum(gainActual))
+      ConRes <- dplyr::mutate(dplyr::group_by(ConRes, resource),
+                                 lossEfficiency = lossPerUnit / sum(lossPerUnit),
+                                 lossActual = lossPerUnit * consumerAbund,
+                                 lossNormal = lossActual / sum(lossActual))
+      
+      cheddarCommunity <- cheddar::Community(
+        redPool,
+        properties = list(
+          title = paste(TotalID, ":", Communities, ": row", r),
+          M.units = "masses",
+          N.units = "abund"
+        ),
+        trophic.links = dplyr::full_join(ResCon, ConRes, 
+                                         by = c("resource", "consumer"))
+      )
+      
+      cheddarCommunity
+    }
+  )
+}
+```
+
+### Example Gallery {.tabset}
+<!--```{r templot, results = "asis", echo = FALSE}
+for (i in seq_along(foodWebs)[1:5]) {
+  tmp <- foodWebs[[i]]
+  catHeader(i, 4)
+  print(cheddar::PlotWebByLevel(tmp, show.level.lines = TRUE, 
+                                level = "LongWeightedTrophicLevel"))
+}
+```-->
+
+#### Code
+```{r gallerycode}
+# From documentation: 
+# https://cran.r-project.org/web/packages/cheddar/vignettes/ImportExport.pdf
+ToIgraph <- function(community, weight=NULL)
+{
+    if(is.null(TLPS(community)))
+    {
+        stop('The community has no trophic links')
+    }
+    else
+    {
+        tlps <- TLPS(community, link.properties=weight)
+        if(!is.null(weight))
+        {
+            tlps$weight <- tlps[,weight]
+        }
+        #? Should be graph_from_data_frame?
+        return (graph.data.frame(tlps, 
+                                 vertices=NPS(community),
+                                 directed=TRUE))
+    }
+}
+
+sideBySideGainLoss <- function(CheddarFoodWeb, 
+                               threshold = 0, # sets to minimal size edges below
+                               nodeSize = c("Abundance", "Size", "None"),
+                               edgeScale = 10) {
+  theG <- ToIgraph(CheddarFoodWeb) 
+  
+  # layout.auto yields a star with basals on the outside.
+  # layout_with_graphopt has repulsion, but does not give great graphs.
+  theLayout <- igraph::layout.circle(theG) 
+  
+  theSize <- match.arg(nodeSize, c("Abundance", "Size", "None"))
+  if (theSize == "Abundance")
+    theVs <- sqrt(igraph::vertex_attr(theG)$N) * 10
+  else if (theSize == "Size") {
+    theVs <- igraph::vertex_attr(theG)$M
+    theVs <- sqrt(theVs / min(theVs)) * 10
+  } else if (theSize == "None") {
+    theVs <- 15
+  }
+  
+  theColors <- ifelse(
+    igraph::vertex_attr(theG)$Type == "Basal", "skyblue", "red"
+  )
+  
+  theGain <- igraph::edge_attr(theG)$gainNormal
+  theLoss <- igraph::edge_attr(theG)$lossNormal
+  
+  theGain[theGain < threshold] <- 0
+  theLoss[theLoss < threshold] <- 0
+  
+  theGain <- theGain * edgeScale
+  theLoss <- theLoss * edgeScale
+  
+  theGG <- theG
+  theLG <- theG
+  
+  theGG <- igraph::delete_edges(theGG, which(theGain == 0))
+  theLG <- igraph::delete_edges(theLG, which(theLoss == 0))
+  theGain <- theGain[theGain > 0]
+  theLoss <- theLoss[theLoss > 0]
+  
+  
+  par(mfrow = c(2, 2), # Two Rows, Two Columns
+      mar = c(0, 1.5, 1, 0), # Margins, bottom, left, top, right
+      oma = c(0.1, 0.1, 0.1, 0.1) # Outer margins.
+      )
+  
+  cheddar::PlotWebByLevel(CheddarFoodWeb, show.level.lines = TRUE, 
+                                level = "LongWeightedTrophicLevel",
+                          main = "Trophic Structure")
+  plot(
+    theG, 
+    layout = theLayout, 
+    vertex.size = theVs, 
+    edge.width = 1, 
+    edge.arrow.size = 0.3, 
+    edge.arrow.width = 1, 
+    vertex.color = theColors, 
+    edge.lty = 2, 
+    edge.color = "grey", 
+    edge.arrow.mode = ">",
+    main = "Consumption"
+  )
+  plot(
+    theGG, 
+    layout = theLayout, 
+    vertex.size = theVs, 
+    edge.width = theGain, 
+    edge.arrow.size = 0.3, 
+    edge.arrow.width = 1, 
+    vertex.color = theColors, 
+    edge.lty = 2, 
+    edge.color = "blue", 
+    edge.arrow.mode = ">",
+    main = "Consumer's Gains"
+  )
+  plot(
+    theLG, 
+    layout = theLayout, 
+    vertex.size = theVs, 
+    edge.width = theLoss, 
+    edge.arrow.size = 0.3, 
+    edge.arrow.width = 2, 
+    vertex.color = theColors, 
+    edge.lty = 3, 
+    edge.color = "darkred", 
+    edge.arrow.mode = "<",
+    main = "Resource's Losses"
+  )
+}
+```
+
+#### Example LM 1
+```{r gallery1}
+# print(cheddar::PlotWebByLevel(foodWebs[[1]], show.level.lines = TRUE, 
+#                                 level = "LongWeightedTrophicLevel"))
+sideBySideGainLoss(foodWebs[[1]], nodeSize = "None", threshold = 0.1)
+```
+
+#### Example LM 2
+```{r gallery2}
+# print(cheddar::PlotWebByLevel(foodWebs[[28]], show.level.lines = TRUE, 
+#                                 level = "LongWeightedTrophicLevel"))
+sideBySideGainLoss(foodWebs[[34]], nodeSize = "None", threshold = 0.1)
+```
+
+#### Invadable
+```{r gallery3}
+# print(cheddar::PlotWebByLevel(foodWebs[[41]], show.level.lines = TRUE, 
+#                                 level = "LongWeightedTrophicLevel"))
+sideBySideGainLoss(foodWebs[[49]], nodeSize = "None", threshold = 0.1)
+```
+
+#### Does Not Persist
+```{r gallery4}
+# print(cheddar::PlotWebByLevel(foodWebs[[61]], show.level.lines = TRUE, 
+#                                 level = "LongWeightedTrophicLevel"))
+sideBySideGainLoss(foodWebs[[86]], nodeSize = "None", threshold = 0.1)
+```
+
+#### Hybrid
+```{r gallery5}
+# print(cheddar::PlotWebByLevel(foodWebs[[81]], show.level.lines = TRUE, 
+#                                 level = "LongWeightedTrophicLevel"))
+sideBySideGainLoss(foodWebs[[92]], nodeSize = "None", threshold = 0.1)
+```
+
+#### Largest Assembled
+```{r gallery6}
+sideBySideGainLoss(foodWebs[[33]], nodeSize = "None", threshold = 0.1)
+```
+
+#### Largest Hybrid
+```{r gallery7}
+sideBySideGainLoss(foodWebs[[87]], nodeSize = "None", threshold = 0.1)
+```
+
+### Measuring Indirect Interactions
+Perhaps the most obvious way to measure indirect effects of one node on another is to consider the matrix power.
+The entries in the first power $M^1$ represent the direct (un-normalised) effects of species $j$ (column) on species $i$ (row).
+(Multiply the interactions by the abundance column vector on the right to see why I use this convention.)
+Then the entries of $M^n$ represent the effects of species $j$ on species $i$ after a path of exactly $n$ steps.
+[Scotti et al. 2007](https://doi.org/10.1016/j.ecocom.2007.05.002) and
+[Zhao et al. 2016](https://doi.org/10.1111/ele.12638) both recommend essentially to normalise this score and sum it across the first so many (3 and 5 respectively) steps.
+The latter uses it for `qualitative feeding` matrices, while the former suggests biomass flow rather than the interaction matrices we are using I believe.
+
+Some notes before we begin with this.
+The units are a bit wonky if we are not paying attention; the interaction matrix itself before multiplying by abundance has units inverse time-density. 
+So instead of taking the interaction matrix $A$ directly, we will instead take $B:b_{i,j} = a_{i, j} x_j s$ where $x$ is an abundance (i.e. density) and $s$ represents a time unit.
+This is a bit strange, since I am not doing the obvious vector operation as I want to preserve the dimensionality.
+This can be thought of as integrating the matrix for one time unit instead to remove that dimension, but this makes the result invalid if the system is not in a steady-state (as the system would then have a time dependence rather than a constant integral).
+
+Next, it is not immediately obvious (to me at least) what the correct way to measure the influence of one species on another is.
+I.e. should one take $\sum_{i = 1}^{n} M^n$? Should there be penalties with distance?
+
+Indeed, how do we compare the effects (direct or indirect) with their influence on the system itself? That is, we can certainly calculate something, but how can we be certain that what we think we are calculating and what we are actually calculating are the same thing?
+For example, we would expect direct and indirect effects to be present as deviations from the steady-state are resolved, but how do we extract the indirect effects and compare with, e.g., the matrix powers?
+
+<!--
+One way to compare would be to take the integral of the deviations from the steady-state using a perturbation applied sequentially to each species.
+For now, let us just apply the first few powers and see if that yields new information.
+We can continue down other paths if it is interesting or we do not see anything emerge.
+-->
+
+```{r perturbationEffects}
+# For each community that persists/returns to steady-state...
+# Run the dynamics with a perturbation for each species in the community...
+# "Integrate" (lazy Riemann sum) the dynamics to get a total effect over time
+#   as the system collapses back to steady-state...
+# Create a matrix of the effects, which contain the total effects due to a 
+#   perturbation over time.
+# Bonus: correlate with the First, Second, Third, and sum of Matrix Powers?
+# (High correlation means that the matrix powers do actually measure the effects
+#  of perturbations to a population from the steady-state.)
+matsPerturbation <- list()
+matsEffects1 <- list()
+matsEffects2 <- list()
+matsEffects3 <- list()
+matsEffectsAdd <- list()
+for (i in 1:nrow(communitiesAll)) {
+  communityThe <- communitiesAll[i, ]
+  if (!communityThe$Persists) {next}
+  
+  matsPerturbation[[i]] <- matrix(NA, 
+                                  nrow = communityThe$CommunitySize,
+                                  ncol = communityThe$CommunitySize)
+  
+  # Each entry is the effect of the column on the row.
+  # Hence, we will be placing column vectors in the matrix.
+  #TODO Note to future me: double check the transpose, just in case.
+  
+  for (r in 1:communityThe$CommunitySize) {
+    matsPerturbation[[i]][, r] <- with(
+      communityThe, 
+      {
+        tempCommunity <- RMTRCode2::CsvRowSplit(Communities)
+        perturbation <- rep(0, CommunitySize)
+        abund <- RMTRCode2::CsvRowSplit(CommunityAbund)
+        perturbation[r] <- 1#0.0001 * abund[r]
+        dynamics <- RMTRCode2::LawMorton1996_NumIntegration(
+          A = mats[[DatasetID]][[CombnNum]][tempCommunity, tempCommunity],
+          R = pools[[DatasetID]][[CombnNum]]$ReproductionRate[tempCommunity],
+          X = abund + perturbation,
+          OuterTimeStepSize = 1,
+          InnerTimeStepSize = 0.001,
+          Tolerance = 1E-6
+        ) # Column: Species, Row: Time
+        timediff <- diff(dynamics[, 1])
+        dynamics <- dynamics[, -1]
+        unlist(lapply(1:ncol(dynamics), FUN = function(nc, x, x0, t) {
+          sum((x[-1, nc] - x0[nc]) * timediff)
+        }, x = dynamics, x0 = abund, t = timediff))
+      }
+    )
+  }
+  
+  # Compute matsEffects^n
+  matsEffects1[[i]] <- with(
+    communityThe, 
+      {
+        tempCommunity <- RMTRCode2::CsvRowSplit(Communities)
+        abund <- RMTRCode2::CsvRowSplit(CommunityAbund)
+        tempmat <- mats[[DatasetID]][[CombnNum]][tempCommunity, tempCommunity]
+        do.call(cbind, lapply(1:ncol(tempmat), FUN = function(nc, x, x0) {
+          (x[, nc] * x0[nc])
+        }, x = tempmat, x0 = abund))
+      }
+  )
+  matsEffects2[[i]] <- expm::`%^%`(matsEffects1[[i]], 2)
+  matsEffects3[[i]] <- expm::`%^%`(matsEffects1[[i]], 3)
+  # As has been pointed out to me, Sum_{k = 0}^{infty}(G^k) = (I - G)^-1
+  matsEffectsAdd[[i]] <- 
+    solve(diag(nrow(matsEffects1[[i]])) - matsEffects1[[i]],
+          diag(nrow(matsEffects1[[i]])))
+}
+```
+
+```{r}
+# Average correlation between matrix entries across all matrices
+print("Perturbation vs 1st Power:")
+mean(unlist(lapply(seq_along(matsPerturbation), function(i, m1, m2) {
+  if (is.null(m1[[i]])) return(NULL)
+  cor(m1[[i]][1:(nrow(m1[[i]])^2)],
+      m2[[i]][1:(nrow(m2[[i]])^2)])
+}, m1 = matsPerturbation, m2 = matsEffects1)))
+print("Perturbation vs 2nd Power:")
+mean(unlist(lapply(seq_along(matsPerturbation), function(i, m1, m2) {
+  if (is.null(m1[[i]])) return(NULL)
+  cor(m1[[i]][1:(nrow(m1[[i]])^2)],
+      m2[[i]][1:(nrow(m2[[i]])^2)])
+}, m1 = matsPerturbation, m2 = matsEffects2)))
+print("Perturbation vs 3rd Power:")
+mean(unlist(lapply(seq_along(matsPerturbation), function(i, m1, m2) {
+  if (is.null(m1[[i]])) return(NULL)
+  cor(m1[[i]][1:(nrow(m1[[i]])^2)],
+      m2[[i]][1:(nrow(m2[[i]])^2)])
+}, m1 = matsPerturbation, m2 = matsEffects3)))
+print("Perturbation vs Infinite sum of powers starting from 0:")
+mean(unlist(lapply(seq_along(matsPerturbation), function(i, m1, m2) {
+  if (is.null(m1[[i]])) return(NULL)
+  cor(m1[[i]][1:(nrow(m1[[i]])^2)],
+      m2[[i]][1:(nrow(m2[[i]])^2)])
+}, m1 = matsPerturbation, m2 = matsEffectsAdd)))
+```
+This turns out to be fairly sensitive to the timescale considered (1 time unit versus 100 for instance), but not obviously so for the (absolute rather than relative) perturbation size (1 vs 0.1 or 0.01).
+Changing from absolute to relative greatly reduces the correlation to values between -0.2 and -0.05 roughly for values of 0.01, 0.001, and 0.0001.
+
+As for how we can use the matrix, one easy set of summary statistics is to look for the proportions of various relationship types.
+```{r}
+matsPerturbationsProps <- do.call(rbind, lapply(matsPerturbation, function(m) {
+  if (is.null(m)) return(
+    data.frame(
+      SelfRegulationPos = NA,
+      SelfRegulationNeg = NA,
+      Mutualism = NA,
+      Competition = NA,
+      Exploitation = NA
+    )
+  )
+  
+  mutual <- 0
+  compet <- 0
+  exploi <- 0
+  inters <- 0
+  for (i in 1:(nrow(m) - 1)) {
+    for (j in (i+1):(ncol(m))) {
+      if (m[i, j] > 0 && m[j, i] > 0)        mutual <- mutual + 1
+      else if (m[i, j] < 0 && m[j, i] < 0)   compet <- compet + 1
+      else if ((m[i, j] < 0 && m[j, i] > 0) ||
+               (m[i, j] > 0 && m[j, i] < 0)) exploi <- exploi + 1
+      inters <- inters + 1 # expecting (nrow(m) * (nrow(m) - 1) / 2)
+    }
+  }
+  
+  data.frame(
+    SelfRegulationPos = sum(diag(m) > 0) / nrow(m),
+    SelfRegulationNeg = sum(diag(m) < 0) / nrow(m),
+    Mutualism = mutual / inters,
+    Competition = compet / inters,
+    Exploitation = exploi / inters
+  )
+}))
+```
+
+```{r}
+cbind(communitiesAll, matsPerturbationsProps)
+```
+
+How much of this exploitation is due to basal species?
+
+```{r}
+matsPerturbationsPropsByType <- do.call(
+  rbind, 
+  lapply(seq_along(matsPerturbation), function(i, permat, commun, commat) {
+    #print(i)
+    if (is.null(permat[[i]])) return(
+      data.frame(
+      SelfRegulationPosBasal = NA,
+      SelfRegulationNegBasal = NA,
+      MutualismBasal = NA,
+      CompetitionBasal = NA,
+      ExploitationBasal = NA,
+      SelfRegulationPosConsu = NA,
+      SelfRegulationNegConsu = NA,
+      MutualismConsu = NA,
+      CompetitionConsu = NA,
+      ExploitationConsu = NA
+      )
+    )
+    
+    sigmat <- with(
+      commun[i, ],
+      {
+        tempCommunity <- RMTRCode2::CsvRowSplit(Communities)
+        sign(commat[[DatasetID]][[CombnNum]][tempCommunity, tempCommunity])
+      })
+    sigmatBasal <- diag(sigmat) < 0
+    permatBasal <- sign(permat[[i]])[sigmatBasal, sigmatBasal]
+    permatConsu <- sign(permat[[i]])[!sigmatBasal, !sigmatBasal]
+    
+    mutualB <- 0
+    mutualC <- 0
+    competB <- 0
+    competC <- 0
+    exploiB <- 0
+    exploiC <- 0
+    intersB <- 0
+    intersC <- 0
+    with(list(m = permatBasal),
+         if (length(m) > 1 && nrow(m) > 1) {
+           for (i in 1:(nrow(m) - 1)) {
+             for (j in (i+1):(ncol(m))) {
+               if (m[i, j] > 0 && m[j, i] > 0)        mutualB <<- mutualB + 1
+               else if (m[i, j] < 0 && m[j, i] < 0)   competB <<- competB + 1
+               else if ((m[i, j] < 0 && m[j, i] > 0) ||
+                        (m[i, j] > 0 && m[j, i] < 0)) exploiB <<- exploiB + 1
+               intersB <<- intersB + 1 # expecting (nrow(m) * (nrow(m) - 1) / 2)
+             }
+           }
+         } else {
+           mutualB <<- NA; competB <<- NA; exploiB <<- NA; intersB <<- NA
+         }
+    )
+    with(list(m = permatConsu),
+         if (length(m) > 1 && nrow(m) > 1) {
+           for (i in 1:(nrow(m) - 1)) {
+             for (j in (i+1):(ncol(m))) {
+               if (m[i, j] > 0 && m[j, i] > 0)        mutualC <<- mutualC + 1
+               else if (m[i, j] < 0 && m[j, i] < 0)   competC <<- competC + 1
+               else if ((m[i, j] < 0 && m[j, i] > 0) ||
+                        (m[i, j] > 0 && m[j, i] < 0)) exploiC <<- exploiC + 1
+               intersC <<- intersC + 1 # expecting (nrow(m) * (nrow(m) - 1) / 2)
+             }
+           }
+         } else {
+           mutualC <<- NA; competC <<- NA; exploiC <<- NA; intersC <<- NA
+         }
+    )
+    
+    if (length(permatBasal) > 1) {
+      srpb <- sum(diag(permatBasal) > 0) / nrow(permatBasal)
+      srnb <- sum(diag(permatBasal) < 0) / nrow(permatBasal)
+    } else {
+      srpb <- sum(sign(permatBasal) == 1)
+      srnb <- sum(sign(permatBasal) == -1)
+    }
+    
+    if (length(permatConsu) > 1) {
+      srpc <- sum(diag(permatConsu) > 0) / nrow(permatConsu)
+      srnc <- sum(diag(permatConsu) < 0) / nrow(permatConsu)
+    } else {
+      srpc <- sum(sign(permatConsu) == 1)
+      srnc <- sum(sign(permatConsu) == -1)
+    }
+    
+    data.frame(
+      SelfRegulationPosBasal = srpb,
+      SelfRegulationNegBasal = srnb,
+      MutualismBasal = mutualB / intersB,
+      CompetitionBasal = competB / intersB,
+      ExploitationBasal = exploiB / intersB,
+      SelfRegulationPosConsu = srpc,
+      SelfRegulationNegConsu = srnc,
+      MutualismConsu = mutualC / intersC,
+      CompetitionConsu = competC / intersC,
+      ExploitationConsu = exploiC / intersC
+    )
+  },
+  permat = matsPerturbation,
+  commun = communitiesAll,
+  commat = mats
+  )
+)
+```
+
+```{r}
+matsPerturbationsPropsByType
+```
+
+Jon suggested trying to obtain the characteristic time scales of the system over which we should measure the results.
+Usually, that is derived from the eigenvalues of the matrix.
+[The following is a nice reminder text.](https://math.stackexchange.com/a/1266273)
+In this case, this suggests that we should also compute the Jacobian of the system, both for comparison and for calculation of the time scale.
+We then will want to recompute the perturbation matrix to see what happens over the more appropriately computed time scale.
+We numerically compute the Jacobian with `rootSolve::jacobian.full`.
+Note that "[t]he Jacobian is estimated numerically, by perturbing the x-values."
+To obtain the eigenvalues, they recommend using the `base::eigen` function.
+
+```{r}
+matsJacobi <- list()
+matsJacobiTimes <- list()
+matsJacobiTimesFast <- list()
+for (i in 1:nrow(communitiesAll)) {
+  communityThe <- communitiesAll[i, ]
+  if (!communityThe$Persists) {next}
+  
+  matsJacobi[[i]] <- 
+    with(
+      communityThe, 
+      {
+        tempCommunity <- RMTRCode2::CsvRowSplit(Communities)
+        rootSolve::jacobian.full(
+          y = RMTRCode2::CsvRowSplit(CommunityAbund), 
+          func = RMTRCode2::GeneralisedLotkaVolterra,
+          parms = list(
+            a = mats[[DatasetID]][[CombnNum]][tempCommunity, tempCommunity],
+            r = pools[[DatasetID]][[CombnNum]]$ReproductionRate[tempCommunity],
+            epsilon = 1E-6
+          )
+        )
+      }
+    )
+  
+  matsJacobiTimes[[i]] <- 1 / min(abs(Re(eigen(matsJacobi[[i]])$values)))
+  matsJacobiTimesFast[[i]] <- 1 / max(abs(Re(eigen(matsJacobi[[i]])$values)))
+}
+```
+
+```{r}
+matsPerturbationWJacobiTimes <- list()
+matsPerturbationWJacobiTimesFast <- list()
+for (i in 1:nrow(communitiesAll)) {
+  communityThe <- communitiesAll[i, ]
+  if (!communityThe$Persists) {next}
+  
+  matsPerturbationWJacobiTimes[[i]] <- matrix(NA, 
+                                  nrow = communityThe$CommunitySize,
+                                  ncol = communityThe$CommunitySize)
+  matsPerturbationWJacobiTimesFast[[i]] <- matrix(NA, 
+                                  nrow = communityThe$CommunitySize,
+                                  ncol = communityThe$CommunitySize)
+  
+  # Each entry is the effect of the column on the row.
+  # Hence, we will be placing column vectors in the matrix.
+  #TODO Note to future me: double check the transpose, just in case.
+  
+  for (r in 1:communityThe$CommunitySize) {
+    matsPerturbationWJacobiTimes[[i]][, r] <- with(
+      communityThe, 
+      {
+        tempCommunity <- RMTRCode2::CsvRowSplit(Communities)
+        perturbation <- rep(0, CommunitySize)
+        abund <- RMTRCode2::CsvRowSplit(CommunityAbund)
+        perturbation[r] <- 0.01 * abund[r] #1#0.0001 * abund[r]
+        dynamics <- RMTRCode2::LawMorton1996_NumIntegration(
+          A = mats[[DatasetID]][[CombnNum]][tempCommunity, tempCommunity],
+          R = pools[[DatasetID]][[CombnNum]]$ReproductionRate[tempCommunity],
+          X = abund + perturbation,
+          OuterTimeStepSize = matsJacobiTimes[[i]],
+          InnerTimeStepSize = matsJacobiTimes[[i]] * 0.001,
+          Tolerance = 1E-6
+        ) # Column: Species, Row: Time
+        timediff <- diff(dynamics[, 1])
+        dynamics <- dynamics[, -1]
+        unlist(lapply(1:ncol(dynamics), FUN = function(nc, x, x0, t) {
+          sum((x[-1, nc] - x0[nc]) * timediff)
+        }, x = dynamics, x0 = abund, t = timediff))
+      }
+    )
+  }
+  for (r in 1:communityThe$CommunitySize) {
+    matsPerturbationWJacobiTimesFast[[i]][, r] <- with(
+      communityThe, 
+      {
+        tempCommunity <- RMTRCode2::CsvRowSplit(Communities)
+        perturbation <- rep(0, CommunitySize)
+        abund <- RMTRCode2::CsvRowSplit(CommunityAbund)
+        perturbation[r] <- 0.01 * abund[r] #1#0.0001 * abund[r]
+        dynamics <- RMTRCode2::LawMorton1996_NumIntegration(
+          A = mats[[DatasetID]][[CombnNum]][tempCommunity, tempCommunity],
+          R = pools[[DatasetID]][[CombnNum]]$ReproductionRate[tempCommunity],
+          X = abund + perturbation,
+          OuterTimeStepSize = matsJacobiTimesFast[[i]],
+          InnerTimeStepSize = matsJacobiTimesFast[[i]] * 0.001,
+          Tolerance = 1E-6
+        ) # Column: Species, Row: Time
+        timediff <- diff(dynamics[, 1])
+        dynamics <- dynamics[, -1]
+        unlist(lapply(1:ncol(dynamics), FUN = function(nc, x, x0, t) {
+          sum((x[-1, nc] - x0[nc]) * timediff)
+        }, x = dynamics, x0 = abund, t = timediff))
+      }
+    )
+  }
+}
+```
+
+(Switching between absolute (1) to relative (0.01) does not cause big changes when using the characteristic time scales. Going for finer resolution (absolute steps of 0.001 vs relative steps of 0.001) also did not substantially affect the results.)
+
+We can look at pair-wise correlations with our matrices.
+To be clear, for each two methods, we proceed to take the correlations of the entries of the matrices for each case and average them.
+We can see that the Jacobian seems fairly consistent with the first graph power as well as the unit perturbation cases, but is not strongly related to the perturbation over the characteristic time scale.
+On the other hand, perturbation over the characteristic time scale is still more consistent with perturbation over a unit time scale than with the attempts at graph powers.
+
+```{r}
+matsToCompare <- list(
+  "PertOverUnit" = matsPerturbation,
+  "PertOverChar" = matsPerturbationWJacobiTimes,
+  "PertOverShrt" = matsPerturbationWJacobiTimesFast,
+  "Jacobian" = matsJacobi,
+  "Graph^1" = matsEffects1,
+  "Graph^2" = matsEffects2,
+  "Graph^3" = matsEffects3,
+  "sum(Graph)" = matsEffectsAdd
+)
+
+matCorrAvg <- foreach::foreach(
+    i = iterators::iter(matsToCompare)
+) %:% foreach::foreach(
+    j = iterators::iter(matsToCompare)
+) %do% {
+    mean(unlist(lapply(seq_along(i), function(k, m1, m2) {
+        if (is.null(m1[[k]])) return(NULL)
+        cor(m1[[k]][1:(nrow(m1[[k]])^2)],
+            m2[[k]][1:(nrow(m2[[k]])^2)])
+    }, m1 = i, m2 = j)))
+} %>% unlist %>% matrix(
+  ncol = length(matsToCompare), nrow = length(matsToCompare)
+)
+
+rownames(matCorrAvg) <- names(matsToCompare)
+colnames(matCorrAvg) <- names(matsToCompare)
+matCorrAvg
+```
+
+One might immediately wonder if the Jacobian is a better measurement of total effects, but the Jacobian does not appear to reflect the indirect competition amongst the Basal species that we might expect.
+The perturbation over a unit time scale does seem to reflect graph effects if we use the infinite sum $\sum_{k = 0}^{\infty} G^k =  (I - G)^{-1}$, which is reflected in the high average correlation.
+(We have applied this to the interaction matrix multiplied by the abundance of species by column, which can be thought of as the overall effect of the column species on the row species as opposed to the per capita effect.)
+For example, see the following matrices.
+
+```{r}
+print("Unit time")
+matsPerturbation[[1]]
+print("Jacobian")
+matsJacobi[[1]]
+print("Sum_{k=0}^{infty}(Graph^k)")
+matsEffectsAdd[[1]]
+```
+
+On the other hand, considering the perturbations over characteristic time scales leads to some unexpected results, such as exploitation relationships instead of competition or no interaction at all.
+While this is not necessarily wrong, it does call into question which matrix best describes the interactions, as each version interacts on different time scales.
+(The Jacobian covers instantaneous time scales, the unit perturbation is over a very short time scale, the characteristic time of the largest magnitude eigenvalue is after the major fluctuations are bounded by exponential decay, and the characteristic time of the smallest magnitude eigenvalue is after the most minor fluctuations are bounded by exponential decay.)
+
+```{r}
+print(paste("Fastest Characteristic Time", matsJacobiTimesFast[[1]]))
+matsPerturbationWJacobiTimesFast[[1]]
+print(paste("Slowest Characteristic Time", matsJacobiTimes[[1]]))
+matsPerturbationWJacobiTimes[[1]]
+```
+
+## Leontief Analysis
+
+Giving `enaR` a try, we establish the flow matrix as a size-adjusted (assuming size is a proxy for mass) absolute flow of mass from resource to consumer. 
+Note that we do not appear to want the losses incorporated into the flow matrix.
+The `enaR` package also requests 
+
+- a vector of inputs, the amount of “mass” flowing into our basal species, 
+- a vector of respirations, the amount of “mass” lost by our species’ “breathing”,
+- a vector of “exports”, which is the amount of mass passed onto further systems,
+- a vector of total outputs (respiration + exports),
+- a vector of biomass actually stored in each node/species, 
+- and whether the entities species are alive.
+
+```{r}
+Leontief <- list()
+
+stopifnot(nrow(communitiesAll) == length(foodWebs))
+
+for (i in 1:length(foodWebs)) {
+  communityThe <- communitiesAll[i, ]
+  foodwebsThe <- foodWebs[[i]]
+  if (!communityThe$Persists) {next}
+  
+  Leontief[[i]] <- with(
+    foodwebsThe, {
+      flow.mat <- matrix(data = 0, nrow = nrow(nodes), ncol = nrow(nodes))
+      rownames(flow.mat) <- colnames(flow.mat) <- nodes$node
+      if (!is.null(trophic.links)) {
+      for (link in 1:nrow(trophic.links)) {
+        linkRow <- trophic.links[link, ]
+        # NOTE: from-row-to-column
+        flow.mat[linkRow$resource, linkRow$consumer] <-
+          # Note: mass gained by consumer < mass lost by resource (Thermodynamics)
+          # The amount of mass flowing (from the resource) to the consumer
+          # is the gainPerUnit multiplied by the resourceAbund and consumerAbund
+          # (i.e. the abundance generated multiplied by number of interactions)
+          # multiplied by the proxy for mass generated, consumerSize.
+          linkRow$gainPerUnit * 
+          linkRow$resourceAbund * linkRow$consumerAbund *
+          nodes[linkRow$consumer, ]$M
+        
+        
+        flow.mat[linkRow$consumer, linkRow$resource] <-
+          # The amount of mass flowing from the resource (to the consumer)
+          # is the lossPerUnit multiplied by the resourceAbund and consumerAbund
+          # (i.e. the abundance lost multiplied by number of interactions)
+          # multiplied by the proxy for mass lost, resourceSize.
+          linkRow$lossPerUnit * 
+          linkRow$resourceAbund * linkRow$consumerAbund *
+          nodes[linkRow$resource, ]$M
+        
+        stopifnot(abs(flow.mat[linkRow$consumer, linkRow$resource]) >
+                    abs(flow.mat[linkRow$resource, linkRow$consumer]))
+      }
+      }
+      
+      # Amount of mass flowing into the system: basal generated.
+      flow.input <- ifelse(
+        nodes$Type == "Basal",
+        nodes$M * nodes$ReproductionRate * nodes$N,
+        0
+      )
+      
+      # Amount of mass leaving the system. I think this includes 
+      # losses due to inefficiencies in the flow matrix,
+      # losses due to intra-specific competition (basals), and
+      # losses due to failure to predate (consumer reproduction rate).
+      # It is not quite clear which of these are "respiration" versus "export".
+      # Thinking economically (efficiencies?) I think the inefficiencies in the
+      # flow matrix are more liable to be called respiration.
+      # The population losses could, I think, be considered to be due to leaving
+      # the system to be used in another system, although this is very handwavey
+      # in a silicon system.
+      
+      # Effect on the column, by the row:
+      # go by column, if negative, add the transpose.
+      flow.respiration <- colSums(ifelse(flow.mat < 0, 
+                                         flow.mat + t(flow.mat), 
+                                         0), na.rm = TRUE)
+      
+      # Correct the amount of mass loss due to inefficiency.
+      flow.mat[flow.mat < 0] <- 0
+      
+      # Change in abundance multiplied by size.
+      flow.export <- ifelse(
+        nodes$Type == "Basal",
+        nodes$N^2 * nodes$Intraspecific * nodes$M,
+        nodes$ReproductionRate * nodes$N * nodes$M
+      )
+      
+      flow.output <- flow.respiration + flow.export
+      
+      storage <- nodes$N
+      living <- rep(TRUE, nrow(nodes))
+      
+      enaR::pack(
+        flow.mat, flow.input, 
+        flow.respiration, flow.export, flow.output, 
+        storage, living
+      )
+    })
+}
+```
+
+(Note: "there is no edge attribute named flow" refers to a few strictly basal systems.)
+
+Despite performing the operations only on those systems that persist with 
+steady-state (or at least long run) abundances, some of the calculated input and
+output vectors differ (usually magnitude < $10^{-9}$).  
+We thus next make sure the networks are considered balanced before extracting a relationships table (using a technique attributed to Ulanowicz and Puccia (1990)).
+
+```{r}
+LeontiefMTI <- lapply(Leontief, function(x) {
+  if (!is.null(x)) 
+    enaR::enaMTI(enaR::balance(x, method = "AVG2")) 
+  else x
+})
+# Returns
+#  G : Rows are who is consumed,
+#      Columns are who is consuming
+#      Entries are percentages of diet
+#  FP: "Negative impact of predator on prey"
+#  Q = G - t(FP)
+#  M : Indirect impacts formed by the infinite sum of powers of Q beginning at 1.
+```
+
+An easy way to extract the results is to apply the `table` function.
+
+```{r}
+lapply(LeontiefMTI, function(x) {if(!is.null(x)) 
+  table(x$Relations.Table$`Mixed (integral)`)})
+```
+
+In contrast to earlier attempts, we now see a few rare mutualisms.
+Note that the Leontief matrix specifically removes the zeroth power, so we consider what happens when adding it in and compare with removing it from the graph approach.
+We also have a few cases where the matrix has no non-zero entries due to having only non-interacting basal species which need to be ignored for the averaging to make sense.
+Adding the Leontief matrix of indirect effects to the matrix comparison (and transposing to reflect the differing row-column conventions), we have the following.
+
+```{r, warning=FALSE, message=FALSE}
+matsToCompare <- list(
+  "PertOverUnit" = matsPerturbation,
+  "PertOverChar" = matsPerturbationWJacobiTimes,
+  "PertOverShrt" = matsPerturbationWJacobiTimesFast,
+  "Jacobian" = matsJacobi,
+  "Graph^1" = matsEffects1,
+  "Graph^2" = matsEffects2,
+  "Graph^3" = matsEffects3,
+  "sum(Graph)" = matsEffectsAdd,
+  "sum(Graph)-I" = lapply(matsEffectsAdd, function(x) {
+    if(!is.null(x)) x - diag(nrow = nrow(x), ncol = ncol(x))}),
+  "Leontief" = lapply(LeontiefMTI, function(x) if(!is.null(x)) t(x$M)),
+  "Leontief+I" = lapply(LeontiefMTI, function(x) {
+    if(!is.null(x)) (t(x$M) + diag(nrow = nrow(x$M), ncol = ncol(x$M)))})
+)
+
+matCorrAvg <- foreach::foreach(
+    i = iterators::iter(matsToCompare)
+) %:% foreach::foreach(
+    j = iterators::iter(matsToCompare)
+) %do% {
+    mean(unlist(lapply(seq_along(i), function(k, m1, m2) {
+        if (is.null(m1[[k]])) return(NULL)
+        cor(m1[[k]][1:(nrow(m1[[k]])^2)],
+            m2[[k]][1:(nrow(m2[[k]])^2)])
+    }, m1 = i, m2 = j)), na.rm = TRUE)
+} %>% unlist %>% matrix(
+  ncol = length(matsToCompare), nrow = length(matsToCompare)
+)
+
+rownames(matCorrAvg) <- names(matsToCompare)
+colnames(matCorrAvg) <- names(matsToCompare)
+matCorrAvg
+```
+
+Unpacking the additions to the matrix, the diagonal of the Leontief approach with the zeroth power included matches up extremely well with the approach I had been trying to use with the graphs, $0.953$.
+Removing this power from both the Leontief and graphs approach, the values match up relatively well at about $0.595$, but are not as related as the unit perturbation is to the graph approach $0.695$ or the Jacobian to the graph without the zeroth power $0.660$.
+Of particular note due to the strength of the average correlation is the graphs approach without the zeroth power compared to the first power of the graphs approach, which shows a $0.993$ average correlation.
+
+## Save Workspace
+
+```{r save}
+save(
+  communitiesAll, # Tibble, row is a community.
+  invasionsDirected, # List of who is invadable by whom per pool.
+  islandInteractionsOneEmptyTwo, # Outcomes of three island interactions.
+  islandInteractionsOneEmptyTwoWhich, # Which species are present per island.
+  islandInteractionsOneTwo, # Outcomes of two island interactions.
+  islandInteractionsOneTwoWhich, # Which species are present per island.
+  # Note: the island outcomes are by data set ID followed by by combination.
+  mats, # Interaction Matrices
+  paramFrame, # Contains run information, outcomes. Row is by settings.
+  plotScalingData, # Contains assembly outcomes in a one per row format.
+  pools, # The system pools
+  file = "LM1996-NumPoolCom-QOut-2021-05.RData"
+) # Community: an assembly outcome or hybrid or a hybrid's collapse.
+```
