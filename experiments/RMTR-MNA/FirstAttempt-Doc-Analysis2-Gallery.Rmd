@@ -1,0 +1,754 @@
+---
+title: "Multiple Numerical Assembly 2 RMD"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Sections {.tabset}
+
+## Abstract
+
+Previously, I sent around some images comparing the alpha diversity results of each run.
+This met with general approval as well as questions including gamma diversity, the burstiness of arrivals (co-establishment), the burstiness of extinctions (co-extinctions), and comparisons with purely neutral models of arrival and extinction.
+<!-- 
+Quasi-equilibria <-> comparison with simple colonisation/extinction. Not sure still how to do this with community structure. I think one could in principle have each of the 2^100 systems analysed for zeros and stability in Mathematica and see how that navigates the 2^100 state space.
+Varying space <-> clear signal?
+
+
+-->
+
+In this document, we continue to attempt to address Chris's question of how increased spatial mobility changes biodiversity 
+measures. <!--What question to address.-->
+We begin by loading up each data set referring to different neutral (arrival-extinction) and spatial (dispersal speed) conditions. 
+We can then extract our diversity metrics for each system and each site/ecosystem/environment within the system and compare them.
+
+### Notes
+
+* While Chris prefers abundance/richness as a dichotomy, it might be helpful for publication to consider more than that.
+
+### TODO
+
+* Measure the impact of dispersal on invadability. This preferably identifies both the height of the new barrier as well as precisely determining the effect. This might include the asymmetry at the ends of the line spatial arrangement (as compared to a ring spatial arrangement).
+** I anticipate that this is precisely the effect of the extra term. To show it then, analytically we can check the per-capita rate of growth with the additional term, which will act as a penalty. Empirically, we look at the invasions that we expect to have succeeded but then died out when space was introduced and we should be able to see a good match between its predicted per-capita growth rate and when/if it died out within a given system. This breaks down if it can survive in an adjacent system, for what it is worth.
+* Evenness by trophic level. This might help us deduce how neutral the trophic levels are, but requires analysing how the trophic network changes over time (possibly in contrast to the theoretical food web). Furthermore, this is most advantageous to investigate as we change the parameters of the simulation to include more trophic levels. This would also allow us to color code abundance and examine richness of trophic levels (both number of levels and richness within levels).
+** We should make a point of running another layer of consumers (and producers?) as well so as to be able to better observe the resultant diversity. I do note that, contrary to previous expecations, we are running at about $30\%$ of the pool. As I am only using 1 pool at this point, there might be a high amount of variation.
+** The parent point here might require moving onto Viking. The `deSolve` package does have functions that return lists, where the first element is a vector of derivatives of $y$ with respect to $t$. The ''next'' elements seem like they could be things like the trophic structure and trophic levels.
+* We should consider the "run to stability", then variable change. This requires another set of (2 sets of) systems where we run the system as before to stability (everything looks stable at least!) and then make a jump in one (or two? space and arrival or space and extinction rate?) of the parameters.
+* From previous chats, there is also the prospect of comparing ''pure'' neutral dynamics. In terms of simulations, a pool of the same size, but all producers would seem to do it. In terms of analytics, there should be a good neutral theory solution.
+* Another point of interest is how bursty is the distribution compared to the exponential null model? This in effect studies the impact of the dynamics. If they are far burstier than we expect/neutrality would dictate, than we can deduce there are multiple related secondary extinctions. Otherwise, the system would appear to be merely neutral dynamics and primary extinctions.
+
+
+### Future
+
+* Once the strictly deterministic dynamics are sufficiently cleared out, Chris (and Susan) would like to swap to Gillespie style / jump process / stochiometry dynamics.
+
+### Functions
+```{r, warning=FALSE, message=FALSE}
+library(dplyr)     # Data Manipulation
+library(tidyr)     # Data Pivotting
+library(ggplot2)   # 2-D Plot
+library(plotly)    # 3-D Plot
+library(ggfortify) # used for biplots of PCAs
+library(vegan)     # Ecological analysis mega-package
+library(htmltools) # Programmatic chunks
+library(RMTRCode2)
+
+# https://stackoverflow.com/a/7172832
+ifrm <- function(obj, env = globalenv()) {
+  obj <- deparse(substitute(obj))
+  if(exists(obj, envir = env)) {
+    rm(list = obj, envir = env)
+  }
+}
+
+log0 <- function(x, base = exp(1)) {
+  xneq0 <- x != 0 & !is.na(x)
+  x[xneq0] <- log(x[xneq0], base = base)
+  return(x)
+}
+```
+
+### Data
+
+As of the writing of this script, all of the data is stored in the same location as this script.
+The parameters used to generate the interaction matrices, pools, and events is not stored with the attempts, which is something I should probably fix in the future.
+(I could store them in the ellipsis argument or as a separate object.)
+```{r}
+by_for_thinning <- 10
+divide_time_by <- 1E4
+
+load_safe_thin <- function(fname, bythin) {
+  loaded <- tryCatch({load(fname)}, 
+                     error = function(e) {
+                       print(fname)
+                       print(e)
+                       return(NA)
+                     })
+  if (is.na(loaded)) {
+    return(NA)
+  } else {
+    loaded <- get(loaded)
+    loaded$Abundance <- loaded$Abundance[seq(from = 1,
+                                             to = nrow(loaded$Abundance),
+                                             by = bythin), ]
+    toEliminate <- loaded$Abundance[, -1] < loaded$Parameters$EliminationThreshold & loaded$Abundance[, -1] > 0
+    loaded$Abundance[, -1][toEliminate] <- 0
+    loaded$Abundance[, 1] <- loaded$Abundance[, 1] / divide_time_by
+    return(loaded)
+  }
+}
+
+# All .RData
+files_dat <- dir(pattern = ".RData$")
+# Remove PoolMats
+files_dat <- files_dat[
+  !grepl(x = files_dat, 
+         pattern = "PoolMats", 
+         fixed = TRUE)
+  ]
+
+# Technically overkill, but prevents unintentional loads.
+# Break into two separate runs to load only intended.
+# Process "MNA-FirstAttempt#####-Result-Env10-####.RData"
+files_dat_FA <- files_dat[
+  grepl(x = files_dat, 
+        pattern = "FirstAttempt", 
+        fixed = TRUE)
+  ]
+Results <- sapply(
+  files_dat_FA,
+  load_safe_thin, 
+  bythin = by_for_thinning,
+  simplify = FALSE, USE.NAMES = TRUE
+)
+
+# Process "MNA-Dist#####-Ext###-Env10-####.RData"
+files_dat_Ext <- files_dat[
+  grepl(x = files_dat, 
+        pattern = "Dist", 
+        fixed = TRUE)
+  ]
+Results <- c(Results, sapply(
+  files_dat_Ext,
+  load_safe_thin, 
+  bythin = by_for_thinning,
+  simplify = FALSE, USE.NAMES = TRUE
+))
+```
+
+### Pools and Matrices
+
+```{r}
+load_safe <- function(fname) {
+  loaded <- tryCatch({load(fname)}, 
+                     error = function(e) {
+                       print(fname)
+                       print(e)
+                       return(NA)
+                     })
+  if (all(is.na(loaded))) {
+    return(NA)
+  } else {
+    return(sapply(loaded, get, 
+                  envir = sys.frame(sys.parent(0)), 
+                  simplify = FALSE, USE.NAMES = TRUE))
+  }
+}
+
+# All .RData
+files_dat_PM <- dir(pattern = ".RData$")
+# Remove PoolMats
+files_dat_PM <- files_dat_PM[
+  grepl(x = files_dat_PM, 
+        pattern = "PoolMats", 
+        fixed = TRUE)
+  ]
+
+PoolsMats <- sapply(
+  files_dat_PM,
+  load_safe, 
+  simplify = FALSE, USE.NAMES = TRUE
+)
+```
+
+<!-- 
+### Trophic Functions
+```{r}
+EliminiationThreshold <- unique(sapply(
+  Results, 
+  function(lst) {lst$Parameters$EliminationThreshold}
+))
+stopifnot(length(EliminiationThreshold) == 1)
+
+NumEnvironments <- unique(sapply(
+  Results, 
+  function(lst) {lst$NumEnvironments}
+))
+stopifnot(length(NumEnvironments) == 1)
+
+TrophicFunctions <- sapply(
+  PoolsMats,
+  function(PM, NE, ET) {
+    RMTRCode2::CalculateTrophicStructure(
+      Pool = PM$Pool,
+      NumEnvironments = NE,
+      InteractionMatrices = PM$InteractionMatrices,
+      EliminationThreshold = ET
+    )
+  },
+  NE = NumEnvironments,
+  ET = EliminiationThreshold
+)
+```
+
+```{r}
+TrophicAnalyses <- lapply(
+  seq_along(Results),
+  function(i, Result, Nm, TrophFN) {
+    # Identify Appropriate Function.
+    Unusual1 <- grepl(pattern = "FirstAttempt",
+                      x = Nm[i], fixed = TRUE)
+    NormalKey <- strsplit(Nm[i], split = '-')[[1]][3]
+    linkedFN <- if(Unusual1) {
+      TrophFN[grepl(x = names(TrophFN),
+                     pattern = "FirstAttempt", fixed = TRUE)][[1]]
+    } else {
+      TrophFN[grepl(x = names(TrophFN), 
+                     pattern = NormalKey, fixed = TRUE)][[1]]
+    }
+    
+    # Apply to each row.
+    
+    return(apply(Result[[i]]$Abundance[, -1],
+                 MARGIN = 1,
+                 FUN = linkedFN)
+    )
+  },
+  Result = Results,
+  Nm = names(Results),
+  TrophFN = TrophicFunctions
+)
+
+names(TrophicAnalyses) <- names(Results)
+```
+-->
+
+## Diversity {.tabset}
+
+```{r}
+# Borrowing code from FirstAttempt-Doc-Analysis.Rmd
+Calculate_Diversity <- function(result) {
+  Diversity <- lapply(
+    1:result$NumEnvironments,
+    function(i, abund, numSpecies) {
+      time <- abund[, 1]
+      env <- abund[, 1 + 1:numSpecies + numSpecies * (i - 1)]
+      richness <- rowSums(env != 0)
+      abundSum <- rowSums(env)
+      #NOTE: THIS CAN YIELD NAN'S (0/0).
+      # THIS IS NOT NECESSARILY A PROBLEM.
+      # IT MIGHT BE WORTH IT JUST TO USE 0 OR
+      # TO CATCH IT EXPLICITLY AND REPLACE WITH NAN.
+      entropy <- env / abundSum
+      entropy <- - apply(
+        entropy, MARGIN = 1,
+        FUN = function(x) {
+          sum(x * log0(x))
+        })
+      species <- apply(
+        env, MARGIN = 1,
+        FUN = function(x) {
+          toString(which(x > 0))
+        }
+      )
+      evenness <- entropy / log(richness)
+      data.frame(Time = time, 
+                 Richness = richness, 
+                 Entropy = entropy,
+                 Evenness = evenness,
+                 Species = species,
+                 Environment = i,
+                 stringsAsFactors = FALSE)
+    },
+    abund = result$Abundance,
+    numSpecies = (ncol(result$Abundance) - 1) / result$NumEnvironments
+  )
+  
+  
+  Diversity <- dplyr::bind_rows(Diversity)
+  Diversity_alpha <- Diversity
+  # Diversity_alpha <- Diversity_alpha %>% dplyr::mutate(
+  #   Evenness = Entropy / log(Richness)
+  # )
+  
+  # Modify to do the gamma bits right here.
+  Diversity_gamma <- Diversity %>% dplyr::group_by(
+    Time
+  ) %>% dplyr::summarise(
+    Mean = mean(Richness),
+    SpeciesTotal = toString(sort(unique(unlist(strsplit(paste(
+      Species, collapse = ", "), split = ", ", fixed = TRUE))))),
+    Gamma = unlist(lapply(strsplit(
+      SpeciesTotal, split = ", ", fixed = TRUE), length))
+  ) %>% tidyr::pivot_longer(
+    cols = c(Mean, Gamma), 
+    names_to = "Aggregation",
+    values_to = "Richness"
+  )
+  
+  # Combine the two types of results
+  Diversity_alpha <- Diversity_alpha %>% dplyr::select(
+    -Species
+  ) %>% tidyr::pivot_longer(
+    cols = c(Richness, Entropy, Evenness),
+    names_to = "Measurement",
+    values_to = "Value"
+  ) %>% dplyr::mutate(
+    Environment = as.character(Environment)
+  )
+  
+  Diversity_gamma <- Diversity_gamma %>% dplyr::select(
+    -SpeciesTotal
+  ) %>% dplyr::rename(
+    Environment = Aggregation,
+    Value = Richness
+  ) %>% dplyr::mutate(
+    Measurement = "Richness"
+  )
+  
+  Diversity_beta <- Diversity_alpha %>% dplyr::filter(
+    Measurement == "Richness"
+  ) %>% dplyr::select(
+    -Measurement
+  ) %>% dplyr::left_join(
+    y = Diversity_gamma %>% dplyr::filter(
+      Measurement == "Richness", Environment == "Gamma"
+    ) %>% dplyr::select(
+      -Measurement, -Environment
+    ),
+    by = "Time",
+    suffix = c("_Alpha", "_Gamma")
+    # ) %>% dplyr::group_by(
+    #   Time
+  ) %>% dplyr::mutate(
+    BetaSpeciesMissing = Value_Gamma - Value_Alpha,
+    BetaSpeciesPercentage = Value_Alpha/Value_Gamma
+  ) %>% dplyr::select(
+    -Value_Gamma, -Value_Alpha
+  ) %>% tidyr::pivot_longer(
+    names_to = "Measurement",
+    values_to = "Value",
+    cols = c(BetaSpeciesMissing, BetaSpeciesPercentage)
+    # ) %>% dplyr::ungroup(
+  )
+  
+  #print(c(colnames(Diversity_alpha), colnames(Diversity_beta), colnames(Diversity_gamma)))
+  Diversity <- rbind(
+    Diversity_alpha,
+    Diversity_beta,
+    Diversity_gamma
+  )
+  
+  return(Diversity)
+}
+```
+
+```{r, warning=FALSE}
+# Note that if a file fails to load, we might have NA instead of a result to work with.
+Diversity <- sapply(
+  USE.NAMES = TRUE, simplify = FALSE,
+  Results, function(result) {
+    if (length(result) == 1 && is.na(result)) {
+      # Problem case.
+      return(NA)
+    }
+    print(paste("Calculating", Sys.time()))
+    
+    # Calculate the diversity.
+    # We will need to extract the system properties from
+    # the file names which we carry through using sapply.
+    return(Calculate_Diversity(result))
+  }
+)
+```
+
+```{r}
+Properties <- strsplit(names(Diversity), '-', 
+                       fixed = TRUE)
+# 1st Chunk: Name, Discard
+# 2nd Chunk: Iteration + Distance
+# 3rd Chunk: Result or Extinction Rate (or Arrival?)
+# 4th Chunk: Number of Environments
+# 5th Chunk: Space Type + .RData
+# Note the mix of Keyword and Location Structure (oops).
+# Note also that this strsplit character is a bad decision and should be changed for next time. (D'oh.)
+# (E.g. Dates DD-MM-YYYY, Decimals 1.35e-05.)
+Properties <- data.frame(
+  do.call(rbind, Properties),
+  stringsAsFactors = FALSE
+)
+names(Properties)[1:5] <- c(
+  "Name", "IterANDDist", "Modifier", "EnvNum", "SpaceAND.RData"
+)
+
+Properties$FullName <- names(Diversity)
+
+# Capture the position between the text (first group)
+# and the set of numbers (somehow without the +).
+# The \\K resets so that we do not capture any text.
+patternString <- "((?>[a-zA-Z]+)(?=[0-9eE]))\\K"
+
+# Split strings. Some of the trick will be to introduce
+# a character to make the separation around. We use "_".
+Properties <- Properties %>% dplyr::mutate(
+  IterANDDist = gsub(pattern = patternString, 
+                     replacement = "_", 
+                     x = IterANDDist, perl = TRUE),
+  Modifier = gsub(pattern = patternString, 
+                  replacement = "_", 
+                  x = Modifier, perl = TRUE),
+  EnvNum = gsub(pattern = patternString, 
+                replacement = "_", 
+                x = EnvNum, perl = TRUE)
+) %>% tidyr::separate(
+  IterANDDist, into = c("Iter", "Distance"),
+  sep = "[_]", fill = "right"
+) %>% tidyr::separate(
+  Modifier, into = c("Modifier", "ModIntensity"),
+  sep = "[_]", fill = "right"
+) %>% tidyr::separate(
+  EnvNum, into = c("Env", "Environments"),
+  sep = "[_]"
+) %>% tidyr::separate(
+  SpaceAND.RData, into = c("Space", ".RData"),
+  sep = "[.]"
+) %>% dplyr::select(
+  -Name, -.RData, -Env
+) 
+```
+
+```{r}
+Diversity <- lapply(1:length(Diversity),
+                    function(i, df, nm) {
+                      df[[i]] %>% mutate(
+                        Simulation = nm[i]
+                      )
+                    }, 
+                    df = Diversity,
+                    nm = names(Diversity))
+```
+```{r}
+Diversity <- dplyr::left_join(
+  dplyr::bind_rows(Diversity),
+  Properties,
+  by = c("Simulation" = "FullName")
+)
+```
+```{r}
+Diversity <- Diversity %>% dplyr::mutate(
+  Distance = dplyr::case_when(
+    is.na(Distance) ~ "1e+00",
+    TRUE ~ Distance
+  )
+)
+```
+
+### Alpha Richness {.tabset}
+
+#### Overall
+```{r}
+ggplot2::ggplot(
+  Diversity %>% dplyr::filter(
+    Measurement == "Richness",
+    Environment != "Gamma",
+    Space != "Ring",
+    Environment != "Mean"
+  ), 
+  ggplot2::aes(
+    x = Time,
+    y = Value,
+    color = factor(Environment),
+    alpha = ifelse(Environment %in% c("3", "7", "Mean"), 1, 0.3)
+  )
+) + ggplot2::geom_line(
+) + ggplot2::geom_line(
+  data = Diversity %>% dplyr::filter(
+    Measurement == "Richness",
+    Environment != "Gamma",
+    Space != "Ring",
+    Environment == "Mean"
+  ), 
+  color = "black"
+) + ggplot2::guides(
+  alpha = "none"
+) + ggplot2::scale_color_discrete(
+  "Environment"
+) + ggplot2::labs(
+  y = "Richness",
+  x = paste0("Time, ", divide_time_by, " units"),
+  title = "Overview of Alpha Richness over Time by System Properties",
+  caption = "Each row has the same arrival and extinction events."
+) + ggplot2::facet_grid(
+  Modifier + ModIntensity ~ Space + Distance
+)
+# ggplot2::ggsave(overallrich + ggplot2::coord_cartesian(ylim = c(0, 25)), filename = "MNA-AlphaRichness-Overview.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+```{r}
+Plot_Richness <- function(df) {
+  tempname <- paste(unique(df$Simulation), collapse = " ")
+  
+  temp <- ggplot2::ggplot(
+    df %>% dplyr::filter(
+      Measurement == "Richness",
+      Environment != "Gamma",
+      Environment != "Mean"
+    ), 
+    ggplot2::aes(
+      x = Time,
+      y = Value,
+      color = factor(Environment),
+      alpha = ifelse(Environment %in% c("3", "7", "Mean"), 1, 0.3)
+    )
+  ) + ggplot2::geom_line(
+  ) + ggplot2::geom_line(
+    data = df %>% dplyr::filter(
+      Measurement == "Richness",
+      Environment != "Gamma",
+      Environment == "Mean"
+    ), 
+    color = "black"
+  ) + ggplot2::guides(
+    alpha = "none"
+  ) + ggplot2::scale_color_discrete(
+    "Environment"
+  ) + ggplot2::labs(
+    title = tempname,
+    x = paste0("Time, ", divide_time_by, " units"),
+    y = "Richness"
+  )
+  
+  return(temp)
+}
+
+Plots_Richness_alpha <- Diversity %>% dplyr::group_split(
+  Simulation
+) %>% purrr::map(
+  Plot_Richness
+)
+# In the next chunk, we use
+# www.r-bloggers.com/2020/07/programmatically-create-new-geadings-and-outputs-in-rmarkdown/
+
+```
+
+```{r, echo=FALSE, results = "asis"}
+for (i in 1 : length(Plots_Richness_alpha)) {
+  cat("  \n\n")
+  cat("#### Sim: ", i, "  \n\n") # Create 4th level headings
+  
+  print(
+    Plots_Richness_alpha[[i]]
+  )
+  
+  cat("  \n\n")
+}
+```
+
+
+### Evenness {.tabset}
+
+#### Overall
+```{r}
+ggplot2::ggplot(
+  Diversity %>% dplyr::filter(
+    Measurement == "Evenness",
+    Environment != "Gamma",
+    Space != "Ring",
+    Environment != "Mean"
+  ), 
+  ggplot2::aes(
+    x = Time,
+    y = Value,
+    color = factor(Environment),
+    alpha = ifelse(Environment %in% c("3", "7", "Mean"), 1, 0.3)
+  )
+) + ggplot2::geom_line(
+) + ggplot2::geom_line(
+  data = Diversity %>% dplyr::filter(
+    Measurement == "Evenness",
+    Environment != "Gamma",
+    Space != "Ring",
+    Environment == "Mean"
+  ), 
+  color = "black"
+) + ggplot2::guides(
+  alpha = "none"
+) + ggplot2::scale_color_discrete(
+  "Environment"
+) + ggplot2::labs(
+  y = "Evenness",
+  x = paste0("Time, ", divide_time_by, " units"),
+  title = "Overview of Evenness over Time by System Properties",
+  caption = "Each row has the same arrival and extinction events."
+) + ggplot2::facet_grid(
+  Modifier + ModIntensity ~ Space + Distance
+)
+# ggplot2::ggsave(overallrich + ggplot2::coord_cartesian(ylim = c(0, 25)), filename = "MNA-AlphaRichness-Overview.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+```{r}
+Plot_Evenness <- function(df) {
+  tempname <- paste(unique(df$Simulation), collapse = " ")
+  
+  temp <- ggplot2::ggplot(
+    df %>% dplyr::filter(
+      Measurement == "Evenness",
+      Environment != "Gamma",
+      Environment != "Mean"
+    ), 
+    ggplot2::aes(
+      x = Time,
+      y = Value,
+      color = factor(Environment),
+      alpha = ifelse(Environment %in% c("3", "7", "Mean"), 1, 0.3)
+    )
+  ) + ggplot2::geom_line(
+  ) + ggplot2::geom_line(
+    data = df %>% dplyr::filter(
+      Measurement == "Evenness",
+      Environment != "Gamma",
+      Environment == "Mean"
+    ), 
+    color = "black"
+  ) + ggplot2::guides(
+    alpha = "none"
+  ) + ggplot2::scale_color_discrete(
+    "Environment"
+  ) + ggplot2::labs(
+    title = tempname,
+    x = paste0("Time, ", divide_time_by, " units"),
+    y = "Evenness"
+  )
+  
+  return(temp)
+}
+
+Plots_Evenness <- Diversity %>% dplyr::group_split(
+  Simulation
+) %>% purrr::map(
+  Plot_Evenness
+)
+# In the next chunk, we use
+# www.r-bloggers.com/2020/07/programmatically-create-new-headings-and-outputs-in-rmarkdown/
+
+```
+
+```{r, echo=FALSE, results = "asis"}
+for (i in 1 : length(Plots_Evenness)) {
+  cat("  \n\n")
+  cat("#### Sim: ", i, "  \n\n") # Create 4th level headings
+  
+  print(
+    Plots_Evenness[[i]]
+  )
+  
+  cat("  \n\n")
+}
+```
+
+### Gamma Richness {.tabset}
+
+#### Richness
+```{r}
+ggplot2::ggplot(
+  Diversity %>% dplyr::filter(
+    Measurement == "Richness",
+    Environment == "Gamma",
+    Space != "Ring"
+  ), 
+  ggplot2::aes(
+    x = Time,
+    y = Value
+  )
+) + ggplot2::geom_line(
+) + ggplot2::labs(
+  y = "Richness",
+  x = paste0("Time, ", divide_time_by, " units"),
+  title = "Gamma Richness over Time by System Properties",
+  caption = "Each row has the same arrival and extinction events."
+) + ggplot2::facet_grid(
+  Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::coord_cartesian(ylim = c(0, 45))
+
+# ggplot2::ggsave(overallgamma, filename = "MNA-GammaRichness-Overview.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+### Beta Richness {.tabset}
+
+#### $\gamma - \alpha$
+```{r}
+ggplot2::ggplot(
+  Diversity %>% dplyr::filter(
+    Measurement == "BetaSpeciesMissing",
+    Environment != "Gamma",
+    Space != "Ring",
+    Environment != "Mean"
+  ), 
+  ggplot2::aes(
+    x = Time,
+    y = Value,
+    color = factor(Environment),
+    alpha = ifelse(Environment %in% c("3", "7", "Mean"), 1, 0.3)
+  )
+) + ggplot2::geom_line(
+) + ggplot2::guides(
+  alpha = "none"
+) + ggplot2::scale_color_discrete(
+  "Environment"
+) + ggplot2::labs(
+  y = "Absolute Species Turnover", # en.wikipedia.org/wiki/Beta_diversity
+  x = paste0("Time, ", divide_time_by, " units"),
+  title = "Overview of Gamma - Alpha Richness over Time by System Properties",
+  caption = "Each row has the same arrival and extinction events."
+) + ggplot2::facet_grid(
+  Modifier + ModIntensity ~ Space + Distance
+)
+# ggplot2::ggsave(overallbetamiss, filename = "MNA-BetaMissing-Overview.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+#### $\alpha / \gamma$
+```{r}
+ggplot2::ggplot(
+  Diversity %>% dplyr::filter(
+    Measurement == "BetaSpeciesPercentage",
+    Environment != "Gamma",
+    Space != "Ring",
+    Environment != "Mean"
+  ), 
+  ggplot2::aes(
+    x = Time,
+    y = Value,
+    color = factor(Environment),
+    alpha = ifelse(Environment %in% c("3", "7", "Mean"), 1, 0.3)
+  )
+) + ggplot2::geom_line(
+) + ggplot2::guides(
+  alpha = "none"
+) + ggplot2::scale_color_discrete(
+  "Environment"
+) + ggplot2::labs(
+  y = "Percentage Species Present", # en.wikipedia.org/wiki/Beta_diversity
+  x = paste0("Time, ", divide_time_by, " units"),
+  title = "Overview of Alpha/Gamma Richness over Time by System Properties",
+  caption = "Each row has the same arrival and extinction events."
+) + ggplot2::facet_grid(
+  Modifier + ModIntensity ~ Space + Distance
+)
+# ggplot2::ggsave(overallbetapercent, filename = "MNA-BetaPercent-Overview.pdf", dpi = "retina", width = 11, height = 8)
+```
+
