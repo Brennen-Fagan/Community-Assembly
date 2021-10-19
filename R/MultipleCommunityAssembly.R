@@ -330,25 +330,29 @@ CalculateTrophicStructure <- function(
         by = c("to" = "node")
       )
 
-      # Split data frame.
-      ResCon <- GraphAsDataFrame[GraphAsDataFrame$weight > 0,]
-      ConRes <- GraphAsDataFrame[GraphAsDataFrame$weight < 0,]
+      if (("weight" %in% colnames(GraphAsDataFrame))) {
+        # We're in a case where there are edges.
+        # In the opposite case, we cannot do this part of the calculation.
+        # Split data frame.
+        ResCon <- GraphAsDataFrame[GraphAsDataFrame$weight > 0,]
+        ConRes <- GraphAsDataFrame[GraphAsDataFrame$weight < 0,]
 
-      # Reorder and rename variables.
-      ResCon <- dplyr::select(ResCon,
-                              to, from, # resource = to, consumer = from,
-                              effectPerUnit = weight, resourceAbund = N)
-      ConRes <- dplyr::select(ConRes,
-                              to, from, # resource = from, consumer = to,
-                              effectPerUnit = weight, consumerAbund = N)
-      ResCon <- dplyr::mutate(dplyr::group_by(ResCon, from),
-                              effectActual = effectPerUnit * resourceAbund,
-                              Type = "Exploit+")
-      ConRes <- dplyr::mutate(dplyr::group_by(ConRes, from),
-                              effectActual = effectPerUnit * consumerAbund,
-                              Type = ifelse(from == to,
-                                            "SelfReg-",
-                                            "Exploit-"))
+        # Reorder and rename variables.
+        ResCon <- dplyr::select(ResCon,
+                                to, from, # resource = to, consumer = from,
+                                effectPerUnit = weight, resourceAbund = N)
+        ConRes <- dplyr::select(ConRes,
+                                to, from, # resource = from, consumer = to,
+                                effectPerUnit = weight, consumerAbund = N)
+        ResCon <- dplyr::mutate(dplyr::group_by(ResCon, from),
+                                effectActual = effectPerUnit * resourceAbund,
+                                Type = "Exploit+")
+        ConRes <- dplyr::mutate(dplyr::group_by(ConRes, from),
+                                effectActual = effectPerUnit * consumerAbund,
+                                Type = ifelse(from == to,
+                                              "SelfReg-",
+                                              "Exploit-"))
+      }
 
       IntriG <- with(redPool, data.frame(
         from = node, #resource = node,
@@ -357,7 +361,8 @@ CalculateTrophicStructure <- function(
                                ReproductionRate, 0),
         effectActual = ifelse(ReproductionRate > 0,
                               N * ReproductionRate, 0),
-        Type = "Intrisc+"))
+        Type = "Intrisc+",
+        stringsAsFactors = FALSE))
       IntriL <- with(redPool, data.frame(
         from = node, #resource = node,
         to = node, #consumer = node,
@@ -365,11 +370,22 @@ CalculateTrophicStructure <- function(
                                ReproductionRate, 0),
         effectActual = ifelse(ReproductionRate < 0,
                               N * ReproductionRate, 0),
-        Type = "Intrisc-"))
+        Type = "Intrisc-",
+        stringsAsFactors = FALSE))
+
+      if (exists("ResCon")) {
+        ResCon <- dplyr::select(ResCon, -resourceAbund)
+      } else {
+        ResCon <- data.frame()
+      }
+      if (exists("ConRes")) {
+        ConRes <- dplyr::select(ConRes, -consumerAbund)
+      } else {
+        ConRes <- data.frame()
+      }
 
       EdgeDataFrame <- dplyr::bind_rows(
-        dplyr::select(ResCon, -resourceAbund),
-        dplyr::select(ConRes, -consumerAbund),
+        ResCon, ConRes,
         IntriG, IntriL
       )
 
