@@ -186,28 +186,38 @@ LawMorton1996_CommunityMat <- function(
   CompetitionBasal = 0,
   Connectance = 1, # in [0, 1]
   DiagParam = 0) {
+
+  if (!is.null(seed)) {
+    if (exists(".Random.seed")) {
+      oldSeed <- .Random.seed
+    }
+
+    newSeeds <- matrix(runif(
+      nrow(Pool) * nrow(Pool)
+    ) * 1E8, nrow = nrow(Pool))
+  } else {
+    newSeeds <- matrix(nrow = nrow(Pool), ncol = nrow(Pool))
+  }
+
   theMatrix <- foreach::foreach(
-    i = iterators::iter(Pool, by = 'row'), .combine = 'rbind'
+    i = iterators::iter(Pool, by = 'row'), .combine = 'rbind',
+    nsrow = iterators::iter(newSeeds, by = 'row')
   ) %:% foreach::foreach(
-    j = iterators::iter(Pool, by = 'row'), .combine = 'c'
+    j = iterators::iter(Pool, by = 'row'), .combine = 'c',
+    nsval = iterators::iter(nsrow)
   ) %dopar% {
-    if (!is.null(seed)) {
+    if (!is.na(nsval)) {
       if (exists(".Random.seed")) {
         oldSeed <- .Random.seed
       }
-      # NOTE: THIS IS BAD DESIGN.
-      # IF WE REDO EXPERIMENTS, CHANGE TO
-      # GENERATE NEW SEEDS BASED ON INITIAL SEED
-      # AS NEEDED INSTEAD OF SIMPLE ADDITION,
-      # WHICH CREATES CORRELATIONS.
-      set.seed(seed + i$ID + j$ID)
+      set.seed(nsval)
     }
     p <- LawMorton1996_aij(i, j, Parameters, CompetitionBasal,
                            Connectance, DiagParam)
     retval <- ifelse(p == 0,
                      0,
                      sign(p) * rtruncnorm(0, Inf, abs(p), abs(p) * Parameters[6]))
-    if (!is.null(seed) & exists("oldSeed")) {
+    if (!is.na(nsval) & exists("oldSeed")) {
       set.seed(oldSeed)
     }
     retval
