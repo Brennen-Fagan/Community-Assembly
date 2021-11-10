@@ -1,5 +1,8 @@
 print("Script stops early if a test fails.")
 
+library(RMTRCode2)
+
+parallelOK <- TRUE
 numBasal <- 3; numConsum <- 2; numEnviron <- 5
 print(paste("Settings", paste(numBasal, numConsum, numEnviron)))
 egArrivalRate <- 0.1
@@ -137,6 +140,13 @@ egDispersal <- CreateDispersalMatrix(
   egDists, SpeciesSpeeds = 1:(numBasal + numConsum)
 )
 
+print("Test 0 behaviour of distance matrix.")
+egDispersal0 <- CreateDispersalMatrix(
+  Matrix::sparseMatrix(
+    i = numEnviron, j = numEnviron, x = 0),
+  SpeciesSpeeds = 1:(numBasal + numConsum)
+)
+
 stopifnot(
   nrow(egDispersal) == numEnviron * (numBasal + numConsum),
   ncol(egDispersal) == nrow(egDispersal),
@@ -183,6 +193,7 @@ egDispersal <- CreateDispersalMatrix(
 )
 
 stopifnot(
+  !any(egDispersal0 != 0),
   nrow(egDispersal) == numEnviron * (numBasal + numConsum),
   ncol(egDispersal) == nrow(egDispersal),
   isTRUE(all.equal(Matrix::colSums(egDispersal), rep(0, ncol(egDispersal)))),
@@ -220,6 +231,7 @@ stopifnot(
 # MultipleNumericalAssembly_Dispersal ##########################################
 print("Testing Main Function: Dispersal")
 
+print("Test reproducibility.")
 egResults_Dispersal <- MultipleNumericalAssembly_Dispersal(
   Pool = egPool,
   NumEnvironments = numEnviron,
@@ -244,9 +256,205 @@ egResults_Dispersal2 <- MultipleNumericalAssembly_Dispersal(
   EliminationThreshold = 10^-4, ArrivalDensity = 0.4,
   Verbose = TRUE
 )
+
 stopifnot(isTRUE(all.equal(egResults_Dispersal$Abundance,
                            egResults_Dispersal2$Abundance)))
 
+print("Test that no interaction is same as separate runs.")
+
+egResults_Dispersal3 <- MultipleNumericalAssembly_Dispersal(
+  Pool = egPool,
+  NumEnvironments = numEnviron,
+  InteractionMatrices = egInteractions,
+  Events = egEvents,
+  PerCapitaDynamics = egDynamics,
+  DispersalMatrix = egDispersal0,
+  EliminationThreshold = 10^-4, ArrivalDensity = 0.4,
+  Verbose = TRUE
+)
+
+
+print("Subtest 1: 1 Island at a time.")
+if (parallelOK) {
+  clust <- parallel::makeCluster(3)
+} else {
+  clust <- parallel::makeCluster(1)
+}
+
+parallel::clusterExport(clust, "egPool")
+
+egEventsSubsets <- lapply(
+  1:numEnviron, function(i, events, seed) {
+    temp <- events
+    temp$Type[temp$Environment != i] <- "Dummy" # Should not run.
+    temp$Environment <- 1
+    list(Events = temp,
+         Seed = seed)
+  }, events = egEvents$Events, seed = egEvents$Seed
+)
+egEventsSubsets2 <- lapply(
+  1:numEnviron, function(i, events, seed) {
+    temp <- events
+    temp$Type[temp$Environment != i] <- "Dummy" # Should not run.
+    #temp$Environment <- 1
+    list(Events = temp,
+         Seed = seed)
+  }, events = egEvents$Events, seed = egEvents$Seed
+)
+egMatsSubsets <- lapply(
+  1:numEnviron, function(i, matrices, seed) {
+    list(Mats = list(matrices[[i]]),
+         Seeds = seed[i])
+  }, matrices = egInteractions$Mats, seed = egInteractions$Seeds
+)
+egDynamicsSubsets <- lapply(
+  egMatsSubsets, function(mat, reprate) {
+    PerCapitaDynamics_Type1(reprate, mat$Mats[[1]],
+                            NumEnvironments = 1)
+  }, reprate = egPool$ReproductionRate
+)
+
+egResults_Dispersal4Calc <- parallel::parLapply(
+  cl = clust,
+  1:numEnviron, function(i, pl, Di, mats, events, dynamics) {
+    library(RMTRCode2)
+    #print(i)
+    #print("###################################################")
+    MultipleNumericalAssembly_Dispersal(
+      Pool = pl,
+      NumEnvironments = 1,
+      InteractionMatrices = mats,
+      Events = events[[i]],
+      PerCapitaDynamics = dynamics[[i]],
+      DispersalMatrix = Di,
+      EliminationThreshold = 10^-4, ArrivalDensity = 0.4,
+      Verbose = FALSE
+    )
+  },
+  pl = egPool,
+  Di = egDispersal0[1:5, 1:5],
+  mats = egInteractions, #egMatsSubsets, # Bad implementation, we don't use the
+                                         # full interaction matrix but for rate.
+  events = egEventsSubsets, dynamics = egDynamicsSubsets
+)
+
+print("Subtest 2: All Islands, but only events on 1 at a time.")
+egResults_Dispersal5Calc <- parallel::parLapply(
+  cl = clust,
+  egEventsSubsets, function(
+    events, pl, nE, In, Dy, Di) {
+    library(RMTRCode2)
+    MultipleNumericalAssembly_Dispersal(
+      Pool = pl,
+      NumEnvironments = nE,
+      InteractionMatrices = In,
+      Events = events,
+      PerCapitaDynamics = Dy,
+      DispersalMatrix = Di,
+      EliminationThreshold = 10^-4, ArrivalDensity = 0.4,
+      Verbose = FALSE
+    )
+  },
+  pl = egPool,
+  nE = numEnviron,
+  In = egInteractions,
+  Dy = egDynamics,
+  Di = egDispersal0
+)
+
+parallel::stopCluster(clust)
+
+egResults_Dispersal4 <- list()
+egResults_Dispersal4$Events <- do.call(
+  rbind, lapply(1:length(egResults_Dispersal4Calc), function(i, dat) {
+    temp <- dat[[i]]$Events[!is.na(dat[[i]]$Events$Success), ]
+    temp$Environment <- i
+    temp
+  }, dat = egResults_Dispersal4Calc)
+)
+egResults_Dispersal4$Events <- egResults_Dispersal4$Events[
+  order(egResults_Dispersal4$Events$Times),
+]
+egResults_Dispersal4$Abundance <- cbind(
+  time = egResults_Dispersal4Calc[[1]]$Abundance[, 1],
+  do.call(
+    cbind,
+    lapply(1:length(egResults_Dispersal4Calc), function(i, x) {
+      x[[i]]$Abundance[
+        , 1:(numBasal+numConsum) + 1
+      ]
+    }, x = egResults_Dispersal4Calc)
+  )
+)
+egResults_Dispersal4$NumEnvironments <- length(egResults_Dispersal4Calc)
+egResults_Dispersal4$EnvironmentSeeds <- unique(unlist(lapply(
+  egResults_Dispersal4Calc, function(x) x$EnvironmentSeeds
+)))
+egResults_Dispersal4$HistorySeed <- unique(unlist(lapply(
+  egResults_Dispersal4Calc, function(x) x$HistorySeed
+)))
+egResults_Dispersal4$Parameters <- unique(unlist(lapply(
+  egResults_Dispersal4Calc, function(x) x$Parameters
+), recursive = FALSE))
+names(egResults_Dispersal4$Parameters) <- names(egResults_Dispersal4Calc[[1]]$Parameters)
+egResults_Dispersal4$Ellipsis <- unique(unlist(lapply(
+  egResults_Dispersal4Calc, function(x) x$Ellipsis
+), recursive = FALSE))
+
+stopifnot(
+  unlist(lapply(
+    1:length(egResults_Dispersal3),
+    function(i) all.equal(egResults_Dispersal3[[i]],
+                          egResults_Dispersal4[[i]],
+                          use.names = FALSE, check.attributes = FALSE)
+    )) == c(TRUE, "target is deSolve, current is matrix", rep(TRUE, 5))
+)
+
+egResults_Dispersal5 <- list()
+egResults_Dispersal5$Events <- do.call(
+  rbind, lapply(1:length(egResults_Dispersal5Calc), function(i, dat) {
+    temp <- dat[[i]]$Events[!is.na(dat[[i]]$Events$Success), ]
+    temp$Environment <- i
+    temp
+  }, dat = egResults_Dispersal5Calc)
+)
+egResults_Dispersal5$Events <- egResults_Dispersal5$Events[
+  order(egResults_Dispersal5$Events$Times),
+]
+egResults_Dispersal5$Abundance <- cbind(
+  time = egResults_Dispersal5Calc[[1]]$Abundance[, 1],
+  do.call(
+    cbind,
+    lapply(1:length(egResults_Dispersal5Calc), function(i, x) {
+      x[[i]]$Abundance[
+        , (i - 1) * (numBasal + numConsum) + 1:(numBasal+numConsum) + 1
+      ]
+    }, x = egResults_Dispersal5Calc)
+  )
+)
+egResults_Dispersal5$NumEnvironments <- length(egResults_Dispersal5Calc)
+egResults_Dispersal5$EnvironmentSeeds <- unique(unlist(lapply(
+  egResults_Dispersal5Calc, function(x) x$EnvironmentSeeds
+)))
+egResults_Dispersal5$HistorySeed <- unique(unlist(lapply(
+  egResults_Dispersal5Calc, function(x) x$HistorySeed
+)))
+egResults_Dispersal5$Parameters <- unique(unlist(lapply(
+  egResults_Dispersal5Calc, function(x) x$Parameters
+), recursive = FALSE))
+names(egResults_Dispersal5$Parameters) <- names(egResults_Dispersal5Calc[[1]]$Parameters)
+egResults_Dispersal5$Ellipsis <- unique(unlist(lapply(
+  egResults_Dispersal5Calc, function(x) x$Ellipsis
+), recursive = FALSE))
+
+stopifnot(
+  unlist(lapply(
+    1:length(egResults_Dispersal3),
+    function(i) all.equal(egResults_Dispersal3[[i]],
+                          egResults_Dispersal5[[i]],
+                          use.names = FALSE, check.attributes = FALSE)
+  )) == c(TRUE, "target is deSolve, current is matrix", rep(TRUE, 5))
+)
 
 # MultipleNumericalAssembly_Dispersal, Trophics ################################
 

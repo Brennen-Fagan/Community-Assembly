@@ -271,6 +271,7 @@ CalculateTrophicStructure <- function(
   ) {
   # Borrowing from LM1996-NumPoolCom-FoodWebs-2021-07.Rmd
   nrowPool <- nrow(Pool)
+  `%>%` <- magrittr::`%>%s`
 
   # This function should be appliable row-wise to the results.
   # One does need to remove the time column, as usual.
@@ -528,7 +529,8 @@ MultipleNumericalAssembly_Dispersal <- function(
   # We'll take a guess as to how the eigenvalues of Reactions relate to the
   # characteristic time of the system.
   # ReactionTime <- 1/max(abs(eigen(Reactions)$values))
-  ReactionTime <- 1/max(abs(eigen(InteractionMatrices$Mats[[1]])$values))
+  ReactionTime <- 1/max(abs(eigen(InteractionMatrices$Mats[[1]],
+                                  only.values = TRUE)$values))
 
 
   # Dynamics: ##################################################################
