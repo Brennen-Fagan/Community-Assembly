@@ -271,11 +271,11 @@ CalculateTrophicStructure <- function(
   ) {
   # Borrowing from LM1996-NumPoolCom-FoodWebs-2021-07.Rmd
   nrowPool <- nrow(Pool)
-  `%>%` <- magrittr::`%>%`
 
   # This function should be appliable row-wise to the results.
   # One does need to remove the time column, as usual.
   function(y) {
+    `%>%` <- magrittr::`%>%`
     # Clean up anything not present.
     y <- ifelse(y <= EliminationThreshold, 0, y)
 
@@ -479,7 +479,7 @@ MultipleNumericalAssembly_Dispersal <- function(
   ExtinctRate = NULL, # If NULL, set to arrival rate.
   ExtinctFUN = NULL, # Takes Events and Rate, Returns Event Times.
 
-  ComputeInteractionMatrix = NULL, # Required if InteractionMatrices not provided
+  # ComputeInteractionMatrix = NULL, # Required if InteractionMatrices not provided
 
   ... # Arguments to pass through to ComputeInteractionMatrix or for Spatials.
 
@@ -490,13 +490,29 @@ MultipleNumericalAssembly_Dispersal <- function(
 ) {
 
   # System Set Up: #############################################################
-  # List of per environment interaction matrices.
-  if (is.null(InteractionMatrices))
-    InteractionMatrices <- CreateEnvironmentInteractions(
-      Pool = Pool, NumEnvironments = NumEnvironments,
-      ComputeInteractionMatrix = ComputeInteractionMatrix,
-      EnvironmentSeeds = EnvironmentSeeds, ...
+  # Time scale
+  if (is.null(CharacteristicRate) &&
+      is.null(InteractionMatrices) #&&
+      #is.null(ComputeInteractionMatrix)
+      ) {
+    stop(paste("Need to supply Characteristic Rate or Interaction Matrices",
+               "in order to establish time scales and time steps."))
+    # InteractionMatrices <- CreateEnvironmentInteractions(
+    #   Pool = Pool, NumEnvironments = NumEnvironments,
+    #   ComputeInteractionMatrix = ComputeInteractionMatrix,
+    #   EnvironmentSeeds = EnvironmentSeeds, ...
+    # )
+  } else if (!is.null(CharacteristicRate)) {
+    ReactionTime <- 1 / CharacteristicRate
+  } else {
+    # We'll take a guess as to how the eigenvalues of Reactions relate to the
+    # characteristic time of the system.
+    ReactionTime <- 1 / max(
+      unlist(lapply(InteractionMatrices$Mats, function(mat) {
+        abs(eigen(mat, only.values = TRUE)$values)
+      }))
     )
+  }
   # Dataframe of Times, Species, Environment, Type, and Success.
   if (is.null(Events))
     Events <- CreateAssemblySequence(
@@ -524,22 +540,6 @@ MultipleNumericalAssembly_Dispersal <- function(
       Verbose = Verbose
     )
   )
-
-  # Computation Times: #########################################################
-  if (is.null(CharacteristicRate) && is.null(InteractionMatrices)) {
-    stop(paste("Need to supply Characteristic Rate or Interaction Matrices",
-               "in order to establish time scales and time steps."))
-  } else if (!is.null(CharacteristicRate)) {
-    ReactionTime <- 1 / CharacteristicRate
-  } else {
-    # We'll take a guess as to how the eigenvalues of Reactions relate to the
-    # characteristic time of the system.
-    ReactionTime <- 1 / max(
-      unlist(lapply(InteractionMatrices$Mats, function(mat) {
-        abs(eigen(mat, only.values = TRUE)$values)
-      }))
-    )
-  }
 
   # Dynamics: ##################################################################
   Dynamics <- function(t, y, parms) {
@@ -594,7 +594,9 @@ MultipleNumericalAssembly_Dispersal <- function(
   retval$Events <- deEvents$func(ReturnEvents = TRUE)
   retval$Abundance <- abundance
   retval$NumEnvironments <- NumEnvironments
-  retval$EnvironmentSeeds <- InteractionMatrices$Seeds
+  if (!is.null(InteractionMatrices)) {
+    retval$EnvironmentSeeds <- InteractionMatrices$Seeds
+  }
   retval$HistorySeed <- Events$Seed
   retval$Parameters <- list(
     EliminationThreshold = EliminationThreshold,

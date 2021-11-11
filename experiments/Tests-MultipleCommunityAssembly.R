@@ -360,6 +360,32 @@ egResults_Dispersal5Calc <- lapply(
   Di = egDispersal0
 )
 
+print("Subtest 3: 1 Islands at a time using characteristic rate.")
+egResults_Dispersal6Calc <- lapply(
+  1:numEnviron, function(i, pl, Di, mats, events, dynamics) {
+    #library(RMTRCode2)
+    MultipleNumericalAssembly_Dispersal(
+      Pool = pl,
+      NumEnvironments = 1,
+      #InteractionMatrices = mats,
+      CharacteristicRate = max(
+        unlist(lapply(mats$Mats, function(mat) {
+          abs(eigen(mat, only.values = TRUE)$values)
+        }))
+      ),
+      Events = events[[i]],
+      PerCapitaDynamics = dynamics[[i]],
+      DispersalMatrix = Di,
+      EliminationThreshold = 10^-4, ArrivalDensity = 0.4,
+      Verbose = FALSE
+    )
+  },
+  pl = egPool,
+  Di = egDispersal0[1:5, 1:5],
+  mats = egInteractions,
+  events = egEventsSubsets, dynamics = egDynamicsSubsets
+)
+
 egResults_Dispersal4 <- list()
 egResults_Dispersal4$Events <- do.call(
   rbind, lapply(1:length(egResults_Dispersal4Calc), function(i, dat) {
@@ -448,6 +474,52 @@ stopifnot(
     1:length(egResults_Dispersal3),
     function(i) all.equal(egResults_Dispersal3[[i]],
                           egResults_Dispersal5[[i]],
+                          use.names = FALSE, check.attributes = FALSE)
+  )) == c(TRUE, "target is deSolve, current is matrix", rep(TRUE, 5))
+)
+
+egResults_Dispersal6 <- list()
+egResults_Dispersal6$Events <- do.call(
+  rbind, lapply(1:length(egResults_Dispersal6Calc), function(i, dat) {
+    temp <- dat[[i]]$Events[!is.na(dat[[i]]$Events$Success), ]
+    temp$Environment <- i
+    temp
+  }, dat = egResults_Dispersal6Calc)
+)
+egResults_Dispersal6$Events <- egResults_Dispersal6$Events[
+  order(egResults_Dispersal6$Events$Times),
+]
+egResults_Dispersal6$Abundance <- cbind(
+  time = egResults_Dispersal6Calc[[1]]$Abundance[, 1],
+  do.call(
+    cbind,
+    lapply(1:length(egResults_Dispersal6Calc), function(i, x) {
+      x[[i]]$Abundance[
+        , 1:(numBasal+numConsum) + 1
+      ]
+    }, x = egResults_Dispersal6Calc)
+  )
+)
+egResults_Dispersal6$NumEnvironments <- length(egResults_Dispersal6Calc)
+egResults_Dispersal6$EnvironmentSeeds <- unique(unlist(lapply(
+  egResults_Dispersal6Calc, function(x) x$EnvironmentSeeds
+)))
+egResults_Dispersal6$HistorySeed <- unique(unlist(lapply(
+  egResults_Dispersal6Calc, function(x) x$HistorySeed
+)))
+egResults_Dispersal6$Parameters <- unique(unlist(lapply(
+  egResults_Dispersal6Calc, function(x) x$Parameters
+), recursive = FALSE))
+names(egResults_Dispersal6$Parameters) <- names(egResults_Dispersal6Calc[[1]]$Parameters)
+egResults_Dispersal6$Ellipsis <- unique(unlist(lapply(
+  egResults_Dispersal6Calc, function(x) x$Ellipsis
+), recursive = FALSE))
+
+stopifnot(
+  unlist(lapply(
+    1:length(egResults_Dispersal3),
+    function(i) all.equal(egResults_Dispersal3[[i]],
+                          egResults_Dispersal6[[i]],
                           use.names = FALSE, check.attributes = FALSE)
   )) == c(TRUE, "target is deSolve, current is matrix", rep(TRUE, 5))
 )
