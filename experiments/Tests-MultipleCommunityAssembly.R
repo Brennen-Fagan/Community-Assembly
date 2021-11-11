@@ -2,7 +2,14 @@ print("Script stops early if a test fails.")
 
 library(RMTRCode2)
 
-parallelOK <- TRUE
+if (!exists("testseed")) {
+  testseed <- runif(1) * 1E8
+  if (exists(".Random.seed")) {
+    old.seed <- .Random.seed
+  }
+  set.seed(testseed)
+}
+
 numBasal <- 3; numConsum <- 2; numEnviron <- 5
 print(paste("Settings", paste(numBasal, numConsum, numEnviron)))
 egArrivalRate <- 0.1
@@ -275,13 +282,6 @@ egResults_Dispersal3 <- MultipleNumericalAssembly_Dispersal(
 
 
 print("Subtest 1: 1 Island at a time.")
-if (parallelOK) {
-  clust <- parallel::makeCluster(3)
-} else {
-  clust <- parallel::makeCluster(1)
-}
-
-parallel::clusterExport(clust, "egPool")
 
 egEventsSubsets <- lapply(
   1:numEnviron, function(i, events, seed) {
@@ -314,8 +314,7 @@ egDynamicsSubsets <- lapply(
   }, reprate = egPool$ReproductionRate
 )
 
-egResults_Dispersal4Calc <- parallel::parLapply(
-  cl = clust,
+egResults_Dispersal4Calc <- lapply(
   1:numEnviron, function(i, pl, Di, mats, events, dynamics) {
     library(RMTRCode2)
     #print(i)
@@ -339,8 +338,7 @@ egResults_Dispersal4Calc <- parallel::parLapply(
 )
 
 print("Subtest 2: All Islands, but only events on 1 at a time.")
-egResults_Dispersal5Calc <- parallel::parLapply(
-  cl = clust,
+egResults_Dispersal5Calc <- lapply(
   egEventsSubsets, function(
     events, pl, nE, In, Dy, Di) {
     library(RMTRCode2)
@@ -361,8 +359,6 @@ egResults_Dispersal5Calc <- parallel::parLapply(
   Dy = egDynamics,
   Di = egDispersal0
 )
-
-parallel::stopCluster(clust)
 
 egResults_Dispersal4 <- list()
 egResults_Dispersal4$Events <- do.call(
@@ -491,3 +487,5 @@ stopifnot(
 )
 
 print("Success.")
+
+if (exists("old.seed")) set.seed(old.seed)
