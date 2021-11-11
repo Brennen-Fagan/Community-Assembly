@@ -414,8 +414,8 @@ egResults_Dispersal4$Abundance <- cbind(
   )
 )
 egResults_Dispersal4$NumEnvironments <- length(egResults_Dispersal4Calc)
-egResults_Dispersal4$EnvironmentSeeds <- unique(unlist(lapply(
-  egResults_Dispersal4Calc, function(x) x$EnvironmentSeeds
+egResults_Dispersal4$ReactionTime <- unique(unlist(lapply(
+  egResults_Dispersal4Calc, function(x) x$ReactionTime
 )))
 egResults_Dispersal4$HistorySeed <- unique(unlist(lapply(
   egResults_Dispersal4Calc, function(x) x$HistorySeed
@@ -430,11 +430,11 @@ egResults_Dispersal4$Ellipsis <- unique(unlist(lapply(
 
 stopifnot(
   unlist(lapply(
-    1:length(egResults_Dispersal3),
-    function(i) all.equal(egResults_Dispersal3[[i]],
-                          egResults_Dispersal4[[i]],
+    names(egResults_Dispersal3),
+    function(i) all.equal(egResults_Dispersal3[i],
+                          egResults_Dispersal4[i],
                           use.names = FALSE, check.attributes = FALSE)
-    )) == c(TRUE, "target is deSolve, current is matrix", rep(TRUE, 5))
+    )) == c(TRUE, "Component 1: target is deSolve, current is matrix", rep(TRUE, 5))
 )
 
 egResults_Dispersal5 <- list()
@@ -460,8 +460,8 @@ egResults_Dispersal5$Abundance <- cbind(
   )
 )
 egResults_Dispersal5$NumEnvironments <- length(egResults_Dispersal5Calc)
-egResults_Dispersal5$EnvironmentSeeds <- unique(unlist(lapply(
-  egResults_Dispersal5Calc, function(x) x$EnvironmentSeeds
+egResults_Dispersal5$ReactionTime <- unique(unlist(lapply(
+  egResults_Dispersal5Calc, function(x) x$ReactionTime
 )))
 egResults_Dispersal5$HistorySeed <- unique(unlist(lapply(
   egResults_Dispersal5Calc, function(x) x$HistorySeed
@@ -476,11 +476,11 @@ egResults_Dispersal5$Ellipsis <- unique(unlist(lapply(
 
 stopifnot(
   unlist(lapply(
-    1:length(egResults_Dispersal3),
-    function(i) all.equal(egResults_Dispersal3[[i]],
-                          egResults_Dispersal5[[i]],
+    names(egResults_Dispersal3),
+    function(i) all.equal(egResults_Dispersal3[i],
+                          egResults_Dispersal5[i],
                           use.names = FALSE, check.attributes = FALSE)
-  )) == c(TRUE, "target is deSolve, current is matrix", rep(TRUE, 5))
+  )) == c(TRUE, "Component 1: target is deSolve, current is matrix", rep(TRUE, 5))
 )
 
 egResults_Dispersal6 <- list()
@@ -506,8 +506,8 @@ egResults_Dispersal6$Abundance <- cbind(
   )
 )
 egResults_Dispersal6$NumEnvironments <- length(egResults_Dispersal6Calc)
-egResults_Dispersal6$EnvironmentSeeds <- unique(unlist(lapply(
-  egResults_Dispersal6Calc, function(x) x$EnvironmentSeeds
+egResults_Dispersal6$ReactionTime <- unique(unlist(lapply(
+  egResults_Dispersal6Calc, function(x) x$ReactionTime
 )))
 egResults_Dispersal6$HistorySeed <- unique(unlist(lapply(
   egResults_Dispersal6Calc, function(x) x$HistorySeed
@@ -522,11 +522,18 @@ egResults_Dispersal6$Ellipsis <- unique(unlist(lapply(
 
 stopifnot(
   unlist(lapply(
-    1:length(egResults_Dispersal3),
-    function(i) all.equal(egResults_Dispersal3[[i]],
-                          egResults_Dispersal6[[i]],
+    names(egResults_Dispersal3),
+    function(i) all.equal(egResults_Dispersal3[i],
+                          egResults_Dispersal6[i],
                           use.names = FALSE, check.attributes = FALSE)
-  )) == c(TRUE, "target is deSolve, current is matrix", rep(TRUE, 5))
+  )) == c(
+    TRUE,
+    "Component 1: target is deSolve, current is matrix",
+    rep(TRUE, 3),
+    "Component 1: Length mismatch: comparison on first 4 components",
+    # 6: 3 has environment seeds, 6 does not.
+    TRUE
+  )
 )
 
 # MultipleNumericalAssembly_Dispersal, Trophics ################################

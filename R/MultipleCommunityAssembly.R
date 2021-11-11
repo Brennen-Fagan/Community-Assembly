@@ -275,7 +275,6 @@ CalculateTrophicStructure <- function(
   # This function should be appliable row-wise to the results.
   # One does need to remove the time column, as usual.
   function(y) {
-    `%>%` <- magrittr::`%>%`
     # Clean up anything not present.
     y <- ifelse(y <= EliminationThreshold, 0, y)
 
@@ -586,9 +585,7 @@ MultipleNumericalAssembly_Dispersal <- function(
   retval$Events <- deEvents$func(ReturnEvents = TRUE)
   retval$Abundance <- abundance
   retval$NumEnvironments <- NumEnvironments
-  if (!is.null(InteractionMatrices)) {
-    retval$EnvironmentSeeds <- InteractionMatrices$Seeds
-  }
+  retval$ReactionTime <- ReactionTime
   retval$HistorySeed <- Events$Seed
   retval$Parameters <- list(
     EliminationThreshold = EliminationThreshold,
@@ -610,6 +607,9 @@ MultipleNumericalAssembly_Dispersal <- function(
     retval$Parameters$ExtinctRate <- ExtinctRate
   if (!is.null(ExtinctFUN))
     retval$Parameters$ExtinctFUN <- ExtinctFUN
+  if (!is.null(InteractionMatrices)) {
+    retval$Parameters$EnvironmentSeeds <- InteractionMatrices$Seeds
+  }
 
   return(retval)
 }
