@@ -464,7 +464,6 @@ MultipleNumericalAssembly_Dispersal <- function(
 
   MaximumTimeStep = 1, # Maximum time solver can proceed without elimination.
   BetweenEventSteps = 10, # Number of steps to reach next event to smooth.
-  EnvironmentSeeds = NULL, # If one seed, used to generate seeds for the system.
   # Otherwise, we can use seeds equal to the number of environments
   HistorySeed = NULL, # Use only one seed, this controls all "external" dynamics.
 
@@ -479,8 +478,6 @@ MultipleNumericalAssembly_Dispersal <- function(
   ExtinctRate = NULL, # If NULL, set to arrival rate.
   ExtinctFUN = NULL, # Takes Events and Rate, Returns Event Times.
 
-  # ComputeInteractionMatrix = NULL, # Required if InteractionMatrices not provided
-
   ... # Arguments to pass through to ComputeInteractionMatrix or for Spatials.
 
   # Total run length is determined by the last arrival/extinction event +
@@ -492,16 +489,10 @@ MultipleNumericalAssembly_Dispersal <- function(
   # System Set Up: #############################################################
   # Time scale
   if (is.null(CharacteristicRate) &&
-      is.null(InteractionMatrices) #&&
-      #is.null(ComputeInteractionMatrix)
+      is.null(InteractionMatrices)
       ) {
     stop(paste("Need to supply Characteristic Rate or Interaction Matrices",
                "in order to establish time scales and time steps."))
-    # InteractionMatrices <- CreateEnvironmentInteractions(
-    #   Pool = Pool, NumEnvironments = NumEnvironments,
-    #   ComputeInteractionMatrix = ComputeInteractionMatrix,
-    #   EnvironmentSeeds = EnvironmentSeeds, ...
-    # )
   } else if (!is.null(CharacteristicRate)) {
     ReactionTime <- 1 / CharacteristicRate
   } else {
@@ -513,6 +504,7 @@ MultipleNumericalAssembly_Dispersal <- function(
       }))
     )
   }
+
   # Dataframe of Times, Species, Environment, Type, and Success.
   if (is.null(Events))
     Events <- CreateAssemblySequence(

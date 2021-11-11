@@ -242,14 +242,19 @@ print("Test reproducibility.")
 egResults_Dispersal <- MultipleNumericalAssembly_Dispersal(
   Pool = egPool,
   NumEnvironments = numEnviron,
-  ComputeInteractionMatrix = LawMorton1996_CommunityMat,
+  # ComputeInteractionMatrix = LawMorton1996_CommunityMat,
+  CharacteristicRate = max(
+    unlist(lapply(egInteractions$Mats, function(mat) {
+      abs(eigen(mat, only.values = TRUE)$values)
+    }))
+  ),
   Parameters = c(0.01, 10, 0.5, 0.2, 100, 10),
   PerCapitaDynamics = egDynamics,
   DispersalMatrix = egDispersal,
   EliminationThreshold = 10^-4, ArrivalDensity = 0.4,
   ArrivalEvents = 10, ArrivalRate = egArrivalRate, ArrivalFUN = NULL,
   ExtinctEvents = 10, ExtinctRate = NULL, ExtinctFUN = NULL,
-  EnvironmentSeeds = egInteractions$Seeds,
+  # EnvironmentSeeds = egInteractions$Seeds,
   HistorySeed = egEvents$Seed
 )
 
