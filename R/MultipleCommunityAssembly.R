@@ -271,6 +271,7 @@ CalculateTrophicStructure <- function(
   ) {
   # Borrowing from LM1996-NumPoolCom-FoodWebs-2021-07.Rmd
   nrowPool <- nrow(Pool)
+  `%>%` <- magrittr::`%>%`
 
   # This function should be appliable row-wise to the results.
   # One does need to remove the time column, as usual.
