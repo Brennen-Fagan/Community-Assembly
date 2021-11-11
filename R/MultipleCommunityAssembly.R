@@ -447,7 +447,9 @@ CalculateTrophicStructure <- function(
 MultipleNumericalAssembly_Dispersal <- function(
   Pool, # Required from outside function.
   NumEnvironments, # Number of environments
-  InteractionMatrices = NULL, # List of Environemt specific matrices
+  CharacteristicRate = NULL, # Eigenvalue of the system about stable fixed point
+                             # Provide InteractionMatrices if not known.
+  InteractionMatrices = NULL, # List of Environment specific matrices
   Events = NULL, # Dataframe of Times, Species, Environment, Type, and Success.
 
   PerCapitaDynamics, # The dynamical system governing the ecosystem interactions.
@@ -524,17 +526,22 @@ MultipleNumericalAssembly_Dispersal <- function(
   )
 
   # Computation Times: #########################################################
-  # Arrange the InteractionMatrices into a sparse matrix.
-  Reactions <- Matrix::bdiag(InteractionMatrices$Mats)
-  # We'll take a guess as to how the eigenvalues of Reactions relate to the
-  # characteristic time of the system.
-  # ReactionTime <- 1/max(abs(eigen(Reactions)$values))
-  ReactionTime <- 1/max(abs(eigen(InteractionMatrices$Mats[[1]],
-                                  only.values = TRUE)$values))
-
+  if (is.null(CharacteristicRate) && is.null(InteractionMatrices)) {
+    stop(paste("Need to supply Characteristic Rate or Interaction Matrices",
+               "in order to establish time scales and time steps."))
+  } else if (!is.null(CharacteristicRate)) {
+    ReactionTime <- 1 / CharacteristicRate
+  } else {
+    # We'll take a guess as to how the eigenvalues of Reactions relate to the
+    # characteristic time of the system.
+    ReactionTime <- 1 / max(
+      unlist(lapply(InteractionMatrices$Mats, function(mat) {
+        abs(eigen(mat, only.values = TRUE)$values)
+      }))
+    )
+  }
 
   # Dynamics: ##################################################################
-
   Dynamics <- function(t, y, parms) {
     list( # Reaction: PerCapitaDynamics includes interactions and reproduction.
       as.numeric(
