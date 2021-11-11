@@ -365,7 +365,7 @@ egResults_Dispersal5Calc <- lapply(
   Di = egDispersal0
 )
 
-print("Subtest 3: 1 Islands at a time using characteristic rate.")
+print("Subtest 3: 1 Island at a time using characteristic rate.")
 egResults_Dispersal6Calc <- lapply(
   1:numEnviron, function(i, pl, Di, mats, events, dynamics) {
     #library(RMTRCode2)
