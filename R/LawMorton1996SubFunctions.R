@@ -47,13 +47,15 @@ LawMorton1996_species <- function(
     k6 = Parameters[6]
   ))
 
-  Species$ReproductionRate[(Basal + 1) : (Basal + Consumer)] <- unlist(lapply(
-    Species$Size[(Basal + 1) : (Basal + Consumer)], function(si, k6) {
-      p <- -0.1
-      return(sign(p) * rtruncnorm(0, Inf, abs(p), abs(p) * k6))
-    },
-    k6 = Parameters[6]
-  ))
+  if (Consumer > 0) {
+    Species$ReproductionRate[(Basal + 1) : (Basal + Consumer)] <- unlist(lapply(
+      Species$Size[(Basal + 1) : (Basal + Consumer)], function(si, k6) {
+        p <- -0.1
+        return(sign(p) * rtruncnorm(0, Inf, abs(p), abs(p) * k6))
+      },
+      k6 = Parameters[6]
+    ))
+  }
 
   if (!is.null(seed)) {
     if (exists("oldSeed")) {

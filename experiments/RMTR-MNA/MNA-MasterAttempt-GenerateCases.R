@@ -143,4 +143,5 @@ cases$C <- expand.grid(
 # Make sure you know the cases you are working with...
 stopifnot(sum(sapply(cases, nrow)) == 108)
 
-
+# Assign to each case historiesPerSystem * systemsPerParamSet history seeds,
+# and systemsPerParamSet sets of

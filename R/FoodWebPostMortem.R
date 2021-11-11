@@ -2,6 +2,8 @@
 # See LM1996-NumPoolCom-FoodWebs-2021-07.Rmd
 
 toCheddar <- function(EVList, name = " ") {# Edges Vertices List
+  `%>%` <- magrittr::`%>%`
+
   if (is.na(EVList$Edges) && is.na(EVList$Vertices)) {
     return(NA)
   }
@@ -33,6 +35,8 @@ toCheddar <- function(EVList, name = " ") {# Edges Vertices List
 }
 
 toIGraph <- function(EVList, sign = 0) {
+  `%>%` <- magrittr::`%>%`
+
   igraph::graph_from_data_frame(
     d = if(sign == 0) {
       EVList$Edges
@@ -50,6 +54,8 @@ toPostMortem <- function(EVList,
                          nodeSize = c("None", "Abundance", "Size"),
                          edgeScale = 10,
                          reducedTrophic = TRUE) {
+  `%>%` <- magrittr::`%>%`
+
   if (tolower(threshold) == "adaptive") {
     threshold = EVList$Edges %>% group_by(
       to, effectSign

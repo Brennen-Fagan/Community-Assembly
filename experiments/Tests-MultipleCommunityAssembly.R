@@ -538,6 +538,12 @@ stopifnot(
 
 # MultipleNumericalAssembly_Dispersal, Trophics ################################
 
+
+print("Final test requires dplyr.")
+stopifnot(require(dplyr))
+
+print("Testing trophic calculation.")
+
 egTrophicFunction <- CalculateTrophicStructure(
   Pool = egPool,
   NumEnvironments = numEnviron,
