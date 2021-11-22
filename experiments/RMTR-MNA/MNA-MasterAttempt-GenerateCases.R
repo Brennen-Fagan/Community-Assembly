@@ -4,6 +4,33 @@
 
 library(RMTRCode2)
 
+# https://stackoverflow.com/a/15373917
+thisFile <- function() {
+  cmdArgs <- commandArgs(trailingOnly = FALSE)
+  needle <- "--file="
+  match <- grep(needle, cmdArgs)
+  if (length(match) > 0) {
+    # Rscript
+    return(normalizePath(sub(needle, "", cmdArgs[match])))
+  } else {
+    # 'source'd via R console
+    return(normalizePath(sys.frames()[[1]]$ofile))
+  }
+}
+
+# Initialisation: ##############################################################
+thisDirectory <- dirname(thisFile())
+thisFilePrefix <- "MNA-Master"
+thisFileSuffix <- "-Cases.csv"
+thisSeparator <- "|"
+
+# > runif(1) * 1E8
+# [1] 38427042
+if (exists(".Random.seed")) {
+  old.seed <- .Random.seed
+}
+set.seed(38427042)
+
 # Parameters: ##################################################################
 systemBase <- list()
 systemMods <- list()
@@ -13,6 +40,26 @@ systemMods <- list()
 # 10 pool-environment combinations for each parameter set.
 systemBase$historiesPerSystem <- 10
 systemBase$systemsPerParamSet <- 10
+systemBase$environsPerSystem <- 10
+
+# Threshold below which species are removed during calculations.
+systemBase$eliminationThreshold <- 10^-4
+# Distance above a threshold that a new immigration community starts at.
+# Traill et al. 2007 used for inspiration.
+systemBase$arrivalDensity <- systemBase$eliminationThreshold * 4 * 10 ^ 3
+
+# Maximum time solver can proceed without checking for elimination.
+systemBase$maximumTimeStep <- 1
+# Minimum number of steps to reach next event to smooth.
+systemBase$betweenEventSteps <- 30
+
+systemBase$species <- c(Basal = 34, Consumer = 66)
+systemBase$speciesSpeeds <- 1
+
+# See the coupon collector's problem.
+systemBase$eventNumberFunc <- function(Envs, Spec, Const = 5) {
+  Envs * ceiling(Spec * (log(Spec + Const)))
+}
 
 ### Framework Parameters: ######################################################
 # (Effectively, the ecological dynamics parameters.)
@@ -92,7 +139,7 @@ systemMods$SpaceDistanceMultiplier <- c(1E9, 1E6, 1E3, 1E0)
 # We use indices to refer to rows in the above parameters.
 cases <- list()
 
-# Case A: ######################################################################
+### Case A: ####################################################################
 #   Effectively a supplemental figure, but what happens when we combine the
 #   changes in rates or we see an extreme "no elimination" case.
 #   We don't anticipate that there would be anything *interesting* here, mind,
@@ -106,7 +153,7 @@ cases$A <- expand.grid(
   Space = 1:4
 )
 
-# Case B: ######################################################################
+### Case B: ####################################################################
 #   What happens when we have precise control of the system. No noise, no
 #   randomness, just means of distributions doing precisely what we asked.
 #   For reference, this also seems like a good "no elimination" case to be
@@ -120,7 +167,7 @@ cases$B <- expand.grid(
   Space = 1:4
 )
 
-# Case C: ######################################################################
+### Case C: ####################################################################
 #   This case has all the things that we think are going to be useful and/or
 #   interesting from the perspective of the paper.
 #   Effectively, this is what happens if we allow our system to change through
@@ -143,5 +190,44 @@ cases$C <- expand.grid(
 # Make sure you know the cases you are working with...
 stopifnot(sum(sapply(cases, nrow)) == 108)
 
+# Preparations: ################################################################
+### Assign Random Seeds: #######################################################
 # Assign to each case historiesPerSystem * systemsPerParamSet history seeds,
-# and systemsPerParamSet sets of
+# and systemsPerParamSet sets of enviromentsPerPool environment seeds.
+cases <- lapply(
+  cases,
+  function(case, base) {
+    case$HistorySeeds <- paste0(runif(
+      base$historiesPerSystem * base$systemsPerParamSet) * 1E8,
+      collapse = thisSeparator)
+    case$EnvironmentSeeds <- paste0(runif(
+      base$environsPerSystem * base$systemsPerParamSet) * 1E8,
+      collapse = thisSeparator)
+    case
+  }, base = systemBase
+  )
+
+# Creation: ####################################################################
+### Cases: #####################################################################
+lapply(
+  seq_along(cases),
+  function(i, case, name) {
+    write.table(
+      cases[[i]], file = file.path(
+        thisDirectory,
+        paste0(thisFilePrefix, name[i], thisFileSuffix)
+      ), sep = ","
+    )
+  }, case = cases,  name = names(cases)
+)
+
+### Parameters: ################################################################
+save(systemBase, systemMods, file = file.path(
+  thisDirectory,
+  paste0(thisFilePrefix, "Parameters", thisFileSuffix)
+))
+
+# Cleanup: #####################################################################
+if (exists("old.seed")) {
+  set.seed(old.seed)
+}
