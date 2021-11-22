@@ -314,7 +314,7 @@ egMatsSubsets <- lapply(
 )
 egDynamicsSubsets <- lapply(
   egMatsSubsets, function(mat, reprate) {
-    PerCapitaDynamics_Type1(reprate, mat$Mats[[1]],
+    PerCapitaDynamics_Type1(reprate, mat$Mats[[1]], # only 1 mat in each subset.
                             NumEnvironments = 1)
   }, reprate = egPool$ReproductionRate
 )
