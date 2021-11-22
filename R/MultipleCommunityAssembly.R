@@ -17,6 +17,8 @@ CreateEnvironmentInteractions <- function(
   NumEnvironments, # Number of environments
   ComputeInteractionMatrix, # Required outside function.
   EnvironmentSeeds = NULL, # If one seed, used to generate seeds for the system.
+  ModifyPool = base::identity, # A function that modifies the pool before
+                               # computing the interaction matrix.
   # Otherwise, we can use seeds equal to the number of environments
   ...
 ) {
