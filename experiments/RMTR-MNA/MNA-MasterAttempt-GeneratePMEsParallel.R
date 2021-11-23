@@ -121,23 +121,23 @@ theEnvironments <- lapply(theEnvironments, function(env) {
 print("Generate Pools.")
 print(Sys.time())
 print(system.time(
-foreach::foreach(
-  env = iterators::iter(theEnvironments)
-) %:% foreach::foreach(
-  crow = iterators::iter(with(env, cases), by = "row")
-) %do% { # Faster without the overhead.
-  with(env,
-       pools[[crow$Parameters]][[crow$System]] <-
-         RMTRCode2::LawMorton1996_species(
-           Basal = systemBase$species[1],
-           Consumer = systemBase$species[2],
-           Parameters = systemBase$LM1996ParamSet,
-           LogBodySize = systemBase$LM1996BodySize +
-             systemMods$PoolBodySizes[crow$Framework, ],
-           seed = crow$PoolSeed
-         )
-  )
-}))
+  foreach::foreach(
+    env = iterators::iter(theEnvironments)
+  ) %:% foreach::foreach(
+    crow = iterators::iter(with(env, cases), by = "row")
+  ) %do% { # Faster without the overhead.
+    with(env,
+         pools[[crow$Parameters]][[crow$System]] <-
+           RMTRCode2::LawMorton1996_species(
+             Basal = systemBase$species[1],
+             Consumer = systemBase$species[2],
+             Parameters = systemBase$LM1996ParamSet,
+             LogBodySize = systemBase$LM1996BodySize +
+               systemMods$PoolBodySizes[crow$Framework, ],
+             seed = crow$PoolSeed
+           )
+    )
+  }))
 
 # Generate Matrices: ##########################################################
 ### Rearrange: ################################################################
@@ -159,11 +159,19 @@ print("Generate Matrices.")
 print(Sys.time())
 print(system.time(
   foreach::foreach(
-    env = iterators::iter(theEnvironments)
-  ) %:% foreach::foreach(
-    crow = iterators::iter(with(env, cases), by = "row")
-  ) %dopar% { # Faster without the overhead.
-    with(env,
+    envIndex = iterators::iter(
+      rep(1:length(theEnvironments),
+          times = unlist(lapply(theEnvironments,
+                                function(env) {nrow(env$cases)}))
+      )
+    ),
+    crow = iterators::iter(
+      dplyr::bind_rows(lapply(theEnvironments, function(env) env$cases)),
+      by = "row"
+    )
+  ) %do% { # Faster without the overhead.
+    print(envIndex)
+    with(theEnvironments[[envIndex]],
          matrs[[crow$Parameters]][[crow$System]] <-
            RMTRCode2::CreateEnvironmentInteractions(
              Pool = pools[[crow$Parameters]][[crow$System]],

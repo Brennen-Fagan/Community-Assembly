@@ -194,12 +194,12 @@ LawMorton1996_CommunityMat <- function(
       oldSeed <- .Random.seed
     }
 
-    newSeeds <- matrix(runif(
-      nrow(Pool) * nrow(Pool)
-    ) * 1E8, nrow = nrow(Pool))
-  } else {
-    newSeeds <- matrix(nrow = nrow(Pool), ncol = nrow(Pool))
+    set.seed(seed)
   }
+
+  newSeeds <- matrix(runif(
+    nrow(Pool) * nrow(Pool)
+  ) * 1E8, nrow = nrow(Pool))
 
   theMatrix <- foreach::foreach(
     i = iterators::iter(Pool, by = 'row'), .combine = 'rbind',
@@ -210,7 +210,7 @@ LawMorton1996_CommunityMat <- function(
   ) %dopar% {
     if (!is.na(nsval)) {
       if (exists(".Random.seed")) {
-        oldSeed <- .Random.seed
+        oSeed <- .Random.seed
       }
       set.seed(nsval)
     }
@@ -219,20 +219,14 @@ LawMorton1996_CommunityMat <- function(
     retval <- ifelse(p == 0,
                      0,
                      sign(p) * rtruncnorm(0, Inf, abs(p), abs(p) * Parameters[6]))
-    if (!is.na(nsval) & exists("oldSeed")) {
-      set.seed(oldSeed)
+    if (!is.na(nsval) & exists("oSeed")) {
+      set.seed(oSeed)
     }
     retval
   }
 
   # Need to handle mutualism, competition outside of the entries, since it
   # requires knowledge of the other entry's sign and a shared probability.
-  if (!is.null(seed)) {
-    if (exists(".Random.seed")) {
-      oldSeed <- .Random.seed
-    }
-    set.seed(seed)
-  }
 
   # There are nrow(Pool) * (nrow(Pool) - 1) / 2 Interaction Pairs.
   # Currently, they are all (+, -) exploitation pairs.
