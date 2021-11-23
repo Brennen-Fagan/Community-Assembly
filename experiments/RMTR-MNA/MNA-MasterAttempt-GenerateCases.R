@@ -84,7 +84,7 @@ systemMods <- list(
      0, 0, 0, 1,
     -1, 0, 0, 1,
      0, 0, 0, 0
-  ), ncol = 4),
+  ), ncol = 4, byrow = TRUE),
   InteractionsNoiseMultiplier = c(1, 1, 1, 1, 0)
 )
 
@@ -114,7 +114,7 @@ systemMods$NeutralRateMultipliers <- matrix(c(
   10,    0.1,
    0.1, 10,
   10,   10
-), ncol = 2)
+), ncol = 2, byrow = TRUE)
 
 ### Spatial Dynamics Parameters: ###############################################
 # For the spatial component, we are interested in the following structures.
@@ -201,6 +201,9 @@ stopifnot(sum(sapply(cases, nrow)) == 216)
 cases <- lapply(
   cases,
   function(case, base) {
+    case$PoolSeeds <- paste0(runif(
+      base$systemsPerParamSet) * 1E8,
+      collapse = thisSeparator)
     case$HistorySeeds <- paste0(runif(
       base$historiesPerSystem * base$systemsPerParamSet) * 1E8,
       collapse = thisSeparator)
@@ -226,9 +229,9 @@ lapply(
 )
 
 ### Parameters: ################################################################
-save(systemBase, systemMods, file = file.path(
+save(systemBase, systemMods, thisSeparator, file = file.path(
   thisDirectory,
-  paste0(thisFilePrefix, "Parameters", thisFileSuffix)
+  paste0(thisFilePrefix, "Parameters", ".RData")
 ))
 
 # Cleanup: #####################################################################
