@@ -201,15 +201,15 @@ stopifnot(sum(sapply(cases, nrow)) == 216)
 cases <- lapply(
   cases,
   function(case, base) {
-    case$PoolSeeds <- paste0(runif(
+    case$PoolSeeds <- replicate(nrow(case), paste0(runif(
       base$systemsPerParamSet) * 1E8,
-      collapse = thisSeparator)
-    case$HistorySeeds <- paste0(runif(
+      collapse = thisSeparator))
+    case$HistorySeeds <- replicate(nrow(case), paste0(runif(
       base$historiesPerSystem * base$systemsPerParamSet) * 1E8,
-      collapse = thisSeparator)
-    case$EnvironmentSeeds <- paste0(runif(
+      collapse = thisSeparator))
+    case$EnvironmentSeeds <- replicate(nrow(case), paste0(runif(
       base$environsPerSystem * base$systemsPerParamSet) * 1E8,
-      collapse = thisSeparator)
+      collapse = thisSeparator))
     case
   }, base = systemBase
   )
