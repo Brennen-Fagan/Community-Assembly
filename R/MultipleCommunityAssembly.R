@@ -558,7 +558,9 @@ MultipleNumericalAssembly_Dispersal <- function(
   # Timings <- cumsum(c(
   #   0, rep(diff(Timings) / BetweenEventSteps, each = BetweenEventSteps)
   # ))
-  Timings <- c(0, unlist(lapply(
+  # Note: if approximately exactly divisible, a time can occur twice.
+  # I am unsure if this can cause a double arrival, but unique should handle it.
+  Timings <- unique(unlist(lapply(
     2:length(Timings),
     function(i, ts) {
       seq(from = ts[i - 1], to = ts[i],
@@ -567,6 +569,19 @@ MultipleNumericalAssembly_Dispersal <- function(
     },
     ts = Timings
   )))
+
+  # Bit of an interesting bug. If two consecutive timings are too close, then
+  # the solver cannot run. How close is too close? I found a failed run and
+  # plot(log10(diff(unique(Timings)))) showed that most are at least 1E-5 of
+  # each other. The outlier in this case was 1E-15 apart.
+  # It is hard to know how large a threshold to pick from one datum, but
+  # sqrt(.Machine$double.eps) is about 1.5E-8, which seems like a good start.
+
+  if (any(diff(Timings) < sqrt(.Machine$double.eps))) {
+    # Note that this removes the left entry, which is desired since the
+    # right entry is probably the actual event.
+    Timings <- Timings[-which(diff(Timings) < sqrt(.Machine$double.eps))]
+  }
 
   deEvents$time <- Timings
 

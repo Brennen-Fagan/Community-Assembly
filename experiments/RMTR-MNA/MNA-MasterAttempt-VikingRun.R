@@ -132,10 +132,13 @@ DispersalMatrices <- RMTRCode2::CreateDispersalMatrix(
 
 # Run the system: #############################################################
 print("Run")
-results <- RMTRCode2::MultipleNumericalAssembly_Dispersal(
+# Run times appear to be short enough that we can just run each set of histories
+# (per pool-environ combination) on the same node without hitting time-out.
+results <- lapply(evnt, function(ev) {
+  RMTRCode2::MultipleNumericalAssembly_Dispersal(
   Pool = pool, NumEnvironments = Environments,
   InteractionMatrices = matr,
-  Events = evnt,
+  Events = ev,
   PerCapitaDynamics = PerCapitaDynamics,
   DispersalMatrix = DispersalMatrices,
   EliminationThreshold = EliminationThreshold,
@@ -143,7 +146,7 @@ results <- RMTRCode2::MultipleNumericalAssembly_Dispersal(
   MaximumTimeStep = MaximumTimeStep,
   BetweenEventSteps = BetweenEventSteps,
   Verbose = FALSE
-)
+)})
 
 # Save the system: ############################################################
 print("Save")
