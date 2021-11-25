@@ -11,7 +11,7 @@ library(iterators)
 library(dplyr)
 library(tidyr)
 
-cores <- parallel::detectCores() - 1
+cores <- 5 #parallel::detectCores() - 1
 clust <- parallel::makeCluster(cores)
 doParallel::registerDoParallel(clust)
 
@@ -62,6 +62,7 @@ stopifnot(
 print("Environments.")
 theEnvironments <- lapply(theCases, function(case) {
   tempenv <- new.env()
+  assign("name", basename(case), envir = tempenv)
   assign("cases", read.csv(case, as.is = TRUE), envir = tempenv)
   return(tempenv)
 })
@@ -234,7 +235,7 @@ print(system.time(
       rep(1:length(theEnvironments),
           times = unlist(lapply(theEnvironments,
                                 function(env) {nrow(env$cases)}))
-      )
+      )[various]
     ),
     crow = iterators::iter(
       dplyr::bind_rows(lapply(theEnvironments,
@@ -260,24 +261,26 @@ print(system.time(
 
     # env$matrs[[crow$Parameters]][[crow$System]] <-
     templist[[paste(envIndex, crow$Parameters, crow$System)]] <-
-      RMTRCode2::CreateAssemblySequence(
-        Species = nrowpl,
-        NumEnvironments = systemBase$environsPerSystem,
-        ArrivalEvents = systemBase$eventNumberFunc(
-          systemBase$environsPerSystem, Spec = nrowpl, Const = 7
-          # More than 5 since we are not seeing enough mixing.
-        ),
-        ArrivalRate = rate,
-        ArrivalFUN = RMTRCode2::ArrivalFUN_Example,
-        ExtinctEvents = systemBase$eventNumberFunc(
-          systemBase$environsPerSystem, Spec = nrowpl, Const = 7
-          # More than 5 since we are not seeing enough mixing.
-        ),
-        ExtinctRate = rate,
-        ExtinctFUN = RMTRCode2::ExtinctFUN_Example,
-        HistorySeed = as.numeric(
-          strsplit(crow$HistorySeeds, split = ", ", fixed = TRUE)[[1]]
-        )
+      lapply(strsplit(crow$HistorySeeds, split = ", ", fixed = TRUE)[[1]],
+             function(s) {
+               RMTRCode2::CreateAssemblySequence(
+                 Species = nrowpl,
+                 NumEnvironments = systemBase$environsPerSystem,
+                 ArrivalEvents = systemBase$eventNumberFunc(
+                   systemBase$environsPerSystem, Spec = nrowpl, Const = 7
+                   # More than 5 since we are not seeing enough mixing.
+                 ),
+                 ArrivalRate = rate,
+                 ArrivalFUN = RMTRCode2::ArrivalFUN_Example,
+                 ExtinctEvents = systemBase$eventNumberFunc(
+                   systemBase$environsPerSystem, Spec = nrowpl, Const = 7
+                   # More than 5 since we are not seeing enough mixing.
+                 ),
+                 ExtinctRate = rate,
+                 ExtinctFUN = RMTRCode2::ExtinctFUN_Example,
+                 HistorySeed = as.numeric(s)
+               )
+             }
       )
 
     return(templist)
@@ -291,3 +294,12 @@ for (evt in events) {
 
 # Cleanup: ####################################################################
 parallel::stopCluster(clust)
+
+lapply(theEnvironments,
+       function(env) {
+         newname <- strsplit(env$name, split = ".", fixed = TRUE)[[1]]
+         newname <- paste0(newname[-length(newname)], "-Prepared.RData")
+         save(file = file.path(thisDirectory, newname),
+              envir = env, cases, evnts, matrs, pools)
+       }
+)
