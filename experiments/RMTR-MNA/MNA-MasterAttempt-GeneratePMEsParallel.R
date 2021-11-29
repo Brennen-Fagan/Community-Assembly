@@ -269,14 +269,22 @@ print(system.time(
                  ArrivalEvents = systemBase$eventNumberFunc(
                    systemBase$environsPerSystem, Spec = nrowpl, Const = 7
                    # More than 5 since we are not seeing enough mixing.
-                 ),
-                 ArrivalRate = rate,
+                 ) * systemMods$NeutralRateMultipliers[
+                   crow$Neutral, 1
+                 ],
+                 ArrivalRate = rate * systemMods$NeutralRateMultipliers[
+                   crow$Neutral, 1
+                 ],
                  ArrivalFUN = RMTRCode2::ArrivalFUN_Example,
                  ExtinctEvents = systemBase$eventNumberFunc(
                    systemBase$environsPerSystem, Spec = nrowpl, Const = 7
                    # More than 5 since we are not seeing enough mixing.
-                 ),
-                 ExtinctRate = rate,
+                 ) * systemMods$NeutralRateMultipliers[
+                   crow$Neutral, 2
+                 ],
+                 ExtinctRate = rate * systemMods$NeutralRateMultipliers[
+                   crow$Neutral, 2
+                 ],
                  ExtinctFUN = RMTRCode2::ExtinctFUN_Example,
                  HistorySeed = as.numeric(s)
                )
