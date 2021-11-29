@@ -187,7 +187,7 @@ cases$B <- expand.grid(
 
 cases$C <- expand.grid(
   Framework = 1:4,
-  Neutral = 1:5,
+  Neutral = c(1:3, 5:6),
   Space = 1:8
 )
 
