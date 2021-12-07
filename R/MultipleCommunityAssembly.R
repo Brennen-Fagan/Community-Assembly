@@ -3,8 +3,8 @@ ArrivalFUN_Example <- function(Events, Rate) {
 }
 ExtinctFUN_Example <- ArrivalFUN_Example
 
-ArrivalFUN_Example2 <- function(Duration, Rate) {
-  Events <- Duration * Rate # s * events / s
+ArrivalFUN_Example2 <- function(Events, Rate) {
+  Duration <- Events / Rate # events / (events / s)
   # Note: Sum_i(Xi) ~ Gamma(shape = length(Xi), rate), Xi ~ Exp(rate)
   # mean = length(Xi) * rate
   # For Events "small" (possibly < 1), * 2 not large enough.
@@ -134,16 +134,17 @@ CreateAssemblySequence <- function(
     Extincts <- ExtinctFUN(ExtinctEvents, ExtinctRate)
 
     # Retrieve Species. Retrieve Locations.
+    # Note that length(Arrivals) == ArrivalEvents is not guaranteed.
     Events <- data.frame(
       Times = c(Arrivals, Extincts),
       Species = sample.int(Species,
-                           size = ArrivalEvents + ExtinctEvents,
+                           size = length(Arrivals) + length(Extincts),
                            replace = TRUE),
       Environment = sample.int(NumEnvironments,
-                               size = ArrivalEvents + ExtinctEvents,
+                               size = length(Arrivals) + length(Extincts),
                                replace = TRUE),
-      Type = c(rep("Arrival", ArrivalEvents),
-               rep("Extinct", ExtinctEvents)),
+      Type = c(rep("Arrival", length(Arrivals)),
+               rep("Extinct", length(Extincts))),
       Success = NA
       # Arrival AND Invadable <- TRUE
       # Arrival AND Uninvadable <- FALSE
