@@ -8,6 +8,7 @@ if (!exists("testseed")) {
     old.seed <- .Random.seed
   }
   set.seed(testseed)
+  print(testseed)
 }
 
 numBasal <- 3; numConsum <- 2; numEnviron <- 5
@@ -35,7 +36,29 @@ CreateAssemblySequence(numBasal + numConsum, numEnviron,
 CreateAssemblySequence(numBasal + numConsum, numEnviron,
                        ArrivalRate = egArrivalRate,
                        HistorySeed = egEvents$Seed) -> egEvents2
-stopifnot(identical(egEvents, egEvents2))
+stopifnot(identical(egEvents, egEvents2),
+          nrow(egEvents$Events) == 2 * 10)
+
+CreateAssemblySequence(
+  Species = numBasal + numConsum, NumEnvironments = numEnviron,
+  ArrivalRate = egArrivalRate,
+  ArrivalFUN = ArrivalFUN_Example2,
+  ExtinctFUN = ExtinctFUN_Example2
+) -> egEvents3
+
+CreateAssemblySequence(
+  Species = numBasal + numConsum, NumEnvironments = numEnviron,
+  ArrivalRate = egArrivalRate,
+  ArrivalFUN = ArrivalFUN_Example2,
+  ExtinctFUN = ExtinctFUN_Example2,
+  HistorySeed = egEvents3$Seed
+) -> egEvents4
+stopifnot(identical(egEvents3, egEvents4),
+          # Default argument divided by rate.
+          max(egEvents3$Events$Times) < 10 / egArrivalRate)
+
+stopifnot(rapply(object = egEvents, f = typeof) ==
+            rapply(object = egEvents3, f = typeof))
 
 # PerCapitaDynamics_Type1 ######################################################
 print("Dynamics check")
@@ -577,5 +600,7 @@ stopifnot(
 )
 
 print("Success.")
+print("Testseed:")
+print(testseed)
 
 if (exists("old.seed")) set.seed(old.seed)
