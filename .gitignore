@@ -10,3 +10,7 @@ src/*.so
 src/*.dll
 inst/doc
 experiments/**/Job[_]*
+**/*.png
+**/*.csv
+*.csv
+**/*.Rhistory
