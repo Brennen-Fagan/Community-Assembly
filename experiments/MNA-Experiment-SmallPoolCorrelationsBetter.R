@@ -367,6 +367,20 @@ Richnesses <- lapply(
   charrate = CharacteristicRates
 )
 
+RichnessesCentred <- lapply(Richnesses, function(x) {
+  x %>% dplyr::mutate(
+    dplyr::across(`1`:`10`,
+                  .fns =  ~ .x - mean(.x, na.rm = TRUE))
+  )
+})
+
+RichnessesDeAR1ed <- lapply(RichnessesCentred, function(x) {
+  x %>% dplyr::mutate(
+    dplyr::across(`1`:`10`,
+                  .fns =  ~ residuals(arima(.x, order = c(1, 0, 0))))
+  )
+})
+
 results <- lapply(
   Richnesses,
   function(x) testcorr::rcorr.test(x %>% dplyr::select(`1`:`10`))
