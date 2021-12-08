@@ -70,7 +70,13 @@ CreateEnvironmentInteractions <- function(
         set.seed(seed[i])
       }
 
-      retval <- ComputeInteractionMatrix(pool, ...)
+      # Development Note: there is some ambiguity here as to whether we should
+      # simply modify the pool and resample the interaction matrix conditioned
+      # on the new pool, or if, instead, we should rescale the existing
+      # interactions, sampling only those that fundamentally change.
+      # The former (below) is far easier, but the latter is potentially more
+      # correct.
+      retval <- ComputeInteractionMatrix(ModifyPool(pool), ...)
 
       if (exists("oldSeed")) {
         set.seed(oldSeed)
