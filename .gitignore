@@ -14,3 +14,10 @@ experiments/**/Job[_]*
 **/*.csv
 *.csv
 **/*.Rhistory
+experiments/LCAB_LawMorton1996-NumericalPoolCommunityScaling10/LM96-NumPoolComScaling-Calc10-48hr4_log(1).txt
+experiments/LCAB_LawMorton1996-NumericalPoolCommunityScaling10/LM96-NumPoolComScaling-Calc10-DMTCP-Test-Log.txt
+experiments/LCAB_LawMorton1996-NumericalPoolCommunityScaling10/LM96-NumPoolComScaling-Calc10-DMTCP-Test-Log2.txt
+experiments/LCAB_LawMorton1996-NumericalPoolCommunityScaling10/LM96-NumPoolComScaling-Calc10-Restart_log.txt
+*.html
+*.csv
+*.csv
