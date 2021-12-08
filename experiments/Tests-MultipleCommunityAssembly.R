@@ -140,6 +140,13 @@ with(egEvents$Events[egCompareEventE,], {
                       expectedEvents))
 })
 
+egEventsNo1 <- egEvents
+egEventsNo1$Events <- egEventsNo1$Events[
+  !(egEventsNo1$Events$Species == 1 |
+      egEventsNo1$Events$Environment == 1
+  ),
+]
+
 # CreateDispersalMatrix ########################################################
 # Test for failures.
 print("Test Malformed Distance Matrix.")
@@ -557,6 +564,27 @@ stopifnot(
     # 6: 3 has environment seeds, 6 does not.
     TRUE
   )
+)
+
+print("Subtest 4: No dispersal if no connections")
+egResults_Dispersal7 <- MultipleNumericalAssembly_Dispersal(
+  Pool = egPool,
+  NumEnvironments = numEnviron,
+  InteractionMatrices = egInteractions,
+  Events = egEventsNo1,
+  PerCapitaDynamics = egDynamics,
+  DispersalMatrix = CreateDispersalMatrix(
+    matrix(0, nrow = numEnviron, ncol = numEnviron),
+    SpeciesSpeeds = 1:(numBasal + numConsum)
+  ),
+  EliminationThreshold = 10^-4, ArrivalDensity = 0.4,
+  Verbose = FALSE
+)
+
+stopifnot(
+  !any(egResults_Dispersal7$Abundance[, 1 + 1:(numBasal + numConsum)] > 0),
+  !any(egResults_Dispersal7$Abundance[
+    , 1 + 1 + (0:(numEnviron - 1)) * (numBasal + numConsum)] > 0),
 )
 
 # MultipleNumericalAssembly_Dispersal, Trophics ################################
