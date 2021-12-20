@@ -4,6 +4,12 @@ ArrivalFUN_Example <- function(Events, Rate) {
 ExtinctFUN_Example <- ArrivalFUN_Example
 
 ArrivalFUN_Example2 <- function(Events, Rate) {
+  if (Rate == 0 || Events == 0) {
+    # Waiting finite time for infinite wait times.
+    # Or waiting for no events to occur.
+    # Return no events.
+    return(numeric(0))
+  }
   Duration <- Events / Rate # events / (events / s)
   # Note: Sum_i(Xi) ~ Gamma(shape = length(Xi), rate), Xi ~ Exp(rate)
   # mean = length(Xi) * rate
