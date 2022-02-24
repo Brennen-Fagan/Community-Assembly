@@ -9,43 +9,15 @@ library(parallel)
 library(doParallel)
 library(foreach)
 
-clust <- parallel::makeCluster(14, outfile = "")
+clust <- parallel::makeCluster(4, outfile = "")
 doParallel::registerDoParallel(clust)
 
 time_grouping_size <- 100
 time_averaging_size <- 10
 
-# csvs <- dir(path = ".", pattern = "Cases[.]csv$",
-#             full.names = TRUE)
-#
-# contentsCsvs <- lapply(csvs, utils::read.csv)
-#
-# # From old MasterParameters.RData
-# # 10^9, 10^5, 10^0
-# spaces <- c(1, 5, 8)
-# # (1,1), (1,10), and (10,1)
-# neutrals <- c(1, 3, 6)
-
-# IDs <- lapply(seq_along(contentsCsvs), function(i) {
-#   csv <- contentsCsvs[[i]]
-#   temp <- data.frame(Numbers = csv %>% dplyr::mutate(
-#     Numbers = as.numeric(rownames(csv))
-#   ) %>% dplyr::filter(
-#     Space %in% spaces,
-#     Neutral %in% neutrals
-#   ) %>% dplyr::pull(Numbers)
-#   )
-#
-#   if (nrow(temp) > 0) {
-#     temp$Case <- i
-#     return(temp)
-#   }
-#   else {
-#     return(NULL)
-#   }
-# }) %>% dplyr::bind_rows()
-
-files <- dir("Viking_SaveDiversity_2021-12-28_2022-01-23",
+files <- dir(#"Viking_
+             "SaveDiversity_2022-02-15",
+             #_2021-12-28_2022-01-23",
              pattern = "[.]RData$", full.names = TRUE)
 
 # Diversities <- list()
@@ -54,92 +26,94 @@ Diversities <- foreach(
   file = iterators::iter(files),
   .packages = c("dplyr", "ggplot2")
 ) %dopar% {
-  #for (file in files) {
-  # Retrieve File Number == Case Number
-  caseNumber <- strsplit(tools::file_path_sans_ext(file),
-                         split = "-", fixed = TRUE)[[1]]
-  case <- caseNumber[length(caseNumber) - 1]
-  caseNumber <- caseNumber[length(caseNumber)]
-  #
-  # if (IDs %>% dplyr::filter(
-  #   Case == as.numeric(case),
-  #   (as.numeric(caseNumber) %/% 10) + 1 == Numbers
-  # ) %>% nrow() == 0) {
-  #   return(NULL)
-  # }
+  # Retrieve the trailing id numbers from before the file extension.
+  # 1st: Set, 2nd: CaseNumber, 3rd: History, 4th: Part
+  # Note, if last two are not present, all histories are bundled together.
+  # If last two are present, each file has a single part of a single history.
+  idNums <- suppressWarnings(na.omit(
+    as.numeric(tail(strsplit(tools::file_path_sans_ext(basename(file)),
+                             split = "-", fixed = TRUE)[[1]],
+                    n = 4))),
+    classes = "simpleWarning")
 
   print(file)
   print(Sys.time())
   load(file)
   # Loads Diversity
 
-  # Diversities[[toString(idNums)]] <- Diversity
-  Attributes <-#  dplyr::bind_rows(
-    # if (exists("Attributes")) {
-    #   Attributes
-    # },
+  Attributes <-
     data.frame(
       Pool = toString(Diversity$PoolMod),
       Noise = toString(Diversity$NoiseMod),
       Neutral = toString(Diversity$NeutralMod),
       Space = toString(Diversity$SpaceMod),
-      Case = caseNumber,
+      Set = idNums[1],
+      CaseNumber = idNums[2],
+      History = if(is.na(idNums[3])) {
+        # All Histories and Parts
+        # rep(1:10, each = 2)
+        1:10
+      } else idNums[3],
+      Part = if(is.na(idNums[4])) {
+        # rep(1:2, times = 10)
+        1
+      } else idNums[4],
       stringsAsFactors = FALSE
     )
-  # )
 
-  DiversitiesAlpha <- #dplyr::bind_rows(
-    # if (exists("DiversitiesAlpha")) {
-    #   DiversitiesAlpha
-    # },
-    dplyr::bind_rows(lapply(
-      1:10,
-      function(i, d) d[[i]]$alpha %>% dplyr::mutate(
-        History = i, Case = case, Number = caseNumber
-      ),
-      d = Diversity)) %>% dplyr::select(-Species) %>% dplyr::mutate(
-        Time = floor(Time * time_grouping_size)/time_grouping_size
-      ) %>% dplyr::group_by(
-        Time, History, Environment, Case
-      ) %>% summarise(
-        Richness = floor(median(Richness)),
-        .groups = "drop"
-      ) %>% dplyr::mutate(
-        Pool = toString(Diversity$PoolMod),
-        Noise = toString(Diversity$NoiseMod),
-        Neutral = toString(Diversity$NeutralMod),
-        Space = toString(Diversity$SpaceMod)
+  DiversitiesAlpha <-
+    dplyr::bind_rows(
+      lapply(
+        seq_along(Diversity$Diversities),
+        function(i, d, a) d[[i]]$alpha %>% dplyr::mutate(
+          Set = a$Set[i],
+          Number = a$CaseNumber[i],
+          History = a$History[i],
+          Pool = a$Pool[i],
+          Noise = a$Noise[i],
+          Neutral = a$Neutral[i],
+          Space = a$Space[i]
+        ),
+        d = Diversity$Diversities,
+        a = Attributes
       )
-  # )
+    ) %>% dplyr::select(-Species) %>% dplyr::mutate(
+      Time = floor(Time * time_grouping_size)/time_grouping_size
+    ) %>% dplyr::group_by(
+      Time, Environment, Set, Number, History
+    ) %>% dplyr::summarise(
+      Richness = floor(median(Richness)),
+      .groups = "drop"
+    )
 
-  DiversitiesBeta <- # dplyr::bind_rows(
-    # if (exists("DiversitiesBeta")) {
-    #   DiversitiesBeta
-    # },
-    dplyr::bind_rows(lapply(
-      1:10,
-      function(i, d) dplyr::bind_rows(
-        d[[i]]$beta
-      ) %>% dplyr::mutate(History = i, Case = case, Number = caseNumber),
-      d = Diversity)) %>% dplyr::mutate(
-        Time = floor(Time * time_grouping_size)/time_grouping_size
-      ) %>% dplyr::group_by(
-        Time, History, Env1, Env2, Case
-      ) %>% summarise(
-        Jaccard = median(Jaccard),
-        .groups = "drop"
-      ) %>% dplyr::mutate(
-        Pool = toString(Diversity$PoolMod),
-        Noise = toString(Diversity$NoiseMod),
-        Neutral = toString(Diversity$NeutralMod),
-        Space = toString(Diversity$SpaceMod)
+  DiversitiesBeta <-
+    dplyr::bind_rows(
+      lapply(
+        seq_along(Diversity$Diversities),
+        function(i, d, a) dplyr::bind_rows(
+          d[[i]]$beta
+        ) %>% dplyr::mutate(
+          Set = a$Set[i],
+          Number = a$CaseNumber[i],
+          History = a$History[i],
+          Pool = a$Pool[i],
+          Noise = a$Noise[i],
+          Neutral = a$Neutral[i],
+          Space = a$Space[i]
+        ),
+        d = Diversity$Diversities,
+        a = Attributes
       )
-  # )
+    ) %>% dplyr::mutate(
+      Time = floor(Time * time_grouping_size)/time_grouping_size
+    ) %>% dplyr::group_by(
+      Time, Env1, Env2, Set, Number, History
+    ) %>% dplyr::summarise(
+      Jaccard = median(Jaccard),
+      .groups = "drop"
+    )
 
-  DiversitiesGamma <- # dplyr::bind_rows(
-    # if (exists("DiversitiesGamma")) {
-    #   DiversitiesGamma
-    # },
+  DiversitiesGamma <-
     dplyr::bind_rows(lapply(
       1:10,
       function(i, d) d[[i]]$gamma %>% dplyr::mutate(
@@ -160,7 +134,6 @@ Diversities <- foreach(
         Neutral = toString(Diversity$NeutralMod),
         Space = toString(Diversity$SpaceMod)
       )
-  # )
 
   return(list(
     Attr = Attributes,
@@ -256,7 +229,7 @@ levelsPoolNoise <- paste(
   DiversitiesGamma$Pool,
   DiversitiesGamma$Noise,
   sep = ";;"
-  ) %>% unique() %>% strsplit(
+) %>% unique() %>% strsplit(
   split = ";;", fixed = TRUE
 )
 
@@ -468,7 +441,7 @@ plotsAlphaGamma3x3 <- lapply(
       Time > 3,
       Space %in% c(1, 1E5, 1E6, 1E9),
       Neutral %in% c(#"1, 1", Currently going to borrow from No Noise.
-                     "1, 10", "10, 1")
+        "1, 10", "10, 1")
     )
 
     dag <- dplyr::bind_rows(
@@ -560,20 +533,20 @@ plotsAlphaGammaSpace <- lapply(
         shape = Space
       ),
       size = 4, alpha = 1
-    # ) + ggplot2::geom_rect(
-    #   data = dag %>% dplyr::group_by(
-    #     Neutral, Space
-    #   ) %>% dplyr::summarise(
-    #     xmin = min(`Richness, Alpha`, na.rm = TRUE),
-    #     xmax = max(`Richness, Alpha`, na.rm = TRUE),
-    #     ymin = min(`Richness, Gamma`, na.rm = TRUE),
-    #     ymax = max(`Richness, Gamma`, na.rm = TRUE),
-    #     .groups = "drop"
-    #   ),
-    #   mapping = ggplot2::aes(
-    #     xmin = xmin - 0.5, xmax = xmax + 0.5,
-    #     ymin = ymin - 0.5, ymax = ymax + 0.5
-    #   ), inherit.aes = FALSE, color = "black", fill = "transparent"
+      # ) + ggplot2::geom_rect(
+      #   data = dag %>% dplyr::group_by(
+      #     Neutral, Space
+      #   ) %>% dplyr::summarise(
+      #     xmin = min(`Richness, Alpha`, na.rm = TRUE),
+      #     xmax = max(`Richness, Alpha`, na.rm = TRUE),
+      #     ymin = min(`Richness, Gamma`, na.rm = TRUE),
+      #     ymax = max(`Richness, Gamma`, na.rm = TRUE),
+      #     .groups = "drop"
+      #   ),
+      #   mapping = ggplot2::aes(
+      #     xmin = xmin - 0.5, xmax = xmax + 0.5,
+      #     ymin = ymin - 0.5, ymax = ymax + 0.5
+      #   ), inherit.aes = FALSE, color = "black", fill = "transparent"
     ) + ggplot2::geom_path(
       data = dag %>% dplyr::group_by(
         Neutral, Space
@@ -809,11 +782,6 @@ plotLCABTrust <- DiversitiesAlphaGamma %>% dplyr::filter(
   position = ggplot2::position_dodge(0.8),
   shape = 4
 ) + ggplot2::labs(
-  x = "Inter-Assemblage Distance",
+  x = "Island-Island Distances",
   y = "Number of Species"
-) + ggplot2::theme_bw(
-) + ggplot2::theme(
-  panel.grid.major.x = ggplot2::element_blank(),
-  panel.grid.major.y = ggplot2::element_blank(),
-  panel.grid.minor.y = ggplot2::element_blank()
 )

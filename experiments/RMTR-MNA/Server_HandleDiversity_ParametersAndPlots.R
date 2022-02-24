@@ -4,6 +4,7 @@ library(dplyr)
 library(ggplot2)
 
 time_grouping_size <- 100
+time_averaging_size <- 1000
 
 # Note alphabetical, using 1:3 <=> A:C, and one letter is the only difference.
 filesParameters <- dir(path = ".", pattern = "^MNA[-].+Cases[.]csv$",
@@ -12,7 +13,7 @@ filesParameters <- dir(path = ".", pattern = "^MNA[-].+Cases[.]csv$",
 parametersMaster <- load("MNA-MasterParameters.RData")
 parametersCSVs <- lapply(filesParameters, read.csv)
 
-files <- dir("Viking_SaveDiversity_2021-12-28_2022-01-15",
+files <- dir("Viking_SaveDiversity_2021-12-28_2022-01-23",
              pattern = "[.]RData$", full.names = TRUE)
 
 Diversities <- list()
@@ -50,9 +51,17 @@ DiversitiesAlpha <- dplyr::bind_rows(lapply(
     temp <- dplyr::bind_rows(lapply(
       1:10,
       function(i, d) d[[i]]$alpha %>% dplyr::mutate(Simulation = i),
-      d = x))
+      d = x)) %>% dplyr::select(
+        -Species
+        ) %>% dplyr::mutate(
+        Time = floor(Time * time_grouping_size)/time_grouping_size
+      ) %>% dplyr::group_by(
+        Time, Simulation, Environment
+      ) %>% summarise(
+        Richness = floor(median(Richness))
+      )
 
-    temp %>% dplyr::mutate(
+    temp <- temp %>% dplyr::mutate(
       Pool = toString(x$PoolMod),
       Noise = toString(x$NoiseMod),
       Neutral = toString(x$NeutralMod),
@@ -71,9 +80,15 @@ DiversitiesBeta <- dplyr::bind_rows(lapply(
       function(i, d) dplyr::bind_rows(
         d[[i]]$beta
       ) %>% dplyr::mutate(Simulation = i),
-      d = x))
+      d = x)) %>% dplyr::mutate(
+        Time = floor(Time * time_grouping_size)/time_grouping_size
+      ) %>% dplyr::group_by(
+        Time, Simulation, Env1, Env2
+      ) %>% summarise(
+        Jaccard = floor(median(Jaccard))
+      )
 
-    temp %>% dplyr::mutate(
+    temp <- temp %>% dplyr::mutate(
       Pool = toString(x$PoolMod),
       Noise = toString(x$NoiseMod),
       Neutral = toString(x$NeutralMod),
@@ -89,9 +104,15 @@ DiversitiesGamma <- dplyr::bind_rows(lapply(
     temp <- dplyr::bind_rows(lapply(
       1:10,
       function(i, d) d[[i]]$gamma %>% dplyr::mutate(Simulation = i),
-      d = x))
+      d = x)) %>% dplyr::mutate(
+        Time = floor(Time * time_grouping_size)/time_grouping_size
+      ) %>% dplyr::group_by(
+        Time, Simulation
+      ) %>% summarise(
+        Richness = floor(median(Richness))
+      )
 
-    temp %>% dplyr::mutate(
+    temp <- temp %>% dplyr::mutate(
       Pool = toString(x$PoolMod),
       Noise = toString(x$NoiseMod),
       Neutral = toString(x$NeutralMod),
@@ -104,12 +125,15 @@ DiversitiesGamma <- dplyr::bind_rows(lapply(
 
 print("Preprocessing")
 
+rm(Diversities)
+rm(Diversity)
+
 DiversitiesGamma <- DiversitiesGamma %>% dplyr::filter(
   Aggregation == "Gamma"
 )
 
 DiversitiesGammaAvg <- DiversitiesGamma %>% dplyr::mutate(
-  Time = floor(Time * time_grouping_size)/time_grouping_size
+  Time = floor(Time * time_averaging_size)/time_averaging_size
 ) %>%  dplyr::group_by(
   Time, Pool, Noise, Neutral, Space
 ) %>% dplyr::summarise(
@@ -152,7 +176,7 @@ plotsGamma <- lapply(
         ymax = RichnessHi,
         x = Time
       ),
-      alpha = 0.2,
+      alpha = 0.4,
       fill = "blue",
       inherit.aes = FALSE
     ) + ggplot2::theme_bw(
