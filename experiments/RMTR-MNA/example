@@ -1,0 +1,11 @@
+temp <- results[[1]]$Abundance 
+temp <- cbind(starttime = temp[, 1], temp)
+current <- 1
+for (r in 2:nrow(results[[1]]$Abundance)) {
+    if (isTRUE(all.equal(temp[current, c(-1, -2)], results[[1]]$Abundance[r, -1]))) {
+        temp[current, 2] <- results[[1]]$Abundance[r, 1]
+        temp <- temp[-(current + 1), ]
+    } else {
+        current <- current + 1
+    }
+}
