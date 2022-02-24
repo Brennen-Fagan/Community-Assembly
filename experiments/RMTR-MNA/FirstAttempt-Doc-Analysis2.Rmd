@@ -45,14 +45,16 @@ We can then extract our diversity metrics for each system and each site/ecosyste
 
 ### Functions
 ```{r, warning=FALSE, message=FALSE}
-library(dplyr)     # Data Manipulation
-library(tidyr)     # Data Pivotting
-library(ggplot2)   # 2-D Plot
-library(plotly)    # 3-D Plot
-library(ggfortify) # used for biplots of PCAs
-library(vegan)     # Ecological analysis mega-package
-library(htmltools) # Programmatic chunks
-library(RMTRCode2)
+library(dplyr)        # Data Manipulation
+library(tidyr)        # Data Pivotting
+library(ggplot2)      # 2-D Plot
+library(plotly)       # 3-D Plot
+library(ggfortify)    # used for biplots of PCAs
+library(vegan)        # Ecological analysis mega-package
+library(htmltools)    # Programmatic chunks
+library(fitdistrplus) # Advanced fitting over MASS.
+library(poweRlaw)     # Fitting heavy-tailed distributions.
+library(RMTRCode2)    # Personal package.
 
 # https://stackoverflow.com/a/7172832
 ifrm <- function(obj, env = globalenv()) {
@@ -75,10 +77,11 @@ As of the writing of this script, all of the data is stored in the same location
 The parameters used to generate the interaction matrices, pools, and events is not stored with the attempts, which is something I should probably fix in the future.
 (I could store them in the ellipsis argument or as a separate object.)
 ```{r}
-by_for_thinning <- 10
-divide_time_by <- 1E4
+by_for_thinning <- 10 # time steps
+divide_time_by <- 1E4 # time units
+burn_in <- 1E4 # time units
 
-load_safe_thin <- function(fname, bythin) {
+load_safe_thin <- function(fname, bythin, divtime, burn) {
   loaded <- tryCatch({load(fname)}, 
                      error = function(e) {
                        print(fname)
@@ -92,9 +95,15 @@ load_safe_thin <- function(fname, bythin) {
     loaded$Abundance <- loaded$Abundance[seq(from = 1,
                                              to = nrow(loaded$Abundance),
                                              by = bythin), ]
+    
     toEliminate <- loaded$Abundance[, -1] < loaded$Parameters$EliminationThreshold & loaded$Abundance[, -1] > 0
     loaded$Abundance[, -1][toEliminate] <- 0
-    loaded$Abundance[, 1] <- loaded$Abundance[, 1] / divide_time_by
+    
+    loaded$Abundance <- loaded$Abundance[
+      loaded$Abundance[, 1] > burn,
+    ]
+    
+    loaded$Abundance[, 1] <- loaded$Abundance[, 1] / divtime
     return(loaded)
   }
 }
@@ -120,6 +129,8 @@ Results <- sapply(
   files_dat_FA,
   load_safe_thin, 
   bythin = by_for_thinning,
+  divtime = divide_time_by, 
+  burn = burn_in,
   simplify = FALSE, USE.NAMES = TRUE
 )
 
@@ -132,7 +143,9 @@ files_dat_Ext <- files_dat[
 Results <- c(Results, sapply(
   files_dat_Ext,
   load_safe_thin, 
-  bythin = by_for_thinning,
+  bythin = by_for_thinning, 
+  divtime = divide_time_by, 
+  burn = burn_in,
   simplify = FALSE, USE.NAMES = TRUE
 ))
 ```
@@ -261,6 +274,7 @@ names(TrophicAnalyses) <- names(Results)
 
 ## Diversity {.tabset}
 
+### Preparation
 ```{r}
 # Borrowing code from FirstAttempt-Doc-Analysis.Rmd
 Calculate_Diversity <- function(result) {
@@ -315,7 +329,7 @@ Calculate_Diversity <- function(result) {
     SpeciesTotal = toString(sort(unique(unlist(strsplit(paste(
       Species, collapse = ", "), split = ", ", fixed = TRUE))))),
     Gamma = unlist(lapply(strsplit(
-      SpeciesTotal, split = ", ", fixed = TRUE), length))
+      SpeciesTotal, split = ", ", fixed = TRUE), function(x) length(x[x!=""]) ))
   ) %>% tidyr::pivot_longer(
     cols = c(Mean, Gamma), 
     names_to = "Aggregation",
@@ -377,6 +391,116 @@ Calculate_Diversity <- function(result) {
   
   return(Diversity)
 }
+
+Diversity_jaccard_space <- function(result) {
+  apply(
+    result$Abundance,
+    MARGIN = 1, # Rows
+    function(row, envs) {
+      time <- row[1]
+      dists <- vegan::vegdist(
+        method = "jaccard", 
+        x = matrix(row[-1] > 0, nrow = envs, byrow = TRUE)
+      )
+      
+      dataf <- expand.grid(
+        Env1 = 1:envs,
+        Env2 = 1:envs
+      ) %>% dplyr::filter(
+        Env1 < Env2
+      ) %>% dplyr::mutate(
+        Time = time,
+        Jaccard = dists
+      )
+      
+      return(dataf)
+    },
+    envs = result$NumEnvironments
+  )
+}
+
+Diversity_jaccard_time <- function(result, subsample = 100) {
+  # Break into environments, then apply it to the time series.
+  patches <- lapply(
+    1:result$NumEnvironments, function(i, abund, envs, spec) {
+      abund <- abund[seq(from = 1, to = nrow(abund), by = subsample), ]
+      times <- abund[, 1]
+      patch <- abund[, 1 + 1:spec + spec * (i - 1)]
+      
+      dists <- vegan::vegdist(
+        method = "jaccard", 
+        x = patch > 0
+      )
+      
+      dataf <- expand.grid(
+        Time1 = times,
+        Time2 = times
+      ) %>% dplyr::filter(
+        Time1 < Time2
+      ) %>% dplyr::mutate(
+        Environment = i,
+        Jaccard = dists
+      )
+      
+      return(dataf)
+    }, abund = result$Abundance, envs = result$NumEnvironments,
+    spec = (ncol(result$Abundance) - 1) / result$NumEnvironments
+  )
+}
+```
+
+```{r, eval=TRUE}
+Calculate_Species <- function(result, bintimes = FALSE) {
+  SpeciesPerEnvironment <- lapply(
+    1:result$NumEnvironments,
+    function(i, abund, numSpecies) {
+      time <- abund[, 1]
+      env <- abund[, 1 + 1:numSpecies + numSpecies * (i - 1)]
+      # Need to retrieve Position and Value
+      species <- apply(
+        cbind(time, env), MARGIN = 1,
+        FUN = function(x) {
+          time <- x[1]
+          dat <- x[-1]
+          if (any(dat > 0)) {
+            positions <- (which(dat > 0))
+            values <- dat[positions]
+            data.frame(
+              Time = time,
+              Species = positions,
+              Abundance = values,
+              row.names = NULL
+            )
+          } else {NULL}
+          # Returns as list
+        }
+      )
+      return(
+        dplyr::bind_rows(species) %>% dplyr::mutate(
+          Environment = i
+        )
+      )
+    },
+    abund = result$Abundance,
+    numSpecies = (ncol(result$Abundance) - 1) / result$NumEnvironments
+  )
+  
+  if (bintimes) {
+    # Should equalise time steps.
+    SpeciesPerEnvironment <- lapply(
+      SpeciesPerEnvironment, function(SPE) {
+        SPE %>% dplyr::mutate(
+          TimeFloor = floor(Time*10)/10
+        ) %>% dplyr::group_by(
+          TimeFloor, Species, Environment
+        ) %>% dplyr::summarise(
+          Abundance = median(Abundance, na.rm = TRUE)
+        )
+      })
+  }
+  
+  return(dplyr::bind_rows(SpeciesPerEnvironment))
+}
 ```
 
 ```{r, warning=FALSE}
@@ -388,12 +512,71 @@ Diversity <- sapply(
       # Problem case.
       return(NA)
     }
-    print(paste("Calculating", Sys.time()))
+    # print(paste("Calculating", Sys.time()))
     
     # Calculate the diversity.
     # We will need to extract the system properties from
     # the file names which we carry through using sapply.
     return(Calculate_Diversity(result))
+  }
+)
+```
+
+```{r, warning=FALSE}
+# Expect warnings since we have all 0 rows on occasion.
+JaccardSpace <- sapply(
+  USE.NAMES = TRUE, simplify = FALSE,
+  Results, function(result) {
+    if (length(result) == 1 && is.na(result)) {
+      # Problem case.
+      return(NA)
+    }
+    # print(paste("Calculating", Sys.time()))
+    
+    # Calculate the diversity.
+    # We will need to extract the system properties from
+    # the file names which we carry through using sapply.
+    return(Diversity_jaccard_space(result))
+  }
+)
+```
+
+```{r, warning=FALSE}
+# Expect warnings since we have all 0 rows on occasion.
+JaccardTime <- sapply(
+  USE.NAMES = TRUE, simplify = FALSE,
+  Results, function(result) {
+    if (length(result) == 1 && is.na(result)) {
+      # Problem case.
+      return(NA)
+    }
+    print(paste("Calculating", Sys.time()))
+    
+    # Calculate the diversity.
+    # We will need to extract the system properties from
+    # the file names which we carry through using sapply.
+    return(Diversity_jaccard_time(result))
+    # Too many time points for calculations.
+    # Needs to have log(length(times)^2, base = 2) < 31.
+    # => length(times) < 46340 or so.
+  }
+)
+```
+
+```{r, eval=TRUE}
+SpeciesPresence <-  sapply(
+  USE.NAMES = TRUE, simplify = FALSE,
+  Results, function(result) {
+    if (length(result) == 1 && is.na(result)) {
+      # Problem case.
+      return(NA)
+    }
+    # print(paste("Calculating", Sys.time()))
+    
+    # Calculate the diversity.
+    # We will need to extract the system properties from
+    # the file names which we carry through using sapply.
+    return(Calculate_Species(result))
   }
 )
 ```
@@ -450,7 +633,12 @@ Properties <- Properties %>% dplyr::mutate(
   sep = "[.]"
 ) %>% dplyr::select(
   -Name, -.RData, -Env
-) 
+) %>% dplyr::mutate(
+  Distance = dplyr::case_when(
+    is.na(Distance) ~ "1e+00",
+    TRUE ~ Distance
+  )
+)
 ```
 
 ```{r}
@@ -463,6 +651,46 @@ Diversity <- lapply(1:length(Diversity),
                     df = Diversity,
                     nm = names(Diversity))
 ```
+
+```{r, warning=FALSE}
+JaccardSpace <- lapply(1:length(JaccardSpace),
+                    function(i, df, nm) {
+                      df[[i]] %>% dplyr::bind_rows(
+                        # Need to account for the by times...
+                        # Generates attribute warnings.
+                      ) %>% mutate(
+                        Simulation = nm[i]
+                      )
+                    }, 
+                    df = JaccardSpace,
+                    nm = names(JaccardSpace))
+```
+
+```{r, warning=FALSE}
+JaccardTime <- lapply(1:length(JaccardTime),
+                    function(i, df, nm) {
+                      df[[i]] %>% dplyr::bind_rows(
+                        # Need to account for the by envs...
+                        # Generates attribute warnings.
+                      ) %>% mutate(
+                        Simulation = nm[i]
+                      )
+                    }, 
+                    df = JaccardTime,
+                    nm = names(JaccardTime))
+```
+
+```{r, eval=TRUE}
+SpeciesPresence <- lapply(1:length(SpeciesPresence),
+                    function(i, df, nm) {
+                      df[[i]] %>% mutate(
+                        Simulation = nm[i]
+                      )
+                    }, 
+                    df = SpeciesPresence,
+                    nm = names(SpeciesPresence))
+```
+
 ```{r}
 Diversity <- dplyr::left_join(
   dplyr::bind_rows(Diversity),
@@ -470,7 +698,32 @@ Diversity <- dplyr::left_join(
   by = c("Simulation" = "FullName")
 )
 ```
+
 ```{r}
+JaccardSpace <- dplyr::left_join(
+  dplyr::bind_rows(JaccardSpace),
+  Properties,
+  by = c("Simulation" = "FullName")
+)
+```
+
+```{r}
+JaccardTime <- dplyr::left_join(
+  dplyr::bind_rows(JaccardTime),
+  Properties,
+  by = c("Simulation" = "FullName")
+)
+```
+
+```{r, eval=TRUE}
+SpeciesPresence <- dplyr::left_join(
+  dplyr::bind_rows(SpeciesPresence),
+  Properties,
+  by = c("Simulation" = "FullName")
+)
+```
+
+```{r, eval=FALSE}
 Diversity <- Diversity %>% dplyr::mutate(
   Distance = dplyr::case_when(
     is.na(Distance) ~ "1e+00",
@@ -727,6 +980,18 @@ ggplot2::ggplot(
     alpha = ifelse(Environment %in% c("3", "7", "Mean"), 1, 0.3)
   )
 ) + ggplot2::geom_line(
+) + ggplot2::geom_line(
+    data = Diversity %>% dplyr::filter(
+        Measurement == "BetaSpeciesMissing",
+        Environment != "Gamma",
+        Space != "Ring",
+        Environment != "Mean"
+    ) %>% dplyr::group_by(
+        Modifier, ModIntensity, Space, Distance, Time
+    ) %>% dplyr::summarise(
+        Environment = "Mean",
+        Value = mean(Value, na.rm = TRUE)
+    ), color = "black"
 ) + ggplot2::guides(
   alpha = "none"
 ) + ggplot2::scale_color_discrete(
@@ -745,30 +1010,42 @@ ggplot2::ggplot(
 #### $\alpha / \gamma$
 ```{r}
 ggplot2::ggplot(
-  Diversity %>% dplyr::filter(
-    Measurement == "BetaSpeciesPercentage",
-    Environment != "Gamma",
-    Space != "Ring",
-    Environment != "Mean"
-  ), 
-  ggplot2::aes(
-    x = Time,
-    y = Value,
-    color = factor(Environment),
-    alpha = ifelse(Environment %in% c("3", "7", "Mean"), 1, 0.3)
-  )
+    Diversity %>% dplyr::filter(
+        Measurement == "BetaSpeciesPercentage",
+        Environment != "Gamma",
+        Space != "Ring",
+        Environment != "Mean"
+    ), 
+    ggplot2::aes(
+        x = Time,
+        y = Value,
+        color = factor(Environment),
+        alpha = ifelse(Environment %in% c("3", "7", "Mean"), 1, 0.3)
+    )
 ) + ggplot2::geom_line(
+) + ggplot2::geom_line(
+    data = Diversity %>% dplyr::filter(
+        Measurement == "BetaSpeciesPercentage",
+        Environment != "Gamma",
+        Space != "Ring",
+        Environment != "Mean"
+    ) %>% dplyr::group_by(
+        Modifier, ModIntensity, Space, Distance, Time
+    ) %>% dplyr::summarise(
+        Environment = "Mean",
+        Value = mean(Value, na.rm = TRUE)
+    ), color = "black"
 ) + ggplot2::guides(
-  alpha = "none"
+    alpha = "none"
 ) + ggplot2::scale_color_discrete(
-  "Environment"
+    "Environment"
 ) + ggplot2::labs(
-  y = "Percentage Species Present", # en.wikipedia.org/wiki/Beta_diversity
-  x = paste0("Time, ", divide_time_by, " units"),
-  title = "Overview of Alpha/Gamma Richness over Time by System Properties",
-  caption = "Each row has the same arrival and extinction events."
+    y = "Percentage Species Present", # en.wikipedia.org/wiki/Beta_diversity
+    x = paste0("Time, ", divide_time_by, " units"),
+    title = "Overview of Alpha/Gamma Richness over Time by System Properties",
+    caption = "Each row has the same arrival and extinction events."
 ) + ggplot2::facet_grid(
-  Modifier + ModIntensity ~ Space + Distance
+    Modifier + ModIntensity ~ Space + Distance
 )
 # ggplot2::ggsave(overallbetapercent, filename = "MNA-BetaPercent-Overview.pdf", dpi = "retina", width = 11, height = 8)
 ```
@@ -796,11 +1073,19 @@ Diversity_AG <- dplyr::left_join(
     -Environment
   )
 ) %>% dplyr::mutate(
-  Distance = ifelse(is.na(Distance), "1e+00", Distance)
+  Distance = ifelse(is.na(Distance), 1, Distance)
+)
+
+Diversity_AG_Binned <- Diversity_AG %>% dplyr::mutate(
+    TimeFloor = floor(Time * 10) / 10
+) %>% dplyr::distinct(
+    Modifier, ModIntensity, Space, Distance, # Simulation/Facets
+    Environment, TimeFloor, # Grouping Bins
+    Value, Gamma # Values. If either moves, the trajectory entered a new square.
 )
 
 # ggplot2::ggplot(
-#   Diversity_AG %>% dplyr::filter(
+#   temp %>% dplyr::filter(
 #     Modifier == "Result",
 #     Space == "None",
 #     Environment != "Mean"
@@ -819,21 +1104,1214 @@ Diversity_AG <- dplyr::left_join(
 
 ```{r}
 ggplot2::ggplot(
-  Diversity_AG %>% dplyr::filter(
-    Environment != "Mean",
-    Space != "Ring"
-  ), ggplot2::aes(
-    x = Gamma,
-    y = Value
-  )
+    Diversity_AG %>% dplyr::filter(
+        Environment != "Mean",
+        Space != "Ring"
+    ), ggplot2::aes(
+        x = Value,
+        y = Gamma
+    )
 ) + ggplot2::geom_bin2d(
 ) + ggplot2::scale_fill_viridis_c(
-  trans = "log10"
+    trans = "log10"
+) + ggplot2::geom_point(
+    data = Diversity_AG %>% dplyr::filter(
+        Environment != "Mean",
+        Space != "Ring"
+    ) %>% dplyr::group_by(
+        Modifier, ModIntensity, Space, Distance
+    ) %>% dplyr::summarise(
+        Gamma = mean(Gamma, na.rm = TRUE),
+        Value = mean(Value, na.rm = TRUE)
+    ), color = "red", size = 2, shape = 4
 ) + ggplot2::labs(
-  x = "Gamma Richness",
-  y = "Alpha Richness"
+    x = "Alpha Richness",
+    y = "Gamma Richness"
+) + ggplot2::facet_grid(
+    Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::geom_abline(slope = 1, intercept = 0)
+# ggplot2::ggsave(overallalphagamma, filename = "MNA-AlphaGamma-Overview.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+```{r}
+ggplot2::ggplot(
+    Diversity_AG_Binned %>% dplyr::filter(
+        Environment != "Mean",
+        Space != "Ring"
+    ), ggplot2::aes(
+        x = Value,
+        y = Gamma
+    )
+) + ggplot2::geom_bin2d(
+) + ggplot2::scale_fill_viridis_c(
+    trans = "log10"
+) + ggplot2::geom_point(
+    data = Diversity_AG_Binned %>% dplyr::filter(
+        Environment != "Mean",
+        Space != "Ring"
+    ) %>% dplyr::group_by(
+        Modifier, ModIntensity, Space, Distance
+    ) %>% dplyr::summarise(
+        Gamma = mean(Gamma, na.rm = TRUE),
+        Value = mean(Value, na.rm = TRUE)
+    ), color = "red", size = 2, shape = 4
+) + ggplot2::labs(
+    x = "Alpha Richness",
+    y = "Gamma Richness",
+    subtitle = "Trajectories binned by time to equalise time steps."
+) + ggplot2::facet_grid(
+    Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::geom_abline(slope = 1, intercept = 0)
+# ggplot2::ggsave(overallalphagammabin, filename = "MNA-AlphaGammaBinned-Overview.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+```{r}
+ggplot2::ggplot( 
+    Diversity_AG_Binned %>% dplyr::filter(
+        Environment != "Mean",
+        Space != "Ring"
+    ) %>% dplyr::group_by(
+        Modifier, ModIntensity, Space, Distance
+    ) %>% dplyr::summarise(
+        Gamma = mean(Gamma, na.rm = TRUE),
+        Value = mean(Value, na.rm = TRUE)
+    ), 
+    ggplot2::aes(
+        x = Value,
+        y = Gamma,
+        color = interaction(Modifier, ModIntensity),
+        shape = interaction(Space, Distance)
+    )
+) + ggplot2::geom_point(
+    size = 2
+) + ggplot2::labs(
+    x = "Alpha Richness",
+    y = "Gamma Richness",
+    subtitle = "Trajectories binned by time to equalise time steps."
+) + ggplot2::geom_abline(slope = 1, intercept = 0)
+# ggplot2::ggsave(overallalphagammamean, filename = "MNA-AlphaGammaBinned-Means.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+#### Jaccard, Space
+
+```{r}
+ggplot2::ggplot(
+  JaccardSpace %>% dplyr::filter(Time > 3, Space != "Ring"),
+  ggplot2::aes(x = Time, y = Jaccard, 
+               color = interaction(Env1, Env2)
+  )
+) + ggplot2::geom_line(
+  alpha = 0.3
+) + ggplot2::geom_line(
+  data = JaccardSpace %>% dplyr::filter(Time > 3, Space != "Ring") %>% dplyr::group_by(
+    Time, Distance, Modifier, ModIntensity, Space
+  ) %>% dplyr::summarise(
+    Jaccard = mean(Jaccard, na.rm = TRUE)
+  ),
+  ggplot2::aes(
+    x = Time, y = Jaccard
+  ),
+  inherit.aes = FALSE, color = "black"
+) + ggplot2::facet_grid(
+    Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::guides(
+  color = "none"
+)
+```
+
+#### Jaccard, Time
+<!-- I think I should be able to do the 2dbin, but with a normalisation. Should be a nice experiment and easy result when I am more awake. -->
+<!-- Probably won't work as well as I had imagined unfortunately. We'll try the following. -->
+
+```{r}
+ggplot2::ggplot(
+  JaccardTime %>% dplyr::filter(
+    Space != "Ring"
+  ) %>% dplyr::group_by(
+    Environment, Distance, Space, Modifier, ModIntensity
+  ) %>% dplyr::mutate(
+    TimeDifference = Time2 - Time1
+  ),
+  ggplot2::aes(
+    x = TimeDifference,
+    y = Jaccard
+  )
+) + ggplot2::geom_bin2d(
+) + ggplot2::facet_grid(
+    Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::scale_fill_viridis_c(
+  trans = "log"
+)
+```
+
+```{r}
+ggplot2::ggplot(
+  JaccardTime %>% dplyr::filter(
+    Space != "Ring",
+    Space == "None",
+    Modifier == "Result"
+  ) %>% dplyr::group_by(
+    Environment, Distance, Space, Modifier, ModIntensity
+  ) %>% dplyr::mutate(
+    TimeDifference = Time2 - Time1
+  ),
+  ggplot2::aes(
+    x = TimeDifference,
+    y = Jaccard
+  )
+) + ggplot2::geom_bin2d(
+) + ggplot2::facet_wrap(
+    ~ Environment
+) + ggplot2::scale_fill_viridis_c(
+  trans = "log"
+)
+```
+
+### Species Presence
+
+```{r}
+# ggplot2::ggplot(
+#   SpeciesPresence %>% dplyr::filter(
+#     Space != "Ring",
+#     TimeFloor > 0.2 # Remove "burn-in" which has "impossibly" high presence. 
+#   ),
+#   ggplot2::aes(
+#     x = TimeFloor,
+#     y = Species
+#   )
+# ) + ggplot2::geom_bin2d(
+#   binwidth = c(0.1, 1)
+# ) + ggplot2::scale_fill_viridis_c(
+# )+ ggplot2::facet_grid(
+#   Modifier + ModIntensity ~ Space + Distance
+# )
+ggplot2::ggplot(
+  SpeciesPresence %>% dplyr::filter(
+    Space != "Ring"
+  ) %>% dplyr::group_by(
+    Modifier, ModIntensity, Space, Distance,
+    Species, Time
+  ) %>% dplyr::summarise(
+    Count = n()
+  ),
+  ggplot2::aes(x = Time, y = Species, color = Count)
+) + ggplot2::geom_point(
+  shape = '.'
+) + ggplot2::scale_color_viridis_c(
 ) + ggplot2::facet_grid(
   Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::geom_hline(
+  yintercept = 34.5, color = "red"
 )
-# ggplot2::ggsave(overallAlphaGamma, filename = "MNA-AlphaGamma-Overview.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+```{r}
+ggplot2::ggplot(
+  SpeciesPresence %>% dplyr::filter(
+    Space != "Ring"
+  ) %>% dplyr::group_by(
+    Modifier, ModIntensity, Space, Distance,
+    Species, Time
+  ) %>% dplyr::summarise(
+    Count = n()
+  ),
+  ggplot2::aes(x = Time, y = Species, color = Count)
+) + ggplot2::geom_point(
+  shape = '.'
+) + ggplot2::scale_color_viridis_c(
+  direction = -1
+) + ggplot2::facet_grid(
+  Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::geom_hline(
+  yintercept = 34.5, color = "red"
+)
+```
+
+```{r}
+# Brute forcing here because I would rather position myself to move on if possible.
+# This works because all of the pools are the same (except that the original does not use factors because stringsAsFactors differed between the machines generating the systems).
+# > all.equal(PoolsMats$`MNA-Ext10-PoolMats-Env10.RData`, PoolsMats$`MNA-Ext0.1-PoolMats-Env10.RData`)
+# [1] TRUE
+# > all.equal(PoolsMats$`MNA-Ext10-PoolMats-Env10.RData`, PoolsMats$`MNA-Arr0.1-PoolMats-Env10.RData`)
+# [1] TRUE
+# > all.equal(PoolsMats$`MNA-Ext10-PoolMats-Env10.RData`, PoolsMats$`MNA-Arr10-PoolMats-Env10.RData`)
+# [1] TRUE
+
+SpeciesPresence$Sizes <- PoolsMats$`MNA-FirstAttempt-PoolMats-Env10.RData`$Pool$Size[SpeciesPresence$Species]
+
+```
+
+```{r}
+ggplot2::ggplot(
+  SpeciesPresence %>% dplyr::filter(
+    Space != "Ring"
+  ) %>% dplyr::group_by(
+    Modifier, ModIntensity, Space, Distance,
+    Species, Time, Sizes
+  ) %>% dplyr::summarise(
+    Count = n()
+  ) %>% dplyr::arrange(
+    Sizes
+  ) %>% dplyr::ungroup(
+  ) %>% dplyr::mutate(
+    Species = factor(Species, levels = unique(Species))
+  ),
+  ggplot2::aes(x = Time, y = Species, color = Count)
+) + ggplot2::geom_point(
+  shape = '.'
+) + ggplot2::scale_color_viridis_c(
+) + ggplot2::facet_grid(
+  Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::geom_hline(
+  yintercept = 34.5, color = "red"
+)
+```
+
+### Species Abundance
+
+```{r}
+# ggplot2::ggplot(
+#   SpeciesPresence %>% dplyr::filter(
+#     Space != "Ring",
+#     TimeFloor > 0.2 # Remove "burn-in" which has "impossibly" high presence. 
+#   ),
+#   ggplot2::aes(
+#     x = TimeFloor,
+#     y = Abundance
+#   )
+# ) + ggplot2::geom_bin2d(
+# ) + ggplot2::scale_fill_viridis_c(
+# ) + ggplot2::facet_grid(
+#   Modifier + ModIntensity ~ Space + Distance
+# ) + ggplot2::scale_y_log10(
+# ) 
+ggplot2::ggplot(
+  SpeciesPresence %>% dplyr::filter(
+    Space != "Ring"
+  ) %>% dplyr::mutate(
+    Abundance = round(Abundance)
+  ) %>% dplyr::group_by(
+    Modifier, ModIntensity, Space, Distance,
+    Abundance, Time
+  ) %>% dplyr::summarise(
+    Count = n()
+  ),
+  ggplot2::aes(x = Time, y = Abundance, color = Count)
+) + ggplot2::geom_point(
+  shape = '.'
+) + ggplot2::scale_color_viridis_c(
+  trans = "log"
+) + ggplot2::facet_grid(
+  Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::scale_y_log10(
+)
+```
+
+
+### Species Sizes
+(Recall that there is a threshold above which we have consumers and below which we have producers. This will be denoted with a bright line at the threshold.)
+
+```{r}
+# ggplot2::ggplot(
+#   SpeciesPresence %>% dplyr::filter(
+#     Space != "Ring",
+#     TimeFloor > 0.2 # Remove "burn-in" which has "impossibly" high presence. 
+#   ),
+#   ggplot2::aes(
+#     x = TimeFloor,
+#     y = Sizes
+#   )
+# ) + ggplot2::geom_bin2d(
+#   binwidth = c(0.1, 0.03)
+# ) + ggplot2::scale_fill_viridis_c(
+# ) + ggplot2::facet_grid(
+#   Modifier + ModIntensity ~ Space + Distance
+# ) + ggplot2::scale_y_log10(
+# ) + ggplot2::geom_hline(
+#   yintercept = 0.1, color = "red"
+# )
+
+ggplot2::ggplot(
+  SpeciesPresence %>% dplyr::filter(
+    Space != "Ring"
+  ) %>% dplyr::group_by(
+    Modifier, ModIntensity, Space, Distance,
+    Sizes, Time
+  ) %>% dplyr::summarise(
+    Count = n()
+  ),
+  ggplot2::aes(x = Time, y = Sizes, color = Count)
+) + ggplot2::geom_point(
+  shape = '.'
+) + ggplot2::scale_color_viridis_c(
+) + ggplot2::facet_grid(
+  Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::geom_hline(
+  yintercept = 0.1, color = "red"
+) + ggplot2::scale_y_log10(
+)
+```
+
+Compare with the distribution of traits amongst species.
+```{r}
+ggplot2::ggplot(
+  PoolsMats$`MNA-FirstAttempt-PoolMats-Env10.RData`$Pool,
+  ggplot2::aes(
+    x = Size,
+    fill = Type
+  )
+) + ggplot2::geom_histogram(#ggplot2::geom_density(
+  #alpha = 0.5, adjust = 1/10
+  bins = 100
+) + ggplot2::scale_x_log10() + ggplot2::coord_flip()
+```
+
+## Events {.tabset} 
+
+### Preparation
+
+```{r}
+Calculate_Events <- function(result, abundanceTime = divide_time_by, thinning = by_for_thinning) {
+  abund <- result$Abundance
+  abund[, -1] <- abund[, -1] > 0 # Presence-Absence
+  abundDiff <- apply(abund[, -1], 2, diff) 
+  # Arrival (1) Elimination (-1)
+  # if arrival at time 93,
+  # 92nd entry is 1.
+  abundDiff <- cbind(
+    abund[-1, 1] * abundanceTime, abundDiff
+  )
+  
+  Events <- lapply(
+    1:ncol(abundDiff[, -1]),
+    function(i, ab, tm, sp) {
+      arrivals <- which(ab[, i] == 1)
+      extincts <- which(ab[, i] == -1)
+      
+      if (length(arrivals) + length(extincts) == 0) {
+        return(NULL)
+      } 
+      
+      data.frame(
+        Times = c(tm[arrivals], tm[extincts]),
+        Species = ((i - 1) %% sp) + 1, # 1:1000 -> 1:100
+        Environment = ((i - 1) %/% sp) + 1,
+        Type = c(rep("Arrival", length(arrivals)),
+                  rep("Extinct", length(extincts))),
+        stringsAsFactors = FALSE
+      )
+    },
+    ab = abundDiff[, -1],
+    tm = abundDiff[, 1],
+    sp = ncol(abundDiff[, -1]) / result$NumEnvironments#,
+    #ne = result$NumEnvironments
+  ) %>% dplyr::bind_rows(
+  ) %>% dplyr::arrange(
+    Times, Species, Environment, Type
+  )
+  
+  # Now we check to see which events are in the record.
+  # Note that, due to thinning, we do have a theoretical
+  # problem: an event time might be misrecorded when
+  # extracted from the abundance record.
+  # Hence we cannot just use filtering join operations.
+  # Since we know the maximum time step size and the
+  # thinning, we know that we should detect a change
+  # within (thinning) * (max. time step size) units.
+  maximumGap <- thinning * result$Parameters$MaximumTimeStep
+  
+  result$Events$Type <- as.character(result$Events$Type)
+  
+  # Connect all same event, even with different times.
+  # Remove those that cannot be the same event.
+  # Treat this as the list of Neutral Events that
+  # actually happened.
+  EventsOfficial <- result$Events %>% dplyr::left_join(
+    Events, 
+    by = c("Species", "Environment", "Type")
+  ) %>% dplyr::mutate(
+    # dplyr::filter( # Filtering does not work.
+    # We are seeing losses of about 50% with filter.
+    # "Rows in x with no match in y will have NA values in the new columns." 
+    # -> Times.y will be NA.
+    # Times.y is the detected time.
+    # Times.x is the recorded action's time.
+    # Note that we can get false readings from subtracting two almost the same 
+    # numbers, so we need to appeal to machine precision. 
+    # See all.equal's tolerance argument.
+    `Times.y` = dplyr::case_when(
+      is.na(`Times.y`) ~ as.double(NA),
+      (
+      `Times.y` - `Times.x` < maximumGap + sqrt(.Machine$double.eps) & 
+        `Times.y` - `Times.x` >= -sqrt(.Machine$double.eps)) ~ `Times.y`,
+      TRUE ~ as.double(NA)
+    )
+  ) %>% dplyr::group_by(
+    `Times.x`, Species, Environment, Type, Success
+    # Don't discard Success, others are true groups.
+    # We want to preserve the first `Times.y`
+    # (in case an event happens multiple times)
+    # but if there are no numerics,
+    # we instead want to keep one of the NAs.
+  ) %>% dplyr::summarise(
+    `Times.y` = if (length(na.omit(`Times.y`)) == 0) NA else min(`Times.y`, na.rm = TRUE)
+  ) %>% dplyr::ungroup(
+  ) %>% dplyr::rename(
+    TimeImplemented = `Times.x`,
+    TimeDetected = `Times.y`
+  )
+  
+  # Events that were not detected but were successful.
+  # If this is the case, something happened and was 
+  # undone in the same timespan.
+  # This might happen due to arrivals from adjacent 
+  # patches.
+  # I.e. elimination coinciding with arrival or 
+  # arrival being too dissipated by dispersal.
+  # This probably shouldn't happen in the disconnected system.
+  EventsNotDetected <- EventsOfficial %>% dplyr::filter(
+    is.na(TimeDetected), Success == TRUE
+  # ) %>% dplyr::select(
+  #   -`Times.y`
+  # ) %>% dplyr::rename(
+  #   Times = `Times.x`
+  ) %>% dplyr::mutate(
+    Neutral = TRUE,
+    Detected = FALSE
+  )
+  
+  # Events that were detected and were successful. 'True Positives'
+  # We recorded them as having happened in Events and Abundance.
+  # These are also Neutral with high probability.
+  EventsDetected <- EventsOfficial %>% dplyr::filter(
+    !is.na(TimeDetected), Success == TRUE
+    # ) %>% dplyr::select(
+    # # We keep Times.y for comparison with Events.
+    #   -`Times.x`
+    # ) %>% dplyr::rename(
+    #   Times = `Times.y`
+    ) %>% dplyr::mutate(
+      Neutral = TRUE,
+      Detected = TRUE
+    )
+  
+  # Events that were not detected and were not successful. 'True Negatives'
+  # Also Events that were detected and were not successful. 'False Positives'?
+  # The detection must be of a different event if the event
+  # we recorded was unsuccessful after all.
+  EventsFailed <- EventsOfficial %>% dplyr::filter(
+    #is.na(`Times.y`), 
+    Success != TRUE
+    # ) %>% dplyr::select(
+    #   -`Times.y`
+    # ) %>% dplyr::rename(
+    #   Times = `Times.x`
+    ) %>% dplyr::mutate(
+      Neutral = TRUE,
+      Detected = FALSE
+    )
+  
+  # So we have events that were detected but not successful.
+  # Such events should probably be listed twice: 
+  #   once as neutral (the failure, above)
+  #   once as non-neutral (the detected event, below).
+  # (Note Events are from abundance and thus detected.)
+  EventsNotOfficial <- Events %>% dplyr::rename(
+    TimeDetected = Times
+  ) %>% dplyr::anti_join(
+    EventsDetected, by = c("TimeDetected", "Species", "Environment", "Type")
+  )  %>% dplyr::mutate(
+    Success = TRUE,
+    Neutral = FALSE,
+    Detected = TRUE
+  ) 
+  
+  # The remainder of event space is events that are
+  # not neutral and not successful or 
+  # events that were not implemented.
+  
+  # Note then that, if everything went well
+  stopifnot(nrow(EventsNotOfficial) + nrow(EventsDetected) == nrow(Events),
+            nrow(EventsDetected) + nrow(EventsFailed) + nrow(EventsNotDetected) == nrow(result$Events))
+
+  return(dplyr::bind_rows(
+    EventsDetected,
+    EventsNotDetected,
+    EventsFailed,
+    EventsNotOfficial
+  ) %>% dplyr::mutate(
+    Times = dplyr::case_when(
+      !is.na(TimeImplemented) ~ TimeImplemented,
+      !is.na(TimeDetected) ~ TimeDetected
+    )
+  ) %>% dplyr::arrange(Times, Environment, Species, Type))
+}
+```
+```{r, eval=TRUE}
+Events <-  sapply(
+  USE.NAMES = TRUE, simplify = FALSE,
+  Results, function(result) {
+    if (length(result) == 1 && is.na(result)) {
+      # Problem case.
+      return(NA)
+    }
+    # print(paste("Calculating", Sys.time()))
+    
+    # Calculate the diversity.
+    # We will need to extract the system properties from
+    # the file names which we carry through using sapply.
+    return(Calculate_Events(result))
+  }
+)
+```
+
+```{r}
+Events <- lapply(1:length(Events),
+                    function(i, df, nm) {
+                      df[[i]] %>% mutate(
+                        Simulation = nm[i]
+                      )
+                    }, 
+                    df = Events,
+                    nm = names(Events))
+```
+
+```{r}
+EventsSuccesses <- lapply(Events, function(Event) {
+  Event %>% dplyr::filter(
+    Success == TRUE
+  ) %>% dplyr::group_by(
+    Environment
+  ) %>% dplyr::arrange(
+    Times
+  ) %>% dplyr::mutate(
+    InterarrivalTime = Times - lag(Times), 
+    Dynamic = !Neutral, 
+    Sequence = cumsum(Neutral)
+  ) %>% dplyr::group_by(
+    Environment, Sequence
+  ) %>% dplyr::mutate(
+    EventInSequence = cumsum(Dynamic)
+  )
+}) 
+```
+
+```{r}
+Events <- lapply(Events, function(Event) {
+  Event %>% dplyr::group_by(
+    Environment
+  ) %>% dplyr::arrange(
+    Times
+  ) %>% dplyr::mutate(
+    InterarrivalTime = Times - lag(Times), 
+    Dynamic = !Neutral, 
+    Sequence = cumsum(Neutral)
+  ) %>% dplyr::group_by(
+    Environment, Sequence
+  ) %>% dplyr::mutate(
+    EventInSequence = cumsum(Dynamic)
+  )
+}) 
+```
+
+```{r}
+Events <- dplyr::left_join(
+  dplyr::bind_rows(Events),
+  Properties,
+  by = c("Simulation" = "FullName")
+)
+```
+
+```{r}
+EventsSuccesses <- dplyr::left_join(
+  dplyr::bind_rows(EventsSuccesses),
+  Properties,
+  by = c("Simulation" = "FullName")
+)
+```
+
+```{r, eval=FALSE}
+Events <- Events %>% dplyr::mutate(
+  Distance = dplyr::case_when(
+    is.na(Distance) ~ "1e+00",
+    TRUE ~ Distance
+  )
+)
+```
+
+```{r, eval=FALSE}
+EventsSuccesses <- EventsSuccesses %>% dplyr::mutate(
+  Distance = dplyr::case_when(
+    is.na(Distance) ~ "1e+00",
+    TRUE ~ Distance
+  )
+)
+```
+
+<!--
+
+### Analysis {.tabset}
+
+#### Setup and Neutrality
+First, some notes.
+All neutral events are, at this point, generated from exponential distributions with uniformly at random with replacement selection from the possible environments and species.
+The number of arrival and extinction events are fixed but all events are otherwise generated independently of each other.
+The rate for arrival events and rate for extinction events are both fixed ahead of time and can vary. They have been coupled to the characteristic time of the largest perturbation of the interaction matrices and are either that value (default) or a factor of ten bigger or smaller than that value.
+
+By the nature of the setup, we should expect that the full list of events will behave as a combination of exponential distributions does.
+It is well-known that the minimum of exponentials is an exponential with rate equal to the sum of the rates.
+Further we are exploiting the memorylessness to repeatedly draw from the distribution, so this rate can be thought of as preserved throughout.
+
+Our plan is thus to fit the neutral distributions, see how they are filtered through the ecological dynamics, and then see how the final event times including both neutral and non-neutral events compare.
+
+--> 
+```{r, eval=FALSE}
+# Retrieve the Characteristic Rate used.
+# Since all of the Pools and Matrices are the same, they all have the same characteristic rate.
+# There is a fudge here. Looking back at the code, the first matrix was used, rather than looking over all of the matrices, but we note that the results are essentially the same.
+# Perhaps something to be more careful of for the next round of simulations...
+CharacteristicRate <- max(abs(eigen(PoolsMats[[1]]$InteractionMatrices$Mats[[1]])$values))
+```
+
+<!-- Note that, while considering arrivals and extinctions together, we will need to double the characteristic rate. 
+
+An example analysis of skewness and kurtosis of the inter-event times: -->
+```{r, eval=FALSE}
+set.seed(1)
+exampleData <- Events[[2]] %>% dplyr::filter(Neutral) %>% dplyr::arrange(Times) %>% pull(Times) %>% diff
+fitdistrplus::descdist(exampleData, boot = 100)
+```
+
+<!--clearly a beta distribution is inappropriate, but we do see that Weibull, gamma, and exponential distributions seem like they could be appropriate.
+On the other hand, just as the beta distribution lacks appropriate support, so too does the gamma (we have a few effectively 0's).
+For the latter, we may have to try replacing our 0's.
+Of course, it is worth noting that exponential distributions lie on the boundary with heavy-tailed distributions, so it might make sense to try power law distributions, although it does not seem terribly consistent with a log-normal distribution.
+This motivates the usage of the `poweRlaw` package, which contains functions derived from Clauset, Shalizi and Newman's work on fitting power law distributions.
+We will use `fitdistrplus` for non-heavy tailed distributions and `poweRlaw` for the heavy-tailed distributions.
+Note that we need to use the same data to make good comparisons.
+While the exponential can be fit to a data set with 0's, the gamma and Weibull (and `poweRlaw` package distributions) cannot, so we replace 0's with machine precision.
+(WARNING: the `poweRlaw` package can be quite time intensive for fitting. Caution is advised.) -->
+
+```{r, eval=FALSE}
+censData <- ifelse(exampleData == 0, .Machine$double.eps, exampleData)
+exampleFitsNotHeavy <- list(
+  exp = fitdistrplus::fitdist(censData, "exp", method = "mle"),
+  gamma = fitdistrplus::fitdist(censData, 
+                              "gamma", method = "mle"),
+  weibull = fitdistrplus::fitdist(censData, 
+                              "weibull", method = "mle")
+)
+```
+```{r, eval=FALSE}
+exampleFitsHeavy <- lapply(
+    c(poweRlaw::conexp, poweRlaw::conlnorm, poweRlaw::conpl, poweRlaw::conweibull), function(f) {f$new(censData)}
+)
+
+exampleFitsHeavy <- lapply(
+  exampleFitsHeavy, 
+  function(d) {
+    d$setXmin(poweRlaw::estimate_xmin(d, xmax = Inf))
+    d
+    } 
+)
+  
+names(exampleFitsHeavy) <- c("exp", "lnorm", "pl", "weibull")
+```
+
+<!--
+Taking a quick look at goodness-of-fit statistics, we actually find that we cannot reject any of the distributions out of hand (despite knowing the truth is exponential).
+It is worth noting that the BIC seems to predict the true model, but the AIC does not (which, from what I recall, is expected. The AIC is meant to identify the best predictive model rather than the true model, assuming that the true model is in the set of models compared. BIC is meant to identify the model most likely to be true, on the other hand).
+-->
+
+```{r, eval=FALSE}
+fitdistrplus::gofstat(exampleFitsNotHeavy)
+```
+
+<!--Due to a slightly different optimisation procedure it seems, the `gamlss` package actually prefers a gamma distribution for the data, albeit with a shape parameter that is nearly 1.  We do suppress warnings for any of the errors that might come from the large number of distributions fitted by the package. -->
+
+```{r, warning=FALSE, error=FALSE, message=FALSE, eval=FALSE}
+quiet(exampleData_gamlss <- gamlss::fitDist(exampleData))
+exampleData_gamlss
+```
+
+```{r, warning=FALSE, error=FALSE, message=FALSE, eval=FALSE}
+quiet(censData_gamlss <- gamlss::fitDist(censData))
+exampleData_gamlss
+```
+
+<!--Interestingly, the `poweRlaw` packages all identify the 'heavy tail' as beginning fairly far away from the actual starting point (since all the data is effectively tail) except for the Weibull. -->
+
+```{r, eval=FALSE}
+exampleFitsHeavy
+```
+
+<!-- 
+Since we are not trying to fit a tail only here, the `poweRlaw` methods are not technically fit for purpose, but it might be helpful in the other data sets.
+The usual workflow is determining that the tail has some behaviour one wishes to describe, followed by fitting some distributions, determining if their fits are rejected, and then comparing them over shared ranges.
+This is computationally difficult in practice (in R at least) so we do not do so here.
+
+#### Successful Neutral
+
+#### Unsuccessful Neutral
+
+#### Detected Non-neutral
+
+#### Burstiness of Successes
+
+-->
+
+### Plots {.tabset}
+
+#### Full x Range {.tabset}
+
+##### All Events, By Number in Sequence, Time by Environment
+
+```{r, warning=FALSE}
+ggplot2::ggplot(
+    Events %>% dplyr::filter(
+        Space != "Ring"
+    ),
+    ggplot2::aes(
+        x = InterarrivalTime,
+        fill = factor(EventInSequence)
+    )
+) + ggplot2::geom_density(
+  alpha = 0.25
+) + ggplot2::scale_fill_viridis_d(
+  "Event #"
+) + ggplot2::facet_grid(
+    Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::scale_x_log10() #-> environmenteventssequence
+# ggplot2::ggsave(environmenteventssequence, filename = "MNA-EventEnvironmentArrivalTimes-Sequence.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+##### All Events, By Neutral/Dynamic, Time by Environment
+
+```{r, warning=FALSE}
+ggplot2::ggplot(
+    Events %>% dplyr::filter(
+        Space != "Ring"
+    ),
+    ggplot2::aes(
+        x = InterarrivalTime,
+        fill = Neutral
+    )
+) + ggplot2::geom_density(
+  alpha = 0.25
+) + ggplot2::scale_fill_viridis_d(
+) + ggplot2::facet_grid(
+    Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::scale_x_log10() #-> environmenteventsneutral
+# ggplot2::ggsave(environmenteventsneutral, filename = "MNA-EventEnvironmentArrivalTimes-Overview.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+##### All Events, By Number in Sequence, Overall Time
+
+```{r, warning=FALSE}
+Events %>% dplyr::group_by(
+    Simulation, Iter, Distance, 
+    Modifier, ModIntensity, Environments, Space
+) %>% dplyr::arrange(
+    Times
+) %>% dplyr::mutate(
+    InterarrivalTime = Times - lag(Times), 
+    Dynamic = !Neutral, 
+    Sequence = cumsum(Neutral)
+) %>% dplyr::group_by(
+    Environment, Sequence
+) %>% dplyr::mutate(
+    EventInSequence = cumsum(Dynamic)
+) %>% dplyr::filter(
+    Space != "Ring"
+) %>% ggplot2::ggplot(ggplot2::aes(
+    x = InterarrivalTime,
+    fill = factor(EventInSequence)
+)
+) + ggplot2::geom_density(
+    alpha = 0.25
+) + ggplot2::scale_fill_viridis_d(
+  "Event #"
+) + ggplot2::facet_grid(
+    Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::scale_x_log10() + ggplot2::coord_cartesian(ylim = c(0, 2)) # -> overalleventssequence
+# ggplot2::ggsave(overalleventssequence, filename = "MNA-EventOverallArrivalTimes-Sequence.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+##### All Events, By Neutral/Dynamics, Overall Time
+
+```{r, warning=FALSE}
+Events %>% dplyr::group_by(
+    Simulation, Iter, Distance, 
+    Modifier, ModIntensity, Environments, Space
+) %>% dplyr::arrange(
+    Times
+) %>% dplyr::mutate(
+    InterarrivalTime = Times - lag(Times), 
+    Dynamic = !Neutral, 
+    Sequence = cumsum(Neutral)
+) %>% dplyr::group_by(
+    Environment, Sequence
+) %>% dplyr::mutate(
+    EventInSequence = cumsum(Dynamic)
+) %>% dplyr::filter(
+    Space != "Ring"
+) %>% ggplot2::ggplot(ggplot2::aes(
+    x = InterarrivalTime,
+    fill = Neutral
+)
+) + ggplot2::geom_density(
+    alpha = 0.25
+) + ggplot2::scale_fill_viridis_d(
+) + ggplot2::facet_grid(
+    Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::scale_x_log10() # -> overalleventsneutral
+# ggplot2::ggsave(overalleventsneutral, filename = "MNA-EventOverallArrivalTimes-Overview.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+##### Successful Events, By Number in Sequence, Time by Environment
+
+```{r, warning=FALSE}
+ggplot2::ggplot(
+    EventsSuccesses %>% dplyr::filter(
+        Space != "Ring"
+    ),
+    ggplot2::aes(
+        x = InterarrivalTime,
+        fill = factor(EventInSequence)
+    )
+) + ggplot2::geom_density(
+  alpha = 0.25
+) + ggplot2::scale_fill_viridis_d(
+  "Event #"
+) + ggplot2::facet_grid(
+    Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::scale_x_log10(
+) + ggplot2::coord_cartesian(
+  ylim = c(0, 2)
+) #-> environmenteventssuccesssequence
+# ggplot2::ggsave(environmenteventssuccesssequence, filename = "MNA-EventSuccessEnvironmentArrivalTimes-Sequence.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+##### Successful Events, By Neutral/Dynamics, Time by Environment
+
+```{r, warning=FALSE}
+ggplot2::ggplot(
+    EventsSuccesses %>% dplyr::filter(
+        Space != "Ring"
+    ),
+    ggplot2::aes(
+        x = InterarrivalTime,
+        fill = Neutral
+    )
+) + ggplot2::geom_density(
+  alpha = 0.25
+) + ggplot2::scale_fill_viridis_d(
+) + ggplot2::facet_grid(
+    Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::scale_x_log10() #-> environmenteventssuccessneutral
+# ggplot2::ggsave(environmenteventssuccessneutral, filename = "MNA-EventSuccessEnvironmentArrivalTimes-Overview.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+##### Successful Events, By Number in Sequence, Overall Time
+
+```{r, warning=FALSE}
+EventsSuccesses %>% dplyr::group_by(
+    Simulation, Iter, Distance, 
+    Modifier, ModIntensity, Environments, Space
+) %>% dplyr::arrange(
+    Times
+) %>% dplyr::mutate(
+    InterarrivalTime = Times - lag(Times), 
+    Dynamic = !Neutral, 
+    Sequence = cumsum(Neutral)
+) %>% dplyr::group_by(
+    Environment, Sequence
+) %>% dplyr::mutate(
+    EventInSequence = cumsum(Dynamic)
+) %>% dplyr::filter(
+    Space != "Ring"
+) %>% ggplot2::ggplot(ggplot2::aes(
+    x = InterarrivalTime,
+    fill = factor(EventInSequence)
+)
+) + ggplot2::geom_density(
+    alpha = 0.25
+) + ggplot2::scale_fill_viridis_d(
+  "Event #"
+) + ggplot2::facet_grid(
+    Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::scale_x_log10() + ggplot2::coord_cartesian(ylim = c(0, 2)) # -> overalleventssuccesssequence
+# ggplot2::ggsave(overalleventssuccesssequence, filename = "MNA-EventSuccessOverallArrivalTimes-Sequence.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+##### Successful Events, By Neutral/Dynamics, Overall Time
+
+```{r, warning=FALSE}
+EventsSuccesses %>% dplyr::group_by(
+    Simulation, Iter, Distance, 
+    Modifier, ModIntensity, Environments, Space
+) %>% dplyr::arrange(
+    Times
+) %>% dplyr::mutate(
+    InterarrivalTime = Times - lag(Times), 
+    Dynamic = !Neutral, 
+    Sequence = cumsum(Neutral)
+) %>% dplyr::group_by(
+    Environment, Sequence
+) %>% dplyr::mutate(
+    EventInSequence = cumsum(Dynamic)
+) %>% dplyr::filter(
+    Space != "Ring"
+) %>% ggplot2::ggplot(ggplot2::aes(
+    x = InterarrivalTime,
+    fill = Neutral
+)
+) + ggplot2::geom_density(
+    alpha = 0.25
+) + ggplot2::scale_fill_viridis_d(
+) + ggplot2::facet_grid(
+    Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::scale_x_log10() # -> overalleventssuccessneutral
+# ggplot2::ggsave(overalleventssuccessneutral, filename = "MNA-EventSuccessOverallArrivalTimes-Overview.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+#### Trunc. x Range {.tabset}
+
+##### All Events, By Number in Sequence, Time by Environment
+
+```{r, warning=FALSE}
+ggplot2::ggplot(
+    Events %>% dplyr::filter(
+        Space != "Ring"
+    ),
+    ggplot2::aes(
+        x = InterarrivalTime,
+        fill = factor(EventInSequence)
+    )
+) + ggplot2::geom_density(
+  alpha = 0.25
+) + ggplot2::scale_fill_viridis_d(
+  "Event #"
+) + ggplot2::facet_grid(
+    Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::scale_x_log10(
+) + ggplot2::coord_cartesian(
+  xlim = c(1e-1, 1e4)
+) #-> environmenteventssequence
+# ggplot2::ggsave(environmenteventssequence, filename = "MNA-EventEnvironmentArrivalTimes-Sequence.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+
+##### All Events, By Neutral/Dynamic, Time by Environment
+
+```{r, warning=FALSE}
+ggplot2::ggplot(
+    Events %>% dplyr::filter(
+        Space != "Ring"
+    ),
+    ggplot2::aes(
+        x = InterarrivalTime,
+        fill = Neutral
+    )
+) + ggplot2::geom_density(
+  alpha = 0.25
+) + ggplot2::scale_fill_viridis_d(
+) + ggplot2::facet_grid(
+    Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::scale_x_log10(
+) + ggplot2::coord_cartesian(
+  xlim = c(1e-1, 1e4)
+) #-> environmenteventsneutral
+# ggplot2::ggsave(environmenteventsneutral, filename = "MNA-EventEnvironmentArrivalTimes-Overview.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+
+##### All Events, By Number in Sequence, Overall Time
+
+```{r, warning=FALSE}
+Events %>% dplyr::group_by(
+    Simulation, Iter, Distance, 
+    Modifier, ModIntensity, Environments, Space
+) %>% dplyr::arrange(
+    Times
+) %>% dplyr::mutate(
+    InterarrivalTime = Times - lag(Times), 
+    Dynamic = !Neutral, 
+    Sequence = cumsum(Neutral)
+) %>% dplyr::group_by(
+    Environment, Sequence
+) %>% dplyr::mutate(
+    EventInSequence = cumsum(Dynamic)
+) %>% dplyr::filter(
+    Space != "Ring"
+) %>% ggplot2::ggplot(ggplot2::aes(
+    x = InterarrivalTime,
+    fill = factor(EventInSequence)
+)
+) + ggplot2::geom_density(
+    alpha = 0.25
+) + ggplot2::scale_fill_viridis_d(
+  "Event #"
+) + ggplot2::facet_grid(
+    Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::scale_x_log10(
+) + ggplot2::coord_cartesian(
+  xlim = c(1e-1, 1e4),
+  ylim = c(0, 2)
+) # -> overalleventssequence
+# ggplot2::ggsave(overalleventssequence, filename = "MNA-EventOverallArrivalTimes-Sequence.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+##### All Events, By Neutral/Dynamics, Overall Time
+
+```{r, warning=FALSE}
+Events %>% dplyr::group_by(
+    Simulation, Iter, Distance, 
+    Modifier, ModIntensity, Environments, Space
+) %>% dplyr::arrange(
+    Times
+) %>% dplyr::mutate(
+    InterarrivalTime = Times - lag(Times), 
+    Dynamic = !Neutral, 
+    Sequence = cumsum(Neutral)
+) %>% dplyr::group_by(
+    Environment, Sequence
+) %>% dplyr::mutate(
+    EventInSequence = cumsum(Dynamic)
+) %>% dplyr::filter(
+    Space != "Ring"
+) %>% ggplot2::ggplot(ggplot2::aes(
+    x = InterarrivalTime,
+    fill = Neutral
+)
+) + ggplot2::geom_density(
+    alpha = 0.25
+) + ggplot2::scale_fill_viridis_d(
+) + ggplot2::facet_grid(
+    Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::scale_x_log10(
+) + ggplot2::coord_cartesian(
+  xlim = c(1e-1, 1e4)
+) # -> overalleventsneutral
+# ggplot2::ggsave(overalleventsneutral, filename = "MNA-EventOverallArrivalTimes-Overview.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+##### Successful Events, By Number in Sequence, Time by Environment
+
+```{r, warning=FALSE}
+ggplot2::ggplot(
+    EventsSuccesses %>% dplyr::filter(
+        Space != "Ring"
+    ),
+    ggplot2::aes(
+        x = InterarrivalTime,
+        fill = factor(EventInSequence)
+    )
+) + ggplot2::geom_density(
+  alpha = 0.25
+) + ggplot2::scale_fill_viridis_d(
+  "Event #"
+) + ggplot2::facet_grid(
+    Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::scale_x_log10(
+) + ggplot2::coord_cartesian(
+  xlim = c(1e-1, 1e4),
+  ylim = c(0, 2)
+) #-> environmenteventssuccesssequence
+# ggplot2::ggsave(environmenteventssuccesssequence, filename = "MNA-EventSuccessEnvironmentArrivalTimes-Sequence.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+
+##### Successful Events, By Neutral/Dynamics, Time by Environment
+
+```{r, warning=FALSE}
+ggplot2::ggplot(
+    EventsSuccesses %>% dplyr::filter(
+        Space != "Ring"
+    ),
+    ggplot2::aes(
+        x = InterarrivalTime,
+        fill = Neutral
+    )
+) + ggplot2::geom_density(
+  alpha = 0.25
+) + ggplot2::scale_fill_viridis_d(
+) + ggplot2::facet_grid(
+    Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::scale_x_log10(
+) + ggplot2::coord_cartesian(
+  xlim = c(1e-1, 1e4)
+) #-> environmenteventssuccessneutral
+# ggplot2::ggsave(environmenteventssuccessneutral, filename = "MNA-EventSuccessEnvironmentArrivalTimes-Overview.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+##### Successful Events, By Number in Sequence, Overall Time
+
+```{r, warning=FALSE}
+EventsSuccesses %>% dplyr::group_by(
+    Simulation, Iter, Distance, 
+    Modifier, ModIntensity, Environments, Space
+) %>% dplyr::arrange(
+    Times
+) %>% dplyr::mutate(
+    InterarrivalTime = Times - lag(Times), 
+    Dynamic = !Neutral, 
+    Sequence = cumsum(Neutral)
+) %>% dplyr::group_by(
+    Environment, Sequence
+) %>% dplyr::mutate(
+    EventInSequence = cumsum(Dynamic)
+) %>% dplyr::filter(
+    Space != "Ring"
+) %>% ggplot2::ggplot(ggplot2::aes(
+    x = InterarrivalTime,
+    fill = factor(EventInSequence)
+)
+) + ggplot2::geom_density(
+    alpha = 0.25
+) + ggplot2::scale_fill_viridis_d(
+  "Event #"
+) + ggplot2::facet_grid(
+    Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::scale_x_log10(
+) + ggplot2::coord_cartesian(
+  xlim = c(1e-1, 1e4),
+  ylim = c(0, 2)
+) # -> overalleventssuccesssequence
+# ggplot2::ggsave(overalleventssuccesssequence, filename = "MNA-EventSuccessOverallArrivalTimes-Sequence.pdf", dpi = "retina", width = 11, height = 8)
+```
+
+
+##### Successful Events, By Neutral/Dynamics, Overall Time
+
+```{r,warning=FALSE}
+EventsSuccesses %>% dplyr::group_by(
+    Simulation, Iter, Distance, 
+    Modifier, ModIntensity, Environments, Space
+) %>% dplyr::arrange(
+    Times
+) %>% dplyr::mutate(
+    InterarrivalTime = Times - lag(Times), 
+    Dynamic = !Neutral, 
+    Sequence = cumsum(Neutral)
+) %>% dplyr::group_by(
+    Environment, Sequence
+) %>% dplyr::mutate(
+    EventInSequence = cumsum(Dynamic)
+) %>% dplyr::filter(
+    Space != "Ring"
+) %>% ggplot2::ggplot(ggplot2::aes(
+    x = InterarrivalTime,
+    fill = Neutral
+)
+) + ggplot2::geom_density(
+    alpha = 0.25
+) + ggplot2::scale_fill_viridis_d(
+) + ggplot2::facet_grid(
+    Modifier + ModIntensity ~ Space + Distance
+) + ggplot2::scale_x_log10(
+) + ggplot2::coord_cartesian(
+  xlim = c(1e-1, 1e4)
+) # -> overalleventssuccessneutral
+# ggplot2::ggsave(overalleventssuccessneutral, filename = "MNA-EventSuccessOverallArrivalTimes-Overview.pdf", dpi = "retina", width = 11, height = 8)
 ```
