@@ -499,6 +499,7 @@ MultipleNumericalAssembly_Dispersal <- function(
   # Otherwise, should be of length nrow(Pool) * NumEnvironments, ordered as
   # each species by environment: (Env 1 Spe 1) (Env 1 Spe 2)... (Env 2 Spe 1)...
 
+  TimeInitial = NULL,
   MaximumTimeStep = 1, # Maximum time solver can proceed without elimination.
   BetweenEventSteps = 10, # Number of steps to reach next event to smooth.
   # Otherwise, we can use seeds equal to the number of environments
@@ -556,6 +557,11 @@ MultipleNumericalAssembly_Dispersal <- function(
       HistorySeed = HistorySeed
     )
 
+  if(!is.null(TimeInitial)) {
+    eventsToKeep <- Events$Events$Times >= TimeInitial
+    Events$Events <- Events$Events[eventsToKeep, ]
+  }
+
   ### Event and Root Set Up: ###################################################
   # Note that this is contingent on space.
   # For dispersal, we have nodes on a graph that leak into each other.
@@ -584,7 +590,7 @@ MultipleNumericalAssembly_Dispersal <- function(
   # Timings: ###################################################################
   # Basic Targets: Start time, Event Times, and Final Settling Time.
   Timings <- c(
-    0,
+    if(is.null(TimeInitial)) 0 else TimeInitial,
     Events$Events$Times,
     tail(Events$Events$Times, n = 1) + ReactionTime * 3
   )

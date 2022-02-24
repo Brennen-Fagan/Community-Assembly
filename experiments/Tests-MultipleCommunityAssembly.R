@@ -584,7 +584,130 @@ egResults_Dispersal7 <- MultipleNumericalAssembly_Dispersal(
 stopifnot(
   !any(egResults_Dispersal7$Abundance[, 1 + 1:(numBasal + numConsum)] > 0),
   !any(egResults_Dispersal7$Abundance[
-    , 1 + 1 + (0:(numEnviron - 1)) * (numBasal + numConsum)] > 0),
+    , 1 + 1 + (0:(numEnviron - 1)) * (numBasal + numConsum)] > 0)
+)
+
+
+print("Subtest 5: Interrupted Evaluation")
+TimeNoLate <- 40
+egEventsNo1NoLate <- egEventsNo1
+egEventsNo1NoLate$Events <- egEventsNo1NoLate$Events[
+  egEventsNo1NoLate$Events$Times < TimeNoLate,
+  ]
+# NOTE: Need to include the last event of the previous, since we use that as the
+# (post-)ending state.
+egEventsNo1Late <- egEventsNo1
+egEventsNo1Late$Events <- egEventsNo1Late$Events[
+  egEventsNo1Late$Events$Times >= max(egEventsNo1NoLate$Events$Times),
+]
+
+egResults_Dispersal8 <- MultipleNumericalAssembly_Dispersal(
+  Pool = egPool,
+  NumEnvironments = numEnviron,
+  InteractionMatrices = egInteractions,
+  Events = egEventsNo1NoLate,
+  PerCapitaDynamics = egDynamics,
+  DispersalMatrix = CreateDispersalMatrix(
+    matrix(0, nrow = numEnviron, ncol = numEnviron),
+    SpeciesSpeeds = 1:(numBasal + numConsum)
+  ),
+  EliminationThreshold = 10^-4, ArrivalDensity = 0.4,
+  Verbose = FALSE
+)
+
+TimeLastEvent <- max(egResults_Dispersal8$Events$Times)
+TimeNoLateRow <- which.max(egResults_Dispersal8$Abundance[, 1] >= TimeLastEvent) - 1
+
+# Together, should be same as egResults_Dispersal7
+egResults_Dispersal9 <- MultipleNumericalAssembly_Dispersal(
+  PopulationInitial = egResults_Dispersal8$Abundance[TimeNoLateRow, -1],
+  TimeInitial = egResults_Dispersal8$Abundance[TimeNoLateRow, 1],
+  Pool = egPool,
+  NumEnvironments = numEnviron,
+  InteractionMatrices = egInteractions,
+  Events = egEventsNo1Late,
+  PerCapitaDynamics = egDynamics,
+  DispersalMatrix = CreateDispersalMatrix(
+    matrix(0, nrow = numEnviron, ncol = numEnviron),
+    SpeciesSpeeds = 1:(numBasal + numConsum)
+  ),
+  EliminationThreshold = 10^-4, ArrivalDensity = 0.4,
+  Verbose = FALSE
+)
+
+# Should be the same as above. Diff is egEventsNo1 vs egEventsNo1 without prior
+# events in the events listing.
+egResults_Dispersal10 <- MultipleNumericalAssembly_Dispersal(
+  PopulationInitial = egResults_Dispersal8$Abundance[TimeNoLateRow, -1],
+  TimeInitial = egResults_Dispersal8$Abundance[TimeNoLateRow, 1],
+  Pool = egPool,
+  NumEnvironments = numEnviron,
+  InteractionMatrices = egInteractions,
+  Events = egEventsNo1,
+  PerCapitaDynamics = egDynamics,
+  DispersalMatrix = CreateDispersalMatrix(
+    matrix(0, nrow = numEnviron, ncol = numEnviron),
+    SpeciesSpeeds = 1:(numBasal + numConsum)
+  ),
+  EliminationThreshold = 10^-4, ArrivalDensity = 0.4,
+  Verbose = FALSE
+)
+
+stopifnot(
+  isTRUE(all.equal(egResults_Dispersal9, egResults_Dispersal10)),
+  isTRUE(all.equal(
+    rbind(egResults_Dispersal8$Events,
+          # Remove the duplicated event.
+          egResults_Dispersal9$Events[-1, ]),
+    egResults_Dispersal7$Events
+  )),
+  # More complicated: Abundances except for the gap?
+  # There is some carry through. How about a tolerance of 1E-4 for now.
+  # We'll run this a few times to see if that tolerance is exceeded, and,
+  # if it is, see if anything changes about the resulting story.
+  unlist(lapply(
+    1:ncol(egResults_Dispersal7$Abundance),
+    function(col) {
+      cbind({
+        tempTimeOfLastEvent <- tail(egResults_Dispersal8$Events$Times, 1)
+        tempRowOfLastEvent <- which(
+          egResults_Dispersal8$Abundance[, 1] == tempTimeOfLastEvent
+        )
+        tempRowOfFirstEvent <- which(
+          egResults_Dispersal9$Abundance[, 1] ==
+            egResults_Dispersal9$Events$Times[1]
+        )
+        rbind(
+          egResults_Dispersal8$Abundance[1:tempRowOfLastEvent, ],
+          egResults_Dispersal9$Abundance[
+            tempRowOfFirstEvent:nrow(egResults_Dispersal9$Abundance),]
+        )
+      }[, col], {
+        tempTimeOfLastEvent <- tail(egResults_Dispersal8$Events$Times, 1)
+        tempRowOfLastEvent <- which(
+          egResults_Dispersal7$Abundance[, 1] == tempTimeOfLastEvent
+        )
+        tempRowOfFirstEvent <- which(
+          egResults_Dispersal7$Abundance[, 1] ==
+            egResults_Dispersal9$Events$Times[1]
+        )
+        rbind(
+          egResults_Dispersal7$Abundance[1:tempRowOfLastEvent, ],
+          egResults_Dispersal7$Abundance[
+            tempRowOfFirstEvent:nrow(egResults_Dispersal7$Abundance),]
+        )
+      }[, col]) -> temp
+
+      if(isTRUE(all.equal(temp[, 1], temp[, 2]))) return(TRUE)
+
+      # If the difference is small or they are both to be eliminated, TRUE.
+      if(all(abs((temp[, 1] - temp[, 2]) / temp[, 1]) < 1E-4 |
+         (temp[, 1] < egResults_Dispersal7$Parameters$EliminationThreshold &
+          temp[, 2] < egResults_Dispersal7$Parameters$EliminationThreshold)))
+        return(TRUE)
+      else
+        return(FALSE)
+    }))
 )
 
 # MultipleNumericalAssembly_Dispersal, Trophics ################################
