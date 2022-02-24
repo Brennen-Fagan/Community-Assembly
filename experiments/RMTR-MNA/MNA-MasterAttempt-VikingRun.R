@@ -74,6 +74,7 @@ matrs <- NULL
 evnts <- NULL
 
 candidates <- dir(pattern = "MNA[-]Master.+[-]Cases[-]Prepared[.]RData$",
+                  path = "Prepared_2021-12-20",
                   full.names = TRUE)
 
 stopifnot(length(candidates) == 3)
@@ -113,7 +114,7 @@ print("Space")
 PerIslandDistance <- switch(
   case$Space,
   1e9, 1e8, 1e7, 1e6,
-  1e5, 1e4, 1e3, 1e0
+  1e5, 1e4, 1e3, 1e0, Inf # See Note, 31/01/2022, Calendar, 1400
 )
 
 # Ring Dynamics
