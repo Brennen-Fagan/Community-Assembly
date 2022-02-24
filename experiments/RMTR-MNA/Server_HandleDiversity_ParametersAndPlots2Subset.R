@@ -15,35 +15,35 @@ doParallel::registerDoParallel(clust)
 time_grouping_size <- 100
 time_averaging_size <- 10
 
-# csvs <- dir(path = ".", pattern = "Cases[.]csv$",
-#             full.names = TRUE)
-#
-# contentsCsvs <- lapply(csvs, utils::read.csv)
-#
-# # From old MasterParameters.RData
-# # 10^9, 10^5, 10^0
-# spaces <- c(1, 5, 8)
-# # (1,1), (1,10), and (10,1)
-# neutrals <- c(1, 3, 6)
+csvs <- dir(path = ".", pattern = "Cases[.]csv$",
+            full.names = TRUE)
 
-# IDs <- lapply(seq_along(contentsCsvs), function(i) {
-#   csv <- contentsCsvs[[i]]
-#   temp <- data.frame(Numbers = csv %>% dplyr::mutate(
-#     Numbers = as.numeric(rownames(csv))
-#   ) %>% dplyr::filter(
-#     Space %in% spaces,
-#     Neutral %in% neutrals
-#   ) %>% dplyr::pull(Numbers)
-#   )
-#
-#   if (nrow(temp) > 0) {
-#     temp$Case <- i
-#     return(temp)
-#   }
-#   else {
-#     return(NULL)
-#   }
-# }) %>% dplyr::bind_rows()
+contentsCsvs <- lapply(csvs, utils::read.csv)
+
+# From old MasterParameters.RData
+# 10^9, 10^5, 10^0
+spaces <- c(1, 5, 8)
+# (1,1), (1,10), and (10,1)
+neutrals <- c(1, 3, 6)
+
+IDs <- lapply(seq_along(contentsCsvs), function(i) {
+  csv <- contentsCsvs[[i]]
+  temp <- data.frame(Numbers = csv %>% dplyr::mutate(
+    Numbers = as.numeric(rownames(csv))
+  ) %>% dplyr::filter(
+    Space %in% spaces,
+    Neutral %in% neutrals
+  ) %>% dplyr::pull(Numbers)
+  )
+
+  if (nrow(temp) > 0) {
+    temp$Case <- i
+    return(temp)
+  }
+  else {
+    return(NULL)
+  }
+}) %>% dplyr::bind_rows()
 
 files <- dir("Viking_SaveDiversity_2021-12-28_2022-01-23",
              pattern = "[.]RData$", full.names = TRUE)
@@ -60,13 +60,13 @@ Diversities <- foreach(
                          split = "-", fixed = TRUE)[[1]]
   case <- caseNumber[length(caseNumber) - 1]
   caseNumber <- caseNumber[length(caseNumber)]
-  #
-  # if (IDs %>% dplyr::filter(
-  #   Case == as.numeric(case),
-  #   (as.numeric(caseNumber) %/% 10) + 1 == Numbers
-  # ) %>% nrow() == 0) {
-  #   return(NULL)
-  # }
+
+  if (IDs %>% dplyr::filter(
+    Case == as.numeric(case),
+    (as.numeric(caseNumber) %/% 10) + 1 == Numbers
+  ) %>% nrow() == 0) {
+    return(NULL)
+  }
 
   print(file)
   print(Sys.time())
@@ -74,7 +74,13 @@ Diversities <- foreach(
   # Loads Diversity
 
   # Diversities[[toString(idNums)]] <- Diversity
-  Attributes <-#  dplyr::bind_rows(
+  # print(paste("Exists:",
+  #             exists("Attributes"),
+  #             exists("DiversitiesAlpha"),
+  #             exists("DiversitiesBeta"),
+  #             exists("DiversitiesGamma")
+  # ))
+  Attributes <- # dplyr::bind_rows(
     # if (exists("Attributes")) {
     #   Attributes
     # },
@@ -88,14 +94,14 @@ Diversities <- foreach(
     )
   # )
 
-  DiversitiesAlpha <- #dplyr::bind_rows(
+  DiversitiesAlpha <- # dplyr::bind_rows(
     # if (exists("DiversitiesAlpha")) {
     #   DiversitiesAlpha
     # },
     dplyr::bind_rows(lapply(
       1:10,
       function(i, d) d[[i]]$alpha %>% dplyr::mutate(
-        History = i, Case = case, Number = caseNumber
+        History = i, Case = caseNumber
       ),
       d = Diversity)) %>% dplyr::select(-Species) %>% dplyr::mutate(
         Time = floor(Time * time_grouping_size)/time_grouping_size
@@ -120,7 +126,7 @@ Diversities <- foreach(
       1:10,
       function(i, d) dplyr::bind_rows(
         d[[i]]$beta
-      ) %>% dplyr::mutate(History = i, Case = case, Number = caseNumber),
+      ) %>% dplyr::mutate(History = i, Case = caseNumber),
       d = Diversity)) %>% dplyr::mutate(
         Time = floor(Time * time_grouping_size)/time_grouping_size
       ) %>% dplyr::group_by(
@@ -143,7 +149,7 @@ Diversities <- foreach(
     dplyr::bind_rows(lapply(
       1:10,
       function(i, d) d[[i]]$gamma %>% dplyr::mutate(
-        History = i, Case = case, Number = caseNumber
+        History = i, Case = caseNumber
       ),
       d = Diversity)) %>% dplyr::filter(
         Aggregation == "Gamma"
@@ -252,11 +258,11 @@ DiversitiesGammaAvg <- DiversitiesGamma %>% dplyr::mutate(
   .groups = "drop"
 )
 
-levelsPoolNoise <- paste(
+levelsPoolNoise <- interaction(
   DiversitiesGamma$Pool,
   DiversitiesGamma$Noise,
   sep = ";;"
-  ) %>% unique() %>% strsplit(
+) %>% levels() %>% strsplit(
   split = ";;", fixed = TRUE
 )
 
@@ -448,79 +454,6 @@ plotsAlphaGamma <- lapply(
     ) + ggplot2::theme_bw(
     ) + ggplot2::geom_abline(
       slope = 1, intercept = 0
-    ) + ggplot2::labs(
-      title = "Gamma by Alpha",
-      subtitle = paste0("Pool Modifier = ", pbs, ", ",
-                        "Noise Modifier = ", inm)
-    )
-  }
-)
-
-plotsAlphaGamma3x3 <- lapply(
-  1, function(i) {
-
-    pbs <- levelsPoolNoise[[i]][1]
-    inm <- levelsPoolNoise[[i]][2]
-
-    dag <- DiversitiesAlphaGamma %>% dplyr::filter(
-      Pool == pbs,
-      Noise == inm,
-      Time > 3,
-      Space %in% c(1, 1E5, 1E6, 1E9),
-      Neutral %in% c(#"1, 1", Currently going to borrow from No Noise.
-                     "1, 10", "10, 1")
-    )
-
-    dag <- dplyr::bind_rows(
-      dag,
-      DiversitiesAlphaGamma %>% dplyr::filter(
-        Pool == pbs,
-        Noise == "0",
-        Time > 3,
-        Space %in% c(1, 1E5, 1E6, 1E9),
-        Neutral %in% c("1, 1")
-      )
-    )
-
-    dag <- dag %>% dplyr::mutate(
-      Neutral = dplyr::case_when(
-        Neutral == "1, 10" ~ "High Ext.",
-        Neutral == "1, 1" ~ "Equal Im. & Ext.",
-        Neutral == "10, 1" ~ "High Im.",
-        TRUE ~ "Oops"
-      ),
-      Neutral = factor(
-        Neutral, levels = c("High Im.", "Equal Im. & Ext.", "High Ext.")
-      )
-    )
-
-    ggplot2::ggplot(
-      dag,
-      ggplot2::aes(x = `Richness, Alpha`,
-                   y = `Richness, Gamma`)
-    ) + ggplot2::geom_bin2d(
-      breaks = seq(-0.5, max(dag$`Richness, Alpha`,
-                             dag$`Richness, Gamma`) + 1, 1)
-    ) + ggplot2::geom_point(
-      data = dag %>% group_by(
-        Neutral, Space
-      ) %>% summarise(
-        `Richness, Alpha` = mean(`Richness, Alpha`, na.rm = TRUE),
-        `Richness, Gamma` = mean(`Richness, Gamma`, na.rm = TRUE),
-        .groups = "drop"
-      ),
-      shape = 4, size = 3, color = "red", alpha = 0.8
-    ) + ggplot2::scale_fill_viridis_c(
-      direction = -1, trans = "log10"
-    ) + ggplot2::facet_grid(
-      Neutral ~ Space
-    ) + ggplot2::theme_bw(
-    ) + ggplot2::geom_abline(
-      slope = 1, intercept = 0
-    ) + ggplot2::labs(
-      title = "Gamma by Alpha"#,
-      # subtitle = paste0("Pool Modifier = ", pbs, ", ",
-      #                   "Noise Modifier = ", inm)
     )
   }
 )
@@ -560,20 +493,20 @@ plotsAlphaGammaSpace <- lapply(
         shape = Space
       ),
       size = 4, alpha = 1
-    # ) + ggplot2::geom_rect(
-    #   data = dag %>% dplyr::group_by(
-    #     Neutral, Space
-    #   ) %>% dplyr::summarise(
-    #     xmin = min(`Richness, Alpha`, na.rm = TRUE),
-    #     xmax = max(`Richness, Alpha`, na.rm = TRUE),
-    #     ymin = min(`Richness, Gamma`, na.rm = TRUE),
-    #     ymax = max(`Richness, Gamma`, na.rm = TRUE),
-    #     .groups = "drop"
-    #   ),
-    #   mapping = ggplot2::aes(
-    #     xmin = xmin - 0.5, xmax = xmax + 0.5,
-    #     ymin = ymin - 0.5, ymax = ymax + 0.5
-    #   ), inherit.aes = FALSE, color = "black", fill = "transparent"
+    ) + ggplot2::geom_rect(
+      data = dag %>% dplyr::group_by(
+        Neutral, Space
+      ) %>% dplyr::summarise(
+        xmin = min(`Richness, Alpha`, na.rm = TRUE),
+        xmax = max(`Richness, Alpha`, na.rm = TRUE),
+        ymin = min(`Richness, Gamma`, na.rm = TRUE),
+        ymax = max(`Richness, Gamma`, na.rm = TRUE),
+        .groups = "drop"
+      ),
+      mapping = ggplot2::aes(
+        xmin = xmin - 0.5, xmax = xmax + 0.5,
+        ymin = ymin - 0.5, ymax = ymax + 0.5
+      ), inherit.aes = FALSE, color = "black", fill = "transparent"
     ) + ggplot2::geom_path(
       data = dag %>% dplyr::group_by(
         Neutral, Space
@@ -588,10 +521,6 @@ plotsAlphaGammaSpace <- lapply(
     ) + ggplot2::theme_bw(
     ) + ggplot2::geom_abline(
       slope = 1, intercept = 0
-    ) + ggplot2::labs(
-      title = "Alpha and Gamma By Space, Means",
-      subtitle = paste0("Pool Modifier = ", pbs, ", ",
-                        "Noise Modifier = ", inm)
     )
   }
 )
@@ -644,11 +573,7 @@ plotsAlphaSpace2 <- lapply(
       ggplot2::aes(x = Space, y = Richness,
                    fill = Neutral, group = interaction(Neutral, Space))
     ) + ggplot2::geom_boxplot(
-      position = ggplot2::position_dodge(0.5)
-    ) + ggplot2::stat_summary(
-      fun = mean,
-      position = ggplot2::position_dodge(0.5),
-      shape = 4
+      notch = TRUE
     ) + ggplot2::labs(
       title = "Alpha Diversities by Island Distances",
       subtitle = paste0("Pool Modifier = ", pbs, ", ",
@@ -708,11 +633,6 @@ plotsGammaSpace2 <- lapply(
       ggplot2::aes(x = Space, y = Richness,
                    fill = Neutral, group = interaction(Neutral, Space))
     ) + ggplot2::geom_boxplot(
-      position = ggplot2::position_dodge(0.5)
-    ) + ggplot2::stat_summary(
-      fun = mean,
-      position = ggplot2::position_dodge(0.5),
-      shape = 4
     ) + ggplot2::labs(
       title = "Gamma Diversities by Island Distances",
       subtitle = paste0("Pool Modifier = ", pbs, ", ",
@@ -723,97 +643,4 @@ plotsGammaSpace2 <- lapply(
   }
 )
 
-plotAlphaGammaTrajectory <- function(
-  dag, TimeFilter = 3,
-  EnvirSelect = 1, CaseSelect = 1, HistorySelect = 1
-) {
 
-  cases <- sort(unique(dag$Case))
-  case <- cases[CaseSelect]
-
-  ggplot2::ggplot(
-    dag %>% dplyr::filter(
-      Time > TimeFilter
-    ),
-    ggplot2::aes(x = `Richness, Alpha`,
-                 y = `Richness, Gamma`)
-  ) + ggplot2::geom_bin2d(
-    breaks = seq(-0.5, max(dag$`Richness, Alpha`,
-                           dag$`Richness, Gamma`) + 1, 1)
-  ) + ggplot2::geom_path(
-    data = dag %>% dplyr::filter(
-      Environment == EnvirSelect,
-      Case == case,
-      History == HistorySelect
-    ),
-    mapping = ggplot2::aes(
-      color = Time
-    ), alpha = 0.3
-  ) + ggplot2::geom_point(
-    data = dag %>% dplyr::filter(
-      Time > TimeFilter
-    ) %>% group_by(
-      Neutral, Space
-    ) %>% summarise(
-      `Richness, Alpha` = mean(`Richness, Alpha`, na.rm = TRUE),
-      `Richness, Gamma` = mean(`Richness, Gamma`, na.rm = TRUE),
-      .groups = "drop"
-    ),
-    shape = 4, size = 3, color = "red", alpha = 0.8
-  ) + ggplot2::scale_color_viridis_c(
-    option = "B"
-  ) + ggplot2::scale_fill_viridis_c(
-    direction = -1, trans = "log10"
-  ) + ggplot2::facet_grid(
-    Neutral + Noise ~ Space + Pool
-  ) + ggplot2::theme_bw(
-  ) + ggplot2::geom_abline(
-    slope = 1, intercept = 0
-  )
-}
-
-plotAlphaGammaTrajectoryEG <- plotAlphaGammaTrajectory(
-  dag = DiversitiesAlphaGamma %>% dplyr::filter(
-    Pool == "0, 0, 0, 0",
-    Noise == "1",
-    Space == "1e+07",
-    Neutral == "1, 1"
-  ))
-
-plotAlphaGammaTrajectoryEGBIMODAL <- plotAlphaGammaTrajectory(
-  dag = DiversitiesAlphaGamma %>% dplyr::filter(
-    Pool == "0, 0, 0, 0",
-    Noise == "0",
-    Space == "1e+09",
-    Neutral == "1, 0"
-  ))
-
-plotLCABTrust <- DiversitiesAlphaGamma %>% dplyr::filter(
-  Time > 3, Space != "NA"
-) %>% tidyr::pivot_longer(
-  cols = c("Richness, Gamma", "Richness, Alpha"),
-  names_to = "Diversity", values_to = "Richness"
-) %>% dplyr::mutate(
-  Diversity = substring(Diversity, first = 11),
-  Diversity = case_when(
-    Diversity == "Alpha" ~ "Local",
-    Diversity == "Gamma" ~ "Regional",
-    TRUE ~ "Oops"
-  )
-) %>% ggplot2::ggplot(
-  ggplot2::aes(x = Space, y = Richness, fill = Diversity)
-) + ggplot2::geom_boxplot(
-  position = ggplot2::position_dodge(0.8)
-) + ggplot2::stat_summary(
-  fun = mean,
-  position = ggplot2::position_dodge(0.8),
-  shape = 4
-) + ggplot2::labs(
-  x = "Inter-Assemblage Distance",
-  y = "Number of Species"
-) + ggplot2::theme_bw(
-) + ggplot2::theme(
-  panel.grid.major.x = ggplot2::element_blank(),
-  panel.grid.major.y = ggplot2::element_blank(),
-  panel.grid.minor.y = ggplot2::element_blank()
-)
