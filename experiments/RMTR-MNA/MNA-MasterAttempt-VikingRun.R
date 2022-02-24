@@ -64,7 +64,7 @@ print("Receive")
 # Two CArgs:
 #   Case:       A: 1,   B: 2,   C: 3
 #   Row Number: A: 400, B: 160, C: 1600 (i.e. `nrow`s)
-cargs <- as.numeric(commandArgs(trailingOnly = TRUE))
+cargs <- c(1, 350) #as.numeric(commandArgs(trailingOnly = TRUE))
 
 # Load the System: ############################################################
 print("Load")
@@ -83,7 +83,7 @@ loaded <- load(candidates[cargs[1]])
 outputName <- strsplit(basename(candidates[cargs[1]]),
                        split = ".", fixed = TRUE)[[1]]
 outputName <- paste0(outputName[-length(outputName)],
-                     "-", cargs[1], "-", cargs[2], ".RData")
+                     "-", cargs[1], "-", cargs[2], "-stop", ".RData")
 
 stopifnot(
   c("cases", "pools", "matrs", "evnts") %in% loaded,
@@ -135,19 +135,27 @@ DispersalMatrices <- RMTRCode2::CreateDispersalMatrix(
 print("Run")
 # Run times appear to be short enough that we can just run each set of histories
 # (per pool-environ combination) on the same node without hitting time-out.
-results <- lapply(evnt, function(ev) {
-  RMTRCode2::MultipleNumericalAssembly_Dispersal(
-  Pool = pool, NumEnvironments = Environments,
-  InteractionMatrices = matr,
-  Events = ev,
-  PerCapitaDynamics = PerCapitaDynamics,
-  DispersalMatrix = DispersalMatrices,
-  EliminationThreshold = EliminationThreshold,
-  ArrivalDensity = ArrivalDensity,
-  MaximumTimeStep = MaximumTimeStep,
-  BetweenEventSteps = BetweenEventSteps,
-  Verbose = FALSE
-)})
+results <- list()
+for (i in 5){#seq_along(evnt)) {
+  ev <- evnt[[i]]
+
+  #lapply(evnt, function(ev) {
+  # Actual Event 56417, need to go earlier
+  ev$Events <- ev$Events %>% dplyr::filter(Times < 53000)
+  results[[i]] <- RMTRCode2::MultipleNumericalAssembly_Dispersal(
+    Pool = pool, NumEnvironments = Environments,
+    InteractionMatrices = matr,
+    Events = ev,
+    PerCapitaDynamics = PerCapitaDynamics,
+    DispersalMatrix = DispersalMatrices,
+    EliminationThreshold = EliminationThreshold,
+    ArrivalDensity = ArrivalDensity,
+    MaximumTimeStep = MaximumTimeStep,
+    BetweenEventSteps = BetweenEventSteps,
+    Verbose = TRUE # FALSE
+  )#})
+}
+
 
 # Save the system: ############################################################
 print("Save")
