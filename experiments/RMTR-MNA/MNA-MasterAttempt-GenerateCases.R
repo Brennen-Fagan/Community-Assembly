@@ -118,6 +118,7 @@ systemMods$NeutralRateMultipliers <- matrix(c(
 
 ### Spatial Dynamics Parameters: ###############################################
 # For the spatial component, we are interested in the following structures.
+#   x.   Ring Spatial coupling, distance Inf. (Equivalent to None)
 #   a.   Ring Spatial coupling, distance 1E9.
 #   b.   Ring Spatial coupling, distance 1E8.
 #   c.   Ring Spatial coupling, distance 1E7.
@@ -127,18 +128,18 @@ systemMods$NeutralRateMultipliers <- matrix(c(
 #   g.   Ring Spatial coupling, distance 1E3.
 #   h.   Ring Spatial coupling, distance 1E0.
 
-systemMods$SpaceDistanceMultiplier <- 10^c(9:3, 0)
+systemMods$SpaceDistanceMultiplier <- 10^c(Inf, 9:3, 0)
 
 # Cases: #######################################################################
 # Some of these are special cases and are reduced.
-#   A = (1, c(IV, VII, VIII, IX, X), c(a:h)) * 10 * 10          =>  4000
-#   B = (5, c(I, IV), c(a:h)) * 10 * 10                         =>  1600
+#   A = (1, c(IV, VII, VIII, IX, X), c(x, a:h)) * 10 * 10          =>  4500
+#   B = (5, c(I, IV), c(x, a:h)) * 10 * 10                         =>  1800
 # The remainder are grouped together.
-#   C = (c(1, 2, 3, 4), c(I, II, III, V, VI), c(a:h)) * 10 * 10 => 16000
+#   C = (c(1, 2, 3, 4), c(I, II, III, V, VI), c(x, a:h)) * 10 * 10 => 18000
 # For a grand total of 21,600 runs.
 # As an initial estimate, we saw about 30 minutes per run previously
 # and it seems reasonable to get about 30 cores from Viking.
-#   21,600 * 0.5 / 30 = 180 hours = 15 days.
+#   24,300 * 0.5 / 30 = 360 hours = 30 days.
 
 # We use indices to refer to rows in the above parameters.
 cases <- list()
@@ -154,7 +155,7 @@ cases <- list()
 cases$A <- expand.grid(
   Framework = 1,
   Neutral = c(4, 7:10),
-  Space = 1:8
+  Space = 1:9
 )
 
 ### Case B: ####################################################################
@@ -168,7 +169,7 @@ cases$A <- expand.grid(
 cases$B <- expand.grid(
   Framework = 5,
   Neutral = c(1, 4),
-  Space = 1:8
+  Space = 1:9
 )
 
 ### Case C: ####################################################################
@@ -188,11 +189,11 @@ cases$B <- expand.grid(
 cases$C <- expand.grid(
   Framework = 1:4,
   Neutral = c(1:3, 5:6),
-  Space = 1:8
+  Space = 1:9
 )
 
 # Make sure you know the cases you are working with...
-stopifnot(sum(sapply(cases, nrow)) == 216)
+stopifnot(sum(sapply(cases, nrow)) == 243)
 
 # Preparations: ################################################################
 ### Assign Random Seeds: #######################################################

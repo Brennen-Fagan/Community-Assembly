@@ -11,28 +11,29 @@ library(iterators)
 library(dplyr)
 library(tidyr)
 
-cores <- 5 #parallel::detectCores() - 1
+cores <- 14 #parallel::detectCores() - 1
 clust <- parallel::makeCluster(cores)
 doParallel::registerDoParallel(clust)
 
 # https://stackoverflow.com/a/15373917
 thisFile <- function() {
-  cmdArgs <- commandArgs(trailingOnly = FALSE)
-  needle <- "--file="
-  match <- grep(needle, cmdArgs)
-  if (length(match) > 0) {
-    # Rscript
-    return(normalizePath(sub(needle, "", cmdArgs[match])))
-  } else {
-    # 'source'd via R console
-    return(normalizePath(sys.frames()[[1]]$ofile))
-  }
+  # cmdArgs <- commandArgs(trailingOnly = FALSE)
+  # needle <- "--file="
+  # match <- grep(needle, cmdArgs)
+  # if (length(match) > 0) {
+  #   # Rscript
+  #   return(normalizePath(sub(needle, "", cmdArgs[match])))
+  # } else {
+  #   # 'source'd via R console
+  #   return(normalizePath(sys.frames()[[1]]$ofile))
+  # }
+  return(".")
 }
 
 # Initialisation: ##############################################################
 print("Initialisation.")
 # Identify the files to take.
-thisDirectory <- dirname(thisFile())
+thisDirectory <- "."#dirname(thisFile())
 theCases <- dir(thisDirectory,
                 pattern = "MNA-Master[A-Z]-Cases[.]csv",
                 full.names = TRUE)
@@ -235,7 +236,7 @@ print(system.time(
       rep(1:length(theEnvironments),
           times = unlist(lapply(theEnvironments,
                                 function(env) {nrow(env$cases)}))
-      )[various]
+      )
     ),
     crow = iterators::iter(
       dplyr::bind_rows(lapply(theEnvironments,
@@ -275,8 +276,8 @@ print(system.time(
                  ArrivalRate = rate * systemMods$NeutralRateMultipliers[
                    crow$Neutral, 1
                  ],
-                 ArrivalFUN = RMTRCode2::ArrivalFUN_Example,
-                 ExtinctEvents = systemBase$eventNumberFunc(
+                 ArrivalFUN = RMTRCode2::ArrivalFUN_Example2,
+                 ExtinctEvents =  systemBase$eventNumberFunc(
                    systemBase$environsPerSystem, Spec = nrowpl, Const = 7
                    # More than 5 since we are not seeing enough mixing.
                  ) * systemMods$NeutralRateMultipliers[
@@ -285,7 +286,7 @@ print(system.time(
                  ExtinctRate = rate * systemMods$NeutralRateMultipliers[
                    crow$Neutral, 2
                  ],
-                 ExtinctFUN = RMTRCode2::ExtinctFUN_Example,
+                 ExtinctFUN = RMTRCode2::ExtinctFUN_Example2,
                  HistorySeed = as.numeric(s)
                )
              }
