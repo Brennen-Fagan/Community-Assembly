@@ -21,8 +21,4 @@ experiments/LCAB_LawMorton1996-NumericalPoolCommunityScaling10/LM96-NumPoolComSc
 experiments/LCAB_LawMorton1996-NumericalPoolCommunityScaling10/LM96-NumPoolComScaling-Calc10-DMTCP-Test-Log2.txt
 experiments/LCAB_LawMorton1996-NumericalPoolCommunityScaling10/LM96-NumPoolComScaling-Calc10-Restart_log.txt
 *.html
-2021-11-01-Workspace.RData
-2021-11-13.RData
-MNA-MasterA-Cases-Prepared.RData
-MNA-MasterB-Cases-Prepared.RData
-MNA-MasterC-Cases-Prepared.RData
+*.RData
