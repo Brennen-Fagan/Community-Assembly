@@ -1,12 +1,11 @@
 Package: RMTRCode2
 Type: Package
-Title: What the Package Does in One 'Title Case' Line
-Version: 1.0
-Date: 2021-03-09
-Author: Your Name
-Maintainer: Your Name <your@email.com>
-Description: One paragraph description of what the package does as one or more full
-          sentences.
+Title: Community Assembly (Sensu Law and Morton 1996) in an Archipelago with Dispersal
+Version: 0.2
+Date: 2023-02-17
+Author: Brennen Fagan
+Maintainer: Brennen Fagan <brennen.fagan@york.ac.uk>
+Description: Package provides a numerical implementation of the Law and Morton (1996) community assembly algorithm (notably without a full implementation of permanence methods) in the context of an archipelago (represented by the pool) and multiple islands (represented by patches of communities). The experiments look at what happens when you vary the rate of dispersal between islands and between the pool and the archipelago. 
 License: GPL (>= 2)
 Imports: Rcpp (>= 1.0.6)
 LinkingTo: Rcpp
