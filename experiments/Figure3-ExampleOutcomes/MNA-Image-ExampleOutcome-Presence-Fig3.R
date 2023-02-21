@@ -826,9 +826,10 @@ PLOT_BALT <- ggplot2::ggplot(
     color = pasteCustom(Dispersal, Space)
   )
 ) + ggplot2::geom_line(
-  alpha = 0.4,
+  # alpha = 0.4,
   mapping = ggplot2::aes(
-    group = interaction(Dispersal, Environment)
+    group = interaction(Dispersal, Environment),
+    alpha = ifelse(Measurement == "Regional Rich.", 1, 0.4)
   )
 ) + ggplot2::geom_line(
   data = Diversity %>% dplyr::filter(
