@@ -28,7 +28,7 @@ tosave <- ggplot2::ggplot(
 
 ggplot2::ggsave(
     tosave,
-    "Pool-260x320.png"
-    units = "px"
+    "Pool-260x320.png",
+    units = "px",
     width = 260, height = 320, dpi = 300
 )
