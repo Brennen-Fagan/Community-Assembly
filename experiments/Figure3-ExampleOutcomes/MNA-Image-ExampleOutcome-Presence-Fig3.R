@@ -764,7 +764,7 @@ obj <- gridExtra::arrangeGrob(
 # Alternate Bottom
 Diversity <- Diversity %>% dplyr::mutate(
   Measurement2 = dplyr::case_when(
-    Measurement == "Jaccard" ~ "Turnover",
+    Measurement == "Jaccard" ~ "Spatial Turnover",
     Measurement == "Richness" & Environment == "Gamma" ~ "Regional Rich.",
     Measurement == "Richness" & Environment == "Mean" ~ "Local Rich.", # Panel
     Measurement == "Richness"  ~ "Local Rich.", # Otherwise
@@ -817,7 +817,7 @@ for (s in seq_along(strips)) {
 
 PLOT_BALT <- ggplot2::ggplot(
   Diversity %>% dplyr::filter(
-    Measurement2 %in% c("Turnover", "Local Rich.", "Regional Rich."),
+    Measurement2 %in% c("Spatial Turnover", "Local Rich.", "Regional Rich."),
     Environment != "Mean"
   ),
   ggplot2::aes(
@@ -832,14 +832,14 @@ PLOT_BALT <- ggplot2::ggplot(
   )
 ) + ggplot2::geom_line(
   data = Diversity %>% dplyr::filter(
-    Measurement2 %in% c("Turnover", "Local Rich.", "Regional Rich."),
+    Measurement2 %in% c("Spatial Turnover", "Local Rich.", "Regional Rich."),
     Environment == "Mean"
   ),
   size = 1.5
 ) + ggplot2::geom_ribbon(
   data = DiversityRibbons %>% dplyr::mutate(
     Measurement2 = dplyr::case_when(
-      Measurement == "Jaccard" ~ "Turnover",
+      Measurement == "Jaccard" ~ "Spatial Turnover",
       Measurement == "Richness" ~ "Local Rich.",
       TRUE ~ Measurement
     )
@@ -869,7 +869,7 @@ PLOT_BALT <- ggplot2::ggplot(
 ) + ggplot2::facet_wrap(
   . ~ factor(
     Measurement2, ordered = T,
-    levels = c("Local Rich.", "Regional Rich.", "Turnover")
+    levels = c("Local Rich.", "Regional Rich.", "Spatial Turnover")
   ), nrow = 1, scales = "free_y"
 )
 
