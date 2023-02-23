@@ -504,6 +504,23 @@ DiversityRibbons <- Diversity %>% dplyr::filter(
   .groups = "drop"
 )
 
+DiversityRibbons_Gamma <- Diversity %>% dplyr::filter(
+  (Environment %in% c("Gamma")),
+  Measurement == "Richness"
+) %>%  dplyr::group_by(
+  Time, Iter, Distance, Modifier, ModIntensity, Environments, Space, Dispersal,
+  Measurement
+  # Pool, Noise, Neutral, Space
+) %>% dplyr::summarise(
+  Low = unlist(dplyr::across(dplyr::any_of("Value"),
+                             .fns = ~ quantile(.x, p = 0.1, na.rm = TRUE))),
+  High = unlist(dplyr::across(dplyr::any_of("Value"),
+                              .fns = ~ quantile(.x, p = 0.9, na.rm = TRUE))),
+  .groups = "drop"
+) %>% dplyr::mutate(
+  Measurement = "Regional Rich."
+)
+
 # Plots: #######################################################################
 
 pasteCustom <- function(x, y) {
@@ -512,6 +529,7 @@ pasteCustom <- function(x, y) {
          ifelse(y == 1, "Full", "Med."))
 }
 legend_bl_name <- "Dispersal"
+
 Diversity <- Diversity %>% dplyr::mutate(
   Measurement2 = dplyr::case_when(
     Measurement == "Jaccard" ~ "Spatial Turnover",
@@ -522,7 +540,7 @@ Diversity <- Diversity %>% dplyr::mutate(
   )
 )
 
-PLOT_TALT_pre <- ggplot2::ggplot(
+PLOT_T_pre <- ggplot2::ggplot(
   SpeciesPresence %>% dplyr::mutate(
     Dispersal = dplyr::case_when(
       Space == 1 ~ "Full Dispersal",
@@ -556,16 +574,16 @@ PLOT_TALT_pre <- ggplot2::ggplot(
 )
 
 # https://stackoverflow.com/a/65024951
-PLOT_TALT_post <-
-  ggplot2::ggplot_gtable(ggplot2::ggplot_build(PLOT_TALT_pre))
-strips <- which(startsWith(PLOT_TALT_post$layout$name, 'strip'))
+PLOT_T_post <-
+  ggplot2::ggplot_gtable(ggplot2::ggplot_build(PLOT_T_pre))
+strips <- which(startsWith(PLOT_T_post$layout$name, 'strip'))
 for (s in seq_along(strips)) {
-  PLOT_TALT_post$grobs[[strips[s]]]$grobs[[1]]$children[[1]]$gp$fill <- c(
+  PLOT_T_post$grobs[[strips[s]]]$grobs[[1]]$children[[1]]$gp$fill <- c(
     "cyan", "plum1", "darkorange"
   )[s]
 }
 
-PLOT_BALT <- ggplot2::ggplot(
+PLOT_B <- ggplot2::ggplot(
   Diversity %>% dplyr::filter(
     Measurement2 %in% c("Spatial Turnover", "Local Rich.", "Regional Rich."),
     Environment != "Mean"
@@ -579,7 +597,7 @@ PLOT_BALT <- ggplot2::ggplot(
   # alpha = 0.4,
   mapping = ggplot2::aes(
     group = interaction(Dispersal, Environment),
-    alpha = ifelse(Measurement == "Regional Rich.", 1, 0.4)
+    alpha = ifelse(Measurement2 == "Regional Rich.", 1, 0.4)
   )
 ) + ggplot2::geom_line(
   data = Diversity %>% dplyr::filter(
@@ -588,7 +606,10 @@ PLOT_BALT <- ggplot2::ggplot(
   ),
   size = 1.5
 ) + ggplot2::geom_ribbon(
-  data = DiversityRibbons %>% dplyr::mutate(
+  data = dplyr::bind_rows(
+    DiversityRibbons,
+    DiversityRibbons_Gamma
+  ) %>% dplyr::mutate(
     Measurement2 = dplyr::case_when(
       Measurement == "Jaccard" ~ "Spatial Turnover",
       Measurement == "Richness" ~ "Local Rich.",
@@ -622,20 +643,18 @@ PLOT_BALT <- ggplot2::ggplot(
     Measurement2, ordered = T,
     levels = c("Local Rich.", "Regional Rich.", "Spatial Turnover")
   ), nrow = 1, scales = "free_y"
+) + ggplot2::scale_alpha(guide = "none") + ggplot2::coord_cartesian(
+  ylim = c(0, NA)
 )
 
-objalt <- gridExtra::arrangeGrob(
-  # gridExtra::arrangeGrob(
-  #   PLOT_TL, PLOT_TM, PLOT_TR, PLOT_T_Legend,
-  #   ncol = 4, nrow = 1, widths = c(1, 1, 1, 0.5)
-  # ),
-  PLOT_TALT_post,
-  PLOT_BALT, nrow = 2
+obj <- gridExtra::arrangeGrob(
+  PLOT_T_post,
+  PLOT_B, nrow = 2
 )
 
 ggplot2::ggsave(
   filename = "MNA-Image-Example-Presence.png",
-  plot = objalt,
+  plot = obj,
   height = 11, width = 12, dpi = 480, units = "cm"
 )
 
