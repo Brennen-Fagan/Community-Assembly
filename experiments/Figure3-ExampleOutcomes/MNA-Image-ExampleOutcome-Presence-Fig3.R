@@ -653,7 +653,7 @@ obj <- gridExtra::arrangeGrob(
 )
 
 ggplot2::ggsave(
-  filename = "MNA-Image-Example-Presence.png",
+  filename = "MNA-Image-Example-Presence.pdf",
   plot = obj,
   height = 11, width = 12, dpi = 480, units = "cm"
 )

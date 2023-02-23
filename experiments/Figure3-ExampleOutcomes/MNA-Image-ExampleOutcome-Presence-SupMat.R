@@ -744,32 +744,32 @@ PLOT_BRR <- ggplot2::ggplot(
 
 
 ggplot2::ggsave(
-  filename = "MNA-Image-SupMat-Presence-No.png",
+  filename = "MNA-Image-SupMat-Presence-No.pdf",
   plot = PLOT_TL,
   height = 11, width = 12, dpi = 480, units = "cm"
 )
 ggplot2::ggsave(
-  filename = "MNA-Image-SupMat-Presence-Med.png",
+  filename = "MNA-Image-SupMat-Presence-Med.pdf",
   plot = PLOT_TM,
   height = 11, width = 12, dpi = 480, units = "cm"
 )
 ggplot2::ggsave(
-  filename = "MNA-Image-SupMat-Presence-Full.png",
+  filename = "MNA-Image-SupMat-Presence-Full.pdf",
   plot = PLOT_TR,
   height = 11, width = 12, dpi = 480, units = "cm"
 )
 ggplot2::ggsave(
-  filename = "MNA-Image-SupMat-Presence-Local.png",
+  filename = "MNA-Image-SupMat-Presence-Local.pdf",
   plot = PLOT_BL,
   height = 11, width = 12, dpi = 480, units = "cm"
 )
 ggplot2::ggsave(
-  filename = "MNA-Image-SupMat-Presence-Regional.png",
+  filename = "MNA-Image-SupMat-Presence-Regional.pdf",
   plot = PLOT_BR,
   height = 11, width = 12, dpi = 480, units = "cm"
 )
 ggplot2::ggsave(
-  filename = "MNA-Image-SupMat-Presence-Jaccard.png",
+  filename = "MNA-Image-SupMat-Presence-Jaccard.pdf",
   plot = PLOT_BRR,
   height = 11, width = 12, dpi = 480, units = "cm"
 )
