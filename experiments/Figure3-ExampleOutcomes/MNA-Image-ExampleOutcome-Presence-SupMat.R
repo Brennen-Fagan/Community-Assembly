@@ -33,16 +33,16 @@ load_safe_thin <- function(fname, bythin, divtime, burn) {
     loaded$Abundance <- loaded$Abundance[seq(from = 1,
                                              to = nrow(loaded$Abundance),
                                              by = bythin), ]
-    
+
     toEliminate <-
       loaded$Abundance[, -1] <
       loaded$Parameters$EliminationThreshold & loaded$Abundance[, -1] > 0
     loaded$Abundance[, -1][toEliminate] <- 0
-    
+
     loaded$Abundance <- loaded$Abundance[
       loaded$Abundance[, 1] > burn,
       ]
-    
+
     loaded$Abundance[, 1] <- loaded$Abundance[, 1] / divtime
     return(loaded)
   }
@@ -67,7 +67,7 @@ load_safe <- function(fname) {
 Calculate_Diversity <- function(loaded, nspecies) {
   loaded$Abundance[, -1] <-
     loaded$Abundance[, -1] > loaded$Parameters$EliminationThreshold
-  
+
   ### Alpha Diversity: ##################################################
   diversity_alpha <- lapply(
     1:loaded$NumEnvironments,
@@ -111,9 +111,9 @@ Calculate_Diversity <- function(loaded, nspecies) {
     abund = loaded$Abundance,
     numSpecies = sum(nspecies)
   )
-  
+
   diversity_alpha <- dplyr::bind_rows(diversity_alpha)
-  
+
   print("alpha")
   ### Gamma Diversity: ##################################################
   diversity_gamma <- diversity_alpha %>% dplyr::group_by(
@@ -125,14 +125,14 @@ Calculate_Diversity <- function(loaded, nspecies) {
     Var = var(Richness),
     Var_Basal = var(Richness_Basal),
     Var_Consumer = var(Richness_Consumer),
-    
+
     SpeciesTotal = toString(sort(unique(unlist(strsplit(paste(
       Species, collapse = ", "), split = ", ", fixed = TRUE))))),
     SpeciesTotal_Basal = toString(sort(unique(unlist(strsplit(paste(
       Species_Basal, collapse = ", "), split = ", ", fixed = TRUE))))),
     SpeciesTotal_Consumer = toString(sort(unique(unlist(strsplit(paste(
       Species_Consumer, collapse = ", "), split = ", ", fixed = TRUE))))),
-    
+
     Richness = unlist(lapply(
       strsplit(
         SpeciesTotal, split = ", ", fixed = TRUE
@@ -160,7 +160,7 @@ Calculate_Diversity <- function(loaded, nspecies) {
   ) %>% dplyr::mutate(
     Environment = "Gamma"
   )
-  
+
   print("gamma")
   ### Beta Diversity (Jaccard, Space): ##################################
   diversity_beta <- apply(
@@ -174,7 +174,7 @@ Calculate_Diversity <- function(loaded, nspecies) {
         method = "jaccard",
         x = matrix(row[-1] > 0, nrow = envs, byrow = TRUE)
       ))
-      
+
       dataf <- expand.grid(
         Env1 = 1:envs,
         Env2 = 1:envs
@@ -184,7 +184,7 @@ Calculate_Diversity <- function(loaded, nspecies) {
         Time = time,
         Jaccard = as.numeric(dists)
       )
-      
+
       return(dataf)
     },
     envs = loaded$NumEnvironments
@@ -198,7 +198,7 @@ Calculate_Diversity <- function(loaded, nspecies) {
   ) %>% dplyr::mutate(
     Measurement = "Jaccard"
   )
-  
+
   diversity_beta_avg <- diversity_beta %>% dplyr::group_by(
     Time, Measurement
   ) %>% dplyr::summarise(
@@ -208,7 +208,7 @@ Calculate_Diversity <- function(loaded, nspecies) {
     Environment = "Mean"
   )
   print("beta")
-  
+
   Diversities <- dplyr::bind_rows(
     diversity_alpha %>% dplyr::select(
       -Species_Basal, -Species_Consumer, -Species
@@ -223,7 +223,7 @@ Calculate_Diversity <- function(loaded, nspecies) {
     diversity_beta_avg,
     diversity_gamma
   )
-  
+
   ### Return Diversities: ###############################################
   return(Diversities)
 }
@@ -262,7 +262,7 @@ Calculate_Species <- function(result, bintimes = FALSE) {
     abund = result$Abundance,
     numSpecies = (ncol(result$Abundance) - 1) / result$NumEnvironments
   )
-  
+
   if (bintimes) {
     # Should equalise time steps.
     SpeciesPerEnvironment <- lapply(
@@ -276,7 +276,7 @@ Calculate_Species <- function(result, bintimes = FALSE) {
         )
       })
   }
-  
+
   return(dplyr::bind_rows(SpeciesPerEnvironment))
 }
 
@@ -335,7 +335,7 @@ Diversity <- sapply(
       return(NA)
     }
     # print(paste("Calculating", Sys.time()))
-    
+
     # Calculate the diversity.
     # We will need to extract the system properties from
     # the file names which we carry through using sapply.
@@ -351,7 +351,7 @@ SpeciesPresence <-  sapply(
       return(NA)
     }
     # print(paste("Calculating", Sys.time()))
-    
+
     # Calculate the diversity.
     # We will need to extract the system properties from
     # the file names which we carry through using sapply.
@@ -374,8 +374,8 @@ Properties <- data.frame(
   stringsAsFactors = FALSE
 )
 names(Properties)[1:8] <- c(
-  "MNA", "ExampleOutcome", "Result", 
-  "EnvNum", "Space", "Dist", 
+  "MNA", "ExampleOutcome", "Result",
+  "EnvNum", "Space", "Dist",
   "ImmigrationRate", "ExtirpationRateAND.RData"
 )
 
@@ -483,11 +483,11 @@ DiversityRibbons <- Diversity %>% dplyr::filter(
   !(Environment %in% c("Mean", "Gamma")),
   Measurement == "Richness" | Measurement == "Jaccard"
 ) %>%  dplyr::group_by(
-  Time, Environments, 
-  Space, Dispersal, 
+  Time, Environments,
+  Space, Dispersal,
   ImmigrationRate, ExtirpationRate,
   Measurement
-  
+
   # Pool, Noise, Neutral, Space
 ) %>% dplyr::summarise(
   Low = unlist(dplyr::across(dplyr::any_of("Value"),
@@ -621,7 +621,7 @@ PLOT_BL <- ggplot2::ggplot(
 ) + ggplot2::geom_line(
   alpha = 0.4,
   mapping = ggplot2::aes(
-    group = interaction(ImmigrationRate, ExtirpationRate, 
+    group = interaction(ImmigrationRate, ExtirpationRate,
                         Dispersal, Environment)
   )
 ) + ggplot2::geom_line(
@@ -677,7 +677,7 @@ PLOT_BR <- ggplot2::ggplot(
   x = paste0("Time, ", divide_time_by, " units")
 ) + ggplot2::scale_color_manual(
   name = legend_bl_name,
-  values = c("darkorange", "plum1", "cyan")
+  values = c("darkorange4", "plum4", "cyan4") #c("darkorange", "plum1", "cyan")
 ) + ggplot2::theme_bw(
 ) + ggplot2::coord_cartesian(
   ylim = c(0, 65)

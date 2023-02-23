@@ -401,146 +401,146 @@ write.csv(Neutral, file = "Neutral.csv")
 write.csv(Regional, file = "Regional.csv")
 write.csv(Local, file = "Local.csv")
 
-ggplot2::ggplot(Regional, ggplot2::aes(
-  x = WaitTime
-)) + ggplot2::geom_density(
-) + ggplot2::facet_wrap(. ~ Dispersal)
+# ggplot2::ggplot(Regional, ggplot2::aes(
+  # x = WaitTime
+# )) + ggplot2::geom_density(
+# ) + ggplot2::facet_wrap(. ~ Dispersal)
 
-with(Regional, table(Type, LagType, Dispersal))
+# with(Regional, table(Type, LagType, Dispersal))
 
-fitsMME <- lapply(seq_along(together), function(i, presChanges) {
-  temp <- lapply(dispersalLevels, function(dLevel, pc, nm) {
+# fitsMME <- lapply(seq_along(together), function(i, presChanges) {
+  # temp <- lapply(dispersalLevels, function(dLevel, pc, nm) {
 
-    tempexp <- pc %>% dplyr::filter(
-      !is.na(WaitTime),
-      Dispersal == dLevel
-    ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
-      distr = "exp", method = "mme"
-    )
-    tempgam <- pc %>% dplyr::filter(
-      !is.na(WaitTime),
-      Dispersal == dLevel
-    ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
-      distr = "gamma", method = "mme"
-    )
+    # tempexp <- pc %>% dplyr::filter(
+      # !is.na(WaitTime),
+      # Dispersal == dLevel
+    # ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
+      # distr = "exp", method = "mme"
+    # )
+    # tempgam <- pc %>% dplyr::filter(
+      # !is.na(WaitTime),
+      # Dispersal == dLevel
+    # ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
+      # distr = "gamma", method = "mme"
+    # )
 
-    cdfcomp(list(tempexp, tempgam),
-            legendtext = c("exp", "gamma"),
-            main = paste(nm, dLevel, "CDFs"))
+    # cdfcomp(list(tempexp, tempgam),
+            # legendtext = c("exp", "gamma"),
+            # main = paste(nm, dLevel, "CDFs"))
 
-    return(list("exp" = tempexp, "gamma" = tempgam))
+    # return(list("exp" = tempexp, "gamma" = tempgam))
 
-  }, pc = presChanges[[i]], nm = names(presChanges)[i])
-  names(temp) <- dispersalLevels
-  temp
-}, presChanges = together)
+  # }, pc = presChanges[[i]], nm = names(presChanges)[i])
+  # names(temp) <- dispersalLevels
+  # temp
+# }, presChanges = together)
 
 
-fitsMLE <- lapply(seq_along(together), function(i, presChanges) {
-  temp <- lapply(dispersalLevels, function(dLevel, pc, nm) {
+# fitsMLE <- lapply(seq_along(together), function(i, presChanges) {
+  # temp <- lapply(dispersalLevels, function(dLevel, pc, nm) {
 
-    tempexp <- pc %>% dplyr::filter(
-      !is.na(WaitTime),
-      Dispersal == dLevel
-    ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
-      distr = "exp", method = "mle"
-    )
-    tempgam <- tryCatch(pc %>% dplyr::filter(
-      !is.na(WaitTime),
-      Dispersal == dLevel
-    ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
-      distr = "gamma", method = "mle",
-      start = c(list("shape" = 2), as.list(tempexp$estimate)),
-      lower = c(0, 0)
-    ), error = function(e) {print(e);return(NULL)})
+    # tempexp <- pc %>% dplyr::filter(
+      # !is.na(WaitTime),
+      # Dispersal == dLevel
+    # ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
+      # distr = "exp", method = "mle"
+    # )
+    # tempgam <- tryCatch(pc %>% dplyr::filter(
+      # !is.na(WaitTime),
+      # Dispersal == dLevel
+    # ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
+      # distr = "gamma", method = "mle",
+      # start = c(list("shape" = 2), as.list(tempexp$estimate)),
+      # lower = c(0, 0)
+    # ), error = function(e) {print(e);return(NULL)})
 
-    retval <- list("exp" = tempexp, "gamma" = tempgam)
-
-    cdfcomp(retval[unlist(lapply(retval, not(is.null)))],
-            legendtext =
-              c("exp", "gamma")[unlist(lapply(retval, not(is.null)))],
-            main = paste(nm, dLevel, "CDFs"))
-
-    return(retval)
-
-  }, pc = presChanges[[i]], nm = names(presChanges)[i])
-  names(temp) <- dispersalLevels
-  temp
-}, presChanges = together)
-
-fitsBoth <- lapply(seq_along(together), function(i, presChanges) {
-  temp <- lapply(dispersalLevels, function(dLevel, pc, nm) {
-
-    tempexp <- pc %>% dplyr::filter(
-      !is.na(WaitTime),
-      Dispersal == dLevel
-    ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
-      distr = "exp", method = "mme"
-    )
-    tempgam <- pc %>% dplyr::filter(
-      !is.na(WaitTime),
-      Dispersal == dLevel
-    ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
-      distr = "gamma", method = "mme"
-    )
-
-    tempexp2 <- pc %>% dplyr::filter(
-      !is.na(WaitTime),
-      Dispersal == dLevel
-    ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
-      distr = "exp", method = "mle"
-    )
-    tempgam2 <- tryCatch(pc %>% dplyr::filter(
-      !is.na(WaitTime),
-      Dispersal == dLevel
-    ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
-      distr = "gamma", method = "mle",
-      start = as.list(tempgam$estimate),
-      lower = c(0, 0)
-    ), error = function(e) {print(e);return(NULL)})
-
-    tempexp3 <- pc %>% dplyr::filter(
-      !is.na(WaitTime),
-      Dispersal == dLevel
-    ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
-      distr = "exp", method = "qme", probs = 0.5
-    )
-    tempgam3 <- tryCatch(pc %>% dplyr::filter(
-      !is.na(WaitTime),
-      Dispersal == dLevel
-    ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
-      distr = "gamma", method = "qme", probs = c(0.25, 0.75)
-    ), error = function(e) {print(e);return(NULL)})
-
-    tempexp4 <- pc %>% dplyr::filter(
-      !is.na(WaitTime),
-      Dispersal == dLevel
-    ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
-      distr = "exp", method = "mge", gof = 'KS'
-    )
-    tempgam4 <- tryCatch(pc %>% dplyr::filter(
-      !is.na(WaitTime),
-      Dispersal == dLevel
-    ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
-      distr = "gamma", method = "mge", gof = 'KS'
-    ), error = function(e) {print(e);return(NULL)})
-
-    retval <- list("expMME" = tempexp, "gammaMME" = tempgam,
-                   "expMLE" = tempexp2, "gammaMLE" = tempgam2,
-                   "expQME" = tempexp3, "gammaQME" = tempgam3,
-                   "expMGE" = tempexp4, "gammaMGE" = tempgam4)
+    # retval <- list("exp" = tempexp, "gamma" = tempgam)
 
     # cdfcomp(retval[unlist(lapply(retval, not(is.null)))],
-    #         legendtext =
-    #           names(retval)[unlist(lapply(retval, not(is.null)))],
-    #         main = paste(nm, dLevel, "CDFs"))
+            # legendtext =
+              # c("exp", "gamma")[unlist(lapply(retval, not(is.null)))],
+            # main = paste(nm, dLevel, "CDFs"))
 
-    return(retval)
+    # return(retval)
 
-  }, pc = presChanges[[i]], nm = names(presChanges)[i])
-  names(temp) <- dispersalLevels
-  temp
-}, presChanges = together)
+  # }, pc = presChanges[[i]], nm = names(presChanges)[i])
+  # names(temp) <- dispersalLevels
+  # temp
+# }, presChanges = together)
+
+# fitsBoth <- lapply(seq_along(together), function(i, presChanges) {
+  # temp <- lapply(dispersalLevels, function(dLevel, pc, nm) {
+
+    # tempexp <- pc %>% dplyr::filter(
+      # !is.na(WaitTime),
+      # Dispersal == dLevel
+    # ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
+      # distr = "exp", method = "mme"
+    # )
+    # tempgam <- pc %>% dplyr::filter(
+      # !is.na(WaitTime),
+      # Dispersal == dLevel
+    # ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
+      # distr = "gamma", method = "mme"
+    # )
+
+    # tempexp2 <- pc %>% dplyr::filter(
+      # !is.na(WaitTime),
+      # Dispersal == dLevel
+    # ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
+      # distr = "exp", method = "mle"
+    # )
+    # tempgam2 <- tryCatch(pc %>% dplyr::filter(
+      # !is.na(WaitTime),
+      # Dispersal == dLevel
+    # ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
+      # distr = "gamma", method = "mle",
+      # start = as.list(tempgam$estimate),
+      # lower = c(0, 0)
+    # ), error = function(e) {print(e);return(NULL)})
+
+    # tempexp3 <- pc %>% dplyr::filter(
+      # !is.na(WaitTime),
+      # Dispersal == dLevel
+    # ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
+      # distr = "exp", method = "qme", probs = 0.5
+    # )
+    # tempgam3 <- tryCatch(pc %>% dplyr::filter(
+      # !is.na(WaitTime),
+      # Dispersal == dLevel
+    # ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
+      # distr = "gamma", method = "qme", probs = c(0.25, 0.75)
+    # ), error = function(e) {print(e);return(NULL)})
+
+    # tempexp4 <- pc %>% dplyr::filter(
+      # !is.na(WaitTime),
+      # Dispersal == dLevel
+    # ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
+      # distr = "exp", method = "mge", gof = 'KS'
+    # )
+    # tempgam4 <- tryCatch(pc %>% dplyr::filter(
+      # !is.na(WaitTime),
+      # Dispersal == dLevel
+    # ) %>% dplyr::pull(WaitTime) %>% fitdistrplus::fitdist(
+      # distr = "gamma", method = "mge", gof = 'KS'
+    # ), error = function(e) {print(e);return(NULL)})
+
+    # retval <- list("expMME" = tempexp, "gammaMME" = tempgam,
+                   # "expMLE" = tempexp2, "gammaMLE" = tempgam2,
+                   # "expQME" = tempexp3, "gammaQME" = tempgam3,
+                   # "expMGE" = tempexp4, "gammaMGE" = tempgam4)
+
+    # # cdfcomp(retval[unlist(lapply(retval, not(is.null)))],
+    # #         legendtext =
+    # #           names(retval)[unlist(lapply(retval, not(is.null)))],
+    # #         main = paste(nm, dLevel, "CDFs"))
+
+    # return(retval)
+
+  # }, pc = presChanges[[i]], nm = names(presChanges)[i])
+  # names(temp) <- dispersalLevels
+  # temp
+# }, presChanges = together)
 
 
 
