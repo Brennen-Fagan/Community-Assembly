@@ -440,8 +440,15 @@ ggplot2::ggsave(
     objs[[1]]/objs[[2]]/objs[[3]] +
       patchwork::plot_layout(ncol = 1)#, heights = c(3, 3, 3, 0.5))#, 1, 1))
   ),
-  width = plot_width*1.5, height = plot_height*1.75, units = plot_units,
+  width = plot_width*1.5, height = plot_height*2.25, units = plot_units,
   dpi = plot_dpi
+)
+
+axesLimits_neutral <- concludingplotdata_target %>% dplyr::group_by(
+  FacetPanel
+) %>% dplyr::summarise(
+  Min = min(Value),
+  Max = max(Value)
 )
 
 ## Grouped by Pool & Noise: ####################################################
@@ -461,7 +468,7 @@ concludingplotdata_target <- concludingplotdata %>% dplyr::filter(
   )
 )
 
-objs <- lapply(FacetPanels, function(Fac) {
+objs <- lapply(FacetPanels, function(Fac, Axes) {
   d <- concludingplotdata_target %>% dplyr::filter(
     FacetPanel == Fac
   ) %>% tidyr::separate(
@@ -498,6 +505,8 @@ objs <- lapply(FacetPanels, function(Fac) {
       "0  ", "  2e-09",
       as.character(labelsforplot$Label[c(4, 6)]),
       "2e-03", "0.18   " ,"  0.86")
+  ) + ggplot2::scale_y_continuous(
+    limits = unlist(Axes[Axes$FacetPanel == Fac, 2:3])
   ) + ggplot2::geom_line(
     data = d %>% dplyr::group_by(
       Area, Dispersal, FacetPanel, PoolNoise
@@ -542,7 +551,7 @@ objs <- lapply(FacetPanels, function(Fac) {
   }
 
   obj
-})
+}, Axes = axesLimits_neutral)
 
 ggplot2::ggsave(
   filename = file.path(
