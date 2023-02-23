@@ -440,7 +440,7 @@ ggplot2::ggsave(
     objs[[1]]/objs[[2]]/objs[[3]] +
       patchwork::plot_layout(ncol = 1)#, heights = c(3, 3, 3, 0.5))#, 1, 1))
   ),
-  width = plot_width*1.5, height = plot_height*2.25, units = plot_units,
+  width = plot_width*1.5, height = plot_height*2.5, units = plot_units,
   dpi = plot_dpi
 )
 
