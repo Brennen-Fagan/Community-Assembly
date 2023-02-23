@@ -334,7 +334,7 @@ objs <- lapply(FacetPanels, function(Fac) {
 ggplot2::ggsave(
   filename = file.path(
     outputLocation,
-    "RichnessComparison-Invadability-BaseOnly.png"
+    "RichnessComparison-Invadability-BaseOnly.pdf"
   ),
   plot = (
     objs[[1]]/objs[[2]]/objs[[3]] +
@@ -434,7 +434,7 @@ objs <- lapply(FacetPanels, function(Fac) {
 ggplot2::ggsave(
   filename = file.path(
     outputLocation,
-    "RichnessComparison-Invadability-ByNeutral.png"
+    "RichnessComparison-Invadability-ByNeutral.pdf"
   ),
   plot = (
     objs[[1]]/objs[[2]]/objs[[3]] +
@@ -556,7 +556,7 @@ objs <- lapply(FacetPanels, function(Fac, Axes) {
 ggplot2::ggsave(
   filename = file.path(
     outputLocation,
-    "RichnessComparison-Invadability-ByPoolNoise.png"
+    "RichnessComparison-Invadability-ByPoolNoise.pdf"
   ),
   plot = (
     objs[[1]]/objs[[2]]/objs[[3]] +
@@ -585,7 +585,7 @@ plotsGammaOverAlpha <- lapply(
 ggplot2::ggsave(
   filename = file.path(
     outputLocation,
-    paste0("GammaOverAlpha-BaseOnly.png")
+    paste0("GammaOverAlpha-BaseOnly.pdf")
   ),
   plot = plotsGammaOverAlpha[[1]] + ggplot2::labs(
     x = "Local Richness", y = "Regional Richness",

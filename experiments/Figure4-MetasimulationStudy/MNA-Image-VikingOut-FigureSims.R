@@ -78,7 +78,7 @@ forHeatMaps <- forHeatMaps %>% dplyr::left_join(labelsforplot, by = "Space")
 )
 
 ggplot2::ggsave(
-  filename = file.path(outputLocation, "SimsCompleted-Absolute.png"),
+  filename = file.path(outputLocation, "SimsCompleted-Absolute.pdf"),
   width = plot_width, height = plot_height, units = plot_units,
   dpi = plot_dpi
 )
@@ -182,7 +182,7 @@ for(x in 1:3) {
 ) + patchwork::plot_layout(guides = "collect")
 
 ggplot2::ggsave(
-  filename = file.path(outputLocation, "SimsCompleted-Relative.png"),
+  filename = file.path(outputLocation, "SimsCompleted-Relative.pdf"),
   width = plot_width, height = plot_height, units = plot_units,
   dpi = plot_dpi
 )
