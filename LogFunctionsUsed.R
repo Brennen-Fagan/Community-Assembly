@@ -75,4 +75,16 @@ functionsusedR_nots <- functionsusedR_nots[
 
 # Compare the two to identify functions to potentially deprecate and move to
 # the "Extraneous" directory.
-print(functionsusedR_nots[!(functionsusedR_nots %in% functionsused_nots)])
+possiblyDeprecated <-
+  functionsusedR_nots[!(functionsusedR_nots %in% functionsused_nots)]
+
+names(functionsusedR) <- Rfiles
+
+possiblyDeprecated_homes <-
+  lapply(functionsusedR,
+         function(x) unlist(x)[unlist(x) %in% possiblyDeprecated])
+possiblyDeprecated_homes <- possiblyDeprecated_homes[
+  unlist(lapply(possiblyDeprecated_homes, length) != 0)
+]
+
+# The rest of the inspection needs to be by hand. E.g. rtnorm is used a lot!
