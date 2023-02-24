@@ -3,20 +3,6 @@
 `%do%` <- foreach::`%do%`
 `%:%` <- foreach::`%:%`
 
-CommunityMatrix <- function(method, ...) {
-  if (method %in% c(
-    "SpeciesPool", "Species Pool", "Law", "Morton", "LawMorton1996"
-  )) {
-    return(LawMorton1996(...))
-  } else if (method %in% c(
-
-  )) {
-
-  } else {
-    stop("Method not recognised.")
-  }
-}
-
 SpeciesPresent <- function(Abundance, Threshold = 1E-4) {
   # resultsNotNAs <- apply(
   #   Abundance[, -1],
