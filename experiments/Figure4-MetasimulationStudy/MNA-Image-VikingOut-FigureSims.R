@@ -46,7 +46,7 @@ forHeatMaps <- forHeatMaps %>% dplyr::left_join(labelsforplot, by = "Space")
     ) + ggplot2::theme_bw() + ggplot2::theme(
       axis.text.x = ggplot2::element_text(angle = 30, hjust = 1, vjust = 1))
     )
-) / (
+) / patchwork::plot_spacer() / (
   (
     ggplot2::ggplot(
       forHeatMaps,
@@ -60,7 +60,7 @@ forHeatMaps <- forHeatMaps %>% dplyr::left_join(labelsforplot, by = "Space")
       forHeatMaps,
       ggplot2::aes(x = Immigration, y = Extirpation)
     ) + ggplot2::theme_bw()
-) / (
+) /  patchwork::plot_spacer() /(
   ggplot2::ggplot(
     forHeatMaps,
     ggplot2::aes(x = Immigration, y = `PoolNoise`)
@@ -72,7 +72,7 @@ forHeatMaps <- forHeatMaps %>% dplyr::left_join(labelsforplot, by = "Space")
   ) + ggplot2::ylab(
     "Pool & Noise"
   ) + ggplot2::theme_bw()
-)) & ggplot2::geom_bin2d(
+) + patchwork::plot_layout(heights = c(1, .1, 1, .1, 1))) & ggplot2::geom_bin2d(
 ) & ggplot2::scale_fill_viridis_c(
   trans = "log10", direction = -1
 )
@@ -167,10 +167,10 @@ for(x in 1:3) {
   ((
     heatMaps_Relative[[1]] +
       heatMaps_Relative[[2]]
-  ) / (
+  ) / patchwork::plot_spacer() / (
     heatMaps_Relative[[3]] +
       heatMaps_Relative[[4]]
-  ) / (
+  ) / patchwork::plot_spacer() / (
     heatMaps_Relative[[5]] +
       heatMaps_Relative[[6]]
   )) & ggplot2::geom_raster(
@@ -179,7 +179,7 @@ for(x in 1:3) {
     limits = c(0, 1),
     labels = scales::percent_format()
   )
-) + patchwork::plot_layout(guides = "collect")
+) + patchwork::plot_layout(guides = "collect", heights = c(1, 0.1, 1, 0.1, 1))
 
 ggplot2::ggsave(
   filename = file.path(outputLocation, "SimsCompleted-Relative.pdf"),

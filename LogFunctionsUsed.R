@@ -2,6 +2,9 @@
 
 library(NCmisc)
 
+library(RMTRCode2)
+allOurFunctions <- ls("package:RMTRCode2")
+
 # Assumed this dir is root package directory.
 thisdir <- '.'
 targdirs <- file.path(thisdir, "experiments", c(
@@ -18,6 +21,7 @@ targfiles <- dir(
 )
 
 functionsused <- lapply(targfiles, NCmisc::list.functions.in.file)
+names(functionsused) <- targfiles
 functionsused_nots <- lapply(functionsused, function(x, keep) {
   x[names(x) %in% keep]
 }, keep = "character(0)")
@@ -64,6 +68,7 @@ Rfiles <- dir(
 )
 
 functionsusedR <- lapply(Rfiles, NCmisc::list.functions.in.file)
+names(functionsusedR) <- Rfiles
 
 functionsusedR_nots <- lapply(functionsusedR, function(x, keep) {
   x[names(x) %in% keep]
@@ -75,17 +80,9 @@ functionsusedR_nots <- functionsusedR_nots[
 
 # Compare the two to identify functions to potentially deprecate and move to
 # the "Extraneous" directory.
-possiblyDeprecated <-
-  functionsusedR_nots[!(functionsusedR_nots %in% functionsused_nots)]
+possiblyDeprecated <- allOurFunctions[
+  !(allOurFunctions %in% c(functionsused_nots, functionsusedR_nots))
+  ]
 
-names(functionsusedR) <- Rfiles
 
-possiblyDeprecated_homes <-
-  lapply(functionsusedR,
-         function(x) unlist(x)[unlist(x) %in% possiblyDeprecated])
-possiblyDeprecated_homes <- possiblyDeprecated_homes[
-  unlist(lapply(possiblyDeprecated_homes, length) != 0)
-]
-
-# The rest of the inspection needs to be by hand. E.g. rtnorm is used a lot!
-#
+# The rest of the inspection needs to be by hand.
