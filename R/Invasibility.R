@@ -1,153 +1,4 @@
-CalculateLocalInvadables <- function(
-    Abundance, # Not Time, All Environments
-    PerCapitaDynamics, # function(t, y, parms)
-    ArrivalDensity,
-    DispersalMatrix,
-    Tolerance = sqrt(.Machine$double.eps)
-) {
-  stopifnot(
-    (n <- length(Abundance)) == ncol(DispersalMatrix),
-    n == nrow(DispersalMatrix)
-  )
-
-  # Who are you?
-  candidates <- which(
-    abs(Abundance - rep(0, n)) < Tolerance
-  )
-
-  if (length(candidates) == 0) {return(NULL)}
-
-  # Will the patch accept you?
-  pcd <- PerCapitaDynamics(0, Abundance, list())
-
-  # What will things look like when you arrive?
-  candidateAbundance <- Abundance
-  candidateAbundance[candidates] <-
-    candidateAbundance[candidates] + ArrivalDensity
-
-  # Will dispersal remove you?
-  # dynamics <- unlist(lapply(candidates, function(i, h) {
-  #   # Simple forward with h time steps
-  #
-  #   # t == 0
-  #   candidateAbundance <- Abundance
-  #   candidateAbundance[i] <- ArrivalDensity
-  #
-  #   # t == 1
-  #   d1 <-
-  #     (candidateAbundance * PerCapitaDynamics(0, candidateAbundance, list())) +
-  #     DispersalMatrix %*% candidateAbundance
-  #
-  #   candidateAbundance <- candidateAbundance + h * d1
-  #
-  #   # t == 2
-  #   d2 <- (candidateAbundance * PerCapitaDynamics(0, candidateAbundance, list())) +
-  #     DispersalMatrix %*% candidateAbundance
-  #
-  #   return(d2[i])
-  # }, h = 0.1))
-
-  # Sum(G^k)_{k=1} = (I - G)^{-1} - I
-  eye <- diag(nrow = nrow(DispersalMatrix), ncol = ncol(DispersalMatrix))
-  totalEffects <- (solve(eye - DispersalMatrix) - eye)
-
-  # dynamics <- (candidateAbundance * pcd)[candidates] +
-  #   unlist(lapply(candidates, function(i) {
-  #
-  #     # # Figure out where we can give to, and then get from.
-  #     tempA <- rep(0, nrow(DispersalMatrix))
-  #     tempA[i] <- tempA[i] + ArrivalDensity
-  #
-  #     cA <- Abundance + tempA
-  #     (totalEffects %*% cA)[i]
-  #   }))
-
-  dynamics <- (candidateAbundance * pcd)[candidates] +
-    unlist(lapply(candidates, function(i) {
-
-      # Figure out where we can give to, and then get from.
-      tempA <- rep(0, nrow(DispersalMatrix))
-      tempA[i] <- ArrivalDensity
-
-      # Suppose that these "get froms" are occupied (due to our own donation?).
-      tempA <- (totalEffects %*% tempA)
-      tempA[tempA > 0] <- ArrivalDensity
-      tempA[tempA < 0] <- 0
-      tempA[i] <- ArrivalDensity
-
-      # How much can we expect to receive?
-      cA <- Abundance + tempA
-      (totalEffects %*% cA)[i]
-    }))
-
-  invadable <- pcd[candidates] > 0 & dynamics > 0
-
-  return(invadable)
-}
-
-CalculateLocalInvadables_TestEvent <- function(
-    Abundance, # Not Time, All Environments
-    PerCapitaDynamics, # function(t, y, parms)
-    Environments,
-    ArrivalDensity,
-    DispersalMatrix,
-    Tolerance = sqrt(.Machine$double.eps)
-) {
-  # WARNING: SLOW.
-  stopifnot(
-    (n <- length(Abundance)) == ncol(DispersalMatrix),
-    n == nrow(DispersalMatrix)
-  )
-
-  # Who are you?
-  candidates <- which(
-    abs(Abundance - rep(0, n)) < Tolerance
-  )
-
-  npool <- length(Abundance) / Environments
-
-  if (length(candidates) == 0) {return(NULL)}
-
-  tempdf <- data.frame(id = 1:(npool))
-
-  invadable <- unlist(lapply(candidates, function(i) {
-
-    testEvent <- list(Events = data.frame(
-      Times = 0.01,
-      Species = ((i - 1) %% npool) + 1,
-      Environment = ((i - 1) %/% npool) + 1,
-      Type = "Arrival",
-      Success = NA
-    ), Seed = NA)
-
-    testRun <- RMTRCode2::MultipleNumericalAssembly_Dispersal(
-      Pool = tempdf,
-      NumEnvironments = Environments,
-      Events = testEvent,
-      PerCapitaDynamics = PerCapitaDynamics,
-      DispersalMatrix = DispersalMatrix,
-      EliminationThreshold = 10^-4, ArrivalDensity = ArrivalDensity,
-      Verbose = FALSE,
-      PopulationInitial = Abundance,
-      TimeInitial = 0,
-      CharacteristicRate = 3/10, # So we see what happens over 10 time steps.
-      MaximumTimeStep = 1
-    )
-
-    target <- testRun$Abundance[testRun$Abundance[, 1] > 0.01, i + 1]
-
-    # Must grow at least once over the timescale and not die out by the end.
-    value <- any(diff(target) >= 0) & all(tail(target) > 0)
-
-    names(value) <- NULL
-    # On way up or [on way down || eliminate]?
-    return(value)
-  }))
-
-  return(invadable)
-}
-
-CalculateLocalInvadables_BareBones <- function(
+CalculateLocalInvasibles_BareBones <- function(
     Abundance, # Not Time, All Environments
     PerCapitaDynamics, # function(t, y, parms)
     Environments,
@@ -217,7 +68,9 @@ CalculateLocalInvadables_BareBones <- function(
   return(invadable)
 }
 
-CalculateLocalInvadables_KnockOn <- function(
+CalculateLocalInvadables_BareBones <- CalculateLocalInvasibles_BareBones
+
+CalculateLocalInvasibles_KnockOn <- function(
     Abundance, # Not Time, All Environments
     PerCapitaDynamics, # function(t, y, parms)
     Environments, # Deprecated.
@@ -392,7 +245,9 @@ CalculateLocalInvadables_KnockOn <- function(
   return(outputs)
 }
 
-CalculateLocalInvadables_KnockOnRunSteady <- function(
+CalculateLocalInvadables_KnockOn <- CalculateLocalInvasibles_KnockOn
+
+CalculateLocalInvasibles_KnockOnRunSteady <- function(
     Abundance, # Not Time, All Environments
     PerCapitaDynamics, # function(t, y, parms)
     Environments,
@@ -532,3 +387,7 @@ CalculateLocalInvadables_KnockOnRunSteady <- function(
 
   return(outputs)
 }
+
+
+
+CalculateLocalInvadables_KnockOnRunSteady <- CalculateLocalInvasibles_KnockOnRunSteady
