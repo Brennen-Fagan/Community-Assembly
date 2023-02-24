@@ -21,14 +21,14 @@ MultipleCommunityAssembly.R, "ArrivalFUN_Example", CreateAssemblySequence, No
 MultipleCommunityAssembly.R, "ArrivalFUN_Example2", CreateAssemblySequence, No
 Invadability, "CalculateLocalInvadables", , Yes
 Invadability, "CalculateLocalInvadables_TestEvent", , Yes
-"CommunityMatrix"                    
+CommunityMatrices.R, "CommunityMatrix", , Never Used
 MultipleCommunityAssembly.R, "ExtinctFUN_Example", CreateAssemblySequence, No
 MultipleCommunityAssembly.R, "ExtinctFUN_Example2" , CreateAssemblySequence, No         
-"FindSteadyStateFromBasal"
-"FindSteadyStateFromSize"            
-"IslandDynamicsSTODE"
-"IslandLotkaVolterra"                
-"IslandNumericalAssembly"
-"LawMorton1996_NumericalAssembly"    
-"LawMorton1996_PermanenceAssembly"
-"toPostMortem"
+CommunityIslands.R, "FindSteadyStateFromBasal", , Yes in favour of FindSteadyStateFromEstimate
+CommunityIslands.R, "FindSteadyStateFromSize", , Yes in favour of FindSteadyStateFromEstimate            
+CommunityIslands.R, "IslandDynamicsSTODE", , Yes in favour of IslandDynamics?
+CommunityIslands.R, "IslandLotkaVolterra", IslandDynamics, No              
+CommunityIslands.R, "IslandNumericalAssembly", , Yes in favour of IslandDynamics?
+LawMorton1996.R, "LawMorton1996_NumericalAssembly", , Yes in favour of parallel assembly
+LawMorton1996.R, "LawMorton1996_PermanenceAssembly", , Yes in favour of parallel assembly
+FoodWebPostMortem.R, "toPostMortem", Definitely some of the initial experiments and galleries, Yes no longer working with foodwebs generally.
