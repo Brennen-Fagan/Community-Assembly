@@ -1,0 +1,19 @@
+Log of files and functions and function calls
+
+FILE, FUNCTIONS, CALLED IN
+################################################################################
+Calculate_TimeJaccard, Calculate_TimeJaccard.R,
+################################################################################
+CsvRowSplit, CommunityIslands.R, FindSteadyStateFromEstimate|FindSteadyStateFromBasal|FindSteadyStateFromSize|Productivity
+quiet, CommunityIslands.R,
+FindSteadyStateFromEstimate, CommunityIslands.R,
+FindSteadyStateFromBasal, CommunityIslands.R,
+FindSteadyStateFromSize, CommunityIslands.R,
+Productivity, CommunityIslands.R,
+IslandLotkaVolterra, CommunityIslands.R, IslandDynamics|IslandDynamicsSTODE|IslandNumericalAssembly
+IslandDynamics, CommunityIslands.R,
+IslandPreprocess, , IslandDynamics|IslandDynamicsSTODE|IslandNumericalAssembly
+IslandDynamicsSTODE, CommunityIslands.R,
+IslandNumericalAssembly, CommunityIslands.R,
+################################################################################
+GeneralisedLotkaVolterra, , FindSteadyStateFromEstimate|FindSteadyStateFromBasal|FindSteadyStateFromSize|Productivity
