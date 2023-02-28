@@ -179,12 +179,16 @@ CreateAssemblySequence <- function(
 EliminationAndNeutralEvents <- function(
   EventsAndSeed, Species, #InteractionMatrices, #Pool,
   PerCapitaDynamics, EliminationThreshold,
-  ArrivalDensity, Verbose = FALSE
+  ArrivalDensity, ExtinctionProportion = 1, Verbose = FALSE
 ) {
   EventDF <- EventsAndSeed$Events # Other list entry is seed.
   PerCapitaDynams <- PerCapitaDynamics
   ArrivalDens <- ArrivalDensity
   Verb <- Verbose
+  if (ExtinctionProportion <= 1)
+    RemainPercentage <- 1 - ExtinctionProportion
+  else
+    stop("ExtinctionProportion (= x) unclear. Please keep 0 <= x <= 1.")
 
   function(t, y, parms,
            ReturnEvents = FALSE) {
@@ -205,7 +209,7 @@ EliminationAndNeutralEvents <- function(
       if (EventDF$Type[event] == "Extinct") {
         # Check if already present for records purposes.
         EventDF$Success[event] <<- y[abundanceIndex] > 0
-        y[abundanceIndex] <- 0
+        y[abundanceIndex] <- RemainPercentage * y[abundanceIndex]
       } else if (EventDF$Type[event] == "Arrival") {
         # Check if Uninvadable
         # <=> per capita growth rate > 0
@@ -494,6 +498,7 @@ MultipleNumericalAssembly_Dispersal <- function(
   # Note that this can be made using CreateDispersalMatrix.
   EliminationThreshold = 10^-4, # Below which species are removed from internals
   ArrivalDensity = EliminationThreshold * 4 * 10 ^ 3, # Traill et al. 2007
+  ExtinctionProportion = 1, # Proportion to remove on an "Extinct" event.
 
   PopulationInitial = NULL, # if NULL, rep(rep(0, nrow(Pool)), NumEnvironments).
   # Otherwise, should be of length nrow(Pool) * NumEnvironments, ordered as
@@ -572,6 +577,7 @@ MultipleNumericalAssembly_Dispersal <- function(
       PerCapitaDynamics = PerCapitaDynamics,
       EliminationThreshold = EliminationThreshold,
       ArrivalDensity = ArrivalDensity,
+      ExtinctionProportion = ExtinctionProportion,
       Verbose = Verbose
     )
   )
@@ -648,6 +654,7 @@ MultipleNumericalAssembly_Dispersal <- function(
   retval$HistorySeed <- Events$Seed
   retval$Parameters <- list(
     EliminationThreshold = EliminationThreshold,
+    ExtinctionProportion = ExtinctionProportion,
     ArrivalDensity = ArrivalDensity,
     MaximumTimeStep = MaximumTimeStep,
     BetweenEventSteps = BetweenEventSteps
