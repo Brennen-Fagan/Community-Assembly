@@ -108,7 +108,7 @@ CalculateLocalInvasibles_KnockOn <- function(
       effectAbundance =
         Matrix::Matrix(as.numeric(NA), nrow = length(candidates), ncol = n),
       effectRichness = {
-        temp <- rep(NA, n)
+        temp <- rep(as.numeric(NA), n)
         temp[Abundance > EliminationThreshold] <- 0
         do.call(rbind, replicate(
           length(candidates),
@@ -116,7 +116,7 @@ CalculateLocalInvasibles_KnockOn <- function(
         ))
       },
       effectEstablish = {
-        temp <- rep(NA, n)
+        temp <- rep(as.numeric(NA), n)
         do.call(rbind, replicate(
           length(candidates),
           Matrix::Matrix(temp, nrow = 1, ncol = n)
@@ -175,17 +175,17 @@ CalculateLocalInvasibles_KnockOn <- function(
     speciesGain <- speciesNow[!speciesNow %in% speciesBase]
     speciesPers <- intersect(speciesBase, speciesNow)
     speciesLost <- speciesBase[!speciesBase %in% speciesNow]
-    species <- rep(NA, n)
+    species <- rep(as.numeric(NA), n)
     species[speciesGain] <- 1
     species[speciesPers] <- 0
     species[speciesLost] <- -1
 
     establishBase <- which(
-      PerCapitaDynamics(0, Abundance, list()) > 0 &
+      pcd[,] > 0 &
       Abundance < EliminationThreshold
     )
     establishNow <- which(
-      PerCapitaDynamics(0, retAbund[nrow(retAbund), -1], list()) > 0 &
+      PerCapitaDynamics(0, retAbund[nrow(retAbund), -1], list())[,] > 0 &
       retAbund[nrow(retAbund), -1] < EliminationThreshold
     )
 
@@ -194,7 +194,7 @@ CalculateLocalInvasibles_KnockOn <- function(
     # Can't Now Establish but could before = -1 (note includes focal)
     # Already Present or Can't and Couldn't = NA
     # You can differentiate using species that persist, are gained or are lost.
-    establish <- rep(NA, n)
+    establish <- rep(as.numeric(NA), n)
     establish[establishNow[!establishNow %in% establishBase]] <- 1
     establish[intersect(establishBase, establishNow)] <- 0
     establish[establishBase[!establishBase %in% establishNow]] <- -1
@@ -236,7 +236,7 @@ CalculateLocalInvasibles_KnockOn <- function(
         if("effectEstablish" %in% names(f)) {
           f$effectEstablish
         } else {
-          temp <- rep(NA, n)
+          temp <- rep(as.numeric(NA), n)
           Matrix::Matrix(temp, nrow = 1, ncol = n)
         }
     ))
@@ -378,7 +378,7 @@ CalculateLocalInvasibles_KnockOnRunSteady <- function(
         if("effectRichness" %in% names(f)) {
           f$effectRichness
         } else {
-          temp <- rep(NA, n)
+          temp <- rep(as.numeric(NA), n)
           temp[Abundance > EliminationThreshold] <- 0
           Matrix::Matrix(temp, nrow = 1, ncol = n)
         }
