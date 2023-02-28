@@ -24,7 +24,7 @@ functionsused <- lapply(targfiles, NCmisc::list.functions.in.file)
 names(functionsused) <- targfiles
 functionsused_nots <- lapply(functionsused, function(x, keep) {
   x[names(x) %in% keep]
-}, keep = "character(0)")
+}, keep = c("character(0)", "package:RMTRCode2"))
 functionsused_nots <- sort(unique(unlist(functionsused_nots)))
 
 notmine <- c(
@@ -72,7 +72,7 @@ names(functionsusedR) <- Rfiles
 
 functionsusedR_nots <- lapply(functionsusedR, function(x, keep) {
   x[names(x) %in% keep]
-}, keep = "character(0)")
+}, keep = c("character(0)", "package:RMTRCode2"))
 functionsusedR_nots <- sort(unique(unlist(functionsusedR_nots)))
 functionsusedR_nots <- functionsusedR_nots[
   !(functionsusedR_nots %in% notmine)
