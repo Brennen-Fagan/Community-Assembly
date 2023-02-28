@@ -1,14 +1,20 @@
 # See MNA-Image-ExampleOutcome-Presence.R and
 # MNA-Image-ExampleOutcome-TimeJaccard.R for examples in context.
 
-Calculate_TimeJaccard <- function(loaded, nspecies, minTime) {
+Calculate_TimeJaccard <- function(loaded, nspecies, minTime = NULL) {
   loaded$Abundance[, -1] <-
     loaded$Abundance[, -1] > loaded$Parameters$EliminationThreshold
 
-  ### Alpha Diversity: ##################################################
+  if (#"ReactionTime" %in% names(loaded) &&
+      is.null(minTime)) {
+    minTime = max(loaded$Abundance[, 1])/101 # Slice into 100 comparisons
+  }
+
+  ### Calculate Diversity: ##################################################
   diversity <- lapply(
     1:loaded$NumEnvironments,
     function(i, abund, numSpecies) {
+      print(i)
       time <- abund[, 1]
       env <- abund[, 1 + 1:numSpecies + numSpecies * (i - 1)]
       env_basal <- env[, 1:nspecies[1]]
