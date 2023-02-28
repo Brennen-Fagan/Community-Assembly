@@ -61,14 +61,12 @@ forHeatMaps <- forHeatMaps %>% dplyr::left_join(labelsforplot, by = "Space")
   (
     ggplot2::ggplot(
       forHeatMaps,
-      ggplot2::aes(x = Dispersal, y = `PoolNoise`)
       ggplot2::aes(x = Dispersal, y = Extirpation)
     ) + ggplot2::theme_bw() + ggplot2::theme(
       axis.text.x = ggplot2::element_text(angle = 30, hjust = 1, vjust = 1))
   ) +
     ggplot2::ggplot(
       forHeatMaps,
-      ggplot2::aes(x = Immigration, y = Extirpation)
       ggplot2::aes(x = Immigration, y = `PoolNoise`)
     ) + ggplot2::ylab(
       "Pool & Noise"
