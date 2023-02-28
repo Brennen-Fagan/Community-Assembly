@@ -754,6 +754,7 @@ stopifnot(
 #   EliminationThreshold = 10^-4, ArrivalDensity = 0.4,
 #   Verbose = TRUE
 # )
+print("Invasibility")
 
 # Calculate:
 Invadables <- CalculateLocalInvadables_BareBones(

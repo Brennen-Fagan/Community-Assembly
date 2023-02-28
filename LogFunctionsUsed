@@ -1,5 +1,7 @@
 Log of files and functions and function calls
 
+# Iteration 1: ################################################
+
 The targets for deprecation are
 
 [1] "ArrivalFUN_Example"                 "ArrivalFUN_Example2"
@@ -14,7 +16,6 @@ The targets for deprecation are
 To be retained, they must be used in another function not on this list.
 We then need to double check that the package builds properly and all tests
 and plots can be run without error.
-
 
 FILE, FUNCTIONS, CALLED IN, Deprecated?
 MultipleCommunityAssembly.R, "ArrivalFUN_Example", CreateAssemblySequence, No
