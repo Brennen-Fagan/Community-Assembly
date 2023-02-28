@@ -473,7 +473,7 @@ SpeciesPresence <- SpeciesPresence %>% dplyr::group_by(
   # ),
   Distance = 10^as.numeric(Distance),
   Space = Distance,
-  Dispersal = 1 - exp( -9 / as.numeric(Space) ),
+  Dispersal = 1 - exp( -2 / as.numeric(Space) ),
   Dispersal = paste0(
     formatC(Dispersal))
 )
@@ -484,7 +484,7 @@ Diversity <- Diversity %>% dplyr::mutate(
   # ),
   Distance = 10^as.numeric(Distance),
   Space = Distance,
-  Dispersal = 1 - exp( -9 / as.numeric(Space) ),
+  Dispersal = 1 - exp( -2 / as.numeric(Space) ),
   Dispersal = paste0(
     formatC(Dispersal))
 )
