@@ -149,6 +149,7 @@ for (i in 3){ #seq_along(evnt)){
       outputName, i, "-", 1, ".RData"
     )
   )
+
   ev <- evnt[[i]]
   stopTime <- max(ev$Events$Times) / 2
 
@@ -167,30 +168,35 @@ for (i in 3){ #seq_along(evnt)){
       BetweenEventSteps = BetweenEventSteps,
       Verbose = FALSE
     )
+
     print("Save")
+
     save(
       results, file = fileName1
     )
   }
+
   fileName2 <- file.path(
     outputLocation, paste0(
       outputName, i, "-", 2, ".RData"
     )
   )
+
   if (!file.exists(fileName2)) {
-    
+
     if(!exists("results")) {
       load(fileName1)
     }
-    
+
     print(2)
-    
+
     ev <- evnt[[i]]
     # We'll stop immediately before the last event, then make sure to include
     # it as the starting point for the next event.
     lastEventTime <- max(results$Events$Times)
     ev$Events <- ev$Events %>% dplyr::filter(Times >= lastEventTime)
     stopRow <- which.max(results$Abundance[, 1] >= lastEventTime) - 1
+
     results <- RMTRCode2::MultipleNumericalAssembly_Dispersal(
       PopulationInitial = results$Abundance[stopRow, -1],
       TimeInitial = results$Abundance[stopRow, 1],
@@ -210,6 +216,7 @@ for (i in 3){ #seq_along(evnt)){
       results, file = fileName2
     )
   }
+
   rm(results)
 }
 
