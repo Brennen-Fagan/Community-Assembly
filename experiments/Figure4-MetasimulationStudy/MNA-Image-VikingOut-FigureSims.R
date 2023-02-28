@@ -28,6 +28,15 @@ forHeatMaps <- dplyr::bind_rows(
   Neutral, into = c("Immigration", "Extirpation"), sep = ", "
 ) %>% tidyr::unite(
   "PoolNoise", Pool, Noise, sep = " & "
+) %>% dplyr::mutate(
+  PoolNoise = dplyr::case_when(
+    PoolNoise == "0, 0, 0, 0 & 0" ~ "Homogeneous Env.",
+    PoolNoise == "0, 0, 0, 0 & 1" ~ "Base Case",
+    PoolNoise == "-1, 0, 0, 0 & 1" ~ "Smaller Basal",
+    PoolNoise == "0, 0, 0, 1 & 1" ~ "Larger Consumer",
+    PoolNoise == "-1, 0, 0, 1 & 1" ~ "Smaller and Larger",
+    TRUE ~ "Oops"
+  )
 )
 
 forHeatMaps <- forHeatMaps %>% dplyr::left_join(labelsforplot, by = "Space")
@@ -42,7 +51,9 @@ forHeatMaps <- forHeatMaps %>% dplyr::left_join(labelsforplot, by = "Space")
   ) +
     (ggplot2::ggplot(
       forHeatMaps,
-      ggplot2::aes(x = Dispersal, y = Extirpation)
+      ggplot2::aes(x = Dispersal, y = `PoolNoise`)
+    ) + ggplot2::ylab(
+      "Pool & Noise"
     ) + ggplot2::theme_bw() + ggplot2::theme(
       axis.text.x = ggplot2::element_text(angle = 30, hjust = 1, vjust = 1))
     )
@@ -51,22 +62,23 @@ forHeatMaps <- forHeatMaps %>% dplyr::left_join(labelsforplot, by = "Space")
     ggplot2::ggplot(
       forHeatMaps,
       ggplot2::aes(x = Dispersal, y = `PoolNoise`)
-    ) + ggplot2::ylab(
-      "Pool & Noise"
+      ggplot2::aes(x = Dispersal, y = Extirpation)
     ) + ggplot2::theme_bw() + ggplot2::theme(
       axis.text.x = ggplot2::element_text(angle = 30, hjust = 1, vjust = 1))
   ) +
     ggplot2::ggplot(
       forHeatMaps,
       ggplot2::aes(x = Immigration, y = Extirpation)
-    ) + ggplot2::theme_bw()
+      ggplot2::aes(x = Immigration, y = `PoolNoise`)
+    ) + ggplot2::ylab(
+      "Pool & Noise"
+    ) + ggplot2::theme_bw(
+    )
 ) /  patchwork::plot_spacer() /(
   ggplot2::ggplot(
     forHeatMaps,
-    ggplot2::aes(x = Immigration, y = `PoolNoise`)
-  ) + ggplot2::ylab(
-    "Pool & Noise"
-  ) + ggplot2::theme_bw() + ggplot2::ggplot(
+    ggplot2::aes(x = Immigration, y = Extirpation)
+  ) + ggplot2::theme_bw()+ ggplot2::ggplot(
     forHeatMaps,
     ggplot2::aes(x = Extirpation, y = `PoolNoise`)
   ) + ggplot2::ylab(
@@ -111,7 +123,16 @@ forHeatMaps_Desired <- dplyr::bind_rows(
   Neutral, sep = ", ", into = c("Immigration", "Extirpation")
 ) %>% dplyr::mutate(
   Space = as.character(Space)
-) %>% dplyr::left_join(labelsforplot, by = "Space")
+) %>% dplyr::left_join(labelsforplot, by = "Space") %>% dplyr::mutate(
+  PoolNoise = dplyr::case_when(
+    PoolNoise == "0, 0, 0, 0 & 0" ~ "Homogeneous Env.",
+    PoolNoise == "0, 0, 0, 0 & 1" ~ "Base Case",
+    PoolNoise == "-1, 0, 0, 0 & 1" ~ "Smaller Basal",
+    PoolNoise == "0, 0, 0, 1 & 1" ~ "Larger Consumer",
+    PoolNoise == "-1, 0, 0, 1 & 1" ~ "Smaller and Larger",
+    TRUE ~ "Oops"
+  )
+)
 
 forHeatMaps_Relative <- forHeatMaps %>% dplyr::group_by(
   `PoolNoise`, Immigration, Extirpation, Space, Dispersal
@@ -166,12 +187,12 @@ for(x in 1:3) {
 (
   ((
     heatMaps_Relative[[1]] +
-      heatMaps_Relative[[2]]
-  ) / patchwork::plot_spacer() / (
-    heatMaps_Relative[[3]] +
-      heatMaps_Relative[[4]]
-  ) / patchwork::plot_spacer() / (
-    heatMaps_Relative[[5]] +
+      heatMaps_Relative[[3]]
+  ) /  patchwork::plot_spacer() / (
+    heatMaps_Relative[[2]] +
+      heatMaps_Relative[[5]]
+  ) /  patchwork::plot_spacer() / (
+    heatMaps_Relative[[4]] +
       heatMaps_Relative[[6]]
   )) & ggplot2::geom_raster(
   ) & ggplot2::scale_fill_viridis_c(
