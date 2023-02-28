@@ -66,27 +66,27 @@ if (!exists("CalculateLocalInvadables_KnockOn",
 }
 
 # # Receive the Selection: ######################################################
-print("Receiving number of cores:")
-
-# cargs <- 4
-cargs <- as.numeric(commandArgs(trailingOnly = TRUE))
-
-clust <- parallel::makeCluster(cargs[1], outfile = "")
-doParallel::registerDoParallel(clust)
-
-# Send locally installed packages to cluster.
-parallel::clusterExport(
-  cl = clust, list("allLibraryPaths")
-)
-
-parallel::clusterEvalQ(
-  cl = clust,
-  expr = {
-    .libPaths(allLibraryPaths)
-    library(RMTRCode2)
-    library(Matrix)
-  }
-)
+# print("Receiving number of cores:")
+#
+# # cargs <- 4
+# cargs <- as.numeric(commandArgs(trailingOnly = TRUE))
+#
+# clust <- parallel::makeCluster(cargs[1], outfile = "")
+# doParallel::registerDoParallel(clust)
+#
+# # Send locally installed packages to cluster.
+# parallel::clusterExport(
+#   cl = clust, list("allLibraryPaths")
+# )
+#
+# parallel::clusterEvalQ(
+#   cl = clust,
+#   expr = {
+#     .libPaths(allLibraryPaths)
+#     library(RMTRCode2)
+#     library(Matrix)
+#   }
+# )
 
 # Functions: ##################################################################
 
@@ -164,11 +164,12 @@ thinAndCalculateInvadabilities <- function(loaded, dyn, dis) {
       each = ((ncol(loaded$Abundance) - 1) / loaded$NumEnvironments)
     ), # i.e. 1 1 1 2 2 2 3 3 3, Not Sparse.
     speciesRegional = theSpecies,
-    invadabilityRegional =
+    invadabilityRegional = as.numeric(
       apply(Matrix(loaded$Abundance[target, -1] <
                      loaded$Parameters$EliminationThreshold,
                    nrow = 100, ncol = 10), 1, all) *
-      apply(Matrix(invadabilityMat[,], nrow = 100, ncol = 10), 1, any),
+      apply(Matrix(invadabilityMat[,], nrow = 100, ncol = 10), 1, any)
+      ),
     effectAbundance = invadability$effectAbundance,
     effectRichness = invadability$effectRichness,
     effectEstablish = invadability$effectEstablish
@@ -179,8 +180,8 @@ thinAndCalculateInvadabilities <- function(loaded, dyn, dis) {
 print("Identifying files.")
 
 directories <- dir(
-  path = ".", pattern = "SaveOutput[_]MissingInv",
-  #pattern = "Viking[_]SaveOutput[_]2021[-]12[-]28[_]2022[-]03[-]01",
+  path = ".", #pattern = "SaveOutput[_]",
+  pattern = "Viking[_]SaveOutput[_]Examples",#2021[-]12[-]28[_]2022[-]03[-]01",
   full.names = TRUE, include.dirs = TRUE)
 files <- dir(path = directories,
              pattern = "^MNA[-]Master.+[.]RData$",
@@ -220,7 +221,7 @@ preparedCases <- lapply(filesPrepared, function(fil) {
 results <- foreach::foreach(
   file = iterators::iter(files),
   .packages = c("dplyr")
-) %dopar% {
+) %do%{#par% {
   gc() # Try to reduce the memory usage.
   print(file)
   # Retrieve the trailing id numbers from before the file extension.
@@ -365,4 +366,4 @@ results <- foreach::foreach(
 # end_time <- Sys.time()
 
 # Cleanup: ####################################################################
-parallel::stopCluster(clust)
+# parallel::stopCluster(clust)
