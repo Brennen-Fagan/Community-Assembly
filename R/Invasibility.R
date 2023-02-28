@@ -378,7 +378,7 @@ CalculateLocalInvasibles_KnockOnRunSteady <- function(
         if("effectRichness" %in% names(f)) {
           f$effectRichness
         } else {
-          temp <- rep(as.numeric(NA), n)
+          temp <- rep(NA, n)
           temp[Abundance > EliminationThreshold] <- 0
           Matrix::Matrix(temp, nrow = 1, ncol = n)
         }
