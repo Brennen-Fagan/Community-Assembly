@@ -475,10 +475,12 @@ egResults_Dispersal4$ReactionTime <- unique(unlist(lapply(
 egResults_Dispersal4$HistorySeed <- unique(unlist(lapply(
   egResults_Dispersal4Calc, function(x) x$HistorySeed
 )))
-egResults_Dispersal4$Parameters <- unique(unlist(lapply(
+egResults_Dispersal4$Parameters <- unlist(lapply(
   egResults_Dispersal4Calc, function(x) x$Parameters
-), recursive = FALSE))
-names(egResults_Dispersal4$Parameters) <- names(egResults_Dispersal4Calc[[1]]$Parameters)
+), recursive = FALSE)
+egResults_Dispersal4$Parameters <- egResults_Dispersal4$Parameters[
+  unique(names(egResults_Dispersal4$Parameters))
+  ]
 egResults_Dispersal4$Ellipsis <- unique(unlist(lapply(
   egResults_Dispersal4Calc, function(x) x$Ellipsis
 ), recursive = FALSE))
@@ -529,10 +531,12 @@ egResults_Dispersal5$ReactionTime <- unique(unlist(lapply(
 egResults_Dispersal5$HistorySeed <- unique(unlist(lapply(
   egResults_Dispersal5Calc, function(x) x$HistorySeed
 )))
-egResults_Dispersal5$Parameters <- unique(unlist(lapply(
+egResults_Dispersal5$Parameters <- unlist(lapply(
   egResults_Dispersal5Calc, function(x) x$Parameters
-), recursive = FALSE))
-names(egResults_Dispersal5$Parameters) <- names(egResults_Dispersal5Calc[[1]]$Parameters)
+), recursive = FALSE)
+egResults_Dispersal5$Parameters <- egResults_Dispersal5$Parameters[
+  unique(names(egResults_Dispersal5$Parameters))
+  ]
 egResults_Dispersal5$Ellipsis <- unique(unlist(lapply(
   egResults_Dispersal5Calc, function(x) x$Ellipsis
 ), recursive = FALSE))
@@ -575,10 +579,12 @@ egResults_Dispersal6$ReactionTime <- unique(unlist(lapply(
 egResults_Dispersal6$HistorySeed <- unique(unlist(lapply(
   egResults_Dispersal6Calc, function(x) x$HistorySeed
 )))
-egResults_Dispersal6$Parameters <- unique(unlist(lapply(
+egResults_Dispersal6$Parameters <- unlist(lapply(
   egResults_Dispersal6Calc, function(x) x$Parameters
-), recursive = FALSE))
-names(egResults_Dispersal6$Parameters) <- names(egResults_Dispersal6Calc[[1]]$Parameters)
+), recursive = FALSE)
+egResults_Dispersal6$Parameters <- egResults_Dispersal6$Parameters[
+  unique(names(egResults_Dispersal6$Parameters))
+  ]
 egResults_Dispersal6$Ellipsis <- unique(unlist(lapply(
   egResults_Dispersal6Calc, function(x) x$Ellipsis
 ), recursive = FALSE))
@@ -587,7 +593,7 @@ stopifnot(
   unlist(lapply(
     names(egResults_Dispersal4),
     function(i) if (i == "Parameters") { # We didn't include seeds in this case
-      all.equal(as.matrix(egResults_Dispersal4[[i]][1:4])[,],
+      all.equal(as.matrix(egResults_Dispersal4[[i]][1:5])[,],
                 as.matrix(egResults_Dispersal6[[i]])[,],
                 use.names = FALSE, check.attributes = FALSE)
     } else {
