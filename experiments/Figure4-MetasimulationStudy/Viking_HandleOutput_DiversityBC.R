@@ -13,9 +13,7 @@
 divide_time_by <- 1E4
 preferred_rows_per_event <- 1.5
 
-outputLocation <- file.path(".", paste0("SaveDiversity_",
-                                        "2022-06-17" #Sys.Date()
-                                        ))
+outputLocation <- file.path(".", paste0("SaveDiversityBC_", Sys.Date()))
 if (!dir.exists(outputLocation)) {
   dir.create(outputLocation, showWarnings = FALSE)
 }
@@ -249,7 +247,7 @@ thinAndCalculateDiversities <- function(loaded, nspecies) {
 # Files: ######################################################################
 print("Identifying files.")
 
-directories <- dir(path = ".", pattern = "SaveOutput[_]",
+directories <- dir(path = ".", pattern = "SaveOutput[_]MissingDiv",
                    full.names = TRUE, include.dirs = TRUE)
 files <- dir(path = directories,
              pattern = "^MNA[-]Master.+[.]RData$",
