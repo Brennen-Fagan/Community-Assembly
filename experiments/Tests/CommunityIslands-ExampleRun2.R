@@ -108,18 +108,18 @@ populations <- lapply(
                      epsilon = epsilon),
         positive = TRUE
       )$y
-      print(init)
+      #print(init)
 
       if (any(init < epsilon)) {
         # Someone died, reset to random location.
-        print("Died")
+        #print("Died")
         anyZeroOrNotSame <- TRUE
         init[init < epsilon] <- runif(n = sum(init < epsilon), min = 2, max = 10000)
       } else if (any(round(init / init_old, 1) != 1)) {
         # Not done, keep going.
         #print(init / init_old)
         #print(round(init / init_old, 1))
-        print("Changed")
+        #print("Changed")
         anyZeroOrNotSame <- TRUE
       } else {
         anyZeroOrNotSame <- FALSE
