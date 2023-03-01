@@ -426,6 +426,8 @@ objs <- lapply(FacetPanels, function(Fac) {
       axis.title.x = ggplot2::element_blank()
     )
   } else {
+    obj <- obj + ggplot2::theme(
+      axis.text.x = ggplot2::element_text(angle = 30, hjust = 1, vjust = 1))
   }
 
   obj
@@ -548,6 +550,8 @@ objs <- lapply(FacetPanels, function(Fac, Axes) {
       axis.title.x = ggplot2::element_blank()
     )
   } else {
+    obj <- obj + ggplot2::theme(
+      axis.text.x = ggplot2::element_text(angle = 30, hjust = 1, vjust = 1))
   }
 
   obj
