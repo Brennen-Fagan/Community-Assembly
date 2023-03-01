@@ -6,7 +6,7 @@
 #   load the data,
 #   process the data,
 #   and combine the data,
-# and then serially plot the data and save the plots
+# and save the data for future plotting
 # before proceeding to the next set.
 
 # Note: when we say case number, we mean parameter id number.
@@ -164,46 +164,6 @@ success <- lapply(
         } else {"entries."}
       )
     )
-
-    # ## Create Plotting Data Frames: ############################################
-    # DiversitiesAlphaGamma <- dplyr::full_join(
-    #   DiversitiesAlpha,
-    #   DiversitiesGamma,
-    #   by = c(
-    #     "Time", "Set", "Number", "History",
-    #     "Pool", "Noise", "Neutral", "Space"
-    #   ),
-    #   suffix = c(", Alpha", ", Gamma")
-    # )
-    # 
-    # ## Create Helper Labels: ###################################################
-    # levelsPoolNoise <- paste(
-    #   DiversitiesGamma$Pool,
-    #   DiversitiesGamma$Noise,
-    #   sep = ";;"
-    # ) %>% unique() %>% strsplit(
-    #   split = ";;", fixed = TRUE
-    # )
-    # 
-    # spaceToDispersal <- data.frame(
-    #   Space = unique(Attributes$Space)
-    # ) %>% dplyr::mutate(
-    #   Dispersal = 1 - exp( -9 / as.numeric(Space) ),
-    #   Dispersal = paste0(
-    #     formatC(Dispersal))
-    # ) %>% dplyr::arrange(Space)
-    # 
-    # neutralToLambdas <- data.frame(
-    #   Neutral = unique(Attributes$Neutral)
-    # ) %>% tidyr::separate(
-    #   Neutral, into = c("Immigration", "Extinction"), remove = FALSE,
-    #   sep = "[,][ ]"
-    # ) %>% dplyr::mutate(
-    #   Immigration = paste0(Immigration, " %*% imm."),
-    #   Extinction = paste0(Extinction, " %*% ext.")
-    # )
-    # 
-    # ## Plotting: ###############################################################
 
 
     # Perhaps the riskiest bit.
