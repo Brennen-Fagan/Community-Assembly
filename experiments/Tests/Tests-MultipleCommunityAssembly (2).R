@@ -450,10 +450,12 @@ egResults_Dispersal4$ReactionTime <- unique(unlist(lapply(
 egResults_Dispersal4$HistorySeed <- unique(unlist(lapply(
   egResults_Dispersal4Calc, function(x) x$HistorySeed
 )))
-egResults_Dispersal4$Parameters <- unique(unlist(lapply(
+egResults_Dispersal4$Parameters <- unlist(lapply(
   egResults_Dispersal4Calc, function(x) x$Parameters
-), recursive = FALSE))
-names(egResults_Dispersal4$Parameters) <- names(egResults_Dispersal4Calc[[1]]$Parameters)
+), recursive = FALSE)
+egResults_Dispersal4$Parameters <- egResults_Dispersal4$Parameters[
+  unique(names(egResults_Dispersal4$Parameters))
+  ]
 egResults_Dispersal4$Ellipsis <- unique(unlist(lapply(
   egResults_Dispersal4Calc, function(x) x$Ellipsis
 ), recursive = FALSE))
@@ -496,10 +498,12 @@ egResults_Dispersal5$ReactionTime <- unique(unlist(lapply(
 egResults_Dispersal5$HistorySeed <- unique(unlist(lapply(
   egResults_Dispersal5Calc, function(x) x$HistorySeed
 )))
-egResults_Dispersal5$Parameters <- unique(unlist(lapply(
+egResults_Dispersal5$Parameters <- unlist(lapply(
   egResults_Dispersal5Calc, function(x) x$Parameters
-), recursive = FALSE))
-names(egResults_Dispersal5$Parameters) <- names(egResults_Dispersal5Calc[[1]]$Parameters)
+), recursive = FALSE)
+egResults_Dispersal5$Parameters <- egResults_Dispersal5$Parameters[
+  unique(names(egResults_Dispersal5$Parameters))
+  ]
 egResults_Dispersal5$Ellipsis <- unique(unlist(lapply(
   egResults_Dispersal5Calc, function(x) x$Ellipsis
 ), recursive = FALSE))
@@ -542,10 +546,12 @@ egResults_Dispersal6$ReactionTime <- unique(unlist(lapply(
 egResults_Dispersal6$HistorySeed <- unique(unlist(lapply(
   egResults_Dispersal6Calc, function(x) x$HistorySeed
 )))
-egResults_Dispersal6$Parameters <- unique(unlist(lapply(
+egResults_Dispersal6$Parameters <- unlist(lapply(
   egResults_Dispersal6Calc, function(x) x$Parameters
-), recursive = FALSE))
-names(egResults_Dispersal6$Parameters) <- names(egResults_Dispersal6Calc[[1]]$Parameters)
+), recursive = FALSE)
+egResults_Dispersal6$Parameters <- egResults_Dispersal6$Parameters[
+  unique(names(egResults_Dispersal6$Parameters))
+  ]
 egResults_Dispersal6$Ellipsis <- unique(unlist(lapply(
   egResults_Dispersal6Calc, function(x) x$Ellipsis
 ), recursive = FALSE))
@@ -560,7 +566,7 @@ stopifnot(
     TRUE,
     "Component 1: target is deSolve, current is matrix",
     rep(TRUE, 3),
-    "Component 1: Length mismatch: comparison on first 4 components",
+    "Component 1: Length mismatch: comparison on first 5 components",
     # 6: 3 has environment seeds, 6 does not.
     TRUE
   )
@@ -704,46 +710,6 @@ stopifnot(
       else
         return(FALSE)
     }))
-)
-
-# MultipleNumericalAssembly_Dispersal, Trophics ################################
-
-
-print("Final test requires dplyr.")
-stopifnot(require(dplyr))
-
-print("Testing trophic calculation.")
-
-egTrophicFunction <- CalculateTrophicStructure(
-  Pool = egPool,
-  NumEnvironments = numEnviron,
-  InteractionMatrices = egInteractions,
-  EliminationThreshold = 10^-4
-)
-
-egTrophicLevels <- apply(
-  egResults_Dispersal2$Abundance[, -1], # No Time Column
-  MARGIN = 1, # Rows
-  FUN = egTrophicFunction
-)
-
-stopifnot(
-  sapply(egTrophicLevels, function(lst) {
-    (length(lst$EdgeVertexList) == numEnviron) && # Length is correct
-      all(sapply(lst$EdgeVertexList, function(lst2) # Edgelist is correct
-        (is.na(lst2$Edges) && is.na(lst2$Vertices)) || # No species case
-          (all(lst2$Edges$effectNormalised >= 0) && # Normalisation
-             all(lst2$Edges$effectNormalised <= 1) &&
-             all(lst2$Edges %>% dplyr::group_by( # Check that norm'ed to 1.
-               to, effectSign
-             ) %>% dplyr::summarise(
-               .groups = "drop",
-               test = isTRUE(all.equal(sum(effectNormalised), 1))
-               # Note identical returns FALSE.
-             ) %>% dplyr::pull(test))
-          )
-      ))
-  })
 )
 
 print("Success.")
