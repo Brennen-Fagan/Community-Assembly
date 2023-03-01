@@ -1,6 +1,6 @@
 # Copy of Viking_HandleDiversity_HelperFunctions.R with
 #  Viking_HandleDiversity_HelperFunctionsBC.R added.
-#  Viking_HandleOutput_Invadability2Burnout_HiDisp.R
+#  Viking_HandleOutput_Invadability2Burnout_HiDisp.R (~= !HiDisp version)
 #  Viking_HandleOutput_DiversityBC.R (== the HiDisp version)
 
 # Helper functions for Viking_HandleDiversity_ParametersAndPlots3.R (v3+)
@@ -83,11 +83,12 @@ thinAndCalculateInvadabilities <- function(loaded, dyn, dis) {
       each = ((ncol(loaded$Abundance) - 1) / loaded$NumEnvironments)
     ), # i.e. 1 1 1 2 2 2 3 3 3, Not Sparse.
     speciesRegional = theSpecies,
-    invadabilityRegional =
+    invadabilityRegional = as.numeric(
       apply(Matrix(loaded$Abundance[target, -1] <
                      loaded$Parameters$EliminationThreshold,
                    nrow = 100, ncol = 10), 1, all) *
-      apply(Matrix(invadabilityMat[,], nrow = 100, ncol = 10), 1, any),
+      apply(Matrix(invadabilityMat[,], nrow = 100, ncol = 10), 1, any)
+      ),
     effectAbundance = invadability$effectAbundance,
     effectRichness = invadability$effectRichness,
     effectEstablish = invadability$effectEstablish
