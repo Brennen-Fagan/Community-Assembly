@@ -168,7 +168,8 @@ results <- foreach::foreach(
       TimeJaccard <- list(
         Betas = list(Calculate_TimeJaccard(
           fileContents,
-          nspecies = systemBase$species
+          nspecies = systemBase$species,
+          minTime = max(fileContents$Events$Times)/101
         ))
       )
     } else stop("idNums is not 2 or 4.")
