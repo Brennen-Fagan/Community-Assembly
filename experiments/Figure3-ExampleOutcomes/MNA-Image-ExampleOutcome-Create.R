@@ -9,19 +9,23 @@ EventRateModifiers <- c(1, 1) # Immigration, Extirpation
 LMParameters <- c(0.01, 10, 0.5, 0.2, 100, 0.1)
 LMLogBodySize <- c(-2, -1, -1, 0)
 
-PerIslandDistance <- 10^0
+PerIslandDistance <- Inf # 10^5 # Inf # 10^0
 SpeciesSpeeds <- 1
 Space <- match.arg("Ring", c("None", "Ring", "Line", "Full"))
 
 EliminationThreshold <- 10^-4 # Below which species are removed from internals
 ArrivalDensity <- EliminationThreshold * 4 * 10 ^ 3 # Traill et al. 2007
-ExtinctionProportion <- 0
+ExtinctionProportion <- 1
 
 MaximumTimeStep <- 1 # Maximum time solver can proceed without elimination.
 BetweenEventSteps <- 10 # Number of steps to reach next event to smooth.
 
 CalculatePoolAndMatrices <- FALSE
-dir <- getSrcDirectory(function(){})
+dir <- paste0("Data_", Sys.Date()) # getSrcDirectory(function(){})
+
+if (!dir.exists(dir)) {
+  dir.create(dir, showWarnings = FALSE)
+}
 
 # > runif(1) * 1e8
 # [1] 38427042
