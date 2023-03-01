@@ -90,7 +90,7 @@ parallel::clusterEvalQ(
 print("Identifying files.")
 
 directories <- dir(
-  path = ".", pattern = "SaveOutput[_]",
+  path = ".", pattern = "SaveOutput[_]MissingJac",
   #pattern = "Viking[_]SaveOutput[_]2021[-]12[-]28[_]2022[-]03[-]01",
   full.names = TRUE, include.dirs = TRUE)
 files <- dir(path = directories,
@@ -99,7 +99,7 @@ files <- dir(path = directories,
              include.dirs = TRUE, no.. = TRUE)
 
 # Note alphabetical, using 1:3 <=> A:C, and one letter is the only difference.
-filesParameters <- dir(path = "Prepared_2021-05-03",
+filesParameters <- dir(path = "Prepared_2022-05-03",
                        pattern = "^MNA[-]HiDisp.+Cases[.]csv$",
                        full.names = TRUE, recursive = TRUE,
                        include.dirs = TRUE, no.. = TRUE)
@@ -164,7 +164,8 @@ results <- foreach::foreach(
       TimeJaccard <- list(
         Betas = list(Calculate_TimeJaccard(
           fileContents,
-          nspecies = systemBase$species
+          nspecies = systemBase$species,
+          minTime = max(fileContents$Events$Times)/101
         ))
       )
     } else stop("idNums is not 2 or 4.")
