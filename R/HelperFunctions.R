@@ -1,7 +1,7 @@
 # Copy of Viking_HandleDiversity_HelperFunctions.R with
 #  Viking_HandleDiversity_HelperFunctionsBC.R added.
 #  Viking_HandleOutput_Invadability2Burnout_HiDisp.R
-#  Viking_HandleOutput_DiversityBC.R
+#  Viking_HandleOutput_DiversityBC.R (== the HiDisp version)
 
 # Helper functions for Viking_HandleDiversity_ParametersAndPlots3.R (v3+)
 
