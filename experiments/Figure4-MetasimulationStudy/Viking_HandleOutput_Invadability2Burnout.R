@@ -180,8 +180,8 @@ thinAndCalculateInvadabilities <- function(loaded, dyn, dis) {
 print("Identifying files.")
 
 directories <- dir(
-  path = ".", #pattern = "SaveOutput[_]",
-  pattern = "Viking[_]SaveOutput[_]Examples",#2021[-]12[-]28[_]2022[-]03[-]01",
+  path = ".", pattern = "SaveOutput[_]MissingInv",
+  #pattern = "Viking[_]SaveOutput[_]2021[-]12[-]28[_]2022[-]03[-]01",
   full.names = TRUE, include.dirs = TRUE)
 files <- dir(path = directories,
              pattern = "^MNA[-]Master.+[.]RData$",
