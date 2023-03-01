@@ -7,7 +7,10 @@
 
 
 # Functions: ###################################################################
-## Functions from HandleOutput files.
+## Functions from Figure 3 files not used below: ##############################
+
+
+## Functions from Figure 4 files: #############################################
 
 # Recycling from Viking_HandleOutput_Diversity.R.
 thinAndCalculateInvadabilities <- function(loaded, dyn, dis) {
