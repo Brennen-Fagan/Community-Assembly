@@ -33,9 +33,6 @@ if (!exists("testseed")) {
   print(testseed)
 }
 
-# Trophic Calculations take a long time.
-skipTrophic <- TRUE
-
 numBasal <- 3; numConsum <- 2; numEnviron <- 5
 print(paste("Settings", paste(numBasal, numConsum, numEnviron)))
 egArrivalRate <- 0.1
@@ -852,47 +849,6 @@ for (i in 1:nrow(Invadables)) {
 # In the case where it manages to succeed despite appearing to be about to
 # drop out, we will end up miss-classifying it as a rescue event.
 print(Invadables)
-
-# MultipleNumericalAssembly_Dispersal, Trophics ################################
-
-if (!skipTrophic) {
-  print("Final test requires dplyr.")
-  stopifnot(require(dplyr))
-
-  print("Testing trophic calculation.")
-
-  egTrophicFunction <- CalculateTrophicStructure(
-    Pool = egPool,
-    NumEnvironments = numEnviron,
-    InteractionMatrices = egInteractions,
-    EliminationThreshold = 10^-4
-  )
-
-  egTrophicLevels <- apply(
-    egResults_Dispersal2$Abundance[, -1], # No Time Column
-    MARGIN = 1, # Rows
-    FUN = egTrophicFunction
-  )
-
-  stopifnot(
-    sapply(egTrophicLevels, function(lst) {
-      (length(lst$EdgeVertexList) == numEnviron) && # Length is correct
-        all(sapply(lst$EdgeVertexList, function(lst2) # Edgelist is correct
-          (is.na(lst2$Edges) && is.na(lst2$Vertices)) || # No species case
-            (all(lst2$Edges$effectNormalised >= 0) && # Normalisation
-               all(lst2$Edges$effectNormalised <= 1) &&
-               all(lst2$Edges %>% dplyr::group_by( # Check that norm'ed to 1.
-                 to, effectSign
-               ) %>% dplyr::summarise(
-                 .groups = "drop",
-                 test = isTRUE(all.equal(sum(effectNormalised), 1))
-                 # Note identical returns FALSE.
-               ) %>% dplyr::pull(test))
-            )
-        ))
-    })
-  )
-}
 
 print("Success.")
 print("Testseed:")
