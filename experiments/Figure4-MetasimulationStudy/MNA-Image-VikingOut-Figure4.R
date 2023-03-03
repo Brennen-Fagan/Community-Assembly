@@ -235,7 +235,13 @@ labelsforplot <- concludingplotdata %>% dplyr::select(
 # Main Figure 4: ###############################################################
 
 concludingplotdata_target <- concludingplotdata %>% dplyr::filter(
-  Pool == "0, 0, 0, 0", Noise == "1", Neutral == "(1, 1)"
+  Pool == "0, 0, 0, 0", # Noise == "1", # Incl. Het (Noise 1) and Hom (Noise 0)
+  Neutral == "(1, 1)"
+) %>% dplyr::mutate(
+  Noise = dplyr::case_when(
+    Noise == "1" ~ "Heterogeneous Env.",
+    Noise == "0" ~ "Homogeneous Env."
+  )
 )
 
 objs <- lapply(FacetPanels, function(Fac) {
@@ -272,7 +278,7 @@ objs <- lapply(FacetPanels, function(Fac) {
                "0.18   " ,"   0.86")
   ) + ggplot2::geom_line(
     data = d %>% dplyr::group_by(
-      Area, Dispersal, FacetPanel
+      Area, Dispersal, FacetPanel, Noise
     ) %>% dplyr::summarise(
       Value = mean(Value, na.rm = TRUE), .groups = "drop"
     ),
@@ -294,7 +300,7 @@ objs <- lapply(FacetPanels, function(Fac) {
     breaks = fills
   ) + ggplot2::theme(
     legend.position = #c(0.87, 0.93), Wide
-      c(2/3, 0.9), # Square (half width, twice height) or single column
+      c(1/3+.05, 0.9), # Square (half width, twice height) or single column
     legend.background = ggplot2::element_blank(),
     text = ggplot2::element_text(size = 14)
   ) + ggplot2::ylab(
@@ -307,7 +313,7 @@ objs <- lapply(FacetPanels, function(Fac) {
     } else {
       "Value"
     }
-  )
+  ) + ggplot2::facet_wrap(nrow = 1, facets = "Noise")
 
   if (Fac != FacetPanels[3]) {
     obj <- obj + ggplot2::theme(
@@ -317,12 +323,16 @@ objs <- lapply(FacetPanels, function(Fac) {
       y = 0
     )#+ ggplot2::xlab(" ")
   } else {
-    obj <- obj + ggplot2::annotate(
-      "text",
-      x = c(1.8, 10.2),
-      y = c(-15, -15),  # if single column (half width)
+    obj <- obj + ggplot2::geom_text(
+      data = data.frame(
+      x = rep(c(1.8, 10.2), 2),
+      y = rep(c(-16.5, -16.5), 2),  # if single column (half width)
       size = 4,
-      label = c("No Dispersal", "Full Dispersal")
+      label = c("No Dispersal","", "", "Full Dispersal")
+      ), ggplot2::aes(
+        x = x, y = y, label = label
+      ),
+      inherit.aes = FALSE
     ) + ggplot2::coord_cartesian(
       clip = "off", ylim = c(0, 40)
     )
