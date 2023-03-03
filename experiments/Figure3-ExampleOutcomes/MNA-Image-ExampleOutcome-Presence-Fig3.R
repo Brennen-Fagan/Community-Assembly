@@ -631,7 +631,8 @@ PLOT_B <- ggplot2::ggplot(
   tag = "b)"
   # x = ""
 ) + ggplot2::theme(
-  plot.tag.position = c(0.02, 0.98)
+  plot.tag.position = c(0.02, 0.98),
+  strip.text.x = ggplot2::element_text(size = 8)
 ) + ggplot2::scale_color_manual(
   name = legend_bl_name,
   values = c("darkorange", "plum1", "cyan")
