@@ -401,7 +401,7 @@ not <- function(f) function(...) !f(...)
 
 # Recycling from Viking_HandleOutput_Diversity.R.
 thinAndCalculateInvadabilities <- function(loaded, dyn, dis, 
-                                           preferred_rows_per_event)) {
+                                           preferred_rows_per_event) {
   # We can't handle all of the data that we are going to be looking at;
   # a small sample had ~180k rows for ~5.3k events = ~34 rows per event.
   # To reduce it, we will divide time up so that there are about the
