@@ -400,7 +400,8 @@ not <- function(f) function(...) !f(...)
 ## Functions from Figure 4 files: #############################################
 
 # Recycling from Viking_HandleOutput_Diversity.R.
-thinAndCalculateInvadabilities <- function(loaded, dyn, dis) {
+thinAndCalculateInvadabilities <- function(loaded, dyn, dis, 
+                                           preferred_rows_per_event)) {
   # We can't handle all of the data that we are going to be looking at;
   # a small sample had ~180k rows for ~5.3k events = ~34 rows per event.
   # To reduce it, we will divide time up so that there are about the
@@ -486,7 +487,8 @@ thinAndCalculateInvadabilities <- function(loaded, dyn, dis) {
 }
 
 # Recycling from SecondAttempt-Doc-Analysis2-Gallery.Rmd.
-thinAndCalculateDiversities <- function(loaded, nspecies) {
+thinAndCalculateDiversities <- function(loaded, nspecies, 
+                                        preferred_rows_per_event) {
   # We can't handle all of the data that we are going to be looking at;
   # a small sample had ~180k rows for ~5.3k events = ~34 rows per event.
   # To reduce it, we will divide time up so that there are about the
