@@ -34,7 +34,7 @@ if (!dir.exists(outputLocation)) {
 }
 
 # Going to get a bit crafty here. Load into environments, then extract again.
-temp <- lapply(1:3,
+temp <- lapply(1:4,
                function(i) {
                  load(file.path(directory, paste0("Set",i,"-AllLoadedDataBC.RData")))
                  return(list(
@@ -46,10 +46,10 @@ temp <- lapply(1:3,
                }
 )
 
-DiversitiesAlpha <- dplyr::bind_rows(temp[[1]]$a, temp[[2]]$a, temp[[3]]$a)
-DiversitiesBeta <- dplyr::bind_rows(temp[[1]]$b, temp[[2]]$b, temp[[3]]$b)
-DiversitiesGamma <- dplyr::bind_rows(temp[[1]]$g, temp[[2]]$g, temp[[3]]$g)
-Attributes <- dplyr::bind_rows(temp[[1]]$attr, temp[[2]]$attr, temp[[3]]$attr)
+DiversitiesAlpha <- dplyr::bind_rows(temp[[1]]$a, temp[[2]]$a, temp[[3]]$a, temp[[4]]$a)
+DiversitiesBeta <- dplyr::bind_rows(temp[[1]]$b, temp[[2]]$b, temp[[3]]$b, temp[[4]]$b)
+DiversitiesGamma <- dplyr::bind_rows(temp[[1]]$g, temp[[2]]$g, temp[[3]]$g, temp[[4]]$g)
+Attributes <- dplyr::bind_rows(temp[[1]]$attr, temp[[2]]$attr, temp[[3]]$attr, temp[[4]]$attr)
 
 # Going to get a bit crafty here. Load into environments, then extract again.
 temp <- lapply(1:3,
@@ -62,8 +62,8 @@ temp <- lapply(1:3,
                }
 )
 
-Invadabilities <- dplyr::bind_rows(temp[[1]]$i, temp[[2]]$i, temp[[3]]$i)
-AttrInv <- dplyr::bind_rows(temp[[1]]$attr, temp[[2]]$attr, temp[[3]]$attr)
+Invadabilities <- dplyr::bind_rows(temp[[1]]$i, temp[[2]]$i, temp[[3]]$i, temp[[4]]$i)
+AttrInv <- dplyr::bind_rows(temp[[1]]$attr, temp[[2]]$attr, temp[[3]]$attr, temp[[4]]$attr)
 
 temp <- lapply(1:3,
                function(i) {
@@ -75,8 +75,8 @@ temp <- lapply(1:3,
                }
 )
 
-TimeJaccards <- dplyr::bind_rows(temp[[1]]$j, temp[[2]]$j, temp[[3]]$j)
-AttrTimeJacs <- dplyr::bind_rows(temp[[1]]$attr, temp[[2]]$attr, temp[[3]]$attr)
+TimeJaccards <- dplyr::bind_rows(temp[[1]]$j, temp[[2]]$j, temp[[3]]$j, temp[[4]]$j)
+AttrTimeJacs <- dplyr::bind_rows(temp[[1]]$attr, temp[[2]]$attr, temp[[3]]$attr, temp[[4]]$attr)
 
 library(RMTRCode2) # source("Viking_HandleDiversity_HelperFunctions.R")
 ## Create Plotting Data Frames: ############################################
@@ -348,7 +348,7 @@ ggplot2::ggsave(
     objs[[1]]/objs[[2]]/objs[[3]] +
       patchwork::plot_layout(ncol = 1)#, heights = c(3, 3, 3, 0.5))#, 1, 1))
   ),
-  width = plot_width /2, height = plot_height, units = plot_units,
+  width = plot_width, height = plot_height, units = plot_units,
   dpi = plot_dpi
 )
 
