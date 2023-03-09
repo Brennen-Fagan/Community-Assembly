@@ -78,10 +78,7 @@ temp <- lapply(1:3,
 TimeJaccards <- dplyr::bind_rows(temp[[1]]$j, temp[[2]]$j, temp[[3]]$j)
 AttrTimeJacs <- dplyr::bind_rows(temp[[1]]$attr, temp[[2]]$attr, temp[[3]]$attr)
 
-setNumber <- 3
-
-
-source("Viking_HandleDiversity_HelperFunctions.R")
+library(RMTRCode2) # source("Viking_HandleDiversity_HelperFunctions.R")
 ## Create Plotting Data Frames: ############################################
 DiversitiesAlphaGamma <- dplyr::full_join(
   DiversitiesAlpha %>% dplyr::group_by(
@@ -239,6 +236,7 @@ concludingplotdata_target <- concludingplotdata %>% dplyr::filter(
   Neutral == "(1, 1)"
 ) %>% dplyr::mutate(
   Noise = dplyr::case_when(
+    Noise == "2" ~ "Highly Het. Env.",
     Noise == "1" ~ "Heterogeneous Env.",
     Noise == "0" ~ "Homogeneous Env."
   )
