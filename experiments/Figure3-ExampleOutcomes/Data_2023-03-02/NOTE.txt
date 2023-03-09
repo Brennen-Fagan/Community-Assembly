@@ -1,0 +1,1 @@
+FOR THIS SET OF RUNS, K6 (coefficient of variation) was set to 0.2.
