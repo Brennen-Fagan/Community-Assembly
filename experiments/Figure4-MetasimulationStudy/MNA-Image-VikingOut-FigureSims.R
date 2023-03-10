@@ -32,6 +32,7 @@ forHeatMaps <- dplyr::bind_rows(
   PoolNoise = dplyr::case_when(
     PoolNoise == "0, 0, 0, 0 & 0" ~ "Homogeneous Env.",
     PoolNoise == "0, 0, 0, 0 & 1" ~ "Base Case",
+    PoolNoise == "0, 0, 0, 0 & 2" ~ "Highly Het. Env.",
     PoolNoise == "-1, 0, 0, 0 & 1" ~ "Smaller Basal",
     PoolNoise == "0, 0, 0, 1 & 1" ~ "Larger Consumer",
     PoolNoise == "-1, 0, 0, 1 & 1" ~ "Smaller and Larger",
@@ -114,6 +115,11 @@ forHeatMaps_Desired <- dplyr::bind_rows(
     Neutral = c("1, 1", "1, 0.1", "1, 10", "0.1, 1", "10, 1",
                 "1, 0", "0.1, 0.1", "10, 0.1", "0.1, 10", "10, 10"),
     Space = 10^c(2, 1)
+  ),
+  expand_grid(
+    PoolNoise = c("0, 0, 0, 0 & 2"),
+    Neutral = c("1, 1"),
+    Space = 10^c(Inf, 9:0)
   )
 ) %>% dplyr::rename(
   `PoolNoise` = PoolNoise
@@ -125,6 +131,7 @@ forHeatMaps_Desired <- dplyr::bind_rows(
   PoolNoise = dplyr::case_when(
     PoolNoise == "0, 0, 0, 0 & 0" ~ "Homogeneous Env.",
     PoolNoise == "0, 0, 0, 0 & 1" ~ "Base Case",
+    PoolNoise == "0, 0, 0, 0 & 2" ~ "Highly Het. Env.",
     PoolNoise == "-1, 0, 0, 0 & 1" ~ "Smaller Basal",
     PoolNoise == "0, 0, 0, 1 & 1" ~ "Larger Consumer",
     PoolNoise == "-1, 0, 0, 1 & 1" ~ "Smaller and Larger",
