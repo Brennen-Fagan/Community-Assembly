@@ -52,7 +52,7 @@ DiversitiesGamma <- dplyr::bind_rows(temp[[1]]$g, temp[[2]]$g, temp[[3]]$g, temp
 Attributes <- dplyr::bind_rows(temp[[1]]$attr, temp[[2]]$attr, temp[[3]]$attr, temp[[4]]$attr)
 
 # Going to get a bit crafty here. Load into environments, then extract again.
-temp <- lapply(1:3,
+temp <- lapply(1:4,
                function(i) {
                  load(file.path(directory, paste0("Set",i,"-AllInvadabilityData.RData")))
                  return(list(
@@ -65,7 +65,7 @@ temp <- lapply(1:3,
 Invadabilities <- dplyr::bind_rows(temp[[1]]$i, temp[[2]]$i, temp[[3]]$i, temp[[4]]$i)
 AttrInv <- dplyr::bind_rows(temp[[1]]$attr, temp[[2]]$attr, temp[[3]]$attr, temp[[4]]$attr)
 
-temp <- lapply(1:3,
+temp <- lapply(1:4,
                function(i) {
                  load(file.path(directory, paste0("Set",i,"-AlTimeJacData.RData")))
                  return(list(
@@ -239,7 +239,10 @@ concludingplotdata_target <- concludingplotdata %>% dplyr::filter(
     Noise == "2" ~ "Highly Het. Env.",
     Noise == "1" ~ "Heterogeneous Env.",
     Noise == "0" ~ "Homogeneous Env."
-  )
+  ),
+  Noise = factor(Noise, ordered = TRUE, levels = c(
+    "Homogeneous Env.", "Heterogeneous Env.", "Highly Het. Env."
+  ))
 )
 
 objs <- lapply(FacetPanels, function(Fac) {
@@ -298,7 +301,7 @@ objs <- lapply(FacetPanels, function(Fac) {
     breaks = fills
   ) + ggplot2::theme(
     legend.position = #c(0.87, 0.93), Wide
-      c(1/3+.05, 0.9), # Square (half width, twice height) or single column
+      c(.226, 0.9), # Square (half width, twice height) or single column
     legend.background = ggplot2::element_blank(),
     text = ggplot2::element_text(size = 14)
   ) + ggplot2::ylab(
@@ -324,16 +327,18 @@ objs <- lapply(FacetPanels, function(Fac) {
     obj <- obj + ggplot2::geom_text(
       data = data.frame(
       x = rep(c(1.8, 10.2), 2),
-      y = rep(c(-16.5, -16.5), 2),  # if single column (half width)
+      y = rep(c(-14, -14), 2),  # if single column (half width)
       size = 4,
-      label = c("No Dispersal","", "", "Full Dispersal")
+      label = c("     No Dispersal","", "", "Full Dispersal     ")
       ), ggplot2::aes(
         x = x, y = y, label = label
       ),
       inherit.aes = FALSE
     ) + ggplot2::coord_cartesian(
       clip = "off", ylim = c(0, 40)
-    )
+    ) + ggplot2::theme(
+      axis.text.x = ggplot2::element_text(angle = 30, hjust = 1, vjust = 1)
+      )
   }
 
   obj
@@ -348,7 +353,7 @@ ggplot2::ggsave(
     objs[[1]]/objs[[2]]/objs[[3]] +
       patchwork::plot_layout(ncol = 1)#, heights = c(3, 3, 3, 0.5))#, 1, 1))
   ),
-  width = plot_width, height = plot_height, units = plot_units,
+  width = plot_width, height = plot_height * 1.25, units = plot_units,
   dpi = plot_dpi
 )
 
@@ -471,6 +476,7 @@ concludingplotdata_target <- concludingplotdata %>% dplyr::filter(
   PoolNoise = dplyr::case_when(
     PoolNoise == "0, 0, 0, 0 & 0" ~ "Homogeneous Env.",
     PoolNoise == "0, 0, 0, 0 & 1" ~ "Base Case",
+    PoolNoise == "0, 0, 0, 0 & 2" ~ "Highly Het. Env.",
     PoolNoise == "-1, 0, 0, 0 & 1" ~ "Smaller Basal",
     PoolNoise == "0, 0, 0, 1 & 1" ~ "Larger Consumer",
     PoolNoise == "-1, 0, 0, 1 & 1" ~ "Smaller and Larger",
