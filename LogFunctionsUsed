@@ -16,7 +16,7 @@ Log of files and functions and function calls
 [12] "quiet"
 
 FILE, FUNCTIONS, CALLED IN, Deprecated?
-CommunityMatrices.R, "addMissingEquilibriaEntries", ,
+CommunityMatrices.R, "addMissingEquilibriaEntries", PermanenceAssembly, Yes
 MultipleCommunityAssembly.R, "ArrivalFUN_Example", CreateAssemblySequence, No
 MultipleCommunityAssembly.R, "ArrivalFUN_Example2", CreateAssemblySequence, No
 Invadability, "CalculateLocalInvasibles_BareBones", , No: alias
@@ -25,9 +25,9 @@ Invadability, "CalculateLocalInvasibles_KnockOnRunSteady", , No: alias
 MultipleCommunityAssembly.R, "ExtinctFUN_Example", CreateAssemblySequence, No
 MultipleCommunityAssembly.R, "ExtinctFUN_Example2" , CreateAssemblySequence, No
 CommunityIslands.R, "IslandLotkaVolterra", IslandDynamics, No
-LawMorton1996Checks.R, "LawMorton1996_CheckUninvadable", ,
-LawMorton1996SubFunctions.R, "LawMorton1996_NumIntegration", ,
-CommunityIslands.R, "quiet", ,
+LawMorton1996Checks.R, "LawMorton1996_CheckUninvadable", PermanenceAssembly, Yes
+LawMorton1996SubFunctions.R, "LawMorton1996_NumIntegration", NumericalAssembly, Yes but fair to keep (as an obvious predecessor to other schemes).
+CommunityIslands.R, "quiet", Some of the early analyses?, Yes? I don't see any recent references.
 
 # Iteration 1: ################################################
 
