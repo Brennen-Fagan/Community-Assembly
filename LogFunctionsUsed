@@ -1,5 +1,34 @@
 Log of files and functions and function calls
 
+# Iteration 2: ################################################
+
+ [1] "addMissingEquilibriaEntries"
+ [2] "ArrivalFUN_Example"
+ [3] "ArrivalFUN_Example2"
+ [4] "CalculateLocalInvasibles_BareBones"
+ [5] "CalculateLocalInvasibles_KnockOn"
+ [6] "CalculateLocalInvasibles_KnockOnRunSteady"
+ [7] "ExtinctFUN_Example"
+ [8] "ExtinctFUN_Example2"
+ [9] "IslandLotkaVolterra"
+[10] "LawMorton1996_CheckUninvadable"
+[11] "LawMorton1996_NumIntegration"
+[12] "quiet"
+
+FILE, FUNCTIONS, CALLED IN, Deprecated?
+CommunityMatrices.R, "addMissingEquilibriaEntries", ,
+MultipleCommunityAssembly.R, "ArrivalFUN_Example", CreateAssemblySequence, No
+MultipleCommunityAssembly.R, "ArrivalFUN_Example2", CreateAssemblySequence, No
+Invadability, "CalculateLocalInvasibles_BareBones", , No: alias
+Invadability, "CalculateLocalInvasibles_KnockOn", , No: alias
+Invadability, "CalculateLocalInvasibles_KnockOnRunSteady", , No: alias
+MultipleCommunityAssembly.R, "ExtinctFUN_Example", CreateAssemblySequence, No
+MultipleCommunityAssembly.R, "ExtinctFUN_Example2" , CreateAssemblySequence, No
+CommunityIslands.R, "IslandLotkaVolterra", IslandDynamics, No
+LawMorton1996Checks.R, "LawMorton1996_CheckUninvadable", ,
+LawMorton1996SubFunctions.R, "LawMorton1996_NumIntegration", ,
+CommunityIslands.R, "quiet", ,
+
 # Iteration 1: ################################################
 
 The targets for deprecation are
@@ -24,11 +53,11 @@ Invadability, "CalculateLocalInvadables", , Yes
 Invadability, "CalculateLocalInvadables_TestEvent", , Yes
 CommunityMatrices.R, "CommunityMatrix", , Never Used
 MultipleCommunityAssembly.R, "ExtinctFUN_Example", CreateAssemblySequence, No
-MultipleCommunityAssembly.R, "ExtinctFUN_Example2" , CreateAssemblySequence, No         
+MultipleCommunityAssembly.R, "ExtinctFUN_Example2" , CreateAssemblySequence, No
 CommunityIslands.R, "FindSteadyStateFromBasal", , Yes in favour of FindSteadyStateFromEstimate
-CommunityIslands.R, "FindSteadyStateFromSize", , Yes in favour of FindSteadyStateFromEstimate            
+CommunityIslands.R, "FindSteadyStateFromSize", , Yes in favour of FindSteadyStateFromEstimate
 CommunityIslands.R, "IslandDynamicsSTODE", , Yes in favour of IslandDynamics?
-CommunityIslands.R, "IslandLotkaVolterra", IslandDynamics, No              
+CommunityIslands.R, "IslandLotkaVolterra", IslandDynamics, No
 CommunityIslands.R, "IslandNumericalAssembly", , Yes in favour of IslandDynamics?
 LawMorton1996.R, "LawMorton1996_NumericalAssembly", , Yes in favour of parallel assembly
 LawMorton1996.R, "LawMorton1996_PermanenceAssembly", , Yes in favour of parallel assembly
