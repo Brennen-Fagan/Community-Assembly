@@ -727,7 +727,7 @@ PLOT_BRR <- ggplot2::ggplot(
   inherit.aes = FALSE
 ) + ggplot2::theme_bw(
 ) + ggplot2::labs(
-  y = "Jaccard Distance", # Number of Species",
+  y = "Jaccard Dissimilarity", # Number of Species",
   x = paste0("Time, ", divide_time_by, " units")
   # x = ""
 ) + ggplot2::scale_color_manual(
@@ -740,7 +740,7 @@ PLOT_BRR <- ggplot2::ggplot(
 #  legend.position = "none"
 ) + ggplot2::facet_grid(
   ImmigrationRate ~ ExtirpationRate
-) + ggplot2::ggtitle("Spatial Jaccard Turnover")
+) + ggplot2::ggtitle("Spatial Jaccard Dissimilarity")
 
 
 ggplot2::ggsave(
