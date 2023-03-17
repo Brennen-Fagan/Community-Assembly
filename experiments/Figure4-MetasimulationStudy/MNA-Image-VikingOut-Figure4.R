@@ -308,7 +308,7 @@ objs <- lapply(FacetPanels, function(Fac) {
     if (Fac == FacetPanels[1]) {
       "Richness"
     } else if (Fac == FacetPanels[2]) {
-      "Turnover"
+      "Dissimilarity"
     } else if (Fac == FacetPanels[3]) {
       "Invasibility"
     } else {
@@ -425,7 +425,7 @@ objs <- lapply(FacetPanels, function(Fac) {
     if (Fac == FacetPanels[1]) {
       "Richness"
     } else if (Fac == FacetPanels[2]) {
-      "Turnover"
+      "Dissimilarity"
     } else if (Fac == FacetPanels[3]) {
       "Invasibility"
     } else {
@@ -550,7 +550,7 @@ objs <- lapply(FacetPanels, function(Fac, Axes) {
     if (Fac == FacetPanels[1]) {
       "Richness"
     } else if (Fac == FacetPanels[2]) {
-      "Turnover"
+      "Dissimilarity"
     } else if (Fac == FacetPanels[3]) {
       "Invasibility"
     } else {

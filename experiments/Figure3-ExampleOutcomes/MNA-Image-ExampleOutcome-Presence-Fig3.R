@@ -532,7 +532,7 @@ legend_bl_name <- "Dispersal"
 
 Diversity <- Diversity %>% dplyr::mutate(
   Measurement2 = dplyr::case_when(
-    Measurement == "Jaccard" ~ "Spatial Turnover",
+    Measurement == "Jaccard" ~ "Spatial Diss.",
     Measurement == "Richness" & Environment == "Gamma" ~ "Regional Rich.",
     Measurement == "Richness" & Environment == "Mean" ~ "Local Rich.", # Panel
     Measurement == "Richness"  ~ "Local Rich.", # Otherwise
@@ -585,7 +585,7 @@ for (s in seq_along(strips)) {
 
 PLOT_B <- ggplot2::ggplot(
   Diversity %>% dplyr::filter(
-    Measurement2 %in% c("Spatial Turnover", "Local Rich.", "Regional Rich."),
+    Measurement2 %in% c("Spatial Diss.", "Local Rich.", "Regional Rich."),
     Environment != "Mean"
   ),
   ggplot2::aes(
@@ -601,7 +601,7 @@ PLOT_B <- ggplot2::ggplot(
   )
 ) + ggplot2::geom_line(
   data = Diversity %>% dplyr::filter(
-    Measurement2 %in% c("Spatial Turnover", "Local Rich.", "Regional Rich."),
+    Measurement2 %in% c("Spatial Diss.", "Local Rich.", "Regional Rich."),
     Environment == "Mean"
   ),
   size = 1.5
@@ -611,7 +611,7 @@ PLOT_B <- ggplot2::ggplot(
     DiversityRibbons_Gamma
   ) %>% dplyr::mutate(
     Measurement2 = dplyr::case_when(
-      Measurement == "Jaccard" ~ "Spatial Turnover",
+      Measurement == "Jaccard" ~ "Spatial Diss.",
       Measurement == "Richness" ~ "Local Rich.",
       TRUE ~ Measurement
     )
@@ -642,7 +642,7 @@ PLOT_B <- ggplot2::ggplot(
 ) + ggplot2::facet_wrap(
   . ~ factor(
     Measurement2, ordered = T,
-    levels = c("Local Rich.", "Regional Rich.", "Spatial Turnover")
+    levels = c("Local Rich.", "Regional Rich.", "Spatial Diss.")
   ), nrow = 1, scales = "free_y"
 ) + ggplot2::scale_alpha(guide = "none") + ggplot2::coord_cartesian(
   ylim = c(0, NA)
