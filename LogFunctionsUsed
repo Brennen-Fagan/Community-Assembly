@@ -1,5 +1,53 @@
 Log of files and functions and function calls
 
+# Iteration 3: ################################################
+
+ [1] "ArrivalFUN_Example"
+ [2] "ArrivalFUN_Example2"
+ [3] "AvgGammaAlphaOverTime"
+ [4] "CalculateLocalInvasibles_BareBones"
+ [5] "CalculateLocalInvasibles_KnockOn"
+ [6] "CalculateLocalInvasibles_KnockOnRunSteady"
+ [7] "createAvg"
+ [8] "ExtinctFUN_Example"
+ [9] "ExtinctFUN_Example2"
+[10] "FindSteadyStateFromEstimate"
+[11] "GammaOverAlpha"
+[12] "GeneralisedLotkaVolterra"
+[13] "IslandDynamics"
+[14] "IslandLotkaVolterra"
+[15] "LawMorton1996_CommunityMat"
+[16] "LawMorton1996_NumIntegration"
+[17] "LawMorton1996_PlotAbundance"
+[18] "load_safe"
+[19] "load_safe_thin"
+[20] "not"
+[21] "Productivity"
+[22] "SpeciesPresent"
+[23] "StatisticOverSpace"
+[24] "StatisticOverTime"
+
+of which some have already been handled below, leaving us with
+
+ [3] "AvgGammaAlphaOverTime"
+ [7] "createAvg"
+[10] "FindSteadyStateFromEstimate"
+[11] "GammaOverAlpha"
+[12] "GeneralisedLotkaVolterra"
+[13] "IslandDynamics"
+[15] "LawMorton1996_CommunityMat"
+[17] "LawMorton1996_PlotAbundance"
+[18] "load_safe"
+[19] "load_safe_thin"
+[20] "not"
+[21] "Productivity"
+[22] "SpeciesPresent"
+[23] "StatisticOverSpace"
+[24] "StatisticOverTime"
+
+Some of these appear to be deprecated plotting functions or examples.
+We're probably fine to proceed with these in the package.
+
 # Iteration 2: ################################################
 
  [1] "addMissingEquilibriaEntries"
