@@ -291,7 +291,7 @@ extractLegend <- function(gg) {
 
 # All .RData
 files_dat <- dir(
-  path = "Data_2023-03-01", # "Data_2022-09-16",
+  path = "Data_Figure3", # "Data_2023-03-01", # "Data_2022-09-16",
   pattern = "MNA-Example.+[.]RData$", # "MNA[-]ExampleOutcome[-].+[.]RData$",
   full.names = TRUE
 )
