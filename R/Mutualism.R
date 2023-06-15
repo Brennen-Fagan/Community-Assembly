@@ -1,0 +1,218 @@
+# For mutualism, we are assuming that neutral events remain the same.
+# It is the dynamics that we are changing:
+#   Producers: Positive Intrinsic Growth Rate
+#   Pollinators: Negative Intrinsic Growth Rate
+#   Both: intra-specific and intra-guild competition, positive mutualism
+# Eq: \dot{x}_i = x_i (r - Sum beta_ij x_j + f(x_i, x))
+# where f(x_i, x) = (\sum_j gamma_ij x_j)/(1 + h_i \sum_j gamma_ij x_j)
+# using Zhang et al. 2022.
+# Note the other major (related) approach is Thebault and Fontaine (2010).
+# This file is a derivative of Mutualism.R, where initial testing was done.
+
+Mutualism_species <- function(
+  SpeciesTypes,
+  MinimumRepRates = c(0, -0.2/2.5),
+  MaximumRepRates = c(0.01, 0),
+  seed = NULL
+) {
+  #TODO: Might be nice to add some niche specificity in here.
+  # Then competition might be distance to niche and pollinators might vary
+  # between specific and general.
+
+  # Assuming a bottom-up assembly procedure.
+  # As such, we need some method of starting the invasions.
+  # One method is to seed the system with a starting network, but this might
+  # lead to uninvasible barren patches.
+  # Instead, I'll assume small but positive reproductive rates.
+  # Otherwise, I'll stick closely to Thebault and Fontaine.
+
+  stopifnot(length(SpeciesTypes) > 0)
+
+  if (!is.null(seed)) {
+    if (exists(".Random.seed")) {
+      oldSeed <- .Random.seed
+    }
+    set.seed(seed)
+  }
+
+  # Assuming Basal/Plant/Producers first.
+  r <- c(
+    runif(n = SpeciesTypes[1],
+          min = MinimumRepRates[1],
+          max = MaximumRepRates[1]),
+    unlist(lapply(seq_along(SpeciesTypes[-1]), function(i, n, mn, mx) {
+      runif(n[i], min = mn[i], max = mx[i])
+    },
+    n = SpeciesTypes[-1],
+    mn = MinimumRepRates[-1],
+    mx = MaximumRepRates[-1]
+    ))
+  )
+
+  Species <- data.frame(
+    ID = 1:(sum(SpeciesTypes)),
+    Type = c(
+      rep("Producer", SpeciesTypes[1]),
+      unlist(lapply(seq_along(SpeciesTypes)[-1], function(i) {
+        rep(i, SpeciesTypes[i])
+      }))
+    ),
+    ReproductionRate = r
+  )
+
+  if (!is.null(seed)) {
+    if (exists("oldSeed")) {
+      set.seed(oldSeed)
+    }
+  }
+
+  return(Species)
+}
+
+Mutualism_saturation <- function(
+  SpeciesTypes,
+  MinimumSaturation = 0.1, # Note, using runif so vectors propagate as usual.
+  MaximumSaturation = 1,
+  seed = NULL
+) {
+  # T + F suggest [0.1, 1], while Z et al. suggest 0.2.
+  # (Note: same dims, since T + F use inverse in equation but in assignment.)
+  # Set intraguild to Infinity (should be no mutualism!).
+
+  stopifnot(length(SpeciesTypes) > 0)
+
+  if (!is.null(seed)) {
+    if (exists(".Random.seed")) {
+      oldSeed <- .Random.seed
+    }
+    set.seed(seed)
+  }
+
+  retmat <- matrix(
+    runif(n = length(SpeciesTypes)^2,
+          min = MinimumSaturation, max = MaximumSaturation),
+    nrow = length(SpeciesTypes),
+    ncol = length(SpeciesTypes)
+  )
+
+  diag(retmat) <- Inf
+
+  if (!is.null(seed)) {
+    if (exists("oldSeed")) {
+      set.seed(oldSeed)
+    }
+  }
+
+  return(retmat)
+}
+
+Mutualism_CommunityMat <- function(
+  Pool,
+  MinimumIntraguild, # While one can try to play with runif vectorisation of
+  MaximumIntraguild, # these arguments, I advise against it, since they are
+  MinimumInterguild, # used for sub-blocks at this time.
+  MaximumInterguild, # Function might need to be rewritten for easier variation.
+  IntraspeciesCompetitionMultiplier = 2, # rep(Mult, times = table(Pool$Type))
+  seed = NULL
+) {
+
+  if (!is.null(seed)) {
+    if (exists(".Random.seed")) {
+      oldSeed <- .Random.seed
+    }
+    set.seed(seed)
+  }
+
+  # Intraguild interactions
+  retmat <- matrix(0, nrow(Pool), nrow(Pool))
+  competitors <- outer(Pool$Type, Pool$Type, function(i, j) i == j)
+  retmat[competitors] <- runif(sum(competitors),
+                               min = MinimumIntraguild,
+                               max = MaximumIntraguild)
+
+  # Intraspecies (subset of Intraguild) interactions.
+  diag(retmat) <- diag(retmat) * IntraspeciesCompetitionMultiplier
+
+  # Takes care of block diagonal. Now off-diagonal (interguild) blocks.
+  retmat[!competitors] <- runif(sum(!competitors),
+                                min = MinimumInterguild,
+                                max = MaximumInterguild)
+
+  if (!is.null(seed)) {
+    if (exists("oldSeed")) {
+      set.seed(oldSeed)
+    }
+  }
+
+  return(retmat)
+}
+
+PerCapitaDynamics_Mutualistic1 <- function(
+  ReproductionRate, InteractionMatrix, NumEnvironments,
+  SpeciesTypes, Saturations
+) {
+  # This is just a workhorse/organising function (factory).
+  # No further parametrisation necessary.
+  # ReproductionRate = r,
+  # InteractionMatrix = Block matrix, Beta blocks on diagonal, Gamma off diag.
+  # NumEnvironments = number of patches, as usual
+  # Species Types = Species in each Guild (usually length 2: Plant, Pollinator)
+  # Subtlety: Mutualism plateaus per-guild in this implementation.
+  # Saturations = Matrix of guild-guild saturation values.
+
+  st <- c(0, cumsum(rep(SpeciesTypes, NumEnvironments)))
+  # Block i, j: (st[i] + 1):st[i+1], (st[j] + 1):st[j+1]
+  stind <- seq_along(st[-length(st)])
+
+  # Break into blocks
+  guilds <- outer(
+    stind, stind, Vectorize(
+      function(i, j) {list(
+        InteractionMatrix[(st[i] + 1):st[i+1], (st[j] + 1):st[j+1]]
+      )}
+    ))
+
+  # Linear Terms
+  intraguild <- function(y) {Matrix::bdiag(diag(guilds)) %*% y}
+
+  # Saturating Terms
+  interguild <- function(i, j, y) {
+    # i == j => Intraguild, covered above
+    if ( i == j )  return(
+      matrix(0, nrow = st[i+1] - st[i], ncol = 1)
+    )
+
+    mutualism <- guilds[i, j][[1]] %*% y[(st[j] + 1):st[j+1]]
+
+    # Note: risk of Inf * 0; which we try to catch.
+
+    mutualism <- ifelse(
+      mutualism == 0,
+      0,
+      mutualism / (1 + Saturations[
+        ((i - 1) %% length(SpeciesTypes)) + 1,
+        ((j - 1) %% length(SpeciesTypes)) + 1]
+        * mutualism)
+    )
+
+    return(mutualism)
+  }
+
+  interactions <- function(y) {
+    inter <- outer(stind, stind, Vectorize(
+      function(i, j) {
+        interguild(i, j, y)
+      }
+    ))
+    # Matrix of lists of column vectors
+    # Reorganise by row into matrices, then sum for final (per capita) effect.
+    inter <- unlist(apply(inter, 1, function(x) rowSums(do.call(cbind, x))))
+    return(inter + intraguild(y))
+  }
+
+  # Reconstruct as a single function
+  function(t, y, parms = NULL) {
+    rep(ReproductionRate, NumEnvironments) + interactions(y)
+  }
+}
+
