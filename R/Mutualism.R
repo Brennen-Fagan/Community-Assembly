@@ -108,10 +108,10 @@ Mutualism_saturation <- function(
 
 Mutualism_CommunityMat <- function(
   Pool,
-  MinimumIntraguild, # While one can try to play with runif vectorisation of
-  MaximumIntraguild, # these arguments, I advise against it, since they are
-  MinimumInterguild, # used for sub-blocks at this time.
-  MaximumInterguild, # Function might need to be rewritten for easier variation.
+  MinimumIntraguild = -2/2.5, # While one can try to play with runif vector args
+  MaximumIntraguild = -1/2.5, # I advise against it, since they are
+  MinimumInterguild = 2/2.5,  # used for sub-blocks at this time.
+  MaximumInterguild = 3/2.5,  # Function might need to be rewritten for easier variation.
   IntraspeciesCompetitionMultiplier = 2, # rep(Mult, times = table(Pool$Type))
   seed = NULL
 ) {
@@ -155,7 +155,7 @@ Mutualism_CommunityMat_ByBlock <- function(
   seed = NULL
 ) {
   # Requirements:
-  stopifnot(length(unique(Pool$Types)) == nrow(MinimumGuildMatrix),
+  stopifnot(length(unique(Pool$Type)) == nrow(MinimumGuildMatrix),
             nrow(MinimumGuildMatrix) == ncol(MinimumGuildMatrix),
             nrow(MinimumGuildMatrix) == ncol(MaximumGuildMatrix),
             nrow(MaximumGuildMatrix) == ncol(MaximumGuildMatrix),
@@ -171,13 +171,15 @@ Mutualism_CommunityMat_ByBlock <- function(
 
   # Intraguild interactions
   retmat <- matrix(0, nrow(Pool), nrow(Pool))
+  dict <- unique(Pool$Type)
 
-  for (i in 1:nrow(MinimumGuildMatrix)){
-    for (j in 1:ncol(MinimumGuildMatrix)) {
-      targets <- outer(Pool$Type, Pool$Type, function(x, y) x == i && y == j)
+  for (j in 1:ncol(MinimumGuildMatrix)) {
+    for (i in 1:nrow(MinimumGuildMatrix)) {
+      targets <- outer(Pool$Type, Pool$Type,
+                       function(x, y) x == dict[i] & y == dict[j])
       retmat[targets] <- runif(sum(targets),
                                min = MinimumGuildMatrix[i, j],
-                               max = MinimumGuildMatrix[i, j])
+                               max = MaximumGuildMatrix[i, j])
     }}
 
   # Intraspecies (subset of Intraguild) interactions.
@@ -193,6 +195,19 @@ Mutualism_CommunityMat_ByBlock <- function(
 }
 
 # test:
+# pool <- Mutualism_species(c(5, 10))
+# stopifnot(
+# # Won't be exact same, former goes diagonal first...
+  # all(sign(Mutualism_CommunityMat(pool, seed = 1)) ==
+  #       sign(Mutualism_CommunityMat_ByBlock(
+  #         pool,
+  #         MinimumGuildMatrix = matrix(byrow = TRUE, nrow = 2, ncol = 2,
+  #                                     c(-2/2.5, 2/2.5, 2/2.5, -2/2.5)),
+  #         MaximumGuildMatrix = matrix(byrow = TRUE, nrow = 2, ncol = 2,
+  #                                     c(-1/2.5, 3/2.5, 3/2.5, -1/2.5)),
+  #         seed = 1
+  #       )))
+# )
 
 PerCapitaDynamics_Mutualistic1 <- function(
   ReproductionRate, InteractionMatrix, NumEnvironments,
