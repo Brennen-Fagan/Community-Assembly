@@ -147,6 +147,53 @@ Mutualism_CommunityMat <- function(
   return(retmat)
 }
 
+Mutualism_CommunityMat_ByBlock <- function(
+  Pool,
+  MinimumGuildMatrix, # Entry i,j is the min/max effect of species in guild j on
+  MaximumGuildMatrix, # species in guild i. Allows mutual., pred., comp., etc.
+  IntraspeciesMultiplier = 2, # rep(Mult, times = table(Pool$Type))
+  seed = NULL
+) {
+  # Requirements:
+  stopifnot(length(unique(Pool$Types)) == nrow(MinimumGuildMatrix),
+            nrow(MinimumGuildMatrix) == ncol(MinimumGuildMatrix),
+            nrow(MinimumGuildMatrix) == ncol(MaximumGuildMatrix),
+            nrow(MaximumGuildMatrix) == ncol(MaximumGuildMatrix),
+            length(IntraspeciesMultiplier) == 1 ||
+              length(IntraspeciesMultiplier) == nrow(Pool$Types))
+
+  if (!is.null(seed)) {
+    if (exists(".Random.seed")) {
+      oldSeed <- .Random.seed
+    }
+    set.seed(seed)
+  }
+
+  # Intraguild interactions
+  retmat <- matrix(0, nrow(Pool), nrow(Pool))
+
+  for (i in 1:nrow(MinimumGuildMatrix)){
+    for (j in 1:ncol(MinimumGuildMatrix)) {
+      targets <- outer(Pool$Type, Pool$Type, function(x, y) x == i && y == j)
+      retmat[targets] <- runif(sum(targets),
+                               min = MinimumGuildMatrix[i, j],
+                               max = MinimumGuildMatrix[i, j])
+    }}
+
+  # Intraspecies (subset of Intraguild) interactions.
+  diag(retmat) <- diag(retmat) * IntraspeciesMultiplier
+
+  if (!is.null(seed)) {
+    if (exists("oldSeed")) {
+      set.seed(oldSeed)
+    }
+  }
+
+  return(retmat)
+}
+
+# test:
+
 PerCapitaDynamics_Mutualistic1 <- function(
   ReproductionRate, InteractionMatrix, NumEnvironments,
   SpeciesTypes, Saturations
