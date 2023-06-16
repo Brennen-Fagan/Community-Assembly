@@ -101,6 +101,12 @@ systemMods <- list(
   InteractionsNoiseMultiplier = c(1, 1, 1, 1, 0)
 )
 
+systemMods$Permutation <- c(
+  FALSE,
+  "Within", # Break up the size-structure within "guilds"
+  "Between" # Break up all structure.
+)
+
 ##### Mutualism: ###############################################################
 # Thebault + Fontaine 2010:
 #   r,   Basal: mutualistic  (-0.3, -0.1)
@@ -113,6 +119,8 @@ systemMods <- list(
 #     \dot{xi} = xi (r - l xi + Sum_j (cij xj xi / (aij^-1 + Sum_k xk)))
 #   and cij negative if predating and the sum over xk valid only over basals
 #   for trophic interactions and only for the other guild when mutualistic.
+# For assembly, we can't have negative basal rates (otherwise nothing assembles)
+# so we instead will use (0, 0.001).
 
 # Zhang et al. 2022:
 #   r,   growth rates        (-1, 2)
@@ -124,8 +132,16 @@ systemMods <- list(
 #       gammaij = 0 if no link and gamma0/(degree)^delta if there is.
 #   in the equation
 #       \dot{x}_i = x_i (r - Sum beta_ij x_j + f(x_i, x))
+# This implicitly then has a trade-off between the generalism and specialism.
 
-systemBase$
+systemBase$TF2010ParamMins <- c(0, -0.2, 1, 2, 0.1)
+systemBase$TF2010ParamMaxs <- c(0.001, 0, 2, 3, 1)
+
+systemMods$TF2010 <- matrix(c(
+  0, 0, 0, 0, 0,      0, 0, 0, 0, 0,
+  0.3, 0, 0, 0, 0,    0.499, 0, 0, 0, 0
+), ncol = 10, byrow = TRUE
+)
 
 ### Neutral Dynamics Parameters: ###############################################
 # We are interested in varying the history structure with one of the following.
