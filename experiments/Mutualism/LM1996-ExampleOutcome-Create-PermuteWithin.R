@@ -24,7 +24,7 @@ ExtinctionProportion <- 1
 MaximumTimeStep <- 1 # Maximum time solver can proceed without elimination.
 BetweenEventSteps <- 10 # Number of steps to reach next event to smooth.
 
-CalculatePoolAndMatrices <- FALSE
+CalculatePoolAndMatrices <- TRUE
 dir <- paste0("Data_", Sys.Date()) # getSrcDirectory(function(){})
 
 if (!dir.exists(dir)) {
@@ -101,46 +101,7 @@ if (CalculatePoolAndMatrices) {
         diag(out)[toShuffle] <- diag(mat)[shuffled]
       }
       return(out)
-    })
-
-
-
-  # Across a diagonal (and within a block) this works.
-  # Need to constrain to be within the block still and shuffle diagonal.
-  # labelframe <- data.frame(a = 1:5, type = c("a", "a", "b", "b", "b"))
-  # temp <- matrix(1:25, ncol = 5, nrow = 5)
-  # temp2 <- temp
-  #
-  # for(type1 in unique(labelframe$type)) {
-  #   for(type2 in unique(labelframe$type)) {
-  #     toShuffle <- which(
-  #       upper.tri(temp) &
-  #         (row(temp) %in% labelframe$a[labelframe$type == type1]) &
-  #         (col(temp) %in% labelframe$a[labelframe$type == type2])
-  #     )
-  #
-  #     if (length(toShuffle) == 0) next()
-  #
-  #     # Beware the sample surprise (see documentation details).
-  #     shuffled <- as.numeric(sample(as.character(toShuffle)))
-  #
-  #     temp2[toShuffle] <- temp[shuffled]
-  #     temp2 <- t(temp2)
-  #     temp2[toShuffle] <- t(temp)[shuffled]
-  #     temp2 <- t(temp2)
-  #   }
-  #
-  #   # Diagonal
-  #   toShuffle <- labelframe$a[labelframe$type == type1]
-  #
-  #   if (length(toShuffle) == 0) next()
-  #
-  #   # Beware the sample surprise (see documentation details).
-  #   shuffled <- as.numeric(sample(as.character(toShuffle)))
-  #
-  #   diag(temp2)[toShuffle] <- diag(temp)[shuffled]
-  # }
-
+    }, pl = Pool)
 
   save(Pool, InteractionMatrices,
        file = file.path(dir, paste0(
