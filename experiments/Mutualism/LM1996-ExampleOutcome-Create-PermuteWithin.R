@@ -66,15 +66,81 @@ if (CalculatePoolAndMatrices) {
     sample(subset(Pool, Type == "Consumer", ReproductionRate))
   )
 
+  # Within Block Permutation (Interaction Matrix)
+  InteractionMatrices$Mats <- lapply(
+    InteractionMatrices$Mats,
+    function(mat, pl) {
+      out <- mat
+      for(type1 in unique(pl$Type)) {
+        for(type2 in unique(pl$Type)) {
+          toShuffle <- which(
+            upper.tri(mat) &
+              (row(mat) %in% pl$ID[pl$Type == type1]) &
+              (col(mat) %in% pl$ID[pl$Type == type2])
+          )
+
+          if (length(toShuffle) == 0) next()
+
+          # Beware the sample surprise (see documentation details).
+          shuffled <- as.numeric(sample(as.character(toShuffle)))
+
+          out[toShuffle] <- mat[shuffled]
+          out <- t(out)
+          out[toShuffle] <- t(mat)[shuffled]
+          out <- t(out)
+        }
+
+        # Diagonal
+        toShuffle <- pl$ID[pl$Type == Type]
+
+        if (length(toShuffle) == 0) next()
+
+        # Beware the sample surprise (see documentation details).
+        shuffled <- as.numeric(sample(as.character(toShuffle)))
+
+        diag(out)[toShuffle] <- diag(mat)[shuffled]
+      }
+      return(out)
+    })
+
+
+
   # Across a diagonal (and within a block) this works.
   # Need to constrain to be within the block still and shuffle diagonal.
+  # labelframe <- data.frame(a = 1:5, type = c("a", "a", "b", "b", "b"))
+  # temp <- matrix(1:25, ncol = 5, nrow = 5)
   # temp2 <- temp
-  # temp2[upper.tri(temp2)] <- temp[shuffled]
-  # temp2 <- t(temp2)
-  # temp2[upper.tri(temp2)] <- t(temp)[shuffled]
-  # temp2 <- t(temp2)
-  # temp
-  # temp2
+  #
+  # for(type1 in unique(labelframe$type)) {
+  #   for(type2 in unique(labelframe$type)) {
+  #     toShuffle <- which(
+  #       upper.tri(temp) &
+  #         (row(temp) %in% labelframe$a[labelframe$type == type1]) &
+  #         (col(temp) %in% labelframe$a[labelframe$type == type2])
+  #     )
+  #
+  #     if (length(toShuffle) == 0) next()
+  #
+  #     # Beware the sample surprise (see documentation details).
+  #     shuffled <- as.numeric(sample(as.character(toShuffle)))
+  #
+  #     temp2[toShuffle] <- temp[shuffled]
+  #     temp2 <- t(temp2)
+  #     temp2[toShuffle] <- t(temp)[shuffled]
+  #     temp2 <- t(temp2)
+  #   }
+  #
+  #   # Diagonal
+  #   toShuffle <- labelframe$a[labelframe$type == type1]
+  #
+  #   if (length(toShuffle) == 0) next()
+  #
+  #   # Beware the sample surprise (see documentation details).
+  #   shuffled <- as.numeric(sample(as.character(toShuffle)))
+  #
+  #   diag(temp2)[toShuffle] <- diag(temp)[shuffled]
+  # }
+
 
   save(Pool, InteractionMatrices,
        file = file.path(dir, paste0(
@@ -89,7 +155,7 @@ if (CalculatePoolAndMatrices) {
 # Note: eigenvalues of block matrices are the eigenvalues of the blocks.
 CharacteristicRate <- max(unlist(lapply(
   InteractionMatrices$Mats, function(m) {abs(eigen(m)$values)}
-  )))
+)))
 
 Events <- RMTRCode2::CreateAssemblySequence(
   Species = sum(Species),
@@ -104,7 +170,7 @@ Events <- RMTRCode2::CreateAssemblySequence(
 )
 
 print(combinations <- table(Events$Events$Species,
-            Events$Events$Environment))
+                            Events$Events$Environment))
 if(any(combinations == 0)) {warning(
   "Exists a species which doesn't immigrate to an environment."
 )}
@@ -133,70 +199,70 @@ records <- foreach::foreach(
   .packages = "RMTRCode2"
 ) %dopar% {
   pool <- data.frame(n = 1:sum(Species))#Hack
-### Spatial/Dispersal: #########################################################
-if (Space == "None") {
-  DistanceMatrix <- Matrix::sparseMatrix(
-    i = Environments, j = Environments, x = 0)
-}
-if (Space == "Ring" || Space == "Line")
-  DistanceMatrix <- Matrix::bandSparse(
-    Environments, k = c(-1, 1),
-    diagonals = list(rep(PerIslandDistance, Environments - 1),
-                     rep(PerIslandDistance, Environments - 1))
+  ### Spatial/Dispersal: #########################################################
+  if (Space == "None") {
+    DistanceMatrix <- Matrix::sparseMatrix(
+      i = Environments, j = Environments, x = 0)
+  }
+  if (Space == "Ring" || Space == "Line")
+    DistanceMatrix <- Matrix::bandSparse(
+      Environments, k = c(-1, 1),
+      diagonals = list(rep(PerIslandDistance, Environments - 1),
+                       rep(PerIslandDistance, Environments - 1))
+    )
+  if (Space == "Ring") {
+    DistanceMatrix[Environments, 1] <- PerIslandDistance
+    DistanceMatrix[1, Environments] <- PerIslandDistance
+  }
+  if (Space == "Grid") {
+    # Given matrix(1:4, nrow = 2), trying 1 <-> 2, 1 <-> 3, 2 <-> 4, 3 <-> 4.
+    # I.e. matrix(c(0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0), nrow = 4)
+    # Use divisor closest to but <= square root for number of rows.
+  }
+  if (Space == "Full") {
+    DistanceMatrix <- matrix(1, nrow = Environments, ncol = Environments)
+    diag(DistanceMatrix) <- 0
+  }
+
+  DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
+    EnvironmentDistances = DistanceMatrix,
+    SpeciesSpeeds = rep(SpeciesSpeeds, nrow(Pool))
   )
-if (Space == "Ring") {
-  DistanceMatrix[Environments, 1] <- PerIslandDistance
-  DistanceMatrix[1, Environments] <- PerIslandDistance
-}
-if (Space == "Grid") {
-  # Given matrix(1:4, nrow = 2), trying 1 <-> 2, 1 <-> 3, 2 <-> 4, 3 <-> 4.
-  # I.e. matrix(c(0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0), nrow = 4)
-  # Use divisor closest to but <= square root for number of rows.
-}
-if (Space == "Full") {
-  DistanceMatrix <- matrix(1, nrow = Environments, ncol = Environments)
-  diag(DistanceMatrix) <- 0
-}
 
-DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
-  EnvironmentDistances = DistanceMatrix,
-  SpeciesSpeeds = rep(SpeciesSpeeds, nrow(Pool))
-)
+  ## Run: #######################################################################
+  print(Sys.time())
+  if (exists("MultipleNumericalAssembly_Dispersal")) {
+    theFun <- MultipleNumericalAssembly_Dispersal
+  } else {
+    theFun <- RMTRCode2::MultipleNumericalAssembly_Dispersal
+  }
 
-## Run: #######################################################################
-print(Sys.time())
-if (exists("MultipleNumericalAssembly_Dispersal")) {
-  theFun <- MultipleNumericalAssembly_Dispersal
-} else {
-  theFun <- RMTRCode2::MultipleNumericalAssembly_Dispersal
-}
+  result <- theFun(
+    Pool = Pool, NumEnvironments = Environments,
+    InteractionMatrices = InteractionMatrices,
+    Events = Events,
+    PerCapitaDynamics = PerCapitaDynamics,
+    DispersalMatrix = DispersalMatrix,
+    EliminationThreshold = EliminationThreshold,
+    ArrivalDensity = ArrivalDensity,
+    ExtinctionProportion = ExtinctionProportion,
+    MaximumTimeStep = MaximumTimeStep,
+    BetweenEventSteps = BetweenEventSteps,
+    Verbose = FALSE
+  )
+  print(record <- Sys.time())
 
-result <- theFun(
-  Pool = Pool, NumEnvironments = Environments,
-  InteractionMatrices = InteractionMatrices,
-  Events = Events,
-  PerCapitaDynamics = PerCapitaDynamics,
-  DispersalMatrix = DispersalMatrix,
-  EliminationThreshold = EliminationThreshold,
-  ArrivalDensity = ArrivalDensity,
-  ExtinctionProportion = ExtinctionProportion,
-  MaximumTimeStep = MaximumTimeStep,
-  BetweenEventSteps = BetweenEventSteps,
-  Verbose = FALSE
-)
-print(record <- Sys.time())
+  save(result,
+       file = file.path(dir, paste0(
+         "LM1996PermuteWithin-ExampleExtProp-Result-Env", Environments,
+         "-", Space, "-", round(log10(PerIslandDistance)),
+         "-", EventRateModifiers[1], "-", EventRateModifiers[2],
+         "-ExtProp", ExtinctionProportion, ".RData")
+       )
+  )
+  print(Sys.time())
 
-save(result,
-     file = file.path(dir, paste0(
-       "LM1996PermuteWithin-ExampleExtProp-Result-Env", Environments,
-       "-", Space, "-", round(log10(PerIslandDistance)),
-       "-", EventRateModifiers[1], "-", EventRateModifiers[2],
-       "-ExtProp", ExtinctionProportion, ".RData")
-     )
-)
-print(Sys.time())
-
-return(Sys.time() - record)
+  return(Sys.time() - record)
 }
 
 parallel::stopCluster(clust)
