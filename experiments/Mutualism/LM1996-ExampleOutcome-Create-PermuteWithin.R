@@ -24,7 +24,7 @@ ExtinctionProportion <- 1
 MaximumTimeStep <- 1 # Maximum time solver can proceed without elimination.
 BetweenEventSteps <- 10 # Number of steps to reach next event to smooth.
 
-CalculatePoolAndMatrices <- TRUE
+CalculatePoolAndMatrices <- FALSE
 dir <- paste0("Data_", Sys.Date()) # getSrcDirectory(function(){})
 
 if (!dir.exists(dir)) {
@@ -62,8 +62,8 @@ if (CalculatePoolAndMatrices) {
 
   # Within Type Permutation.
   Pool$ReproductionRate <- c(
-    sample(subset(Pool, Type == "Basal", ReproductionRate)),
-    sample(subset(Pool, Type == "Consumer", ReproductionRate))
+    sample(subset(Pool, Type == "Basal", ReproductionRate)[[1]]),
+    sample(subset(Pool, Type == "Consumer", ReproductionRate)[[1]])
   )
 
   # Within Block Permutation (Interaction Matrix)
@@ -91,7 +91,7 @@ if (CalculatePoolAndMatrices) {
         }
 
         # Diagonal
-        toShuffle <- pl$ID[pl$Type == Type]
+        toShuffle <- pl$ID[pl$Type == type1]
 
         if (length(toShuffle) == 0) next()
 
@@ -209,7 +209,7 @@ records <- foreach::foreach(
     ExtinctionProportion = ExtinctionProportion,
     MaximumTimeStep = MaximumTimeStep,
     BetweenEventSteps = BetweenEventSteps,
-    Verbose = FALSE
+    Verbose = TRUE
   )
   print(record <- Sys.time())
 
