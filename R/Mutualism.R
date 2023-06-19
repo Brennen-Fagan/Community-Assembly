@@ -221,6 +221,11 @@ PerCapitaDynamics_Mutualistic1 <- function(
   # Species Types = Species in each Guild (usually length 2: Plant, Pollinator)
   # Subtlety: Mutualism plateaus per-guild in this implementation.
   # Saturations = Matrix of guild-guild saturation values.
+  force(ReproductionRate)
+  force(Saturations)
+  # See forcing evaluation of function factories.
+  # This might be a bug elsewhere (e.g. if arguments aren't evaluated before
+  # the produced functions are used).
 
   st <- c(0, cumsum(rep(SpeciesTypes, NumEnvironments)))
   # Block i, j: (st[i] + 1):st[i+1], (st[j] + 1):st[j+1]
