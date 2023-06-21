@@ -191,7 +191,8 @@ records <- foreach::foreach(
   )
 
   ## Run: #######################################################################
-  print(Sys.time())
+
+  print(record <- Sys.time())
   if (exists("MultipleNumericalAssembly_Dispersal")) {
     theFun <- MultipleNumericalAssembly_Dispersal
   } else {
@@ -209,9 +210,8 @@ records <- foreach::foreach(
     ExtinctionProportion = ExtinctionProportion,
     MaximumTimeStep = MaximumTimeStep,
     BetweenEventSteps = BetweenEventSteps,
-    Verbose = TRUE
+    Verbose = FALSE
   )
-  print(record <- Sys.time())
 
   save(result,
        file = file.path(dir, paste0(
