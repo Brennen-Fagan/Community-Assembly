@@ -73,7 +73,7 @@ if (CalculatePoolAndMatrices) {
            function(type2) {
       mat <- InteractionMatrices$Mats[[1]]
       toShuffle <- which(
-        upper.tri(mat) &
+        upper.tri(mat) #&
           # (row(mat) %in% pl$ID[pl$Type == type1]) &
           # (col(mat) %in% pl$ID[pl$Type == type2])
       )
