@@ -62,11 +62,12 @@ if (CalculatePoolAndMatrices) {
 
   # Within Type Permutation.
   Pool$ReproductionRate <- c(
-    sample(subset(Pool, Type == "Basal", ReproductionRate)[[1]]),
-    sample(subset(Pool, Type == "Consumer", ReproductionRate)[[1]])
+    # sample(subset(Pool, Type == "Basal", ReproductionRate)[[1]]),
+    # sample(subset(Pool, Type == "Consumer", ReproductionRate)[[1]])
+    sample(Pool$ReproductionRate)
   )
 
-  # Within Block Permutation (Interaction Matrix)
+  # Within Block Permutation (Interaction Matrix) with within block disabled.
   InteractionMatrices$Mats <- lapply(
     InteractionMatrices$Mats,
     function(mat, pl) {
