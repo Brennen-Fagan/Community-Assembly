@@ -26,7 +26,9 @@ Mutualism_species <- function(
   # Instead, I'll assume small but positive reproductive rates.
   # Otherwise, I'll stick closely to Thebault and Fontaine.
 
-  stopifnot(length(SpeciesTypes) > 0)
+  stopifnot(length(SpeciesTypes) > 0,
+            length(SpeciesTypes) == length(MinimumRepRates),
+            length(SpeciesTypes) == length(MaximumRepRates))
 
   if (!is.null(seed)) {
     if (exists(".Random.seed")) {
