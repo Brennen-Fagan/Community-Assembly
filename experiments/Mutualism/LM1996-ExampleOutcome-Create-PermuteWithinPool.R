@@ -39,7 +39,9 @@ PoolSeed <- 75027622
 EnvironmentSeed <- 64713671
 # > runif(1) * 1e8
 # [1] 21957601
-HistorySeed <- 21957601
+# Discarded; exists species which doesn't imigrate to an environment.
+# [1] 44311235
+HistorySeed <- 44311235
 
 # Setup: #######################################################################
 
