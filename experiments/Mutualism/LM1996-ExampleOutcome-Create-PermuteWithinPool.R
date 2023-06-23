@@ -1,0 +1,262 @@
+library(RMTRCode2)
+library(parallel)
+library(doParallel)
+library(iterators)
+library(foreach)
+
+# Parameters: ##################################################################
+Species <- c(Basal = 34, Consumer = 66) * 2
+Environments <- 10
+EventsEach <- Environments * ceiling(sum(Species) * (log(sum(Species)) + 0))
+EventRateModifiers <- c(1, 1) # Immigration, Extirpation
+
+LMParameters <- c(0.01, 10, 0.5, 0.2, 100, 0.1)
+LMLogBodySize <- c(-2, -1, -1, 0)
+
+PerIslandDistance <- Inf # 10^5 # Inf # 10^0
+SpeciesSpeeds <- 1
+Space <- match.arg("Ring", c("None", "Ring", "Line", "Full"))
+
+EliminationThreshold <- 10^-4 # Below which species are removed from internals
+ArrivalDensity <- EliminationThreshold * 4 * 10 ^ 3 # Traill et al. 2007
+ExtinctionProportion <- 1
+
+MaximumTimeStep <- 1 # Maximum time solver can proceed without elimination.
+BetweenEventSteps <- 10 # Number of steps to reach next event to smooth.
+
+CalculatePoolAndMatrices <- TRUE
+dir <- paste0("Data_", Sys.Date()) # getSrcDirectory(function(){})
+
+if (!dir.exists(dir)) {
+  dir.create(dir, showWarnings = FALSE)
+}
+
+# > runif(1) * 1e8
+# [1] 75027622
+PoolSeed <- 75027622
+# > runif(1) * 1e8
+# [1] 64713671
+EnvironmentSeed <- 64713671
+# > runif(1) * 1e8
+# [1] 21957601
+HistorySeed <- 21957601
+
+# Setup: #######################################################################
+
+## Pools and Interaction Matrices: #############################################
+if (CalculatePoolAndMatrices) {
+  Pool <- RMTRCode2::LawMorton1996_species(
+    Basal = Species[1],
+    Consumer = Species[2],
+    Parameters = LMParameters,
+    LogBodySize = LMLogBodySize,
+    seed = PoolSeed
+  )
+
+  InteractionMatrices <- RMTRCode2::CreateEnvironmentInteractions(
+    Pool = Pool, NumEnvironments = Environments,
+    ComputeInteractionMatrix = RMTRCode2::LawMorton1996_CommunityMat,
+    Parameters = LMParameters,
+    EnvironmentSeeds = EnvironmentSeed
+  )
+
+  # Within Type Permutation.
+  Pool$ReproductionRate <- c(
+    sample(subset(Pool, Type == "Basal", ReproductionRate)[[1]]),
+    sample(subset(Pool, Type == "Consumer", ReproductionRate)[[1]])
+  )
+
+  shuffleds_offdiag <- lapply(unique(Pool$Type), function(type1, pl) {
+    lapply(unique(Pool$Type), function(type2) {
+      mat <- InteractionMatrices$Mats[[1]]
+      toShuffle <- which(
+        upper.tri(mat) &
+          (row(mat) %in% pl$ID[pl$Type == type1]) &
+          (col(mat) %in% pl$ID[pl$Type == type2])
+      )
+
+      if(length(toShuffle)) {
+        shuffled <- as.numeric(sample(as.character(toShuffle)))
+      } else {
+        shuffled <- c()
+      }
+
+      return(shuffled)
+    })
+  }, pl = Pool)
+
+  shuffleds_diag <- lapply(unique(Pool$Type), function(type1, pl) {
+
+    toShuffle <- pl$ID[pl$Type == type1]
+
+    if (length(toShuffle) == 0) {
+      shuffled <- c()
+    } else {
+      # Beware the sample surprise (see documentation details).
+      shuffled <- as.numeric(sample(as.character(toShuffle)))
+    }
+
+    return(shuffled)
+    }, pl = Pool)
+
+  # Within Block Permutation (Interaction Matrix)
+  InteractionMatrices$Mats <- lapply(
+    InteractionMatrices$Mats,
+    function(mat, pl) {
+      out <- mat
+      for(ntype1 in seq_along(unique(pl$Type))) {
+        type1 <- unique(pl$Type)[ntype1]
+        for(ntype2 in seq_along(unique(pl$Type))) {
+          type2 <- unique(pl$Type)[ntype2]
+
+          toShuffle <- which(
+            upper.tri(mat) &
+              (row(mat) %in% pl$ID[pl$Type == type1]) &
+              (col(mat) %in% pl$ID[pl$Type == type2])
+          )
+
+          if (length(toShuffle) == 0) next()
+
+          # Beware the sample surprise (see documentation details).
+          shuffled <- shuffleds_offdiag[[ntype1]][[ntype2]]
+
+          out[toShuffle] <- mat[shuffled]
+          out <- t(out)
+          out[toShuffle] <- t(mat)[shuffled]
+          out <- t(out)
+        }
+
+        # Diagonal
+        toShuffle <- pl$ID[pl$Type == type1]
+
+        shuffled <- shuffleds_diag[[ntype1]]
+
+        diag(out)[toShuffle] <- diag(mat)[shuffled]
+      }
+      return(out)
+    }, pl = Pool)
+
+  save(Pool, InteractionMatrices,
+       file = file.path(dir, paste0(
+         "LM1996PermuteWithinPool-ExampleOutcome-PoolMats-Env", Environments, ".RData")))
+} else {
+  load(file = file.path(dir, paste0(
+    "LM1996PermuteWithinPool-ExampleOutcome-PoolMats-Env", Environments, ".RData")))
+}
+
+## Events: #####################################################################
+
+# Note: eigenvalues of block matrices are the eigenvalues of the blocks.
+CharacteristicRate <- max(unlist(lapply(
+  InteractionMatrices$Mats, function(m) {abs(eigen(m)$values)}
+)))
+
+Events <- RMTRCode2::CreateAssemblySequence(
+  Species = sum(Species),
+  NumEnvironments = Environments,
+  ArrivalEvents = EventsEach * EventRateModifiers[1],
+  ArrivalRate = CharacteristicRate * EventRateModifiers[1],
+  ArrivalFUN = RMTRCode2::ArrivalFUN_Example2,
+  ExtinctEvents = EventsEach * EventRateModifiers[2],
+  ExtinctRate = CharacteristicRate * EventRateModifiers[2],
+  ExtinctFUN = RMTRCode2::ExtinctFUN_Example2,
+  HistorySeed = HistorySeed
+)
+
+print(combinations <- table(Events$Events$Species,
+                            Events$Events$Environment))
+if(any(combinations == 0)) {warning(
+  "Exists a species which doesn't immigrate to an environment."
+)}
+
+## Dynamics: ###################################################################
+
+IntMat <- Matrix::bdiag(InteractionMatrices$Mats)
+PerCapitaDynamics <- RMTRCode2::PerCapitaDynamics_Type1(
+  Pool$ReproductionRate, IntMat,
+  NumEnvironments = Environments
+)
+
+
+records <- foreach::foreach(
+  dist = iterators::iter(PerIslandDistance),
+  # .export = c(
+  #   "Pool", "Environments",
+  #   "InteractionMatrices",
+  #   "Events",
+  #   "PerCapitaDynamics",
+  #   "EliminationThreshold",
+  #   "ArrivalDensity",
+  #   "ExtinctionProportion",
+  #   "MaximumTimeStep",
+  #   "BetweenEventSteps"),
+  .packages = "RMTRCode2"
+) %dopar% {
+  pool <- data.frame(n = 1:sum(Species))#Hack
+  ### Spatial/Dispersal: #########################################################
+  if (Space == "None") {
+    DistanceMatrix <- Matrix::sparseMatrix(
+      i = Environments, j = Environments, x = 0)
+  }
+  if (Space == "Ring" || Space == "Line")
+    DistanceMatrix <- Matrix::bandSparse(
+      Environments, k = c(-1, 1),
+      diagonals = list(rep(PerIslandDistance, Environments - 1),
+                       rep(PerIslandDistance, Environments - 1))
+    )
+  if (Space == "Ring") {
+    DistanceMatrix[Environments, 1] <- PerIslandDistance
+    DistanceMatrix[1, Environments] <- PerIslandDistance
+  }
+  if (Space == "Grid") {
+    # Given matrix(1:4, nrow = 2), trying 1 <-> 2, 1 <-> 3, 2 <-> 4, 3 <-> 4.
+    # I.e. matrix(c(0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0), nrow = 4)
+    # Use divisor closest to but <= square root for number of rows.
+  }
+  if (Space == "Full") {
+    DistanceMatrix <- matrix(1, nrow = Environments, ncol = Environments)
+    diag(DistanceMatrix) <- 0
+  }
+
+  DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
+    EnvironmentDistances = DistanceMatrix,
+    SpeciesSpeeds = rep(SpeciesSpeeds, nrow(Pool))
+  )
+
+  ## Run: #######################################################################
+
+  print(record <- Sys.time())
+  if (exists("MultipleNumericalAssembly_Dispersal")) {
+    theFun <- MultipleNumericalAssembly_Dispersal
+  } else {
+    theFun <- RMTRCode2::MultipleNumericalAssembly_Dispersal
+  }
+
+  result <- theFun(
+    Pool = Pool, NumEnvironments = Environments,
+    InteractionMatrices = InteractionMatrices,
+    Events = Events,
+    PerCapitaDynamics = PerCapitaDynamics,
+    DispersalMatrix = DispersalMatrix,
+    EliminationThreshold = EliminationThreshold,
+    ArrivalDensity = ArrivalDensity,
+    ExtinctionProportion = ExtinctionProportion,
+    MaximumTimeStep = MaximumTimeStep,
+    BetweenEventSteps = BetweenEventSteps,
+    Verbose = FALSE
+  )
+
+  save(result,
+       file = file.path(dir, paste0(
+         "LM1996PermuteWithinPool-ExampleExtProp-Result-Env", Environments,
+         "-", Space, "-", round(log10(PerIslandDistance)),
+         "-", EventRateModifiers[1], "-", EventRateModifiers[2],
+         "-ExtProp", ExtinctionProportion, ".RData")
+       )
+  )
+  print(Sys.time())
+
+  return(Sys.time() - record)
+}
+
+parallel::stopCluster(clust)
