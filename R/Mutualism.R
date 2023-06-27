@@ -298,7 +298,7 @@ PerCapitaDynamics_Mutualistic2 <- function(
   # NumEnvironments = number of patches, as usual
   # Species Types = Species in each Guild (usually length 2: Plant, Pollinator)
   # Subtlety: Mutualism plateaus per-guild but contributions are per species.
-  # Saturations = Matrix of species-species saturation values.
+  # Saturations = Matrix of species-species saturation values across patchs.
   #               Saturation is amongst substitutes for a function.
   # Note, the transposal of the indices between plants and animals is equivalent
   # to considering a symmetric matrix. I don't see why this symmetry should be
