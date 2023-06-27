@@ -366,11 +366,16 @@ PerCapitaDynamics_Mutualistic2 <- function(
     inter <- outer(stind, stind, Vectorize(
       function(i, j) {
         interguild(i, j, y)
-      }
+      },
+      SIMPLIFY = FALSE # Causes bugs when all have same dimensions.
     ))
     # Matrix of lists of column vectors
     # Reorganise by row into matrices, then sum for final (per capita) effect.
-    inter <- unlist(apply(inter, 1, function(x) rowSums(do.call(cbind, x))))
+    # We again run into a simplification problem here in R4.0.3, but there is
+    # no argument that we can use to circumvent it until 4.1.0.
+    # Circumvent with recursive unlisting.
+    inter <- unlist(apply(inter, 1,
+                          function(x) list(rowSums(do.call(cbind, x)))))
     return(inter + intraguild(y))
   }
 
