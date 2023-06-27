@@ -335,16 +335,22 @@ PerCapitaDynamics_Mutualistic2 <- function(
     )
 
     ### Differences from Mutualistic1: ###########
-    numerator <- (
+    numerator <- matrix(# Required to make sure structure is matrix in edge case
       guilds[i, j][[1]] *
-        Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]]
+        Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]],
       # Hadamard TF2010's alpha and c
+      nrow = length((st[i] + 1):st[i + 1]),
+      ncol = length((st[j] + 1):st[j + 1])
       )
 
     divisor <- (
       1 + Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]] * (
-        (Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]] > 0) %*%
-               y[(st[j] + 1):st[j + 1]]
+        matrix(# Required to make sure structure is matrix in edge case.
+          Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]] > 0,
+          nrow = length((st[i] + 1):st[i + 1]),
+          ncol = length((st[j] + 1):st[j + 1])
+        ) %*%
+          y[(st[j] + 1):st[j + 1]]
       )[1:TypePatches[i]] # 1 + alpha[i,j] * sum_{k, alpha[i,k] > 0} (y_k)
     ) # Treats y as a column vector and performs dot product. Results in column.
     # R default multiplication is down columns. We remove column struct to use.
