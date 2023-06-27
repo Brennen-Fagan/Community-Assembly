@@ -341,11 +341,12 @@ PerCapitaDynamics_Mutualistic2 <- function(
       )
 
     divisor <- (
-      1 + Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]] * rowSums(
-        ifelse(Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]] > 0,
-               y[(st[j] + 1):st[j + 1]], 0)
+      1 + Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]] * (
+        (Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]] > 0) %*%
+               y[(st[j] + 1):st[j + 1]]
       ) # 1 + alpha[i,j] * sum_{k, alpha[i,k] > 0} (y_k)
-    ) # Note R proceeds down columns natively.
+    ) # Treats y as a column vector and performs dot product. Results in column.
+    # R default multiplication is down columns.
 
     mutualism <- (numerator / divisor) %*% y[(st[j] + 1):st[j+1]]
 
