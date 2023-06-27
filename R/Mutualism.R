@@ -297,8 +297,14 @@ PerCapitaDynamics_Mutualistic2 <- function(
   # InteractionMatrix = Block matrix, Beta blocks on diagonal, Gamma off diag.
   # NumEnvironments = number of patches, as usual
   # Species Types = Species in each Guild (usually length 2: Plant, Pollinator)
-  # Subtlety: Mutualism plateaus per-guild in this implementation.
-  # Saturations = Matrix of guild-guild saturation values.
+  # Subtlety: Mutualism plateaus per-guild but contributions are per species.
+  # Saturations = Matrix of species-species saturation values.
+  #               Saturation is amongst substitutes for a function.
+  # Note, the transposal of the indices between plants and animals is equivalent
+  # to considering a symmetric matrix. I don't see why this symmetry should be
+  # exact (cij == cji) as an assumption and so have not included it here.
+  # It can still be enforced with the inputs.
+
   force(ReproductionRate)
   force(Saturations)
   # See forcing evaluation of function factories.
@@ -327,18 +333,23 @@ PerCapitaDynamics_Mutualistic2 <- function(
       matrix(0, nrow = st[i+1] - st[i], ncol = 1)
     )
 
-    mutualism <- guilds[i, j][[1]] %*% y[(st[j] + 1):st[j+1]]
+    ### Differences from Mutualistic1: ###########
+    numerator <- (
+      guilds[i, j][[1]] *
+        Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]]
+      # Hadamard TF2010's alpha and c
+      )
 
-    # Note: risk of Inf * 0; which we try to catch.
+    divisor <- (
+      1 + Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]] * rowSums(
+        ifelse(Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]] > 0,
+               y[(st[j] + 1):st[j + 1]], 0)
+      ) # 1 + alpha[i,j] * sum_{k, alpha[i,k] > 0} (y_k)
+    ) # Note R proceeds down columns natively.
 
-    mutualism <- ifelse(
-      mutualism == 0,
-      0,
-      mutualism / (1 + Saturations[
-        ((i - 1) %% length(SpeciesTypes)) + 1,
-        ((j - 1) %% length(SpeciesTypes)) + 1]
-        * mutualism)
-    )
+    mutualism <- (numerator / divisor) %*% y[(st[j] + 1):st[j+1]]
+
+    ##############################################
 
     return(mutualism)
   }
