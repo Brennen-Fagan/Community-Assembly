@@ -311,7 +311,8 @@ PerCapitaDynamics_Mutualistic2 <- function(
   # This might be a bug elsewhere (e.g. if arguments aren't evaluated before
   # the produced functions are used).
 
-  st <- c(0, cumsum(rep(SpeciesTypes, NumEnvironments)))
+  TypePatches <- rep(SpeciesTypes, NumEnvironments)
+  st <- c(0, cumsum(TypePatches))
   # Block i, j: (st[i] + 1):st[i+1], (st[j] + 1):st[j+1]
   stind <- seq_along(st[-length(st)])
 
@@ -344,9 +345,9 @@ PerCapitaDynamics_Mutualistic2 <- function(
       1 + Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]] * (
         (Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]] > 0) %*%
                y[(st[j] + 1):st[j + 1]]
-      ) # 1 + alpha[i,j] * sum_{k, alpha[i,k] > 0} (y_k)
+      )[1:TypePatches[i]] # 1 + alpha[i,j] * sum_{k, alpha[i,k] > 0} (y_k)
     ) # Treats y as a column vector and performs dot product. Results in column.
-    # R default multiplication is down columns.
+    # R default multiplication is down columns. We remove column struct to use.
 
     mutualism <- (numerator / divisor) %*% y[(st[j] + 1):st[j+1]]
 
