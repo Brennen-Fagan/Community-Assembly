@@ -363,25 +363,67 @@ PerCapitaDynamics_Mutualistic2 <- function(
     )
 
     ### Differences from Mutualistic1: ###########
-    numerator <- matrix(# Required to make sure structure is matrix in edge case
-      guilds[i, j][[1]] *
-        Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]],
-      # Hadamard TF2010's alpha and c
-      nrow = length((st[i] + 1):st[i + 1]),
-      ncol = length((st[j] + 1):st[j + 1])
+    if(any(guilds[i, j][[1]] > 0)) {
+      # Gains a benefit, in which case divide amongst providers of benefit.
+
+      numerator <- matrix(# Required to make sure structure is matrix in edge case
+        guilds[i, j][[1]] *
+          Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]],
+        # Hadamard TF2010's alpha and c
+        nrow = length((st[i] + 1):st[i + 1]),
+        ncol = length((st[j] + 1):st[j + 1])
       )
 
-    divisor <- (
-      1 + Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]] * (
-        matrix(# Required to make sure structure is matrix in edge case.
-          Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]] > 0,
-          nrow = length((st[i] + 1):st[i + 1]),
-          ncol = length((st[j] + 1):st[j + 1])
-        ) %*%
-          y[(st[j] + 1):st[j + 1]]
-      )[1:TypePatches[i]] # 1 + alpha[i,j] * sum_{k, alpha[i,k] > 0} (y_k)
-    ) # Treats y as a column vector and performs dot product. Results in column.
-    # R default multiplication is down columns. We remove column struct to use.
+      divisor <- (
+        1 + Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]] * (
+          matrix(# Required to make sure structure is matrix in edge case.
+            Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]] > 0,
+            nrow = length((st[i] + 1):st[i + 1]),
+            ncol = length((st[j] + 1):st[j + 1])
+          ) %*%
+            y[(st[j] + 1):st[j + 1]]
+        )[1:TypePatches[i]] # 1 + alpha[i,j] * sum_{k, alpha[i,k] > 0} (y_k)
+      ) # Treats y as a column vector and performs dot product. Results in column.
+      # R default multiplication is down columns. We remove column struct to use.
+
+    } else if(any(guilds[i, j][[1]] < 0)) {
+      # Receives a penalty, in which case divide among possible recipients.
+
+      numerator <- matrix(# Required to make sure structure is matrix in edge case
+        guilds[i, j][[1]] *
+          Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]],
+        # Hadamard TF2010's alpha and c
+        nrow = length((st[i] + 1):st[i + 1]),
+        ncol = length((st[j] + 1):st[j + 1])
+      )
+
+      divisor <- (
+        1 + Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]] * replicate(
+        TypePatches[i], # Should be length((st[i] + 1):st[i + 1]).
+          y[(st[i] + 1):st[i + 1]] %*%
+            matrix(# Required to make sure structure is matrix in edge case.
+              Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]] > 0,
+              nrow = length((st[i] + 1):st[i + 1]),
+              ncol = length((st[j] + 1):st[j + 1])
+            )
+        )[,,] # 1 + alpha[i,j] * sum_{k, alpha[i,k] > 0} (y_k)
+      ) # Treats y as a row vector and performs dot product. Results in row.
+      # Repeat row structure to turn into matrix (accessed with [,,]).
+
+    } else {
+      # zeros matrix
+      numerator <- matrix(# Required to make sure structure is matrix in edge case.
+        0,
+        nrow = length((st[i] + 1):st[i + 1]),
+        ncol = length((st[j] + 1):st[j + 1])
+      )
+      divisor <- matrix(# Required to make sure structure is matrix in edge case.
+        1,
+        nrow = length((st[i] + 1):st[i + 1]),
+        ncol = length((st[j] + 1):st[j + 1])
+      )
+    }
+
 
     mutualism <- (numerator / divisor) %*% y[(st[j] + 1):st[j+1]]
 
