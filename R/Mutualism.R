@@ -394,7 +394,7 @@ PerCapitaDynamics_Mutualistic2 <- function(
     # no argument that we can use to circumvent it until 4.1.0.
     # Circumvent with recursive unlisting.
     inter <- unlist(apply(inter, 1,
-                          function(x) list(rowSums(do.call(cbind, x)))))
+                          function(x) list(Matrix::rowSums(do.call(cbind, x)))))
     return(inter + intraguild(y))
   }
 
