@@ -305,6 +305,17 @@ PerCapitaDynamics_Mutualistic2 <- function(
   # exact (cij == cji) as an assumption and so have not included it here.
   # It can still be enforced with the inputs.
 
+  # Note also that we have a strict definition of guild. To be a member of a
+  # specific guild, you need to have the same interaction types as all other
+  # members of the same guild with other guilds. All pollinators within one
+  # guild pollinate the same guild of plants (although not necessarily the
+  # exact same set of plants). But members of a guild must compete with each
+  # other since members of the same species compete with each other.
+  # "Intraguild predation" then either requires a multiplex network (not here)
+  # or implementation as two separate guilds with otherwise the same
+  # interactions amongst other guilds but with members of the top guild eating
+  # members of the other focal/intermediate guild.
+
   force(ReproductionRate)
   force(Saturations)
   # See forcing evaluation of function factories.
