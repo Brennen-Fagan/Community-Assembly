@@ -343,6 +343,15 @@ PerCapitaDynamics_Mutualistic2 <- function(
       )}
     ))
 
+  # Double-check that the guilds rule above is satisfied.
+  # There shouldn't be any guild that has both + and - interactions with another
+  # guild (including itself). 0's are permitted.
+  stopifnot(all(
+    unlist(lapply(guilds, functions(guild) {
+      !(any(sign(guild) == -1) && any(sign(guild) == 1))
+    }))
+  ))
+
   # Linear Terms
   intraguild <- function(y) {Matrix::bdiag(diag(guilds)) %*% y}
 
