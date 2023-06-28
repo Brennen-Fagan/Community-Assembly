@@ -17,7 +17,7 @@ library(foreach)
 # Parameters: ##################################################################
 Species <- c(Producer = 34, Pollinator = 66) * 2
 Environments <- 10
-EventsEach <- Environments * ceiling(sum(Species) * (log(sum(Species)) + 0))
+EventsEach <- 50#Environments * ceiling(sum(Species) * (log(sum(Species)) + 0))
 EventRateModifiers <- c(1, 1) # Immigration, Extirpation
 
 
@@ -92,6 +92,14 @@ if (CalculatePoolAndMatrices) {
     diag(mat) <- runif(nrow(mat), min = -2, max = -1)
     return(mat)
   })
+
+  # T&F use the connectance of the saturations as the primary connectance...
+  diagSat <- diag(Saturation)
+  Saturation <- Saturation * adjmat
+  diag(Saturation) <- diagSat
+
+  # Additionally, Saturation needs to be species x species x patch:
+  Saturation <- Matrix::bdiag(rep(list(Saturation), Environments))
 
   save(Pool, Saturation, InteractionMatrices,
        file = file.path(dir, paste0(
