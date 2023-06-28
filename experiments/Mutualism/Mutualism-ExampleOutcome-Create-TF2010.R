@@ -64,7 +64,7 @@ if (CalculatePoolAndMatrices) {
   )
 
   Saturation <- Mutualism_saturation(
-    Species, seed = SatSeed
+    rep(1, sum(Species)), seed = SatSeed
   )
 
   InteractionMatrices <- RMTRCode2::CreateEnvironmentInteractions(
@@ -131,7 +131,7 @@ if(any(combinations == 0)) {warning(
 
 IntMat <- Matrix::bdiag(InteractionMatrices$Mats)
 reprate <- Pool$ReproductionRate
-PerCapitaDynamics <- PerCapitaDynamics_Mutualistic1(
+PerCapitaDynamics <- PerCapitaDynamics_Mutualistic2(
   reprate, IntMat,
   NumEnvironments = Environments,
   SpeciesTypes = Species, Saturations = Saturation
