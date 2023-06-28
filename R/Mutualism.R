@@ -309,7 +309,15 @@ PerCapitaDynamics_Mutualistic2 <- function(
   force(Saturations)
   # See forcing evaluation of function factories.
   # This might be a bug elsewhere (e.g. if arguments aren't evaluated before
-  # the produced functions are used).
+  # the produced functions are used). Note that the guards below should render
+  # forcings unnecessary.
+
+  stopifnot(sum(SpeciesTypes) == length(ReproductionRate),
+            length(ReproductionRate) * NumEnvironments == nrow(Saturations),
+            nrow(Saturations) == ncol(Saturations),
+            nrow(Saturations) == nrow(InteractionMatrix),
+            ncol(Saturations) == ncol(InteractionMatrix)
+            )
 
   TypePatches <- rep(SpeciesTypes, NumEnvironments)
   st <- c(0, cumsum(TypePatches))
