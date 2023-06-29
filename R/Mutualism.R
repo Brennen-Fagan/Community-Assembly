@@ -398,7 +398,7 @@ PerCapitaDynamics_Mutualistic2 <- function(
       )
 
       divisor <- (
-        1 + Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]] * replicate(
+        1 + Saturations[(st[i] + 1):st[i + 1], (st[j] + 1):st[j + 1]] * t(replicate(
         TypePatches[i], # Should be length((st[i] + 1):st[i + 1]).
           y[(st[i] + 1):st[i + 1]] %*%
             matrix(# Required to make sure structure is matrix in edge case.
@@ -407,7 +407,7 @@ PerCapitaDynamics_Mutualistic2 <- function(
               ncol = length((st[j] + 1):st[j + 1])
             )
         )[,,] # 1 + alpha[i,j] * sum_{k, alpha[i,k] > 0} (y_k)
-      ) # Treats y as a row vector and performs dot product. Results in row.
+      )) # Treats y as a row vector and performs dot product. Results in row.
       # Repeat row structure to turn into matrix (accessed with [,,]).
 
     } else {
