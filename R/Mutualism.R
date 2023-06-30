@@ -348,7 +348,7 @@ PerCapitaDynamics_Mutualistic2 <- function(
   # guild (including itself). 0's are permitted.
   stopifnot(all(
     unlist(lapply(guilds, function(guild) {
-      !(any(sign(guild[[1]]) == -1) && any(sign(guild[[1]]) == 1))
+      !(any(sign(guild) == -1) && any(sign(guild) == 1))
     }))
   ))
 
