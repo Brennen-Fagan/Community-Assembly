@@ -524,19 +524,32 @@ PerCapitaDynamics_Mutualistic3 <- function(
     }))
   ))
 
+  signs <- outer(1:nrow(guilds), 1:ncol(guilds), Vectorize(
+    function(i, j) {
+      if ( i == j || !any(guilds[i, j][[1]] != 0)) {
+        0
+      } else if (any(sign(guilds[i, j][[1]]) == 1)) {
+        1
+      } else {
+        -1
+      }
+    }
+  ))
+
   # Linear Terms
   intraguild <- function(y) {Matrix::bdiag(diag(guilds)) %*% y}
 
   # Saturating Terms
   interguild <- function(i, j, y) {
     # i == j => Intraguild, covered above
-    guild <- guilds[i, j][[1]]
-    if ( i == j || !any(guild != 0))  return(
+    if (!signs[i, j])  return(
       matrix(0, nrow = st[i+1] - st[i], ncol = 1)
     )
 
+    guild <- guilds[i, j][[1]]
+
     ### Differences from Mutualistic1: ###########
-    if(any(guild > 0)) {
+    if(signs[i, j] == 1) {
       # Gains a benefit, in which case divide amongst providers of benefit.
 
       numerator <- matrix(# Required to make sure structure is matrix in edge case
@@ -559,7 +572,7 @@ PerCapitaDynamics_Mutualistic3 <- function(
       ) # Treats y as a column vector and performs dot product. Results in column.
       # R default multiplication is down columns. We remove column struct to use.
 
-    } else if(any(guild < 0)) {
+    } else {
       # Receives a penalty, in which case divide among possible recipients.
 
       numerator <- matrix(# Required to make sure structure is matrix in edge case
@@ -583,9 +596,9 @@ PerCapitaDynamics_Mutualistic3 <- function(
         )) # Treats y as a row vector and performs dot product. Results in row.
       # Repeat row structure to turn into matrix (accessed with [,,]).
 
-    } else {
-      # zeros matrix
-      return(matrix(0, nrow = st[i+1] - st[i], ncol = 1))
+    # } else {
+    #   # zeros matrix
+    #   return(matrix(0, nrow = st[i+1] - st[i], ncol = 1))
     }
 
 
