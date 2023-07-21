@@ -257,8 +257,8 @@ results <- foreach::foreach(
     # idNums indicates which variation we are dealing with, as well as the
     # associated parameters.
     # This is split between MNA-MasterParameters.RData and the .csv files.
-    Diversity$SysType <- ids[1]
-    Diversity$SpaceMod <- ids[2]
+    Invadability$SysType <- ids[1]
+    Invadability$SpaceMod <- ids[2]
 
     save(Invadability,
          file = fileName
