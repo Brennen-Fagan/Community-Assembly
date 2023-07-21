@@ -79,39 +79,37 @@ doParallel::registerDoParallel(clust)
 #   cl = clust, list("allLibraryPaths")
 # )
 #
-# parallel::clusterEvalQ(
-#   cl = clust,
-#   expr = {
+parallel::clusterEvalQ(
+  cl = clust,
+  expr = {
 #     .libPaths(allLibraryPaths)
-#     library(RMTRCode2)
-#     library(Matrix)
-#   }
-# )
+    library(RMTRCode2)
+    library(Matrix)
+  }
+)
 
 # Files: ######################################################################
 print("Identifying files.")
 
-directories <- dir(
-  path = ".", pattern = "SaveOutput[_]MissingInv",
-  #pattern = "Viking[_]SaveOutput[_]2021[-]12[-]28[_]2022[-]03[-]01",
-  full.names = TRUE, include.dirs = TRUE)
-files <- dir(path = directories,
-             pattern = "^MNA[-]Master.+[.]RData$",
+# directories <- dir(
+#   path = ".", pattern = "SaveOutput[_]MissingInv",
+#   #pattern = "Viking[_]SaveOutput[_]2021[-]12[-]28[_]2022[-]03[-]01",
+#   full.names = TRUE, include.dirs = TRUE)
+files <- dir(
+  path = c("Data_2023-06-26", "Data_2023-06-27", "Data_2023-07-06",
+           "Data2_2023-06-30"),
+  pattern = "^.+[-]ExampleExtProp[-].+[.]RData$",
              full.names = TRUE, recursive = TRUE,
              include.dirs = TRUE, no.. = TRUE)
 
-# Note alphabetical, using 1:3 <=> A:C, and one letter is the only difference.
-filesParameters <- dir(path = "Prepared_2021-12-20",
-                       pattern = "^MNA[-]Master.+Cases[.]csv$",
-                       full.names = TRUE, recursive = TRUE,
-                       include.dirs = TRUE, no.. = TRUE)
-parametersMaster <- load(file.path("Prepared_2021-12-20",
-                                   "MNA-MasterParameters.RData"))
-parametersCSVs <- lapply(filesParameters, utils::read.csv)
-
-# Note the problem observed 31/01/2022, 1400 in the calendar.
-# To accommodate, reassign inf to the *end* of the Space list.
-systemMods$SpaceDistanceMultiplier <- systemMods$SpaceDistanceMultiplier[c(2:9, 1)]
+# # Note alphabetical, using 1:3 <=> A:C, and one letter is the only difference.
+# filesParameters <- dir(path = "Prepared_2021-12-20",
+#                        pattern = "^MNA[-]Master.+Cases[.]csv$",
+#                        full.names = TRUE, recursive = TRUE,
+#                        include.dirs = TRUE, no.. = TRUE)
+# parametersMaster <- load(file.path("Prepared_2021-12-20",
+#                                    "MNA-MasterParameters.RData"))
+# parametersCSVs <- lapply(filesParameters, utils::read.csv)
 
 # We'll need the per capita dynamics and the dispersal matrices.
 filesPrepared <- dir(path = "Prepared_2021-12-20",
