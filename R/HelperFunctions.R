@@ -357,7 +357,7 @@ FindPresenceChanges <- function(loaded) {
   dplyr::bind_rows(reports)
 }
 
-addNeutral <- function(loaded, presenceChanges) {
+addNeutral <- function(loaded, presenceChanges, divide_time_by) {
   # Make Consistent
   events <- loaded$Events %>% dplyr::filter(
     Times > burn_in
@@ -401,7 +401,8 @@ not <- function(f) function(...) !f(...)
 
 # Recycling from Viking_HandleOutput_Diversity.R.
 thinAndCalculateInvadabilities <- function(loaded, dyn, dis, 
-                                           preferred_rows_per_event) {
+                                           preferred_rows_per_event,
+                                           divide_time_by) {
   # We can't handle all of the data that we are going to be looking at;
   # a small sample had ~180k rows for ~5.3k events = ~34 rows per event.
   # To reduce it, we will divide time up so that there are about the
@@ -488,7 +489,8 @@ thinAndCalculateInvadabilities <- function(loaded, dyn, dis,
 
 # Recycling from SecondAttempt-Doc-Analysis2-Gallery.Rmd.
 thinAndCalculateDiversities <- function(loaded, nspecies, 
-                                        preferred_rows_per_event) {
+                                        preferred_rows_per_event,
+                                        divide_time_by) {
   # We can't handle all of the data that we are going to be looking at;
   # a small sample had ~180k rows for ~5.3k events = ~34 rows per event.
   # To reduce it, we will divide time up so that there are about the

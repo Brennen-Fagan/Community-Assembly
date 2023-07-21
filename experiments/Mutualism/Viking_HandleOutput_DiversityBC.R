@@ -134,7 +134,8 @@ results <- foreach::foreach(
         Diversities = list(thinAndCalculateDiversities(
           fileContents,
           nspecies = SpeciesTypes,
-          preferred_rows_per_event = preferred_rows_per_event
+          preferred_rows_per_event = preferred_rows_per_event,
+          divide_time_by = divide_time_by
         ))
       )
     print("diversity")
