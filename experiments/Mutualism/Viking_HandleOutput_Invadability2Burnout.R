@@ -5,10 +5,9 @@
 #   3. Save the invadability values separately, but alongside their parameters.
 
 # Parameters: #################################################################
-divide_time_by <- 1E4
+SpeciesTypes <- c(34, 66) * 2
+divide_time_by <- 1E2
 preferred_rows_per_event <- 1.5
-
-burnout <- 6.5 * 1E4 # In original units.
 
 outputLocation <- file.path(".", paste0("SaveInvadability_", Sys.Date()))
 if (!dir.exists(outputLocation)) {
@@ -82,7 +81,7 @@ doParallel::registerDoParallel(clust)
 parallel::clusterEvalQ(
   cl = clust,
   expr = {
-#     .libPaths(allLibraryPaths)
+    #     .libPaths(allLibraryPaths)
     library(RMTRCode2)
     library(Matrix)
   }
@@ -95,12 +94,13 @@ print("Identifying files.")
 #   path = ".", pattern = "SaveOutput[_]MissingInv",
 #   #pattern = "Viking[_]SaveOutput[_]2021[-]12[-]28[_]2022[-]03[-]01",
 #   full.names = TRUE, include.dirs = TRUE)
+directories <- c("Data_2023-06-26", "Data_2023-06-27", "Data_2023-07-06",
+                 "Data2_2023-06-30")
 files <- dir(
-  path = c("Data_2023-06-26", "Data_2023-06-27", "Data_2023-07-06",
-           "Data2_2023-06-30"),
+  path = directories,
   pattern = "^.+[-]ExampleExtProp[-].+[.]RData$",
-             full.names = TRUE, recursive = TRUE,
-             include.dirs = TRUE, no.. = TRUE)
+  full.names = TRUE, recursive = TRUE,
+  include.dirs = TRUE, no.. = TRUE)
 
 # # Note alphabetical, using 1:3 <=> A:C, and one letter is the only difference.
 # filesParameters <- dir(path = "Prepared_2021-12-20",
@@ -112,75 +112,75 @@ files <- dir(
 # parametersCSVs <- lapply(filesParameters, utils::read.csv)
 
 # We'll need the per capita dynamics and the dispersal matrices.
-filesPrepared <- dir(path = "Prepared_2021-12-20",
-                     pattern = "^MNA[-]Master.+[-]Cases[-]Prepared[.]RData$",
-                     full.names = TRUE, recursive = TRUE,
-                     include.dirs = TRUE, no.. = TRUE)
-preparedCases <- lapply(filesPrepared, function(fil) {
-  tempenv <- new.env()
-  load(fil, envir = tempenv)
-  # We only need the matrices and the reproductive rates, not the events.
-  # This should cut down on the memory requirements.
-  rm(list = c("evnts"), envir = tempenv)
-  return(tempenv)
-})
+# filesPrepared <- dir(path = directories,
+#                      pattern = "^.+[-]ExampleOutcome[-]PoolMats[-].+[.]RData$",
+#                      full.names = TRUE, recursive = TRUE,
+#                      include.dirs = TRUE, no.. = TRUE)
+# preparedCases <- lapply(filesPrepared, function(fil) {
+#   tempenv <- new.env()
+#   load(fil, envir = tempenv)
+#   # We only need the matrices and the reproductive rates, not the events.
+#   # This should cut down on the memory requirements.
+#   rm(list = c("evnts"), envir = tempenv)
+#   return(tempenv)
+# })
 
 
 # 0 In Parallel: ##############################################################
 # start_time <- Sys.time()
 results <- foreach::foreach(
   file = iterators::iter(files),
-  .packages = c("dplyr")
-) %do%{#par% {
+  .packages = c("dplyr")#, "RMTRCode2")
+) %dopar% {
   gc() # Try to reduce the memory usage.
   print(file)
-  # Retrieve the trailing id numbers from before the file extension.
-  # 1st: Set, 2nd: CaseNumber, 3rd: History, 4th: Part
-  # Note, if last two are not present, all histories are bundled together.
-  # If last two are present, each file has a single part of a single history.
-  idNums <- suppressWarnings(na.omit(
-    as.numeric(tail(strsplit(tools::file_path_sans_ext(basename(file)),
-                             split = "-", fixed = TRUE)[[1]],
-                    n = 4))),
-    classes = "simpleWarning")
+  # # Retrieve the trailing id numbers from before the file extension.
+  # # 1st: Set, 2nd: CaseNumber, 3rd: History, 4th: Part
+  # # Note, if last two are not present, all histories are bundled together.
+  # # If last two are present, each file has a single part of a single history.
+  # idNums <- suppressWarnings(na.omit(
+  #   as.numeric(tail(strsplit(tools::file_path_sans_ext(basename(file)),
+  #                            split = "-", fixed = TRUE)[[1]],
+  #                   n = 4))),
+  #   classes = "simpleWarning")
+  #
+  #   print(idNums)
 
-  print(idNums)
+  ids <- strsplit(tools::file_path_sans_ext(basename(file)),
+                  split = "-", fixed = TRUE)[[1]][c(1, 6)]
+  print(ids)
+
 
   fileName <- file.path(
     outputLocation,
-    paste0("MNA-Master", LETTERS[idNums[1]], "-Cases-Invadability-",
-           paste(idNums, collapse = "-"), ".RData")
+    paste0(ids[1], "-Invadability-", ids[2], ".RData")
   )
 
   if (file.exists(fileName)) {
     print("Already done.")
-
-    if (length(idNums) == 2){
-      return(c(idNums, NA, NA))
-    } else {
-      return(idNums)
-    }
-  }
-
-  if (length(idNums) == 4 && idNums[4] == 1) {
-    print("Not end of simulation.")
-    return(idNums)
+    return(ids)
   }
 
   # Build up Required Objects: ################################################
   # See, e.g., VikingRunHalves.R
 
-  IntMats <- Matrix::bdiag(
-    preparedCases[[idNums[1]]]$matrs[[ # Case
-      ((idNums[2] - 1) %/% 10) + 1 # Parameters
-      ]][[((idNums[2] - 1) %% 10) + 1 # System
-          ]]$Mats
-  )
+  load(file.path(dirname(file),
+                 paste0(ids[1], "-ExampleOutcome-PoolMats-Env10.RData")))
 
-  pool <- preparedCases[[idNums[1]]]$pools[[ # Case
-    ((idNums[2] - 1) %/% 10) + 1 # Parameters
-    ]][[((idNums[2] - 1) %% 10) + 1 # System
-        ]]
+  IntMat <- Matrix::bdiag(InteractionMatrices$Mats)
+
+
+  # IntMats <- Matrix::bdiag(
+  #   preparedCases[[idNums[1]]]$matrs[[ # Case
+  #     ((idNums[2] - 1) %/% 10) + 1 # Parameters
+  #     ]][[((idNums[2] - 1) %% 10) + 1 # System
+  #         ]]$Mats
+  # )
+
+  # pool <- preparedCases[[idNums[1]]]$pools[[ # Case
+  #   ((idNums[2] - 1) %/% 10) + 1 # Parameters
+  #   ]][[((idNums[2] - 1) %% 10) + 1 # System
+  #       ]]
 
   tryCatch({
     # 1 Load the Data: ########################################################
@@ -192,23 +192,37 @@ results <- foreach::foreach(
 
     print("loaded")
 
-    if (length(idNums) == 2) {
-      numEnvs <- fileContents[[1]]$NumEnvironments
-    } else if (length(idNums) == 4) {
-      numEnvs <- fileContents$NumEnvironments
-    }
+    numEnvs <- fileContents$NumEnvironments
 
     # Create objects dependent on loaded contents.
-    PerCapitaDynamics <- RMTRCode2::PerCapitaDynamics_Type1(
-      pool$ReproductionRate, IntMats,
-      NumEnvironments = numEnvs
-    )
+    if (ids[1] %in% c(
+      "MNA", "LM1996PermuteWithin", "LM1996PermuteWithinPool")) {
+      PerCapitaDynamics <- RMTRCode2::PerCapitaDynamics_Type1(
+        Pool$ReproductionRate, IntMat,
+        NumEnvironments = numEnvs
+      )
+    } else if (ids[1] %in% c("Mutualism")) {
+      PerCapitaDynamics <- PerCapitaDynamics_Mutualistic1(
+        reprate, IntMat,
+        NumEnvironments = numEnvs,
+        SpeciesTypes = SpeciesTypes, Saturations = Saturation
+      )
+    } else if (ids[1] %in% c("MutTF2010", "PrPrTF2010")) {
+      PerCapitaDynamics <- PerCapitaDynamics_Mutualistic3(
+        reprate, IntMat,
+        NumEnvironments = numEnvs,
+        SpeciesTypes = SpeciesTypes, Saturations = Saturation
+      )
+    } else {
+      stop("Ids[1] not recognised; typo in conditions?")
+    }
 
     # Move this earlier than in _Diversity.R.
     # We need it to know the amount of dispersal.
-    theParameters <- parametersCSVs[[idNums[1]]][((idNums[2] - 1) %/% 10) + 1,]
+    # theParameters <- parametersCSVs[[idNums[1]]][((idNums[2] - 1) %/% 10) + 1,]
 
-    PerIslandDistance <- systemMods$SpaceDistanceMultiplier[theParameters$Space]
+    # PerIslandDistance <- systemMods$SpaceDistanceMultiplier[theParameters$Space]
+    PerIslandDistance <- 10^as.numeric(sub("_", "-", ids[2], fixed = T))
 
     # Ring Dynamics
     DistanceMatrix <- Matrix::bandSparse(
@@ -221,37 +235,30 @@ results <- foreach::foreach(
 
     DispersalMatrices <- RMTRCode2::CreateDispersalMatrix(
       EnvironmentDistances = DistanceMatrix,
-      SpeciesSpeeds = rep(1, nrow(pool))
+      SpeciesSpeeds = rep(1, nrow(Pool))
     )
 
     # 2 Extract Invadabilities over time: ######################
-    if (length(idNums) == 2) { # fileContents is a list of results
-      Invadability <- list(
-        Invadabilities = lapply(
-          fileContents,
-          FUN = thinAndCalculateInvadabilities,
-          dyn = PerCapitaDynamics,
-          dis = DispersalMatrices
-        ))
-    } else if (length(idNums) == 4) {# fileContents is a result
-      Invadability <- list(
-        Invadabilities = list(thinAndCalculateInvadabilities(
-          fileContents,
-          dyn = PerCapitaDynamics,
-          dis = DispersalMatrices
-        ))
-      )
-    } else stop("idNums is not 2 or 4.")
+    Invadability <- list(
+      Invadabilities = list(thinAndCalculateInvadabilities(
+        fileContents,
+        dyn = PerCapitaDynamics,
+        dis = DispersalMatrices,
+        preferred_rows_per_event = preferred_rows_per_event,
+        divide_time_by = divide_time_by,
+        burnout =
+          with(fileContents$Events, Times[length(Times)]) +
+          fileContents$ReactionTime
+      ))
+    )
     print("Invadability")
     # 3. Save the invadability values...: #####################################
     # separately, but alongside its parameters.
     # idNums indicates which variation we are dealing with, as well as the
     # associated parameters.
     # This is split between MNA-MasterParameters.RData and the .csv files.
-    Invadability$PoolMod <- systemMods$PoolBodySizes[theParameters$Framework, ]
-    Invadability$NoiseMod <- systemMods$InteractionsNoiseMultiplier[theParameters$Framework]
-    Invadability$NeutralMod<- systemMods$NeutralRateMultipliers[theParameters$Neutral,]
-    Invadability$SpaceMod <- PerIslandDistance
+    Diversity$SysType <- ids[1]
+    Diversity$SpaceMod <- ids[2]
 
     save(Invadability,
          file = fileName
@@ -262,12 +269,8 @@ results <- foreach::foreach(
     # This is already in the file list, but we can make it easier by taking the
     # id numbers. If there is an error at any point, record the relevant id
     # numbers and the error to know that something went wrong.
-    if (length(idNums) == 2){
-      return(c(idNums, NA, NA))
-    } else {
-      return(idNums)
-    }
-  }, error = function(e, id = idNums) {
+    return(ids)
+  }, error = function(e, id = ids) {
     print(paste(toString(id), e))
     return(list(ID = id,
                 error = e))
@@ -276,4 +279,4 @@ results <- foreach::foreach(
 # end_time <- Sys.time()
 
 # Cleanup: ####################################################################
-# parallel::stopCluster(clust)
+parallel::stopCluster(clust)
