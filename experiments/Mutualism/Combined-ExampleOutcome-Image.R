@@ -177,7 +177,8 @@ SpeciesTypes <- lapply(
       ReproductionRate
       ) %>% dplyr::mutate(
         SimType = n[i],
-      RepRateID = 1:nrow(x[[i]]$Pool)
+      RepRateID = nrow(x[[i]]$Pool):1
+      # NOTE: Highest ID -> LOWEST RepRate -> Consumers/Dependents above Basals.
       )
   }, x = PoolsMats,
   n = sub(pattern = "[-].+", replacement = "", x = basename(names(PoolsMats)))
@@ -295,7 +296,7 @@ PLOT_Presence <- lapply(
     ) + ggplot2::geom_hline(
       yintercept = 1/3 * nrow(PoolsMats[[1]]$Pool), color = "red"
     ) + ggplot2::labs(
-      y = "Species by Size",
+      y = "Species by (Neg. Intrinsic) Reproductive Rate",
       x = paste0("Time, ", divide_time_by, " units"),
       tag = "a)"
     ) + ggplot2::theme_bw(
