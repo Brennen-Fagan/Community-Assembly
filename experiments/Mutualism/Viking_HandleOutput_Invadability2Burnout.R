@@ -203,13 +203,13 @@ results <- foreach::foreach(
       )
     } else if (ids[1] %in% c("Mutualism")) {
       PerCapitaDynamics <- PerCapitaDynamics_Mutualistic1(
-        reprate, IntMat,
+        Pool$ReproductionRate, IntMat,
         NumEnvironments = numEnvs,
         SpeciesTypes = SpeciesTypes, Saturations = Saturation
       )
     } else if (ids[1] %in% c("MutTF2010", "PrPrTF2010")) {
       PerCapitaDynamics <- PerCapitaDynamics_Mutualistic3(
-        reprate, IntMat,
+        Pool$ReproductionRate, IntMat,
         NumEnvironments = numEnvs,
         SpeciesTypes = SpeciesTypes, Saturations = Saturation
       )
