@@ -280,7 +280,7 @@ PLOT_Presence <- lapply(
   function(SType) {
     ggplot2::ggplot(
       SpeciesPresence %>% dplyr::filter(SimType == SType, Dispersal != 1),
-      ggplot2::aes(x = Time, y = RepRateID, color = Count)
+      ggplot2::aes(x = Time, y = -RepRateID, color = Count)
     ) + ggplot2::geom_point(
       shape = '.'
     ) + ggplot2::scale_color_viridis_c(
@@ -294,7 +294,7 @@ PLOT_Presence <- lapply(
         ), ordered = TRUE),
       scales = "free_y"
     ) + ggplot2::geom_hline(
-      yintercept = 1/3 * nrow(PoolsMats[[1]]$Pool), color = "red"
+      yintercept = -2/3 * nrow(PoolsMats[[1]]$Pool), color = "red"
     ) + ggplot2::labs(
       y = "Species by (Neg. Intrinsic) Reproductive Rate",
       x = paste0("Time, ", divide_time_by, " units"),
@@ -357,16 +357,18 @@ PLOT_B <- ggplot2::ggplot(
 ) + ggplot2::labs(
   y = "Value", # Number of Species",
   x = paste0("Time, ", divide_time_by, " units"),
-  tag = "b)"
-  # x = ""
+  tag = "b)",
+  # x = "",
+  color = legend_bl_name,
+  fill = legend_bl_name
 ) + ggplot2::theme(
   plot.tag.position = c(0.02, 0.98),
   strip.text.x = ggplot2::element_text(size = 8)
 # ) + ggplot2::scale_color_manual(
-#   name = legend_bl_name,
+  # name = legend_bl_name#,
 #   values = c("darkorange", "plum1", "cyan")
 # ) + ggplot2::scale_fill_manual(
-#   name = legend_bl_name,
+  # name = legend_bl_name#,
 #   values = c("darkorange4", "plum4", "cyan4")
 ) + ggplot2::facet_wrap(
   SimType ~ factor(
