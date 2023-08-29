@@ -1,20 +1,57 @@
-library(RMTRCode2)
-library(parallel)
-library(doParallel)
-library(iterators)
-library(foreach)
+# Libraries: ##################################################################
+print("Loading libraries")
+librarypath <- file.path(".", "Rlibs")
+if (!dir.exists(librarypath)) {
+  dir.create(librarypath, showWarnings = FALSE)
+}
+.libPaths(c(librarypath, .libPaths()))
 
-clust <- parallel::makeCluster(1, outfile = "")
+allLibraryPaths <- .libPaths()
+
+packages <- c(
+  "Matrix",     # Common Format
+  "parallel",   # Base parallel dependency
+  "doParallel", # For compatible cluster
+  "foreach",    # For parallel evaluation
+  "iterators"   # For parallel evaluation
+)
+
+# Does not work because it tries to use the system-wide libraries... Oops.
+# update.packages(repos = 'https://cloud.r-project.org',
+#                 oldPkgs = packages, ask = FALSE)
+
+for (package in packages) {
+  if (!require(package, character.only = TRUE)) {
+    install.packages(package, lib = librarypath,
+                     repos = 'https://cloud.r-project.org',
+                     dependencies = TRUE)
+  }
+  library(package, character.only = TRUE)
+}
+
+if (!require("RMTRCode2", character.only = TRUE)) {
+  install.packages(
+    "RMTRCode2_0.3.tar.gz", lib = librarypath,
+    repos = NULL, type = "source"
+  )
+}
+library(RMTRCode2)#, lib.loc = librarypath) # lib.loc shouldn't be necessary.
+
+cargs <- as.numeric(commandArgs(trailingOnly = TRUE))
+
+clust <- parallel::makeCluster(cargs[1], outfile = "")
 doParallel::registerDoParallel(clust)
 
 # Parameters: ##################################################################
-Species <- c(Producer = 34, Pollinator = 66) * 2
+Species <- c(Basal = 34, Consumer = 66) * 2
 Environments <- 10
 EventsEach <- Environments * ceiling(sum(Species) * (log(sum(Species)) + 0))
 EventRateModifiers <- c(1, 1) # Immigration, Extirpation
 
+LMParameters <- c(0.01, 10, 0.5, 0.2, 100, 0.1)
+LMLogBodySize <- c(-2, -1, -1, 0)
 
-PerIslandDistance <- 10^c(-1, -2)#(Inf, 9:-1) # 10^5 # Inf # 10^0
+PerIslandDistance <- 10^c(-1, 0, 3, 4) #c(Inf, 9:-1) # 10^5 # Inf # 10^0
 SpeciesSpeeds <- 1
 Space <- match.arg("Ring", c("None", "Ring", "Line", "Full"))
 
@@ -26,53 +63,90 @@ MaximumTimeStep <- 1 # Maximum time solver can proceed without elimination.
 BetweenEventSteps <- 10 # Number of steps to reach next event to smooth.
 
 CalculatePoolAndMatrices <- FALSE
-dir <- paste0("Data_", "2023-06-26")#Sys.Date()) # getSrcDirectory(function(){})
+dir <- paste0("Data_", Sys.Date()) # getSrcDirectory(function(){})
 
 if (!dir.exists(dir)) {
   dir.create(dir, showWarnings = FALSE)
 }
 
 # > runif(1) * 1e8
+# [1] 38427042
+PoolSeed <- 38427042
+# > runif(1) * 1e8
 # [1] 12032489
-PoolSeed <- 12032489
+EnvironmentSeed <- 12032489
 # > runif(1) * 1e8
 # [1] 28665115
-EnvironmentSeed <- 28665115
-# > runif(1) * 1e8
-# [1] 75027622
-HistorySeed <- 75027622
-# > runif(1) * 1e8
-# [1] 64713671
-SatSeed <- 64713671
+HistorySeed <- 28665115
 
 # Setup: #######################################################################
 
 ## Pools and Interaction Matrices: #############################################
 if (CalculatePoolAndMatrices) {
-  Pool <- Mutualism_species(
-    SpeciesTypes = Species,
+  Pool <- RMTRCode2::LawMorton1996_species(
+    Basal = Species[1],
+    Consumer = Species[2],
+    Parameters = LMParameters,
+    LogBodySize = LMLogBodySize,
     seed = PoolSeed
-  )
-
-  Saturation <- Mutualism_saturation(
-    Species, seed = SatSeed
   )
 
   InteractionMatrices <- RMTRCode2::CreateEnvironmentInteractions(
     Pool = Pool, NumEnvironments = Environments,
-    ComputeInteractionMatrix = Mutualism_CommunityMat_ByBlock,
-    EnvironmentSeeds = EnvironmentSeed,
-    MinimumGuildMatrix = matrix(byrow = TRUE, nrow = 2, ncol = 2,
-                                c(-2/2.5, 2/2.5, 2/2.5, -2/2.5)),
-    MaximumGuildMatrix = matrix(byrow = TRUE, nrow = 2, ncol = 2,
-                                c(-1/2.5, 3/2.5, 3/2.5, -1/2.5))
+    ComputeInteractionMatrix = RMTRCode2::LawMorton1996_CommunityMat,
+    Parameters = LMParameters,
+    EnvironmentSeeds = EnvironmentSeed
   )
-  save(Pool, Saturation, InteractionMatrices,
+
+  # Within Type Permutation.
+  Pool$ReproductionRate <- c(
+    sample(subset(Pool, Type == "Basal", ReproductionRate)[[1]]),
+    sample(subset(Pool, Type == "Consumer", ReproductionRate)[[1]])
+  )
+
+  # Within Block Permutation (Interaction Matrix)
+  InteractionMatrices$Mats <- lapply(
+    InteractionMatrices$Mats,
+    function(mat, pl) {
+      out <- mat
+      for(type1 in unique(pl$Type)) {
+        for(type2 in unique(pl$Type)) {
+          toShuffle <- which(
+            upper.tri(mat) &
+              (row(mat) %in% pl$ID[pl$Type == type1]) &
+              (col(mat) %in% pl$ID[pl$Type == type2])
+          )
+
+          if (length(toShuffle) == 0) next()
+
+          # Beware the sample surprise (see documentation details).
+          shuffled <- as.numeric(sample(as.character(toShuffle)))
+
+          out[toShuffle] <- mat[shuffled]
+          out <- t(out)
+          out[toShuffle] <- t(mat)[shuffled]
+          out <- t(out)
+        }
+
+        # Diagonal
+        toShuffle <- pl$ID[pl$Type == type1]
+
+        if (length(toShuffle) == 0) next()
+
+        # Beware the sample surprise (see documentation details).
+        shuffled <- as.numeric(sample(as.character(toShuffle)))
+
+        diag(out)[toShuffle] <- diag(mat)[shuffled]
+      }
+      return(out)
+    }, pl = Pool)
+
+  save(Pool, InteractionMatrices,
        file = file.path(dir, paste0(
-         "Mutualism-ExampleOutcome-PoolMats-Env", Environments, ".RData")))
+         "LM1996PermuteWithin-ExampleOutcome-PoolMats-Env", Environments, ".RData")))
 } else {
   load(file = file.path(dir, paste0(
-    "Mutualism-ExampleOutcome-PoolMats-Env", Environments, ".RData")))
+    "LM1996PermuteWithin-ExampleOutcome-PoolMats-Env", Environments, ".RData")))
 }
 
 ## Events: #####################################################################
@@ -94,9 +168,8 @@ Events <- RMTRCode2::CreateAssemblySequence(
   HistorySeed = HistorySeed
 )
 
-print(combinations <-
-        table(Events$Events$Species,
-            Events$Events$Environment))
+print(combinations <- table(Events$Events$Species,
+                            Events$Events$Environment))
 if(any(combinations == 0)) {warning(
   "Exists a species which doesn't immigrate to an environment."
 )}
@@ -104,15 +177,14 @@ if(any(combinations == 0)) {warning(
 ## Dynamics: ###################################################################
 
 IntMat <- Matrix::bdiag(InteractionMatrices$Mats)
-reprate <- Pool$ReproductionRate
-PerCapitaDynamics <- PerCapitaDynamics_Mutualistic1(
-  reprate, IntMat,
-  NumEnvironments = Environments,
-  SpeciesTypes = Species, Saturations = Saturation
+PerCapitaDynamics <- RMTRCode2::PerCapitaDynamics_Type1(
+  Pool$ReproductionRate, IntMat,
+  NumEnvironments = Environments
 )
 
+
 records <- foreach::foreach(
-  dist = iterators::iter(PerIslandDistance),
+  dist = iterators::iter(PerIslandDistance)#,
   # .export = c(
   #   "Pool", "Environments",
   #   "InteractionMatrices",
@@ -122,14 +194,14 @@ records <- foreach::foreach(
   #   "ArrivalDensity",
   #   "ExtinctionProportion",
   #   "MaximumTimeStep",
-  #   "BetweenEventSteps"),
-  .export = "reprate",
-  .packages = "RMTRCode2"
+  #   "BetweenEventSteps")#,
+  #.packages = "RMTRCode2"
 ) %dopar% {
+  .libPaths(c(librarypath, .libPaths()))
+  library(RMTRCode2)
+  
   print(paste(dist, "in"))
-  # table(Pool)
   pool <- data.frame(n = 1:sum(Species))#Hack
-  # print(paste(dist, "hack"))
   ### Spatial/Dispersal: #########################################################
   if (Space == "None") {
     DistanceMatrix <- Matrix::sparseMatrix(
@@ -160,18 +232,17 @@ records <- foreach::foreach(
     SpeciesSpeeds = rep(SpeciesSpeeds, nrow(pool))
   )
 
-  # print(paste(dist, "disp mat"))
   ## Run: #######################################################################
-  print(Sys.time())
+
+  print(record <- Sys.time())
   if (exists("MultipleNumericalAssembly_Dispersal")) {
     theFun <- MultipleNumericalAssembly_Dispersal
   } else {
     theFun <- RMTRCode2::MultipleNumericalAssembly_Dispersal
   }
-  # print(paste(dist, "fun"))
 
   result <- theFun(
-    pool, NumEnvironments = Environments,
+    Pool = Pool, NumEnvironments = Environments,
     InteractionMatrices = InteractionMatrices,
     Events = Events,
     PerCapitaDynamics = PerCapitaDynamics,
@@ -181,13 +252,12 @@ records <- foreach::foreach(
     ExtinctionProportion = ExtinctionProportion,
     MaximumTimeStep = MaximumTimeStep,
     BetweenEventSteps = BetweenEventSteps,
-    Verbose = TRUE
+    Verbose = FALSE
   )
-  print(record <- Sys.time())
 
   save(result,
        file = file.path(dir, paste0(
-         "Mutualism-ExampleExtProp-Result-Env", Environments,
+         "LM1996PermuteWithin-ExampleExtProp-Result-Env", Environments,
          "-", Space,
          "-", gsub(round(log10(dist)),
                    pattern = "-", replacement = "_", fixed = TRUE),

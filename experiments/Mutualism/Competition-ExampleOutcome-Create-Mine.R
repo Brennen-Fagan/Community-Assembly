@@ -14,7 +14,7 @@ EventsEach <- Environments * ceiling(sum(Species) * (log(sum(Species)) + 0))
 EventRateModifiers <- c(1, 1) # Immigration, Extirpation
 
 
-PerIslandDistance <- 10^c(-1, -2)#(Inf, 9:-1) # 10^5 # Inf # 10^0
+PerIslandDistance <- 10^c(Inf, 9:-1) # 10^5 # Inf # 10^0
 SpeciesSpeeds <- 1
 Space <- match.arg("Ring", c("None", "Ring", "Line", "Full"))
 
@@ -26,24 +26,18 @@ MaximumTimeStep <- 1 # Maximum time solver can proceed without elimination.
 BetweenEventSteps <- 10 # Number of steps to reach next event to smooth.
 
 CalculatePoolAndMatrices <- FALSE
-dir <- paste0("Data_", "2023-06-26")#Sys.Date()) # getSrcDirectory(function(){})
+dir <- paste0("Data_", "2023-08-01") #Sys.Date()) # getSrcDirectory(function(){})
 
 if (!dir.exists(dir)) {
   dir.create(dir, showWarnings = FALSE)
 }
 
-# > runif(1) * 1e8
-# [1] 12032489
-PoolSeed <- 12032489
-# > runif(1) * 1e8
-# [1] 28665115
-EnvironmentSeed <- 28665115
-# > runif(1) * 1e8
-# [1] 75027622
-HistorySeed <- 75027622
-# > runif(1) * 1e8
-# [1] 64713671
-SatSeed <- 64713671
+# > runif(4) * 1e8
+# [1] 40861151 47194803 21284037  9143201
+PoolSeed <- 40861151
+EnvironmentSeed <- 47194803
+HistorySeed <- 21284037
+SatSeed <- 9143201
 
 # Setup: #######################################################################
 
@@ -63,16 +57,16 @@ if (CalculatePoolAndMatrices) {
     ComputeInteractionMatrix = Mutualism_CommunityMat_ByBlock,
     EnvironmentSeeds = EnvironmentSeed,
     MinimumGuildMatrix = matrix(byrow = TRUE, nrow = 2, ncol = 2,
-                                c(-2/2.5, 2/2.5, 2/2.5, -2/2.5)),
+                                c(-2/2.5, -3/2.5, 2/2.5, -2/2.5)),
     MaximumGuildMatrix = matrix(byrow = TRUE, nrow = 2, ncol = 2,
-                                c(-1/2.5, 3/2.5, 3/2.5, -1/2.5))
+                                c(-1/2.5, -2/2.5, 3/2.5, -1/2.5))
   )
   save(Pool, Saturation, InteractionMatrices,
        file = file.path(dir, paste0(
-         "Mutualism-ExampleOutcome-PoolMats-Env", Environments, ".RData")))
+         "Competition-ExampleOutcome-PoolMats-Env", Environments, ".RData")))
 } else {
   load(file = file.path(dir, paste0(
-    "Mutualism-ExampleOutcome-PoolMats-Env", Environments, ".RData")))
+    "Competition-ExampleOutcome-PoolMats-Env", Environments, ".RData")))
 }
 
 ## Events: #####################################################################
@@ -96,7 +90,7 @@ Events <- RMTRCode2::CreateAssemblySequence(
 
 print(combinations <-
         table(Events$Events$Species,
-            Events$Events$Environment))
+              Events$Events$Environment))
 if(any(combinations == 0)) {warning(
   "Exists a species which doesn't immigrate to an environment."
 )}
@@ -187,7 +181,7 @@ records <- foreach::foreach(
 
   save(result,
        file = file.path(dir, paste0(
-         "Mutualism-ExampleExtProp-Result-Env", Environments,
+         "Competition-ExampleExtProp-Result-Env", Environments,
          "-", Space,
          "-", gsub(round(log10(dist)),
                    pattern = "-", replacement = "_", fixed = TRUE),

@@ -1,9 +1,58 @@
+# # Libraries: ##################################################################
+# print("Loading libraries")
+# librarypath <- file.path(".", "Rlibs")
+# if (!dir.exists(librarypath)) {
+#   dir.create(librarypath, showWarnings = FALSE)
+# }
+# .libPaths(c(librarypath, .libPaths()))
+#
+# allLibraryPaths <- .libPaths()
+#
+# packages <- c(
+#   "Matrix",     # Common Format
+#   "parallel",   # Base parallel dependency
+#   "doParallel", # For compatible cluster
+#   "foreach",    # For parallel evaluation
+#   "iterators"   # For parallel evaluation
+# )
+#
+# # Does not work because it tries to use the system-wide libraries... Oops.
+# # update.packages(repos = 'https://cloud.r-project.org',
+# #                 oldPkgs = packages, ask = FALSE)
+#
+# for (package in packages) {
+#   if (!require(package, character.only = TRUE)) {
+#     install.packages(package, lib = librarypath,
+#                      repos = 'https://cloud.r-project.org',
+#                      dependencies = TRUE)
+#   }
+#   library(package, character.only = TRUE)
+# }
+#
+# if (!require("RMTRCode2", character.only = TRUE)) {
+#   install.packages(
+#     "RMTRCode2_0.3.tar.gz", lib = librarypath,
+#     repos = NULL, type = "source"
+#   )
+# }
+# library(RMTRCode2)#, lib.loc = librarypath) # lib.loc shouldn't be necessary.
+#
+# cargs <- as.numeric(commandArgs(trailingOnly = TRUE))
+#
+# clust <- parallel::makeCluster(cargs[1], outfile = "")
+# doParallel::registerDoParallel(clust)
+# parallel::clusterCall(clust, function() {
+# librarypath <- file.path(".", "Rlibs")
+# .libPaths(c(librarypath, .libPaths()))
+# library(RMTRCode2)
+# library(Matrix)
+# }) # Implicitly needed.
 library(RMTRCode2)
+library(Matrix)
 library(parallel)
 library(doParallel)
-library(iterators)
 library(foreach)
-
+library(iterators)
 # Parameters: ##################################################################
 Species <- c(Basal = 34, Consumer = 66) * 2
 Environments <- 10
@@ -13,7 +62,7 @@ EventRateModifiers <- c(1, 1) # Immigration, Extirpation
 LMParameters <- c(0.01, 10, 0.5, 0.2, 100, 0.1)
 LMLogBodySize <- c(-2, -1, -1, 0)
 
-PerIslandDistance <- Inf # 10^5 # Inf # 10^0
+PerIslandDistance <- 10^0# 10^c(Inf, 9:-1) # 10^5 # Inf # 10^0
 SpeciesSpeeds <- 1
 Space <- match.arg("Ring", c("None", "Ring", "Line", "Full"))
 
@@ -24,8 +73,8 @@ ExtinctionProportion <- 1
 MaximumTimeStep <- 1 # Maximum time solver can proceed without elimination.
 BetweenEventSteps <- 10 # Number of steps to reach next event to smooth.
 
-CalculatePoolAndMatrices <- TRUE
-dir <- paste0("Data_", Sys.Date()) # getSrcDirectory(function(){})
+CalculatePoolAndMatrices <- FALSE
+dir <- "Data_2023-06-27"# paste0("Data_", Sys.Date()) # getSrcDirectory(function(){})
 
 if (!dir.exists(dir)) {
   dir.create(dir, showWarnings = FALSE)
@@ -194,6 +243,8 @@ records <- foreach::foreach(
   #   "BetweenEventSteps"),
   .packages = "RMTRCode2"
 ) %dopar% {
+
+  print(paste(dist, "in"))
   pool <- data.frame(n = 1:sum(Species))#Hack
   ### Spatial/Dispersal: #########################################################
   if (Space == "None") {
@@ -203,12 +254,12 @@ records <- foreach::foreach(
   if (Space == "Ring" || Space == "Line")
     DistanceMatrix <- Matrix::bandSparse(
       Environments, k = c(-1, 1),
-      diagonals = list(rep(PerIslandDistance, Environments - 1),
-                       rep(PerIslandDistance, Environments - 1))
+      diagonals = list(rep(dist, Environments - 1),
+                       rep(dist, Environments - 1))
     )
   if (Space == "Ring") {
-    DistanceMatrix[Environments, 1] <- PerIslandDistance
-    DistanceMatrix[1, Environments] <- PerIslandDistance
+    DistanceMatrix[Environments, 1] <- dist
+    DistanceMatrix[1, Environments] <- dist
   }
   if (Space == "Grid") {
     # Given matrix(1:4, nrow = 2), trying 1 <-> 2, 1 <-> 3, 2 <-> 4, 3 <-> 4.
@@ -222,7 +273,7 @@ records <- foreach::foreach(
 
   DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
     EnvironmentDistances = DistanceMatrix,
-    SpeciesSpeeds = rep(SpeciesSpeeds, nrow(Pool))
+    SpeciesSpeeds = rep(SpeciesSpeeds, nrow(pool))
   )
 
   ## Run: #######################################################################
@@ -245,13 +296,15 @@ records <- foreach::foreach(
     ExtinctionProportion = ExtinctionProportion,
     MaximumTimeStep = MaximumTimeStep,
     BetweenEventSteps = BetweenEventSteps,
-    Verbose = FALSE
+    Verbose = TRUE
   )
 
   save(result,
        file = file.path(dir, paste0(
          "LM1996PermuteWithinPool-ExampleExtProp-Result-Env", Environments,
-         "-", Space, "-", round(log10(PerIslandDistance)),
+         "-", Space,
+         "-", gsub(round(log10(dist)),
+                   pattern = "-", replacement = "_", fixed = TRUE),
          "-", EventRateModifiers[1], "-", EventRateModifiers[2],
          "-ExtProp", ExtinctionProportion, ".RData")
        )
@@ -261,4 +314,4 @@ records <- foreach::foreach(
   return(Sys.time() - record)
 }
 
-parallel::stopCluster(clust)
+#parallel::stopCluster(clust)

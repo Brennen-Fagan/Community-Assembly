@@ -1,20 +1,74 @@
+# NOTE: Major differences from T&F 2010:
+# Not worrying about varying connectivity in this script. With 200 species
+# T&F suggest around 0.05 connectivity, but that's for a final network.
+# Between 20 and 50 species occur with a 0.20 connectance.
+
+# Libraries: ##################################################################
+#print("Loading libraries")
+#librarypath <- file.path(".", "Rlibs")
+#if (!dir.exists(librarypath)) {
+#  dir.create(librarypath, showWarnings = FALSE)
+#}
+#.libPaths(c(librarypath, .libPaths()))
+#
+#allLibraryPaths <- .libPaths()
+#
+#packages <- c(
+#  "Matrix",     # Common Format
+#  "parallel",   # Base parallel dependency
+#  "doParallel", # For compatible cluster
+#  "foreach",    # For parallel evaluation
+#  "iterators"   # For parallel evaluation
+#)
+#
+## Does not work because it tries to use the system-wide libraries... Oops.
+## update.packages(repos = 'https://cloud.r-project.org',
+##                 oldPkgs = packages, ask = FALSE)
+#
+#for (package in packages) {
+#  if (!require(package, character.only = TRUE)) {
+#    install.packages(package, lib = librarypath,
+#                     repos = 'https://cloud.r-project.org',
+#                     dependencies = TRUE)
+#  }
+#  library(package, character.only = TRUE)
+#}
+#
+#if (!require("RMTRCode2", character.only = TRUE)) {
+#  install.packages(
+#    "RMTRCode2_0.3.tar.gz", lib = librarypath,
+#    repos = NULL, type = "source"
+#  )
+#}
+#library(RMTRCode2)#, lib.loc = librarypath) # lib.loc shouldn't be necessary.
+#
+#cargs <- as.numeric(commandArgs(trailingOnly = TRUE))
+#
 library(RMTRCode2)
+library(Matrix)
 library(parallel)
 library(doParallel)
-library(iterators)
 library(foreach)
+library(iterators)
 
 clust <- parallel::makeCluster(1, outfile = "")
 doParallel::registerDoParallel(clust)
+parallel::clusterCall(clust, function() {
+  librarypath <- file.path(".", "Rlibs")
+  .libPaths(c(librarypath, .libPaths()))
+  library(RMTRCode2)
+  library(Matrix)
+}) # Implicitly needed.
+#
 
 # Parameters: ##################################################################
-Species <- c(Producer = 34, Pollinator = 66) * 2
+Species <- c(Producer = 34, Competitor = 66) * 2
 Environments <- 10
 EventsEach <- Environments * ceiling(sum(Species) * (log(sum(Species)) + 0))
 EventRateModifiers <- c(1, 1) # Immigration, Extirpation
 
 
-PerIslandDistance <- 10^c(-1, -2)#(Inf, 9:-1) # 10^5 # Inf # 10^0
+PerIslandDistance <- 10^c(Inf, 9:-1) # 10^5 # Inf # 10^0
 SpeciesSpeeds <- 1
 Space <- match.arg("Ring", c("None", "Ring", "Line", "Full"))
 
@@ -26,24 +80,18 @@ MaximumTimeStep <- 1 # Maximum time solver can proceed without elimination.
 BetweenEventSteps <- 10 # Number of steps to reach next event to smooth.
 
 CalculatePoolAndMatrices <- FALSE
-dir <- paste0("Data_", "2023-06-26")#Sys.Date()) # getSrcDirectory(function(){})
+dir <- paste0("Data_", "2023-08-01")#Sys.Date()) # getSrcDirectory(function(){})
 
 if (!dir.exists(dir)) {
   dir.create(dir, showWarnings = FALSE)
 }
 
-# > runif(1) * 1e8
-# [1] 12032489
-PoolSeed <- 12032489
-# > runif(1) * 1e8
-# [1] 28665115
-EnvironmentSeed <- 28665115
-# > runif(1) * 1e8
-# [1] 75027622
-HistorySeed <- 75027622
-# > runif(1) * 1e8
-# [1] 64713671
-SatSeed <- 64713671
+# > runif(4) * 1e8
+# [1] 77126769 30015943 97371227 60920814
+PoolSeed <- 77126769
+EnvironmentSeed <- 30015943
+HistorySeed <- 97371227
+SatSeed <- 60920814
 
 # Setup: #######################################################################
 
@@ -51,11 +99,13 @@ SatSeed <- 64713671
 if (CalculatePoolAndMatrices) {
   Pool <- Mutualism_species(
     SpeciesTypes = Species,
+    MinimumRepRates = c(0.3, -0.2),
+    MaximumRepRates = c(0.5, 0),
     seed = PoolSeed
   )
 
   Saturation <- Mutualism_saturation(
-    Species, seed = SatSeed
+    rep(1, sum(Species)), seed = SatSeed
   )
 
   InteractionMatrices <- RMTRCode2::CreateEnvironmentInteractions(
@@ -63,16 +113,41 @@ if (CalculatePoolAndMatrices) {
     ComputeInteractionMatrix = Mutualism_CommunityMat_ByBlock,
     EnvironmentSeeds = EnvironmentSeed,
     MinimumGuildMatrix = matrix(byrow = TRUE, nrow = 2, ncol = 2,
-                                c(-2/2.5, 2/2.5, 2/2.5, -2/2.5)),
+                                c(0, -3, 2, -2)),
     MaximumGuildMatrix = matrix(byrow = TRUE, nrow = 2, ncol = 2,
-                                c(-1/2.5, 3/2.5, 3/2.5, -1/2.5))
+                                c(0, -2, 3, -1))
   )
+
+  # To induce the proper connectance, you can Hadamard product an undirected
+  # network with each interaction matrix. Due to the block structure, we need
+  # to use the same block structure in the adj. matrix. We also fix diagonals.
+  adjmat <- CreateConnectanceByBlock(
+    Species,
+    Connectances = matrix(c(0, 0.2, NA, 0),
+                          byrow = TRUE, nrow = 2),
+    Directed = FALSE
+  )
+
+  InteractionMatrices$Mats <- lapply(InteractionMatrices$Mats, function(mat) {
+    mat <- mat * adjmat
+    diag(mat) <- runif(nrow(mat), min = -3, max = -2)
+    return(mat)
+  })
+
+  # T&F use the connectance of the saturations as the primary connectance...
+  diagSat <- diag(Saturation)
+  Saturation <- Saturation * adjmat
+  diag(Saturation) <- diagSat
+
+  # Additionally, Saturation needs to be species x species x patch:
+  Saturation <- Matrix::bdiag(rep(list(Saturation), Environments))
+
   save(Pool, Saturation, InteractionMatrices,
        file = file.path(dir, paste0(
-         "Mutualism-ExampleOutcome-PoolMats-Env", Environments, ".RData")))
+         "CompTF2010-ExampleOutcome-PoolMats-Env", Environments, ".RData")))
 } else {
   load(file = file.path(dir, paste0(
-    "Mutualism-ExampleOutcome-PoolMats-Env", Environments, ".RData")))
+    "CompTF2010-ExampleOutcome-PoolMats-Env", Environments, ".RData")))
 }
 
 ## Events: #####################################################################
@@ -96,7 +171,7 @@ Events <- RMTRCode2::CreateAssemblySequence(
 
 print(combinations <-
         table(Events$Events$Species,
-            Events$Events$Environment))
+              Events$Events$Environment))
 if(any(combinations == 0)) {warning(
   "Exists a species which doesn't immigrate to an environment."
 )}
@@ -105,7 +180,7 @@ if(any(combinations == 0)) {warning(
 
 IntMat <- Matrix::bdiag(InteractionMatrices$Mats)
 reprate <- Pool$ReproductionRate
-PerCapitaDynamics <- PerCapitaDynamics_Mutualistic1(
+PerCapitaDynamics <- PerCapitaDynamics_Mutualistic4(
   reprate, IntMat,
   NumEnvironments = Environments,
   SpeciesTypes = Species, Saturations = Saturation
@@ -169,6 +244,7 @@ records <- foreach::foreach(
     theFun <- RMTRCode2::MultipleNumericalAssembly_Dispersal
   }
   # print(paste(dist, "fun"))
+  print(record <- Sys.time())
 
   result <- theFun(
     pool, NumEnvironments = Environments,
@@ -183,11 +259,10 @@ records <- foreach::foreach(
     BetweenEventSteps = BetweenEventSteps,
     Verbose = TRUE
   )
-  print(record <- Sys.time())
 
   save(result,
        file = file.path(dir, paste0(
-         "Mutualism-ExampleExtProp-Result-Env", Environments,
+         "CompTF2010-ExampleExtProp-Result-Env", Environments,
          "-", Space,
          "-", gsub(round(log10(dist)),
                    pattern = "-", replacement = "_", fixed = TRUE),

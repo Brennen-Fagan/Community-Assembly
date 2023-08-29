@@ -4,24 +4,75 @@
 # T&F suggest around 0.05 connectivity, but that's for a final network.
 # Between 20 and 50 species occur with a 0.20 connectance.
 
-
+# Libraries: ##################################################################
+#print("Loading libraries")
+#librarypath <- file.path(".", "Rlibs")
+#if (!dir.exists(librarypath)) {
+#  dir.create(librarypath, showWarnings = FALSE)
+#}
+#.libPaths(c(librarypath, .libPaths()))
+#
+#allLibraryPaths <- .libPaths()
+#
+#packages <- c(
+#  "Matrix",     # Common Format
+#  "parallel",   # Base parallel dependency
+#  "doParallel", # For compatible cluster
+#  "foreach",    # For parallel evaluation
+#  "iterators"   # For parallel evaluation
+#)
+#
+## Does not work because it tries to use the system-wide libraries... Oops.
+## update.packages(repos = 'https://cloud.r-project.org',
+##                 oldPkgs = packages, ask = FALSE)
+#
+#for (package in packages) {
+#  if (!require(package, character.only = TRUE)) {
+#    install.packages(package, lib = librarypath,
+#                     repos = 'https://cloud.r-project.org',
+#                     dependencies = TRUE)
+#  }
+#  library(package, character.only = TRUE)
+#}
+#
+#if (!require("RMTRCode2", character.only = TRUE)) {
+#  install.packages(
+#    "RMTRCode2_0.3.tar.gz", lib = librarypath,
+#    repos = NULL, type = "source"
+#  )
+#}
+#library(RMTRCode2)#, lib.loc = librarypath) # lib.loc shouldn't be necessary.
+#
+#cargs <- as.numeric(commandArgs(trailingOnly = TRUE))
+#
 library(RMTRCode2)
+library(Matrix)
 library(parallel)
 library(doParallel)
-library(iterators)
 library(foreach)
+library(iterators)
 
-# clust <- parallel::makeCluster(3, outfile = "")
-# doParallel::registerDoParallel(clust)
+clust <- parallel::makeCluster(5, outfile = "")
+doParallel::registerDoParallel(clust)
+parallel::clusterCall(clust, function() {
+librarypath <- file.path(".", "Rlibs")
+.libPaths(c(librarypath, .libPaths()))
+library(RMTRCode2)
+library(Matrix)
+}) # Implicitly needed.
+#
+
+
+
 
 # Parameters: ##################################################################
 Species <- c(Producer = 34, Pollinator = 66) * 2
 Environments <- 10
-EventsEach <- 50#Environments * ceiling(sum(Species) * (log(sum(Species)) + 0))
+EventsEach <- Environments * ceiling(sum(Species) * (log(sum(Species)) + 0))
 EventRateModifiers <- c(1, 1) # Immigration, Extirpation
 
 
-PerIslandDistance <- Inf # 10^c(Inf, 9:-1) # 10^5 # Inf # 10^0
+PerIslandDistance <- 10^c(8:-1) # 10^5 # Inf # 10^0
 SpeciesSpeeds <- 1
 Space <- match.arg("Ring", c("None", "Ring", "Line", "Full"))
 
@@ -32,8 +83,8 @@ ExtinctionProportion <- 1
 MaximumTimeStep <- 1 # Maximum time solver can proceed without elimination.
 BetweenEventSteps <- 10 # Number of steps to reach next event to smooth.
 
-CalculatePoolAndMatrices <- TRUE
-dir <- paste0("Data_", Sys.Date()) # getSrcDirectory(function(){})
+CalculatePoolAndMatrices <- FALSE
+dir <- paste0("Data2_", "2023-06-30")#Sys.Date()) # getSrcDirectory(function(){})
 
 if (!dir.exists(dir)) {
   dir.create(dir, showWarnings = FALSE)
@@ -82,7 +133,7 @@ if (CalculatePoolAndMatrices) {
   # to use the same block structure in the adj. matrix. We also fix diagonals.
   adjmat <- CreateConnectanceByBlock(
     Species,
-    Connectances = matrix(c(1, 0.2, NA, 1),
+    Connectances = matrix(c(0, 0.2, NA, 0),
                           byrow = TRUE, nrow = 2),
     Directed = FALSE
   )
@@ -139,7 +190,7 @@ if(any(combinations == 0)) {warning(
 
 IntMat <- Matrix::bdiag(InteractionMatrices$Mats)
 reprate <- Pool$ReproductionRate
-PerCapitaDynamics <- PerCapitaDynamics_Mutualistic2(
+PerCapitaDynamics <- PerCapitaDynamics_Mutualistic3(
   reprate, IntMat,
   NumEnvironments = Environments,
   SpeciesTypes = Species, Saturations = Saturation
@@ -203,6 +254,7 @@ records <- foreach::foreach(
     theFun <- RMTRCode2::MultipleNumericalAssembly_Dispersal
   }
   # print(paste(dist, "fun"))
+  print(record <- Sys.time())
 
   result <- theFun(
     pool, NumEnvironments = Environments,
@@ -215,9 +267,8 @@ records <- foreach::foreach(
     ExtinctionProportion = ExtinctionProportion,
     MaximumTimeStep = MaximumTimeStep,
     BetweenEventSteps = BetweenEventSteps,
-    Verbose = TRUE
+    Verbose = FALSE
   )
-  print(record <- Sys.time())
 
   save(result,
        file = file.path(dir, paste0(
@@ -234,4 +285,4 @@ records <- foreach::foreach(
   return(Sys.time() - record)
 }
 
-parallel::stopCluster(clust)
+#parallel::stopCluster(clust)
