@@ -564,11 +564,12 @@ PLOT_T_pre <- ggplot2::ggplot(
 ) + ggplot2::labs(
   y = "Species by Size",
   x = paste0("Time, ", divide_time_by, " units"),
-  tag = "a)"
+  tag = "(a)"
 ) + ggplot2::theme_bw(
 ) + ggplot2::theme(
   axis.text.x = ggplot2::element_blank(),
-  plot.tag.position = c(0.02, 0.98)
+  plot.tag.position = c(0.02, 0.98),
+  plot.tag = ggplot2::element_text(face = "bold")
 ) + ggplot2::scale_y_continuous(
   limits = c(0, 100)
 )
@@ -628,10 +629,11 @@ PLOT_B <- ggplot2::ggplot(
 ) + ggplot2::labs(
   y = "Value", # Number of Species",
   x = paste0("Time, ", divide_time_by, " units"),
-  tag = "b)"
+  tag = "(b)"
   # x = ""
 ) + ggplot2::theme(
   plot.tag.position = c(0.02, 0.98),
+  plot.tag = ggplot2::element_text(face = "bold"),
   strip.text.x = ggplot2::element_text(size = 8)
 ) + ggplot2::scale_color_manual(
   name = legend_bl_name,
