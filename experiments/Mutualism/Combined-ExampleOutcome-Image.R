@@ -23,8 +23,8 @@ burn_in <-0 # 1E1 # time units
 
 # All .RData
 files_dat <- dir(
-  path = c("Data_2023-06-26", "Data_2023-06-27", "Data_2023-07-06",
-           "Data2_2023-06-30"), # "Data_2022-09-16",
+  path = c("Data_2023-06-26", "Data_2023-06-27", "Data2_2023-06-30",
+           "Data_2023-07-06", "Data_2023-08-01"), # "Data_2022-09-16",
   pattern = ".+Example.+[.]RData$", # "MNA[-]ExampleOutcome[-].+[.]RData$",
   full.names = TRUE
 )
