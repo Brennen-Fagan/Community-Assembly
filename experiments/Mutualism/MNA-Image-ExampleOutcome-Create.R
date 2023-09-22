@@ -26,7 +26,7 @@ MaximumTimeStep <- 1 # Maximum time solver can proceed without elimination.
 BetweenEventSteps <- 10 # Number of steps to reach next event to smooth.
 
 CalculatePoolAndMatrices <- TRUE
-dir <- paste0("Data_", "2023-09-23")#Sys.Date()) # getSrcDirectory(function(){})
+dir <- paste0("Data_", "2023-09-24")#Sys.Date()) # getSrcDirectory(function(){})
 
 if (!dir.exists(dir)) {
   dir.create(dir, showWarnings = FALSE)
@@ -36,10 +36,12 @@ if (!dir.exists(dir)) {
 # [1] 11365664 91994571 20423344 # Data_2023-07-06
 # [1] 65566924 64305636 14447307 # Data_2023-09-22
 # [1] 71113291 29907014 76606233 # Data_2023-09-23
+# [1] 53606086 70944574 40035408 # Data_2023-09-24
 seeds <- c(
   # 11365664, 91994571, 20423344 # Data_2023-07-06
   # 65566924, 64305636, 14447307 # Data_2023-09-22
-  71113291, 29907014, 76606233 # Data_2023-09-23
+  # 71113291, 29907014, 76606233 # Data_2023-09-23
+  53606086, 70944574, 40035408 # Data_2023-09-24
 )
 PoolSeed <- seeds[1]
 EnvironmentSeed <- seeds[2]
