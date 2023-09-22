@@ -14,7 +14,7 @@ EventRateModifiers <- c(1, 1) # Immigration, Extirpation
 LMParameters <- c(0.01, 10, 0.5, 0.2, 100, 0.1)
 LMLogBodySize <- c(-2, -1, -1, 0)
 
-PerIslandDistance <- 10^c(6:-1) # 10^5 # Inf # 10^0
+PerIslandDistance <- 10^c(Inf, 9:-1) # 10^5 # Inf # 10^0
 SpeciesSpeeds <- 1
 Space <- match.arg("Ring", c("None", "Ring", "Line", "Full"))
 
@@ -25,7 +25,7 @@ ExtinctionProportion <- 1
 MaximumTimeStep <- 1 # Maximum time solver can proceed without elimination.
 BetweenEventSteps <- 10 # Number of steps to reach next event to smooth.
 
-CalculatePoolAndMatrices <- FALSE
+CalculatePoolAndMatrices <- TRUE
 dir <- paste0("Data_", Sys.Date()) # getSrcDirectory(function(){})
 
 if (!dir.exists(dir)) {
@@ -33,10 +33,15 @@ if (!dir.exists(dir)) {
 }
 
 # > runif(3) * 1e8
-# [1] 11365664 91994571 20423344
-PoolSeed <- 11365664
-EnvironmentSeed <- 91994571
-HistorySeed <- 20423344
+# [1] 11365664 91994571 20423344 # Data_2023-07-06
+# [1] 65566924 64305636 14447307 # Data_2023-09-22
+seeds <- c(
+  # 11365664, 91994571, 20423344 # Data_2023-07-06
+  65566924, 64305636, 14447307 # Data_2023-09-22
+)
+PoolSeed <- seeds[1]
+EnvironmentSeed <- seeds[2]
+HistorySeed <- seeds[3]
 
 # Setup: #######################################################################
 
