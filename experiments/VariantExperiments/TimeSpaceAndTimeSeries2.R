@@ -61,12 +61,13 @@ result$Abundance[, -1] <- ifelse(
 )
 
 
+
 nPatches <- 10 # Fixed in between simulations.
 nSpecies <- (ncol(result$Abundance) - 1) / nPatches
 
 stopifnot(nSpecies == floor(nSpecies),
           nSpecies == ceiling(nSpecies),
-          nSpecies > 0) # Check if integer
+          nSpecies > 0) # Check if positive integer
 
 # Functions: ##################################################################
 nonzero <- function(vec) {
@@ -346,7 +347,7 @@ if (calculationsBII) {
 #                        monitoring effectiveness (e.g. sampling intensity),
 #                        and length of monitoring.
 
-interventionGap <- 1000 # Time after arrival that intervention takes place.
+interventionGap <- 100 # Time after arrival that intervention takes place.
 interventionDelay <- 10 # Time after intervention researchers must wait.
 
 # What should our model of sampling be?
@@ -355,8 +356,10 @@ interventionDelay <- 10 # Time after intervention researchers must wait.
 # two temporal sampling points (calculate diff between time points and compare
 # between control and experiment/disturbed). At worst, it only compares the
 # difference in number of species for a single time point between C & E/D.
-# Try a like-for-like.
-samplingLength <- 10; samplingGap <- 99;
+# Susan and Jon agreed with In\^es above.
+# Set samplingGap to match interventionGap to make for only one time sample.
+samplingGap <- interventionGap;
+
 # notate everything that you perceive
 samplingFailureRate <- 0.1
 # and report back.
@@ -369,7 +372,7 @@ samplingPerAbundance <- 1/100
 # We'll take a sampling period to be instantaneous.
 
 lastTimeSampleable <- result$Events$Times[length(result$Events$Times)]
-lastTimeSampleable <- lastTimeSampleable - samplingLength * samplingGap * 2
+lastTimeSampleable <- lastTimeSampleable - samplingGap * 2
 firstTimeSampleable <- 1000 # to make sure we're past the simulation burnin.
 
 # The Bootstraps: #############################################################
@@ -400,15 +403,15 @@ bootstrapSamples <- foreach::foreach(
   # They'd be interested in trying to estimate the regional pool / diversity,
   # as well as local diversity and inter-patch diversity.
   sampling_TimeSeries <- data.frame(expand.grid(
-    Time = unique(c(seq(from = burnin, by = samplingGap,
-                        to = burnin + samplingLength * samplingGap),
-                    seq(from = intervention + interventionDelay,
+    Time = unique(c(seq(from = intervention - samplingGap,
+                        by = -samplingGap,
+                        to = burnin),
+                    seq(from = intervention + samplingGap,
                         by = samplingGap,
-                        to = intervention + interventionDelay +
-                          samplingLength * samplingGap))),
+                        to = intervention + (intervention - burnin)))),
     Patch = experiment,
     Type = "Time series"
-  ))
+  )) %>% dplyr::arrange(Time)
 
   # Space for Time:
   # The premise is that the Space for Time researcher is looking between the
@@ -417,9 +420,9 @@ bootstrapSamples <- foreach::foreach(
   # They'd also be interested in estimating the regional pool / diversity,
   # as well as local diversity and inter-patch diversity.
   sampling_SpaceForTime <- data.frame(expand.grid(
-    Time = seq(from = intervention + interventionDelay, by = samplingGap,
-               to = intervention + interventionDelay +
-                 samplingLength * samplingGap),
+    Time = seq(from = intervention + samplingGap,
+               by = samplingGap,
+               to = intervention + (intervention - burnin)),
     Patch = c(control, experiment),
     Type = "Space for time"
   ))
