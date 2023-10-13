@@ -90,7 +90,7 @@ files <- dir(path = c("Data_2023-06-26", "Data_2023-06-27", "Data_2023-07-06",
 
 # 0 In Parallel: ##############################################################
 results <- foreach::foreach(
-  file = iterators::iter(files), .packages = c("dplyr", "RMTRCode2")
+  file = iterators::iter(files), .packages = c("dplyr")#, "RMTRCode2")
 ) %dopar% {
   print(file)
   # # Retrieve the trailing id numbers from before the file extension.

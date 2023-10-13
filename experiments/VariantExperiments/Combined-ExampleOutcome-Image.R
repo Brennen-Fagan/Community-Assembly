@@ -280,7 +280,8 @@ PLOT_Presence <- lapply(
   function(SType) {
     ggplot2::ggplot(
       SpeciesPresence %>% dplyr::filter(SimType == SType, Dispersal != 1),
-      ggplot2::aes(x = Time, y = -RepRateID, color = Count)
+      ggplot2::aes(x = Time, y = RepRateID, color = Count)
+      # Highest ID -> Lowest Reproductive Rate (Line 180)
     ) + ggplot2::geom_point(
       shape = '.'
     ) + ggplot2::scale_color_viridis_c(
