@@ -199,3 +199,142 @@ bootstrapSamples <- bootstrapSamples %>% dplyr::group_by(
 ) %>% dplyr::ungroup()
 
 parallel::stopCluster(clust)
+
+# Plotting: ###################################################################
+### Plot 0: Sense Checking: ###################################################
+# Richness Comparison
+plot_0_Richness <- ggplot2::ggplot(
+  bootstrapSamples %>% dplyr::mutate(
+    TrueRichness = unlist(lapply(
+      strsplit(SamplingNonZeroSpecies, split = ", ", fixed = TRUE), length
+    ))
+  ),
+  ggplot2::aes(x = Time, y = TrueRichness, color = Patch, group = Patch)
+) + ggplot2::geom_line(
+) + ggplot2::geom_line(
+  ggplot2::aes(y = SamplingAlpha * 3),
+  alpha = 0.25,
+  linetype = 2
+) + ggplot2::scale_y_continuous(
+  sec.axis = ggplot2::sec_axis(~ . / 3, name = "Richness Observed")
+) + ggplot2::facet_wrap(. ~ Patch)
+
+# But correlation remains low? (but significant) (For file 5-1-1)
+# with(bootstrapSamples %>% dplyr::mutate(
+#   TrueRichness = unlist(lapply(
+#     strsplit(SamplingNonZeroSpecies, split = ", ", fixed = TRUE), length
+#   ))
+# ), cor.test(TrueRichness, SamplingAlpha))
+
+plot_0_Abundance <- ggplot2::ggplot(
+  bootstrapSamples,
+  ggplot2::aes(x = Time, y = SamplingAbundance, color = Patch, group = Patch)
+) + ggplot2::geom_line(
+) + ggplot2::geom_line(
+  ggplot2::aes(y = SamplingObserved * 100),
+  alpha = 0.25,
+  linetype = 2
+) + ggplot2::scale_y_continuous(
+  name = "True Total Abundance",
+  sec.axis = ggplot2::sec_axis(~ . / 100, name = "Abundance Observed")
+) + ggplot2::facet_wrap(. ~ Patch)
+
+# Abundance is (unsurprisingly) much more correlated. (For file 5-1-1)
+# with(bootstrapSamples, cor.test(SamplingAbundance, SamplingObserved))
+
+if (calculationsPlotLong) {
+  plot_0_AbundanceSpecies <- lapply(
+    1:result$NumEnvironments,
+    function(i) RMTRCode2::LawMorton1996_PlotAbundance(
+      result$Abundance[
+        result$Abundance[, 1] > min(bootstrapSamples$Time) &
+          result$Abundance[, 1] < max(bootstrapSamples$Time)
+        , c(1, (i-1) * 200 + 1:200 + 1)], guides = FALSE
+    ) + ggplot2::scale_y_log10()
+  ) %>% patchwork::wrap_plots()
+}
+
+# bootstrapSamplesOccupancy <- bootstrapSamples %>% dplyr::group_by(
+#   Bootstrap, Time, Type, Control, TimeActualRow, TimeActual, TimeSinceStart
+# ) %>% dplyr::group_map(
+#   function(x, y) {
+#     # Per Bootstrap, Time, Patch Set (Control/Experiment)
+#     # We are reproducing our Figure 3a in principle.
+#     # Note that that would mean No. of Bootstrap plots!
+#     # It doesn't make sense to average these on a per species basis.
+#     # It might make sense, however, to average on the dominant niche
+#     # (according to the pool) though.
+#     # How do we minimise the number of plots? We can reduce to 100 + 2
+#     # by having Fig 3a equivalent have nowhere present as NA, and present
+#     # as -5 : 5 (all Control : all Experiment) and the 2 as richness plots.
+#
+#     # Second thoughts: maybe we only need the true occupancy.
+#
+#     TruePresent <- unique(unlist(
+#       strsplit(x$SamplingNonZeroSpecies, split = ", ")
+#       ))
+#
+#   }
+# )
+
+plot_0_OccupancyTrue <- (
+  speciesAbundances <- RMTRCode2::Calculate_Species(
+    result
+  )
+) %>% dplyr::group_by(
+  Time, Species
+) %>% dplyr::summarise(
+  Count = dplyr::n()
+) %>% dplyr::left_join(
+  Pool %>% dplyr::arrange(Size) %>% dplyr::mutate(SizeID = 1:nrow(Pool)),
+  by = c("Species" = "ID")
+) %>% ggplot2::ggplot(
+  ggplot2::aes(x = Time, y = SizeID, color = Count)
+) + ggplot2::geom_point(
+  shape = '.'
+) + ggplot2::scale_color_viridis_c(
+  direction = -1, limits = c(1, 10)
+) + ggplot2::geom_hline(
+  yintercept = nrow(Pool %>% dplyr::filter(Type == Type[1])) + 0.5,
+  color = "red"
+) + ggplot2::labs(
+  y = "Species by Size"
+) + ggplot2::theme_bw()
+
+
+(speciesAbundanceStats <- speciesAbundances %>% dplyr::group_by(
+  Time, Species
+) %>% dplyr::summarise(
+  Count = dplyr::n(),
+  AvgAbundance = mean(Abundance),
+  AvgLogAbundance = mean(log(Abundance))
+))
+
+plot_0_AbundanceAvg <- speciesAbundanceStats %>% ggplot2::ggplot(
+  ggplot2::aes(x = Time, y = AvgAbundance,
+               color = as.character(Species), group = Species)
+) + ggplot2::geom_line(
+) + ggplot2::labs(
+  y = "Average Abundance"
+) + ggplot2::facet_wrap(
+  . ~ Count
+) + ggplot2::theme_bw() + ggplot2::scale_y_log10(
+) + ggplot2::guides(color = "none")
+
+plot_0_AbundanceGeoAvg <- speciesAbundanceStats %>% ggplot2::ggplot(
+  ggplot2::aes(x = Time, y = exp(AvgLogAbundance),
+               color = as.character(Species), group = Species)
+) + ggplot2::geom_line(
+) + ggplot2::labs(
+  y = "Average Abundance (Geometric)"
+) + ggplot2::facet_wrap(
+  . ~ Count
+) + ggplot2::theme_bw() + ggplot2::scale_y_log10(
+) + ggplot2::guides(color = "none")
+
+
+# Still need to do Observed Species Abundances, consumer richness,
+# basal richness, and to add correlations to the plots.
+#
+# plot_0_Consumers <-
+
