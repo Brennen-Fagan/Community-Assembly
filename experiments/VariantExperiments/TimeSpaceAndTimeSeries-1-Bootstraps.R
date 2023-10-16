@@ -20,6 +20,7 @@ bootstrapSeed <-
   # 83418616 # Used for 2023-09-24
   12854863 # Used for 2023-09-25
 
+calculationsPlotLong <- FALSE
 # Libraries: ##################################################################
 library(dplyr)
 library(tidyr)
@@ -62,7 +63,7 @@ stopifnot(nSpecies == floor(nSpecies),
           nSpecies == ceiling(nSpecies),
           nSpecies > 0) # Check if positive integer
 
-source("TimeSpaceAndTimeSeries-Functions.R")
+source("TimeSpaceAndTimeSeries-0-Functions.R")
 
 # Setup and Framing: ##########################################################
 # Two researchers come upon a set of sites after having been told that the

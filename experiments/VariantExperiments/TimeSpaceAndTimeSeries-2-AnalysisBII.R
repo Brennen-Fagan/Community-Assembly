@@ -1,7 +1,6 @@
 calculationsBII <- FALSE
 # Skip glmer.nb for BII from Scholes and Biggs?
 calculationsLong <- FALSE
-calculationsPlotLong <- FALSE
 
 
 
@@ -31,7 +30,7 @@ if (calculationsBII) {
   #  Control = Habitat_as_described:Use_intensity
   # Note: none of the time variables they use imply repeated sampling treated
   # as separate instances. Instead, they imply that they are combined.
-  
+
   bootstrapSamplesBIISource <- bootstrapSamples %>% dplyr::group_by(
     # First format similarly to BII input data.
     Time, Patch, Type, Control, Bootstrap # together == Rowwise
@@ -41,7 +40,7 @@ if (calculationsBII) {
       if (length(IDs) == 0) return(data.frame())
       IDsInvasive <- as.numeric(strsplit(
         x$SamplingIDsInvasive, ", ", fixed = TRUE)[[1]])
-      
+
       data.frame(table(IDs)) %>% dplyr::rename(
         ID = IDs, Abundance = Freq
       ) %>% dplyr::mutate(
@@ -57,7 +56,7 @@ if (calculationsBII) {
     Invasive = toString(unique(Invasive)),
     .groups = "drop"
   )
-  
+
   ##### Abundance Data: #########################################################
   # Quite a weird thing here: they effectively mean to be summarising, but don't
   # in the guidance online (ID and Abundance are not used anymore and are
@@ -81,7 +80,7 @@ if (calculationsBII) {
   ) %>% dplyr::mutate(
     RescaledAbundance = TotalAbundance/MaxAbundance
   ) %>% dplyr::select(-ID, -Abundance)
-  
+
   # Interesting plots: it generally doesn't look like abundance is going up,
   # although there are some occasional spikes.
   # ggplot2::ggplot(
@@ -102,7 +101,7 @@ if (calculationsBII) {
   #     ) + ggplot2::geom_violin() + ggplot2::geom_boxplot(notch = TRUE)
   # both show substantial differences, and theirs are exaggerated.
   # Nonetheless, I don't think *mine* are significant.
-  
+
   ##### Site Data: ##############################################################
   bootstrapSamplesBIISites <- bootstrapSamplesBIISource %>% dplyr::group_by(
     Type, Bootstrap # "Study ID", but across controls
@@ -112,7 +111,7 @@ if (calculationsBII) {
       controlData <- x %>% dplyr::filter(Control == "Control")
       # Disturbed/Experimental Data.
       # disturbData <- x %>% dplyr::filter(Control != "Control")
-      
+
       expand.grid(
         unique(paste(controlData$Patch, controlData$Control, sep = "-")),
         unique(paste(x$Patch, x$Control, sep = "-"))
@@ -134,7 +133,7 @@ if (calculationsBII) {
     into = c("s2", "s2Control"),
     sep = "[-]", convert = TRUE
   )
-  
+
   ##### Jaccard Data: ###########################################################
   bootstrapSamplesBIIJaccard <- foreach::foreach(
     site = iterators::iter(bootstrapSamplesBIISites, by = "row"),
@@ -143,17 +142,17 @@ if (calculationsBII) {
     data <- bootstrapSamplesBIISource %>% dplyr::filter(
       Type == site$Type, Bootstrap == site$Bootstrap
     )
-    
+
     sor <- getJacAbSym(s1 = site$s1, s2 = site$s2,
                        s1Control = site$s1Control,
                        s2Control = site$s2Control,
                        data = data)
-    
+
     site %>% dplyr::mutate(
       JacAbSym = sor
     )
   } %>% dplyr::ungroup()
-  
+
   # As with abundance, something similar is happening here. Notably, time series
   # does NOT share the same behaviour as Space for time.
   # bootstrapSamplesBIIJaccard %>% ggplot2::ggplot(
@@ -163,7 +162,7 @@ if (calculationsBII) {
   # appeared in the tail of the control period, which then stabilise through the
   # experiment period, giving the illusion of increasing intactness.
   # One way to test would be to decrease the rate of colonisations.
-  
+
   ##### Bray-Curtis Data: #######################################################
   bootstrapSamplesBIIBray <- foreach::foreach(
     site = iterators::iter(bootstrapSamplesBIISites, by = "row"),
@@ -172,27 +171,27 @@ if (calculationsBII) {
     data <- bootstrapSamplesBIISource %>% dplyr::filter(
       Type == site$Type, Bootstrap == site$Bootstrap
     )
-    
+
     sor <- get_bray(s1 = site$s1, s2 = site$s2,
                     s1Control = site$s1Control,
                     s2Control = site$s2Control, data = data)
-    
+
     site %>% dplyr::mutate(
       Bray = sor
     )
   } %>% dplyr::ungroup()
-  
+
   # Different values (generally higher, but for highest?), but similar patterns.
   # bootstrapSamplesBIIBray %>% ggplot2::ggplot(
   #   ggplot2::aes(x = interaction(s1Control, s2Control, Type), y = Bray)
   # ) + ggplot2::geom_violin() + ggplot2::geom_boxplot(notch = TRUE, width = 0.1)
-  
+
   ##### Convert to Predicted: ###################################################
   # This involves modelling each statistic (Abundance, Jaccard, Bray-Curtis),
   # followed by predicting for our patches based on the assumption that they are
   # all the pristine type instead of disturbed type (Control == "Control").
   # Finally, we'll be dividing the actual divided by the prediction.
-  
+
   ####### Abundance: ############################################################
   # Note: Following plot is roughly linear for
   #       "MNA-ExampleExtProp-Result-Env10-Ring-Inf-1-1-ExtProp1.RData".
@@ -215,56 +214,56 @@ if (calculationsBII) {
   # logistic. (BII avoids this issue by ignoring the boundedness of abundance
   # and by adjusting the highest values to peak at 0.999 instead of 1.)
   # For now, at Jack and Tadhg's suggestion, we'll just do what they do.
-  
+
   modelAbundanceSpaceTime <- lme4::lmer(
     sqrt(RescaledAbundance) ~ Control + (1 | Bootstrap),
     data = bootstrapSamplesBIIAbundance %>% dplyr::filter(
       Type == "Space for time"
     )
   )
-  
+
   modelAbundanceTimeSeries <- lme4::lmer(
     sqrt(RescaledAbundance) ~ Control + (1 | Bootstrap),
     data = bootstrapSamplesBIIAbundance %>% dplyr::filter(
       Type == "Time series"
     )
   )
-  
+
   predictedAbundanceSpaceTime <- data.frame(
     Control = unique(bootstrapSamplesBIIAbundance$Control),
     Type = "Space for time"
   ) %>% dplyr::mutate(
     RescaledAbundance = predict(modelAbundanceSpaceTime, ., re.form = NA)^2
   )
-  
+
   predictedAbundanceTimeSeries <- data.frame(
     Control = unique(bootstrapSamplesBIIAbundance$Control),
     Type = "Time series"
   ) %>% dplyr::mutate(
     RescaledAbundance = predict(modelAbundanceTimeSeries, ., re.form = NA)^2
   )
-  
+
   ####### Jaccard: ##############################################################
   bootstrapSamplesBIIJaccard <- bootstrapSamplesBIIJaccard %>% dplyr::mutate(
     logitCS = car::logit(JacAbSym, adjust = 0.001, percents = FALSE),
     contrastControl = factor(paste(s1Control, s2Control, sep = "-")),
     contrastControl = relevel(contrastControl, ref = "Control-Control")
   )
-  
+
   modelJaccardSpaceTime <- lme4::lmer(
     logitCS ~ contrastControl + (1 | Bootstrap) + (1 | s2),
     data = bootstrapSamplesBIIJaccard %>% dplyr::filter(
       Type == "Space for time"
     )
   )
-  
+
   modelJaccardTimeSeries <- lme4::lmer(
     logitCS ~ contrastControl + (1 | Bootstrap) + (1 | s2),
     data = bootstrapSamplesBIIJaccard %>% dplyr::filter(
       Type == "Time series"
     )
   )
-  
+
   predictedJaccardSpaceTime <- data.frame(
     contrastControl = unique(bootstrapSamplesBIIJaccard$contrastControl),
     Type = "Space for time"
@@ -276,7 +275,7 @@ if (calculationsBII) {
     col = contrastControl, remove = FALSE,
     into = c("s1Control", "Control"), sep = "[-]"
   )
-  
+
   predictedJaccardTimeSeries <- data.frame(
     contrastControl = unique(bootstrapSamplesBIIJaccard$contrastControl),
     Type = "Time series"
@@ -288,28 +287,28 @@ if (calculationsBII) {
     col = contrastControl, remove = FALSE,
     into = c("s1Control", "Control"), sep = "[-]"
   )
-  
+
   ####### Bray-Curtis: ##########################################################
   bootstrapSamplesBIIBray <- bootstrapSamplesBIIBray %>% dplyr::mutate(
     logitCS = car::logit(Bray, adjust = 0.001, percents = FALSE),
     contrastControl = factor(paste(s1Control, s2Control, sep = "-")),
     contrastControl = relevel(contrastControl, ref = "Control-Control")
   )
-  
+
   modelBraySpaceTime <- lme4::lmer(
     logitCS ~ contrastControl + (1 | Bootstrap) + (1 | s2),
     data = bootstrapSamplesBIIBray %>% dplyr::filter(
       Type == "Space for time"
     )
   )
-  
+
   modelBrayTimeSeries <- lme4::lmer(
     logitCS ~ contrastControl + (1 | Bootstrap) + (1 | s2),
     data = bootstrapSamplesBIIBray %>% dplyr::filter(
       Type == "Time series"
     )
   )
-  
+
   predictedBraySpaceTime <- data.frame(
     contrastControl = unique(bootstrapSamplesBIIBray$contrastControl),
     Type = "Space for time"
@@ -321,7 +320,7 @@ if (calculationsBII) {
     col = contrastControl, remove = FALSE,
     into = c("s1Control", "Control"), sep = "[-]"
   )
-  
+
   predictedBrayTimeSeries <- data.frame(
     contrastControl = unique(bootstrapSamplesBIIBray$contrastControl),
     Type = "Time series"
@@ -333,7 +332,7 @@ if (calculationsBII) {
     col = contrastControl, remove = FALSE,
     into = c("s1Control", "Control"), sep = "[-]"
   )
-  
+
   ##### Final BII Predictions: ##################################################
   # Usage: Mutiply BII by proportion that is each land use type ("Control").
   predictedBII <- dplyr::bind_rows(
@@ -347,7 +346,7 @@ if (calculationsBII) {
   ) %>% dplyr::mutate(
     BII = RescaledAbundance * Bray
   )
-  
+
   ### Scholes and Biggs (2005) BII: #############################################
   # Need to interpret:
   #   Taxon : Suggests group by ID. Could be explored more thoroughly with a
@@ -365,7 +364,7 @@ if (calculationsBII) {
   #      the taxon level.
   #      One major problem though is the autocorrelation; another is that
   #      multiple samples from the same place can vary greatly.
-  
+
   # Note that variance != mean here upon initial check
   # %>% dplyr::group_by(ID) %>% dplyr::summarise(
   #        Mean = mean(Abundance),
@@ -380,7 +379,7 @@ if (calculationsBII) {
         ID = factor(ID)
       ) # samples in Abundance notation
     )
-    
+
     modelSBAbundanceTimeSeries <-  lme4::glmer.nb(
       Abundance ~ ID + (1 | Bootstrap) + (1 | Patch),
       data = bootstrapSamplesBIISource %>% dplyr::filter(
@@ -389,29 +388,29 @@ if (calculationsBII) {
         ID = factor(ID)
       ) # samples in Abundance notation
     )
-    
+
     predictSBAbundanceSpaceTimeDat <- bootstrapSamplesBIISource %>% dplyr::filter(
       Invasive == FALSE, Control == "Experiment",
       Type == "Space for time"
     ) %>% dplyr::mutate(
       ID = factor(ID)
     ) %>% dplyr::distinct(ID)
-    
+
     predictSBAbundanceTimeSeriesDat <- bootstrapSamplesBIISource %>% dplyr::filter(
       Invasive == FALSE, Control == "Experiment",
       Type == "Time series"
     ) %>% dplyr::mutate(
       ID = factor(ID)
     ) %>% dplyr::distinct(ID)
-    
+
     predictSBAbundanceSpaceTime <-
       predict(modelSBAbundanceSpaceTime,
               predictSBAbundanceSpaceTimeDat, re.form = NA, type = "response")
-    
+
     predictSBAbundanceTimeSeries <-
       predict(modelSBAbundanceTimeSeries,
               predictSBAbundanceTimeSeriesDat, re.form = NA, type = "response")
-    
+
     bootstrapSamplesBIISource <- bootstrapSamplesBIISource %>% dplyr::mutate(
       Invasive = dplyr::case_when(
         Invasive == "TRUE" ~ TRUE,
@@ -436,23 +435,23 @@ if (calculationsBII) {
       ),
       by = c("ID", "Invasive", "Control", "Type")
     )
-    
+
     # Since each Taxon has one Species and we're comparing Control to Experiment,
     # We consider R(ij) = 1 and A(jk) = 5 regardles of i, j, k, so they cancel.
     # Then it is simply sum(native Abundace / native Reference Abundance)/num. nat.
-    
+
     # I'm not perfectly convinced by how I've done it though. Going with gut here
     # and then we can refine it later.
-    
+
     predictedSB <- bootstrapSamplesBIISource %>% dplyr::filter(
       !is.na(AbundanceRef)
     ) %>% dplyr::group_by(Type, Bootstrap) %>% dplyr::summarise(
       BII = mean(Abundance/AbundanceRef)
     )
   }
-  
+
   ### Bray-Curtis's: ############################################################
-  
+
   bootstrapSamplesBrayAll <- foreach::foreach(
     site = iterators::iter(bootstrapSamplesBIISites, by = "row"),
     .combine = dplyr::bind_rows
@@ -460,11 +459,11 @@ if (calculationsBII) {
     data <- bootstrapSamplesBIISource %>% dplyr::filter(
       Type == site$Type, Bootstrap == site$Bootstrap
     )
-    
+
     sor <- get_bray_all(s1 = site$s1, s2 = site$s2,
                         s1Control = site$s1Control,
                         s2Control = site$s2Control, data = data)
-    
+
     cbind(site, sor)
   } %>% dplyr::ungroup()
 }
@@ -488,7 +487,7 @@ if (exists("predictedBII")) {
     # subtitle = "Crosses are model predictions.",
     # caption = paste0("file: ", file_result)
   )
-  
+
   plot_3_BIIAbundance <- ggplot2::ggplot(
     bootstrapSamplesBIIAbundance,
     ggplot2::aes(x = Type, y = RescaledAbundance, fill = Control)
@@ -508,7 +507,7 @@ if (exists("predictedBII")) {
     # subtitle = "Crosses are model predictions.",
     # caption = paste0("file: ", file_result)
   )
-  
+
   plot_3_BIIJaccard <- ggplot2::ggplot(
     bootstrapSamplesBIIJaccard,
     ggplot2::aes(x = Type, y = JacAbSym, fill = contrastControl)
@@ -528,7 +527,7 @@ if (exists("predictedBII")) {
     # subtitle = "Crosses are model predictions.",
     # caption = paste0("file: ", file_result)
   )
-  
+
   plot_3_BIIBray <- ggplot2::ggplot(
     bootstrapSamplesBIIBray,
     ggplot2::aes(x = Type, y = Bray, fill = contrastControl)
@@ -548,7 +547,7 @@ if (exists("predictedBII")) {
     # subtitle = "Crosses are model predictions.",
     # caption = paste0("file: ", file_result)
   )
-  
+
   plot_3_BII <- (
     (plot_3_BIITotal + plot_3_BIIAbundance)/(plot_3_BIIBray + plot_3_BIIJaccard)
   ) + patchwork::plot_layout(
