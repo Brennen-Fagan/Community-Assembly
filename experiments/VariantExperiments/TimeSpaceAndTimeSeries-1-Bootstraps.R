@@ -80,7 +80,7 @@ source("TimeSpaceAndTimeSeries-0-Functions.R")
 #                        and length of monitoring.
 
 # Time after arrival that intervention takes place.
-interventionGap <- 10 * result$ReactionTime
+interventionGap <- 100 * result$ReactionTime
 
 # What should our model of sampling be?
 # The typical one sounds like it is be in a place for a period of time,
@@ -104,7 +104,7 @@ samplingPerAbundance <- 1/100
 # We'll take a sampling period to be instantaneous.
 
 lastTimeSampleable <- result$Events$Times[length(result$Events$Times)]
-lastTimeSampleable <- lastTimeSampleable - samplingGap * 2
+lastTimeSampleable <- lastTimeSampleable - interventionGap * 2
 firstTimeSampleable <- 1000 # to make sure we're past the simulation burnin.
 
 # The Bootstraps: #############################################################
@@ -140,7 +140,7 @@ bootstrapSamples <- foreach::foreach(
                         to = burnin),
                     seq(from = intervention + samplingGap,
                         by = samplingGap,
-                        to = intervention + (intervention - burnin)))),
+                        to = intervention + interventionGap))),
     Patch = experiment,
     Type = "Time series"
   )) %>% dplyr::arrange(Time)

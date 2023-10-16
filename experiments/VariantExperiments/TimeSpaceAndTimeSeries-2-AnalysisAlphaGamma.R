@@ -40,12 +40,16 @@ bootstrapSamplesDeltaAlpha <- bootstrapSamples %>% dplyr::group_by(
 
 bootstrapSamplesPairedAlpha <- bootstrapSamples %>% dplyr::mutate(
   TimeSinceStart = round(TimeSinceStart, digits = 1) # Rare 1 != 1 issue.
-) %>% dplyr::filter( # Excessive, but explicit:
-  (Type == "Time series" & Control == "Control" & 
-     TimeSinceStart == min(TimeSinceStart)) |
-    (Type == "Time series" & Control != "Control" & 
-       TimeSinceStart == max(TimeSinceStart)) |
-    (Type != "Time series" & TimeSinceStart == max(TimeSinceStart))
+) %>% dplyr::group_by(
+  Type, Control, Bootstrap, Patch
+) %>% dplyr::arrange(
+  TimeSinceStart
+) %>% dplyr::mutate(
+  TimeGapNumber = seq_along(TimeSinceStart),
+  TimeGapNumber = ifelse(
+    Type == "Time series" & Control == "Control",
+    rev(TimeGapNumber), TimeGapNumber
+  ) # i.e.  5, 4, 3, 2, 1, ___, 1, 2, 3, 4, 5
 ) %>% dplyr::group_by(
   # Average across patches first.
   Type, Control, Bootstrap, TimeSinceStart
@@ -58,26 +62,26 @@ bootstrapSamplesPairedAlpha <- bootstrapSamples %>% dplyr::mutate(
     },
     TRUE ~ Patch - median(Patch)
   ),
-  DistanceFromCenterExpRev = ifelse(Control == "Experiment" & 
-                                      Type == "Space for time", 
+  DistanceFromCenterExpRev = ifelse(Control == "Experiment" &
+                                      Type == "Space for time",
                                    -DistanceFromCenter,
                                    DistanceFromCenter)
 ) %>% dplyr::ungroup(
 ) %>% dplyr::group_by(
-  DistanceFromCenterExpRev, Bootstrap, TimeSinceStart, Type
+  DistanceFromCenterExpRev, Bootstrap, TimeGapNumber, Type
 ) %>% dplyr::group_modify(
   .f = ~ computeSpeciesInControl(.x)
 ) %>% dplyr::ungroup(
 ) %>% dplyr::group_by(
-  DistanceFromCenterExpRev, Bootstrap, TimeSinceStart, Type, Control
-) %>% dplyr::summarise(
+  DistanceFromCenterExpRev, Bootstrap, TimeGapNumber, Type, Control
+) %>% dplyr::summarise( # Effectively a rename, but useful struct. for later.
   AverageSamplingAlpha = mean(SamplingAlpha),
   AverageSamplingAlphaNative = mean(SamplingAlphaNative),
   AverageSamplingAlphaInvasive = mean(SamplingAlphaInvasive),
   .groups = "drop"
 ) %>% dplyr::group_by(
   # Then perform difference by converting control to negatives and adding.
-  DistanceFromCenterExpRev, Bootstrap, Type
+  DistanceFromCenterExpRev, Bootstrap, TimeGapNumber, Type
 ) %>% dplyr::mutate(
   dplyr::across(
     .cols = AverageSamplingAlpha : AverageSamplingAlphaInvasive,
@@ -111,7 +115,7 @@ bootstrapSamplesDeltaGamma <- bootstrapSamples %>% dplyr::group_by(
     IDsInvasive <- unique(unlist(strsplit(
       x$SamplingIDsInvasive, ", ", fixed = TRUE
     )))
-    
+
     data.frame(
       SamplingGammaNative = length(IDsNative),
       IDsNative = toString(IDsNative),
@@ -213,8 +217,46 @@ plot_2_DeltaGamma <- ggplot2::ggplot(
 )
 
 ### Plot 3: ###################################################################
-plot_1_PairedAlpha <- ggplot2::ggplot(
-  bootstrapSamplesPairedAlpha,
+# plot_1_PairedAlpha <- ggplot2::ggplot(
+#   bootstrapSamplesPairedAlpha,
+#   ggplot2::aes(
+#     x = Type,
+#     y = `Difference of Average Number of Species in Patch`
+#   )
+# ) + ggplot2::geom_violin(
+# ) + ggplot2::geom_boxplot(
+#   width = 0.1,
+#   notch = TRUE
+# ) + ggplot2::geom_line(
+#   data = bootstrapSamplesPairedAlpha %>% dplyr::left_join(
+#     bootstrapSamplesPairedAlpha %>% dplyr::group_by(
+#       Bootstrap, DistanceFromCenterExpRev
+#     ) %>% dplyr::filter(
+#       `Species Subset` == "Overall"
+#     ) %>% dplyr::arrange(Type) %>% dplyr::summarise(
+#       Slope = diff(`Difference of Average Number of Species in Patch`)
+#     ),
+#     by = c("Bootstrap", "DistanceFromCenterExpRev")
+#   ),
+#   ggplot2::aes(group = Bootstrap, color = Slope),
+#   alpha = 0.2
+# ) + ggplot2::facet_grid(
+#   factor(`Species Subset`, ordered = TRUE, levels = c(
+#     "Overall", "Detected in Control", "Not Detected in Control"
+#   )) ~ DistanceFromCenterExpRev + TimeGapNumber
+# ) + ggplot2::labs(
+#   title = "Paired Alpha",
+#   subtitle = "Difference is Experiment - Control",
+#   caption = paste0("file: ", file_result)
+# ) + ggplot2::scale_color_viridis_c(option = "C")
+
+target <- bootstrapSamplesPairedAlpha %>% dplyr::filter(
+  DistanceFromCenterExpRev == 0,
+  TimeGapNumber == 10
+)
+
+plot_1_PairedAlphaStart <- ggplot2::ggplot(
+  target,
   ggplot2::aes(
     x = Type,
     y = `Difference of Average Number of Species in Patch`
@@ -224,7 +266,7 @@ plot_1_PairedAlpha <- ggplot2::ggplot(
   width = 0.1,
   notch = TRUE
 ) + ggplot2::geom_line(
-  data = bootstrapSamplesPairedAlpha %>% dplyr::left_join(
+  data = target %>% dplyr::left_join(
     bootstrapSamplesPairedAlpha %>% dplyr::group_by(
       Bootstrap, DistanceFromCenterExpRev
     ) %>% dplyr::filter(
@@ -236,12 +278,12 @@ plot_1_PairedAlpha <- ggplot2::ggplot(
   ),
   ggplot2::aes(group = Bootstrap, color = Slope),
   alpha = 0.2
-) + ggplot2::facet_grid(
+) + ggplot2::facet_wrap(
   factor(`Species Subset`, ordered = TRUE, levels = c(
     "Overall", "Detected in Control", "Not Detected in Control"
-  )) ~ DistanceFromCenterExpRev
+  )) ~ .#DistanceFromCenterExpRev + TimeGapNumber
 ) + ggplot2::labs(
-  title = "Paired Alpha",
+  title = "Paired Alpha, Maximal Distance, Gap = 10 * lambda",
   subtitle = "Difference is Experiment - Control",
   caption = paste0("file: ", file_result)
 ) + ggplot2::scale_color_viridis_c(option = "C")
