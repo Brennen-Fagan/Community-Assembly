@@ -102,6 +102,54 @@ bootstrapSamplesPairedAlpha <- bootstrapSamples %>% dplyr::mutate(
   values_to = "Difference of Average Number of Species in Patch"
 )
 
+bootstrapSamplesTimedAlpha <- bootstrapSamples %>% dplyr::mutate(
+  TimeSinceStart = round(TimeSinceStart, digits = 1) # Rare 1 != 1 issue.
+) %>% dplyr::group_by(
+  Type, Control, Bootstrap, Patch
+) %>% dplyr::arrange(
+  TimeSinceStart
+) %>% dplyr::mutate(
+  TimeGapNumber = seq_along(TimeSinceStart),
+  TimeGapNumber = ifelse(
+    Type == "Time series" & Control == "Control",
+    rev(TimeGapNumber), TimeGapNumber
+  ) # i.e.  5, 4, 3, 2, 1, ___, 1, 2, 3, 4, 5
+) %>% dplyr::ungroup(
+) %>% dplyr::group_by(
+  Bootstrap, TimeGapNumber, Type
+) %>% dplyr::group_modify(
+  .f = ~ computeSpeciesInControl(.x)
+) %>% dplyr::ungroup(
+) %>% dplyr::group_by(
+  Bootstrap, TimeGapNumber, Type, Control
+) %>% dplyr::summarise( # Average over Space.
+  AverageSamplingAlpha = mean(SamplingAlpha),
+  AverageSamplingAlphaNative = mean(SamplingAlphaNative),
+  AverageSamplingAlphaInvasive = mean(SamplingAlphaInvasive),
+  .groups = "drop"
+) %>% dplyr::group_by(
+  # Then perform difference by converting control to negatives and adding.
+  Bootstrap, TimeGapNumber, Type
+) %>% dplyr::mutate(
+  dplyr::across(
+    .cols = AverageSamplingAlpha : AverageSamplingAlphaInvasive,
+    .fns = ~ ifelse(Control == "Control", -.x, .x)
+  )
+) %>% dplyr::summarise(
+  DeltaAverageSamplingAlpha = sum(AverageSamplingAlpha),
+  DeltaAverageSamplingAlphaNative = sum(AverageSamplingAlphaNative),
+  DeltaAverageSamplingAlphaInvasive = sum(AverageSamplingAlphaInvasive),
+  .groups = "drop"
+) %>% dplyr::rename(
+  `Overall` = DeltaAverageSamplingAlpha,
+  `Detected in Control` = DeltaAverageSamplingAlphaNative,
+  `Not Detected in Control` = DeltaAverageSamplingAlphaInvasive
+) %>% tidyr::pivot_longer(
+  cols = c(`Overall`, `Detected in Control`, `Not Detected in Control`),
+  names_to = "Species Subset",
+  values_to = "Difference of Average Number of Species in Patch"
+)
+
 ### Gamma: ####################################################################
 # (Note: no guarantee of agreement due to differing sampling.)
 bootstrapSamplesDeltaGamma <- bootstrapSamples %>% dplyr::group_by(
@@ -287,3 +335,232 @@ plot_1_PairedAlphaStart <- ggplot2::ggplot(
   subtitle = "Difference is Experiment - Control",
   caption = paste0("file: ", file_result)
 ) + ggplot2::scale_color_viridis_c(option = "C")
+
+target <- bootstrapSamplesPairedAlpha %>% dplyr::filter(
+  DistanceFromCenterExpRev == 0,
+  TimeGapNumber %in% c(1, 25, 50, 75, 100)
+)
+
+plot_1_PairedAlphaTimeGaps <- ggplot2::ggplot(
+  target,
+  ggplot2::aes(
+    x = TimeGapNumber,
+    y = `Difference of Average Number of Species in Patch`,
+    fill = Type, group = interaction(Type, TimeGapNumber)
+  )
+) + ggplot2::geom_violin(
+  position = ggplot2::position_dodge(10)
+) + ggplot2::geom_boxplot(
+  position = ggplot2::position_dodge(10),
+  width = 2,
+  notch = TRUE
+) + ggplot2::facet_wrap(
+  factor(`Species Subset`, ordered = TRUE, levels = c(
+    "Overall", "Detected in Control", "Not Detected in Control"
+  )) ~ .#DistanceFromCenterExpRev + TimeGapNumber
+) + ggplot2::labs(
+  title = "Paired Alpha, Maximal Distance, Varying Gaps",
+  subtitle = "Difference is Experiment - Control",
+  caption = paste0("file: ", file_result)
+)
+
+target <- bootstrapSamplesPairedAlpha %>% dplyr::filter(
+  TimeGapNumber %in% c(10)
+)
+
+plot_1_PairedAlphaPairGaps <- ggplot2::ggplot(
+  target,
+  ggplot2::aes(
+    x = DistanceFromCenterExpRev,
+    y = `Difference of Average Number of Species in Patch`,
+    fill = Type, group = interaction(Type, DistanceFromCenterExpRev)
+  )
+) + ggplot2::geom_violin(
+  position = ggplot2::position_dodge(1)
+) + ggplot2::geom_boxplot(
+  position = ggplot2::position_dodge(1),
+  width = 0.1,
+  notch = TRUE
+) + ggplot2::facet_wrap(
+  factor(`Species Subset`, ordered = TRUE, levels = c(
+    "Overall", "Detected in Control", "Not Detected in Control"
+  )) ~ .#DistanceFromCenterExpRev + TimeGapNumber
+) + ggplot2::labs(
+  title = "Paired Alpha, Varying Distance, Gap = 10 * lambda",
+  subtitle = "Difference is Experiment - Control",
+  caption = paste0("file: ", file_result)
+)
+
+target <- bootstrapSamplesTimedAlpha %>% dplyr::filter(
+  TimeGapNumber %in% c(1, 25, 50, 75, 100)
+)
+
+plot_1_TimedAlphaTimeGaps <- ggplot2::ggplot(
+  target,
+  ggplot2::aes(
+    x = TimeGapNumber,
+    y = `Difference of Average Number of Species in Patch`,
+    fill = Type, group = interaction(Type, TimeGapNumber)
+  )
+) + ggplot2::geom_violin(
+  position = ggplot2::position_dodge(10)
+) + ggplot2::geom_boxplot(
+  position = ggplot2::position_dodge(10),
+  width = 2,
+  notch = TRUE
+) + ggplot2::facet_wrap(
+  factor(`Species Subset`, ordered = TRUE, levels = c(
+    "Overall", "Detected in Control", "Not Detected in Control"
+  )) ~ .#DistanceFromCenterExpRev + TimeGapNumber
+) + ggplot2::labs(
+  title = "Paired Alpha, Average over Patches, Varying Gaps",
+  subtitle = "Difference is Experiment - Control",
+  caption = paste0("file: ", file_result)
+)
+
+target <- bootstrapSamplesPairedAlpha %>% dplyr::filter(
+  DistanceFromCenterExpRev == 0
+) %>% dplyr::group_by(
+  Type, TimeGapNumber, `Species Subset`
+) %>% dplyr::rename(
+  y = `Difference of Average Number of Species in Patch`
+) %>% dplyr::summarise(
+  yminp = min(y),
+  ymin1 = quantile(y, probs = 0.025),
+  ymin2 = quantile(y, probs = 0.25),
+  ymedian = quantile(y, probs = 0.5),
+  ymean = mean(y),
+  ymax1 = quantile(y, probs = 1 - 0.25),
+  ymax2 = quantile(y, probs = 1 - 0.025),
+  ymaxp = max(y),
+  .groups = "drop"
+)
+
+plot_1_PairedAlphaTimeGaps_Ribbon <- ggplot2::ggplot(
+  target,
+  ggplot2::aes(
+    x = TimeGapNumber,
+    fill = Type, group = Type, color = Type
+  )
+) + ggplot2::geom_ribbon( # Inner
+  ggplot2::aes(ymin = ymin2,
+               ymax = ymax1), alpha = 0.3
+) + ggplot2::geom_ribbon( # Outer
+  ggplot2::aes(ymin = ymin1,
+               ymax = ymax2), alpha = 0.2
+) + ggplot2::geom_line(
+  ggplot2::aes(y = ymedian), linetype = "dotted"
+) + ggplot2::geom_line(
+  ggplot2::aes(y = ymean), linetype = "dashed"
+) + ggplot2::geom_point( # Minimum detected
+  ggplot2::aes(y = yminp), shape = 22, alpha = 0.4
+) + ggplot2::geom_point( # Maximum detected
+  ggplot2::aes(y = ymaxp), shape = 22, alpha = 0.4
+) + ggplot2::facet_grid(
+  factor(`Species Subset`, ordered = TRUE, levels = c(
+    "Overall", "Detected in Control", "Not Detected in Control"
+  )) ~ Type
+) + ggplot2::labs(
+  title = "Paired Alpha, Maximal Distance, Varying Gaps",
+  subtitle = "Difference is Experiment - Control",
+  caption = paste0("file: ", file_result),
+  ylab = "Difference of Average Number of Species in Patch"
+)
+
+target <- bootstrapSamplesPairedAlpha %>% dplyr::filter(
+  # DistanceFromCenterExpRev == 0
+  TimeGapNumber == 10
+) %>% dplyr::group_by(
+  Type, DistanceFromCenterExpRev, `Species Subset`
+) %>% dplyr::rename(
+  y = `Difference of Average Number of Species in Patch`
+) %>% dplyr::summarise(
+  yminp = min(y),
+  ymin1 = quantile(y, probs = 0.025),
+  ymin2 = quantile(y, probs = 0.25),
+  ymedian = quantile(y, probs = 0.5),
+  ymean = mean(y),
+  ymax1 = quantile(y, probs = 1 - 0.25),
+  ymax2 = quantile(y, probs = 1 - 0.025),
+  ymaxp = max(y),
+  .groups = "drop"
+)
+
+plot_1_PairedAlphaPairGaps_Ribbon <- ggplot2::ggplot(
+  target,
+  ggplot2::aes(
+    x = DistanceFromCenterExpRev,
+    fill = Type, group = Type, color = Type
+  )
+) + ggplot2::geom_ribbon( # Inner
+  ggplot2::aes(ymin = ymin2,
+               ymax = ymax1), alpha = 0.3
+) + ggplot2::geom_ribbon( # Outer
+  ggplot2::aes(ymin = ymin1,
+               ymax = ymax2), alpha = 0.2
+) + ggplot2::geom_line(
+  ggplot2::aes(y = ymedian), linetype = "dotted"
+) + ggplot2::geom_line(
+  ggplot2::aes(y = ymean), linetype = "dashed"
+) + ggplot2::geom_point( # Minimum detected
+  ggplot2::aes(y = yminp), shape = 22, alpha = 0.4
+) + ggplot2::geom_point( # Maximum detected
+  ggplot2::aes(y = ymaxp), shape = 22, alpha = 0.4
+) + ggplot2::facet_grid(
+  factor(`Species Subset`, ordered = TRUE, levels = c(
+    "Overall", "Detected in Control", "Not Detected in Control"
+  )) ~ Type
+) + ggplot2::labs(
+  title = "Paired Alpha, Varying Distance, Gap = 10 * lambda",
+  subtitle = "Difference is Experiment - Control",
+  caption = paste0("file: ", file_result),
+  ylab = "Difference of Average Number of Species in Patch"
+)
+
+target <- bootstrapSamplesTimedAlpha %>% dplyr::filter(
+) %>% dplyr::group_by(
+  Type, TimeGapNumber, `Species Subset`
+) %>% dplyr::rename(
+  y = `Difference of Average Number of Species in Patch`
+) %>% dplyr::summarise(
+  yminp = min(y),
+  ymin1 = quantile(y, probs = 0.025),
+  ymin2 = quantile(y, probs = 0.25),
+  ymedian = quantile(y, probs = 0.5),
+  ymean = mean(y),
+  ymax1 = quantile(y, probs = 1 - 0.25),
+  ymax2 = quantile(y, probs = 1 - 0.025),
+  ymaxp = max(y),
+  .groups = "drop"
+)
+
+plot_1_TimedAlphaTimeGaps_Ribbon <- ggplot2::ggplot(
+  target,
+  ggplot2::aes(
+    x = TimeGapNumber,
+    fill = Type, group = Type, color = Type
+  )
+) + ggplot2::geom_ribbon( # Inner
+  ggplot2::aes(ymin = ymin2,
+               ymax = ymax1), alpha = 0.3
+) + ggplot2::geom_ribbon( # Outer
+  ggplot2::aes(ymin = ymin1,
+               ymax = ymax2), alpha = 0.2
+) + ggplot2::geom_line(
+  ggplot2::aes(y = ymedian), linetype = "dotted"
+) + ggplot2::geom_line(
+  ggplot2::aes(y = ymean), linetype = "dashed"
+) + ggplot2::geom_point( # Minimum detected
+  ggplot2::aes(y = yminp), shape = 22, alpha = 0.4
+) + ggplot2::geom_point( # Maximum detected
+  ggplot2::aes(y = ymaxp), shape = 22, alpha = 0.4
+) + ggplot2::facet_grid(
+  factor(`Species Subset`, ordered = TRUE, levels = c(
+    "Overall", "Detected in Control", "Not Detected in Control"
+  )) ~ Type
+) + ggplot2::labs(
+  title = "Paired Alpha, Average over Patches, Varying Gaps",
+  subtitle = "Difference is Experiment - Control",
+  caption = paste0("file: ", file_result),
+  ylab = "Difference of Average Number of Species in Patch"
+)
