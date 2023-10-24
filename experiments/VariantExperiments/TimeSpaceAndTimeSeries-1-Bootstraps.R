@@ -21,6 +21,7 @@ bootstrapSeed <-
   12854863 # Used for 2023-09-25
 
 calculationsPlotLong <- FALSE
+logarithmicTimeScale <- FALSE
 # Libraries: ##################################################################
 library(dplyr)
 library(tidyr)
@@ -128,6 +129,29 @@ bootstrapSamples <- foreach::foreach(
   intervention <- burnin + interventionGap # When land use change "occurs".
   # print(paste(bootstrapID, ":", toString(intervention)))
 
+  if(logarithmicTimeScale) {
+    #timediffs <- exp(seq(from = -log(interventionGap/samplingGap),
+    #                 to = log(interventionGap/samplingGap),
+    #                 length.out = round(interventionGap/samplingGap)))
+    #timediffs <- exp(seq(from = -log(interventionGap),
+    #                     to = log(interventionGap),
+    #                     length.out = round(interventionGap/samplingGap)))
+    # This version is symmetric on the log scale, centred on the sampling gap,
+    # and ends at the intervention gap. Number of sampling times not guaranteed.
+    timediffs <- unique(exp(c(
+                     seq(from = -log(interventionGap),
+                         to = log(samplingGap),
+                         length.out = floor(interventionGap/samplingGap/2)),
+                     seq(from = log(samplingGap),
+                         to = log(interventionGap),
+                         length.out = ceiling(interventionGap/samplingGap/2))  
+                         )))
+  } else {
+    timediffs <- seq(from = samplingGap,
+                        by = samplingGap,
+                        to = interventionGap)
+  }
+
   # Time Series:
   # The premise is that the Time Series researcher is only looking at the
   # plots where the experiment / land use change is taking place, but they
@@ -135,12 +159,8 @@ bootstrapSamples <- foreach::foreach(
   # They'd be interested in trying to estimate the regional pool / diversity,
   # as well as local diversity and inter-patch diversity.
   sampling_TimeSeries <- data.frame(expand.grid(
-    Time = unique(c(seq(from = intervention - samplingGap,
-                        by = -samplingGap,
-                        to = burnin),
-                    seq(from = intervention + samplingGap,
-                        by = samplingGap,
-                        to = intervention + interventionGap))),
+    Time = unique(c(intervention - timediffs,
+                    intervention + timediffs)),
     Patch = experiment,
     Type = "Time series"
   )) %>% dplyr::arrange(Time)
@@ -152,9 +172,7 @@ bootstrapSamples <- foreach::foreach(
   # They'd also be interested in estimating the regional pool / diversity,
   # as well as local diversity and inter-patch diversity.
   sampling_SpaceForTime <- data.frame(expand.grid(
-    Time = seq(from = intervention + samplingGap,
-               by = samplingGap,
-               to = intervention + (intervention - burnin)),
+    Time = intervention + timediffs,
     Patch = c(control, experiment),
     Type = "Space for time"
   ))
