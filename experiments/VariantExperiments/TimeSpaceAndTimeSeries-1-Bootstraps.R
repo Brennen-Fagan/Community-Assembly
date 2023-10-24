@@ -46,7 +46,7 @@ doParallel::registerDoParallel(clust)
 
 # Files: ######################################################################
 directory <- '.' # Mutualism folder.
-file_result <- "MNA-ExampleExtProp-Result-Env10-Ring-5-1-1-ExtProp1.RData"
+file_result <- "MNA-ExampleExtProp-Result-Env10-Ring-0-1-1-ExtProp1.RData"
 file_pool <- "MNA-ExampleOutcome-PoolMats-Env10.RData"
 load(file.path(directory, "Data_2023-09-25", file_result))
 load(file.path(directory, "Data_2023-09-25", file_pool))
@@ -210,7 +210,7 @@ plot_0_Richness <- ggplot2::ggplot(
       strsplit(SamplingNonZeroSpecies, split = ", ", fixed = TRUE), length
     ))
   ),
-  ggplot2::aes(x = Time, y = TrueRichness, color = Patch, group = Patch)
+  ggplot2::aes(x = Time/result$ReactionTime, y = TrueRichness, color = Patch, group = Patch)
 ) + ggplot2::geom_line(
 ) + ggplot2::geom_line(
   ggplot2::aes(y = SamplingAlpha * 3),
@@ -218,7 +218,12 @@ plot_0_Richness <- ggplot2::ggplot(
   linetype = 2
 ) + ggplot2::scale_y_continuous(
   sec.axis = ggplot2::sec_axis(~ . / 3, name = "Richness Observed")
-) + ggplot2::facet_wrap(. ~ Patch)
+) + ggplot2::facet_wrap(
+  . ~ Patch
+) + ggplot2::labs(
+  x = "Time (Units: Characteristic Times)",
+  y = "True Richness"
+)
 
 # But correlation remains low? (but significant) (For file 5-1-1)
 # with(bootstrapSamples %>% dplyr::mutate(
@@ -229,7 +234,7 @@ plot_0_Richness <- ggplot2::ggplot(
 
 plot_0_Abundance <- ggplot2::ggplot(
   bootstrapSamples,
-  ggplot2::aes(x = Time, y = SamplingAbundance, color = Patch, group = Patch)
+  ggplot2::aes(x = Time/result$ReactionTime, y = SamplingAbundance, color = Patch, group = Patch)
 ) + ggplot2::geom_line(
 ) + ggplot2::geom_line(
   ggplot2::aes(y = SamplingObserved * 100),
@@ -238,7 +243,10 @@ plot_0_Abundance <- ggplot2::ggplot(
 ) + ggplot2::scale_y_continuous(
   name = "True Total Abundance",
   sec.axis = ggplot2::sec_axis(~ . / 100, name = "Abundance Observed")
-) + ggplot2::facet_wrap(. ~ Patch)
+) + ggplot2::facet_wrap(. ~ Patch
+) + ggplot2::labs(
+  x = "Time (Units: Characteristic Times)"
+)
 
 # Abundance is (unsurprisingly) much more correlated. (For file 5-1-1)
 # with(bootstrapSamples, cor.test(SamplingAbundance, SamplingObserved))
@@ -290,7 +298,7 @@ plot_0_OccupancyTrue <- (
   Pool %>% dplyr::arrange(Size) %>% dplyr::mutate(SizeID = 1:nrow(Pool)),
   by = c("Species" = "ID")
 ) %>% ggplot2::ggplot(
-  ggplot2::aes(x = Time, y = SizeID, color = Count)
+  ggplot2::aes(x = Time/result$ReactionTime, y = SizeID, color = Count)
 ) + ggplot2::geom_point(
   shape = '.'
 ) + ggplot2::scale_color_viridis_c(
@@ -299,6 +307,7 @@ plot_0_OccupancyTrue <- (
   yintercept = nrow(Pool %>% dplyr::filter(Type == Type[1])) + 0.5,
   color = "red"
 ) + ggplot2::labs(
+  x = "Time (Units: Characteristic Times)",
   y = "Species by Size"
 ) + ggplot2::theme_bw()
 
@@ -312,10 +321,11 @@ plot_0_OccupancyTrue <- (
 ))
 
 plot_0_AbundanceAvg <- speciesAbundanceStats %>% ggplot2::ggplot(
-  ggplot2::aes(x = Time, y = AvgAbundance,
+  ggplot2::aes(x = Time/result$ReactionTime, y = AvgAbundance,
                color = as.character(Species), group = Species)
 ) + ggplot2::geom_line(
 ) + ggplot2::labs(
+  x = "Time (Units: Characteristic Times)",
   y = "Average Abundance"
 ) + ggplot2::facet_wrap(
   . ~ Count
@@ -323,10 +333,11 @@ plot_0_AbundanceAvg <- speciesAbundanceStats %>% ggplot2::ggplot(
 ) + ggplot2::guides(color = "none")
 
 plot_0_AbundanceGeoAvg <- speciesAbundanceStats %>% ggplot2::ggplot(
-  ggplot2::aes(x = Time, y = exp(AvgLogAbundance),
+  ggplot2::aes(x = Time/result$ReactionTime, y = exp(AvgLogAbundance),
                color = as.character(Species), group = Species)
 ) + ggplot2::geom_line(
 ) + ggplot2::labs(
+  x = "Time (Units: Characteristic Times)",
   y = "Average Abundance (Geometric)"
 ) + ggplot2::facet_wrap(
   . ~ Count
