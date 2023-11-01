@@ -7,13 +7,14 @@
 # bootstrap.
 # > runif(1) * 1e8
 # [1] 97870743
-bootstraps <- 10
+bootstraps <- 100
 bootstrapSeed <-
-  97870743 # used for 2023-09-25 -> Hik6_2023-03-04, 56-6
+  # 97870743 # used for 2023-09-25, 5 -> Hik6_2023-03-04, 56-6
+  21139057 # used for 2023-09-25, 5 -> Inf
 
 calculationsPlotLong <- FALSE
 logarithmicTimeScale <- TRUE
-relabelPoolIntervention <- TRUE
+relabelPoolIntervention <- FALSE
 timeInterventionRandom <- FALSE
 patchInterventionRandom <- FALSE
 # Libraries: ##################################################################
@@ -41,7 +42,7 @@ library(lme4)
 directory <- '.' # VariousExperiments folder.
 source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
 
-clust <- parallel::makeCluster(3)#, outfile = "")
+clust <- parallel::makeCluster(3, outfile = "")
 doParallel::registerDoParallel(clust)
 
 # Files: ######################################################################
@@ -53,10 +54,10 @@ fileBaseResult2 <- NULL
 fileBasePool <- "MNA-ExampleOutcome-PoolMats-Env10.RData"
 
 # Intervention
-fileInterventionFolder <- "Data_Hik6_2023-03-04"
-fileInterventionResult <- "MNA-Hik6A-Cases-Prepared-1-56-6-1.RData"
-fileInterventionResult2 <- "MNA-Hik6A-Cases-Prepared-1-56-6-2.RData"
-fileInterventionPool <- "MNA-Hik6A-Cases-Prepared.RData"
+fileInterventionFolder <- "Data_2023-09-25"
+fileInterventionResult <- "MNA-ExampleExtProp-Result-Env10-Ring-Inf-1-1-ExtProp1.RData"
+fileInterventionResult2 <- NULL
+fileInterventionPool <- "MNA-ExampleOutcome-PoolMats-Env10.RData"
 
 resultBase <- loadSimulation(
   file.path(directory, fileBaseFolder, fileBaseResult),
@@ -224,9 +225,21 @@ stopifnot(nSpecies == floor(nSpecies),
 #                        monitoring effectiveness (e.g. sampling intensity),
 #                        and length of monitoring.
 
+# Interesting problem: we need everything to be on the same time scales.
+# We're already using the reaction times as our best proxy/control of the time
+# scale, so we'll reformat all of the times using those.
+resultBase$Abundance[, 1] <-
+  resultBase$Abundance[, 1] / resultBase$ReactionTime
+resultBase$Events$Times <-
+  resultBase$Events$Times / resultBase$ReactionTime
+resultIntervention$Abundance[, 1] <-
+  resultIntervention$Abundance[, 1] / resultIntervention$ReactionTime
+resultIntervention$Events$Times <-
+  resultIntervention$Events$Times / resultIntervention$ReactionTime
+
 # Time after arrival that intervention takes place.
-timeGapBase <- 100 * resultBase$ReactionTime
-timeGapIntervention <- 100 * resultIntervention$ReactionTime
+# Since same time scale, opting for the same value here.
+timeGap <- 100
 
 # What should our model of sampling be?
 # The typical one sounds like it is be in a place for a period of time,
@@ -236,8 +249,7 @@ timeGapIntervention <- 100 * resultIntervention$ReactionTime
 # difference in number of species for a single time point between C & E/D.
 # Susan and Jon agreed with In\^es above.
 # Set samplingGap to match interventionGap to make for only one time sample.
-samplingGapBase <- resultBase$ReactionTime;
-samplingGapIntervention <- resultIntervention$ReactionTime;
+samplingGap <- 1
 
 # notate everything that you perceive
 samplingFailureRate <- 0.1
@@ -254,38 +266,32 @@ lastTimeSampleable <- resultBase$Events$Times[
   length(resultBase$Events$Times)
   ]
 lastTimeSampleable <-
-  lastTimeSampleable - timeGapBase * 2
+  lastTimeSampleable - timeGap * 2
 
 lastTimeSampleableAlternate <- resultIntervention$Events$Times[
   length(resultIntervention$Events$Times)
   ]
 lastTimeSampleableAlternate <-
-  lastTimeSampleableAlternate - timeGapIntervention * 2
+  lastTimeSampleableAlternate - timeGap * 2
 
 # to make sure we're past the simulation burnin.
-firstTimeSampleableBase <- 125 * resultBase$ReactionTime
-firstTimeSampleableIntervention <- 125 * resultIntervention$ReactionTime
+firstTimeSampleableBase <- 125
+firstTimeSampleableIntervention <- 125
 
 # Enforce the first sampleable row for the intervention.
 interventionFirstRowSampleable <-
   which.max(resultIntervention$Abundance[, 1] > firstTimeSampleableIntervention)
 
 if(logarithmicTimeScale) {
-  #timediffs <- exp(seq(from = -log(interventionGap/samplingGap),
-  #                 to = log(interventionGap/samplingGap),
-  #                 length.out = round(interventionGap/samplingGap)))
-  #timediffs <- exp(seq(from = -log(interventionGap),
-  #                     to = log(interventionGap),
-  #                     length.out = round(interventionGap/samplingGap)))
   # This version is symmetric on the log scale, centred on the sampling gap,
-  # and ends at the intervention gap. Number of sampling times not guaranteed.
+  # and ends at the time gap. Number of sampling times not guaranteed.
   timediffs <- unique(exp(c(
-    seq(from = -log(interventionGap),
+    seq(from = -log(timeGap),
         to = log(samplingGap),
-        length.out = floor(interventionGap/samplingGap/2)),
+        length.out = floor(timeGap/samplingGap/2)),
     seq(from = log(samplingGap),
-        to = log(interventionGap),
-        length.out = ceiling(interventionGap/samplingGap/2))
+        to = log(timeGap),
+        length.out = ceiling(timeGap/samplingGap/2))
   )))
   timediffs <- timediffs[timediffs > min(c(
     diff(resultBase$Abundance[, 1]),
@@ -294,7 +300,7 @@ if(logarithmicTimeScale) {
 } else {
   timediffs <- seq(from = samplingGap,
                    by = samplingGap,
-                   to = interventionGap)
+                   to = timeGap)
 }
 
 # The Bootstraps: #############################################################
@@ -313,14 +319,15 @@ bootstrapSamples <- foreach::foreach(
 
   # Pick a random start time.
   burnin <- runif(
-    n = 1, min = firstTimeSampleable, max = lastTimeSampleable
+    n = 1, min = firstTimeSampleableBase, max = lastTimeSampleable
   ) # When the researchers can arrive, presume steady-state.
-  timeSwitch <- burnin + interventionGap # When land use change "occurs".
+  timeSwitch <- burnin + timeGap # When land use change "occurs".
   # print(paste(bootstrapID, ":", toString(intervention)))
 
   timeAlternate <- if (timeInterventionRandom) {
     runif(
-      n = 1, min = firstTimeSampleable, max = lastTimeSampleableAlternate
+      n = 1, min = firstTimeSampleableIntervention,
+      max = lastTimeSampleableAlternate
     )
   } else {
     timeSwitch
@@ -343,7 +350,7 @@ bootstrapSamples <- foreach::foreach(
                         timeSwitch + timediffs)),
     Patch = experiment,
     Type = "Time series"
-  )) %>% dplyr::arrange(Time) %>% dplyr::mutate(
+  )) %>% dplyr::arrange(TimeBase) %>% dplyr::mutate(
     TimeIntervention = TimeBase - timeSwitch + timeAlternate,
     PatchIntervention = patchAlternate[Patch]
   )
@@ -355,13 +362,15 @@ bootstrapSamples <- foreach::foreach(
   # They'd also be interested in estimating the regional pool / diversity,
   # as well as local diversity and inter-patch diversity.
   sampling_SpaceForTime <- data.frame(expand.grid(
-    Time = interventionTime + timediffs,
+    TimeBase = timeSwitch + timediffs,
     Patch = c(control, experiment),
     Type = "Space for time"
-  )) %>% dplyr::arrange(Time) %>% dplyr::mutate(
+  )) %>% dplyr::arrange(TimeBase) %>% dplyr::mutate(
     TimeIntervention = TimeBase - timeSwitch + timeAlternate,
     PatchIntervention = patchAlternate[Patch]
   )
+
+  # print(paste(bootstrapID, "made it."))
 
   sampling_SpaceForTime <- sampleFromResultsIntervention(
     sampling = sampling_SpaceForTime,
@@ -371,22 +380,33 @@ bootstrapSamples <- foreach::foreach(
     interventionTime = timeSwitch,
     nSpecies = nSpecies,
     samplingPerAbundance = samplingPerAbundance,
-    samplingFailureRate = samplingFailureRate
+    samplingFailureRate = samplingFailureRate,
+    Pool = rbind(PoolBase, PoolIntervention)
   )
+
+  # print(paste(bootstrapID, "made it."))
 
   sampling_TimeSeries <- sampleFromResultsIntervention(
     sampling = sampling_TimeSeries,
     baseAbundance = resultBase$Abundance,
     interventionAbundance = resultIntervention$Abundance,
     control = control,
-    interventionTime = interventionTime,
+    interventionTime = timeSwitch,
     nSpecies = nSpecies,
     samplingPerAbundance = samplingPerAbundance,
-    samplingFailureRate = samplingFailureRate
+    samplingFailureRate = samplingFailureRate,
+    Pool = rbind(PoolBase, PoolIntervention)
   )
 
-  sampling_SpaceForTime <- computeSpeciesInControl(sampling_SpaceForTime)
-  sampling_TimeSeries <- computeSpeciesInControl(sampling_TimeSeries)
+  # print(paste(bootstrapID, "made it."))
+
+  sampling_SpaceForTime <- computeSpeciesInControl(
+    sampling_SpaceForTime, Time = "TimeBase")
+  sampling_TimeSeries <- computeSpeciesInControl(
+    sampling_TimeSeries, Time = "TimeBase")
+
+  print(paste(bootstrapID, "made it."))
+
   return(
     dplyr::bind_rows(
       sampling_SpaceForTime,
@@ -400,9 +420,9 @@ bootstrapSamples <- foreach::foreach(
 bootstrapSamples <- bootstrapSamples %>% dplyr::group_by(
   Type, Control, Bootstrap, Patch
 ) %>% dplyr::arrange(
-  Time
+  TimeBase
 ) %>% dplyr::mutate(
-  TimeSinceStart = Time - min(Time)
+  TimeSinceStart = TimeBase - min(TimeBase)
 ) %>% dplyr::ungroup()
 
 parallel::stopCluster(clust)

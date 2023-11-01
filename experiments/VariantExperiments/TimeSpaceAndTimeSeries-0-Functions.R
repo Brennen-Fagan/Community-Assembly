@@ -134,7 +134,8 @@ sampleFromResultsIntervention <- function(
   interventionTime, # Intervention Time Period
   nSpecies, # Number of species
   samplingPerAbundance, # Convert from Abundance to sample-able individuals.
-  samplingFailureRate # Pr(Researcher Doesn't See Sample)
+  samplingFailureRate, # Pr(Researcher Doesn't See Sample)
+  Pool
 ) {
   # ASSUME:
   #  The intervention abundance and the result abundance are the same format
@@ -144,7 +145,7 @@ sampleFromResultsIntervention <- function(
   sampling %>% dplyr::mutate(
     # Descriptions
     Control = ifelse(
-      Patch %in% control | Time < interventionTime,
+      Patch %in% control | TimeBase < interventionTime,
       "Control", "Experiment"
     )
   ) %>% dplyr::rowwise(
@@ -161,7 +162,7 @@ sampleFromResultsIntervention <- function(
     TimeBase, Patch
   ) %>% dplyr::group_modify(
     .f = function(x, y) {
-      if (y$Control == "Control") {
+      if (x$Control == "Control") {
         temp <- baseAbundance[
           x$TimeActualRow, # First Col. = Time
           1 + nSpecies * (y$Patch - 1) + 1:nSpecies
@@ -237,7 +238,7 @@ sampleFromResultsIntervention <- function(
 # In truth all species are more or less the same, originating from the true
 # regional pool. Our researchers wouldn't know this.
 # Instead, they would both use their control to estimate the natives.
-computeSpeciesInControl <- function(sampling) {
+computeSpeciesInControl <- function(sampling, Time = "Time") {
   controlSpecies <- sampling %>% dplyr::filter(
     Control == "Control"
   ) %>% dplyr::pull(
@@ -248,7 +249,7 @@ computeSpeciesInControl <- function(sampling) {
   ) %>% unique()
 
   sampling %>% dplyr::group_by(
-    Time, Patch
+    dplyr::all_of(Time), Patch
   ) %>% dplyr::group_modify(
     .f = function(x, y) {
       splitSamplingIDs <- strsplit(x$SamplingIDs, ", ", fixed = T)[[1]]
