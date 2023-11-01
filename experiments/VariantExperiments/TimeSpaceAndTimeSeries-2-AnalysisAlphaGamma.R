@@ -788,7 +788,7 @@ plot_1_PairedBetaDistGaps_Ribbon <- ggplot2::ggplot(
     "All", "Det. In Control", "Not Det. In Control"
   )) ~ Type
 ) + ggplot2::labs(
-  title = "Paired Alpha, Varying Distance, Gap = 10 * lambda",
+  title = "Paired Beta, Varying Distance, Gap = 10 * lambda",
   subtitle = "Presence/Absence Beta Dissimilarity",
   caption = paste0("file: ", file_result),
   ylab = "Jaccard Dissimilarity"
@@ -838,7 +838,7 @@ plot_1_TimedBetaTimeGaps_Ribbon <- ggplot2::ggplot(
   )) ~ Type
 ) + ggplot2::labs(
   title = paste0(
-    "Paired Alpha, Maximal Distance, Varying Time Gap",
+    "Paired Beta, Maximal Distance, Varying Time Gap",
     if (logarithmicTimeScale) ", Log Scale X")
   ,
   subtitle = "Presence/Absence Beta Dissimilarity",
