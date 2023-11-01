@@ -106,12 +106,100 @@ resultIntervention$Abundance[, -1] <- ifelse(
   0, resultIntervention$Abundance[, -1]
 )
 
-if (relabelPoolIntervention) {
-  # PoolIntervention <-
-}
+nPatches <- resultBase$NumEnvironments
+# Why not Intervention? Because the Base patches will be 1-to-1 replaced.
 
-nPatches <- 10 # Fixed in between simulations.
-nSpecies <- (ncol(result$Abundance) - 1) / nPatches
+if (relabelPoolIntervention) {
+  # Pool Problems:
+  # NOTE: We use "which" in the sampling scheme.
+  #       We SHOULD insert the Pool$ID[which(...)] instead, but
+  #       all of our pools label species 1:nrow(Pool) anyways.
+  # Brute force labeling and relabeling.
+  if (!"ID" %in% colnames(PoolIntervention)) {
+    PoolIntervention$ID <- 1:nrow(PoolIntervention)
+  }
+  flagAdditions <- 0 # Used to update Events later.
+  while (any(PoolIntervention$ID %in% PoolBase$ID)) {
+    flagAdditions <- flagAdditions + 1
+    PoolIntervention$ID <- length(PoolBase$ID) + PoolIntervention$ID
+  }
+
+  # Abundance Problems:
+  # Since we perform our sampling based on column position, we need to
+  # give the different species different column positions.
+  # => Inserting empty (rep(0)) columns.
+  # Easiest method is probably to
+  #   separate matrices into environments,
+  #   cbind to each environment the appropriate new columns,
+  #   then recombine the environments as before.
+
+  # Note BASE first, then INTERVENTION
+  resultBase$Abundance <- dplyr::bind_cols(
+    resultBase$Abundance[, 1], # Time Column
+    lapply(
+      1:resultBase$NumEnvironments,
+      function(i, ab, nspec) {
+        # Time Col. + Past Env. Cols + This Env.'s Cols
+        temp <- ab[, 1 + (i - 1) * nspec + (1:nspec)]
+
+        return(dplyr::bind_cols(
+          temp, matrix(0, nrow = nrow(temp), ncol = nrow(PoolIntervention))
+        ))
+      },
+      ab = resultBase$Abundance,
+      nspec = nrow(PoolBase)
+    )
+  )
+
+  # Note reverse ordering!
+  resultIntervention$Abundance <- dplyr::bind_cols(
+    resultIntervention$Abundance[, 1], # Time Column
+    lapply(
+      1:resultIntervention$NumEnvironments,
+      function(i, ab, nspec) {
+        # Time Col. + Past Env. Cols + This Env.'s Cols
+        temp <- ab[, 1 + (i - 1) * nspec + (1:nspec)]
+
+        return(dplyr::bind_cols(
+          matrix(0, nrow = nrow(temp), ncol = nrow(PoolBase)), temp
+        ))
+      },
+      ab = resultIntervention$Abundance,
+      nspec = nrow(PoolIntervention)
+    )
+  )
+
+  # Event Problems:
+  resultIntervention$Events$Species <-
+    resultIntervention$Events$Species + flagAdditions * length(PoolBase$ID)
+
+  nSpecies <- nrow(PoolBase) + nrow(PoolIntervention)
+} else if (
+  length(setdiff(PoolBase$ID, PoolIntervention$ID)) > 0 ||
+  length(setdiff(PoolIntervention$ID, PoolBase$ID)) > 0 ) {
+  # Pool Problems: We're not relabeling, but one pool is obv. different.
+  # Nothing to do here.
+
+  # Abundance Problems: We are, however, missing some columns.
+  # The cols to add are non-trivial!
+  # We will have to trust that the different IDs AND
+  # the orders they appear in are correct!
+
+  MissingFromIntervention <- setdiff(PoolBase$ID, PoolIntervention$ID)
+  MissingFromBase <- setdiff(PoolBase$ID, PoolIntervention$ID)
+
+  if (length(MissingFromIntervention)) {
+    # Need to add columns, in the right places!, to Intervention Abundance.
+  }
+
+  # Event Problems: Differences in species in pool isn't a problem for events.
+  # Nothing to do here.
+
+
+  nSpecies <- length(union(PoolBase, PoolIntervention))
+} else {
+  nSpecies <- nrow(PoolBase) # Should be the same as PoolIntervention.
+}
 
 stopifnot(nSpecies == floor(nSpecies),
           nSpecies == ceiling(nSpecies),
