@@ -19,9 +19,10 @@ bootstrapSeed <-
   # 56901098 # Used for 2023-09-23
   # 83418616 # Used for 2023-09-24
   12854863 # Used for 2023-09-25
+  # 99701559 # Used for Hik6_2023-03-04, 56-6
 
 calculationsPlotLong <- FALSE
-logarithmicTimeScale <- FALSE
+logarithmicTimeScale <- TRUE
 # Libraries: ##################################################################
 library(dplyr)
 library(tidyr)
@@ -38,6 +39,8 @@ library(doParallel)
 library(foreach)
 library(doRNG)
 
+library(vegan) # vegdist
+
 library(betapart)
 library(car)
 library(lme4)
@@ -47,10 +50,50 @@ doParallel::registerDoParallel(clust)
 
 # Files: ######################################################################
 directory <- '.' # Mutualism folder.
-file_result <- "MNA-ExampleExtProp-Result-Env10-Ring-0-1-1-ExtProp1.RData"
-file_pool <- "MNA-ExampleOutcome-PoolMats-Env10.RData"
+file_result <-
+  #"MNA-Hik6A-Cases-Prepared-1-56-6-1.RData"
+  "MNA-ExampleExtProp-Result-Env10-Ring-5-1-1-ExtProp1.RData"
+file_result2 <- NULL # "MNA-Hik6A-Cases-Prepared-1-56-6-2.RData"
+file_pool <-
+  #"MNA-Hik6A-Cases-Prepared.RData"
+  "MNA-ExampleOutcome-PoolMats-Env10.RData"
 load(file.path(directory, "Data_2023-09-25", file_result))
 load(file.path(directory, "Data_2023-09-25", file_pool))
+
+if (!is.null(file_result2)) {
+  results1 <- results
+  load(file.path(directory, "Data_Hik6_2023-03-04", file_result2))
+
+  EntriesToCheck <- !names(results) %in% c("Events", "Abundance")
+
+  stopifnot(isTRUE(all.equal(results[EntriesToCheck],
+                             results1[EntriesToCheck])))
+
+  results1$Abundance <- results1$Abundance[
+    results1$Abundance[, 1] < min(results$Abundance[, 1]),
+  ]
+
+  results$Events <- rbind(results1$Events, results$Events)
+  results$Events <- results$Events %>% dplyr::distinct()
+  results$Abundance <- rbind(results1$Abundance, results$Abundance)
+
+  result <- results # Note the "s", there was a change in formatting!
+
+  rm(results1)
+  rm(results)
+}
+
+if (exists("pools") && !exists("Pool")) {
+  IDNumbers <- sub(file_result, pattern = ".RData", replacement = "")
+  IDNumbers <- strsplit(IDNumbers, split = "-", fixed = TRUE)[[1]]
+  IDNumbers <- IDNumbers[(which(IDNumbers == "Prepared") + 1):length(IDNumbers)]
+  IDNumbers <- as.numeric(IDNumbers)
+  Pool <- pools[[cases$Parameters[IDNumbers[2]]]][[cases$System[IDNumbers[2]]]]
+  # Why 2? 1 == File / Main Case, 2 == row of cases (derived from row of CSV)
+  # 3 == The seeds used, 4 == which part of the simulation was saved.
+  # Note 3 and 4 are optional if all simulations of a row were saved together.
+}
+
 # Make sure we clear out any extinct abundances:
 result$Abundance[, -1] <- ifelse(
   result$Abundance[, -1] < result$Parameters$EliminationThreshold,
@@ -108,6 +151,30 @@ lastTimeSampleable <- result$Events$Times[length(result$Events$Times)]
 lastTimeSampleable <- lastTimeSampleable - interventionGap * 2
 firstTimeSampleable <- 1000 # to make sure we're past the simulation burnin.
 
+if(logarithmicTimeScale) {
+  #timediffs <- exp(seq(from = -log(interventionGap/samplingGap),
+  #                 to = log(interventionGap/samplingGap),
+  #                 length.out = round(interventionGap/samplingGap)))
+  #timediffs <- exp(seq(from = -log(interventionGap),
+  #                     to = log(interventionGap),
+  #                     length.out = round(interventionGap/samplingGap)))
+  # This version is symmetric on the log scale, centred on the sampling gap,
+  # and ends at the intervention gap. Number of sampling times not guaranteed.
+  timediffs <- unique(exp(c(
+    seq(from = -log(interventionGap),
+        to = log(samplingGap),
+        length.out = floor(interventionGap/samplingGap/2)),
+    seq(from = log(samplingGap),
+        to = log(interventionGap),
+        length.out = ceiling(interventionGap/samplingGap/2))
+  )))
+  timediffs <- timediffs[timediffs > min(diff(result$Abundance[, 1]))]
+} else {
+  timediffs <- seq(from = samplingGap,
+                   by = samplingGap,
+                   to = interventionGap)
+}
+
 # The Bootstraps: #############################################################
 bootstrapSamples <- foreach::foreach(
   bootstrapID = 1:bootstraps,
@@ -128,29 +195,6 @@ bootstrapSamples <- foreach::foreach(
   ) # When the researchers can arrive, presume steady-state.
   intervention <- burnin + interventionGap # When land use change "occurs".
   # print(paste(bootstrapID, ":", toString(intervention)))
-
-  if(logarithmicTimeScale) {
-    #timediffs <- exp(seq(from = -log(interventionGap/samplingGap),
-    #                 to = log(interventionGap/samplingGap),
-    #                 length.out = round(interventionGap/samplingGap)))
-    #timediffs <- exp(seq(from = -log(interventionGap),
-    #                     to = log(interventionGap),
-    #                     length.out = round(interventionGap/samplingGap)))
-    # This version is symmetric on the log scale, centred on the sampling gap,
-    # and ends at the intervention gap. Number of sampling times not guaranteed.
-    timediffs <- unique(exp(c(
-                     seq(from = -log(interventionGap),
-                         to = log(samplingGap),
-                         length.out = floor(interventionGap/samplingGap/2)),
-                     seq(from = log(samplingGap),
-                         to = log(interventionGap),
-                         length.out = ceiling(interventionGap/samplingGap/2))  
-                         )))
-  } else {
-    timediffs <- seq(from = samplingGap,
-                        by = samplingGap,
-                        to = interventionGap)
-  }
 
   # Time Series:
   # The premise is that the Time Series researcher is only looking at the
@@ -228,7 +272,8 @@ plot_0_Richness <- ggplot2::ggplot(
       strsplit(SamplingNonZeroSpecies, split = ", ", fixed = TRUE), length
     ))
   ),
-  ggplot2::aes(x = Time/result$ReactionTime, y = TrueRichness, color = Patch, group = Patch)
+  ggplot2::aes(x = Time/result$ReactionTime, y = TrueRichness,
+               color = Patch, group = Patch)
 ) + ggplot2::geom_line(
 ) + ggplot2::geom_line(
   ggplot2::aes(y = SamplingAlpha * 3),
@@ -252,7 +297,8 @@ plot_0_Richness <- ggplot2::ggplot(
 
 plot_0_Abundance <- ggplot2::ggplot(
   bootstrapSamples,
-  ggplot2::aes(x = Time/result$ReactionTime, y = SamplingAbundance, color = Patch, group = Patch)
+  ggplot2::aes(x = Time/result$ReactionTime, y = SamplingAbundance,
+               color = Patch, group = Patch)
 ) + ggplot2::geom_line(
 ) + ggplot2::geom_line(
   ggplot2::aes(y = SamplingObserved * 100),
@@ -368,3 +414,26 @@ plot_0_AbundanceGeoAvg <- speciesAbundanceStats %>% ggplot2::ggplot(
 #
 # plot_0_Consumers <-
 
+plot_0_JaccardTrue <- bootstrapSamples %>% dplyr::filter(
+  Type == "Space for time", TimeSinceStart == 0
+) %>% dplyr::group_by(
+  Bootstrap, Time
+) %>% dplyr::group_modify(
+  .f = SpeciesStringsToBeta
+) %>% dplyr::group_by(
+  Bootstrap, Time
+) %>% dplyr::summarise(
+  ymin = quantile(Jaccard, probs = 0.95),
+  ymax = quantile(Jaccard, probs = 0.05),
+  Jaccard = quantile(Jaccard, probs = 0.50)
+) %>% ggplot2::ggplot(
+  ggplot2::aes(x = Time/result$ReactionTime,
+               y = Jaccard, ymin = ymin, ymax = ymax)
+) + ggplot2::geom_ribbon(
+  alpha = 0.25
+) + ggplot2::geom_line(
+) + ggplot2::labs(
+  x = "Time (Units: Characteristic Times)",
+  y = "True Jaccard Dissimilarity (Presence/Absence)",
+  caption = "Inner 90% Interval and Median, Evaluated Only at (False) Disturbance Time"
+) + ggplot2::theme_bw() + ggplot2::geom_rug(sides = "b")
