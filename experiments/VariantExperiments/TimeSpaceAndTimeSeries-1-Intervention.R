@@ -247,8 +247,16 @@ samplingFailureRate <- 0.1
 samplingPerAbundance <- 1/100
 # We'll take a sampling period to be instantaneous.
 
-lastTimeSampleable <- result$Events$Times[length(result$Events$Times)]
+lastTimeSampleable <- resultBase$Events$Times[
+  length(resultBase$Events$Times)
+  ]
 lastTimeSampleable <- lastTimeSampleable - interventionGap * 2
+
+lastTimeSampleableAlternate <- resultIntervention$Events$Times[
+  length(resultIntervention$Events$Times)
+  ]
+lastTimeSampleableAlternate <- lastTimeSampleableAlternate - interventionGap * 2
+
 firstTimeSampleable <- 1000 # to make sure we're past the simulation burnin.
 
 # Enforce the first sampleable row for the intervention.
@@ -297,8 +305,22 @@ bootstrapSamples <- foreach::foreach(
   burnin <- runif(
     n = 1, min = firstTimeSampleable, max = lastTimeSampleable
   ) # When the researchers can arrive, presume steady-state.
-  interventionTime <- burnin + interventionGap # When land use change "occurs".
+  timeSwitch <- burnin + interventionGap # When land use change "occurs".
   # print(paste(bootstrapID, ":", toString(intervention)))
+
+  timeAlternate <- if (timeInterventionRandom) {
+    runif(
+      n = 1, min = firstTimeSampleable, max = lastTimeSampleableAlternate
+    )
+  } else {
+    timeSwitch
+  }
+
+  patchAlternate <- if(patchInterventionRandom) {
+    sample(resultIntervention$NumEnvironments)
+  } else {
+    1:resultBase$NumEnvironments
+  }
 
   # Time Series:
   # The premise is that the Time Series researcher is only looking at the
@@ -307,11 +329,14 @@ bootstrapSamples <- foreach::foreach(
   # They'd be interested in trying to estimate the regional pool / diversity,
   # as well as local diversity and inter-patch diversity.
   sampling_TimeSeries <- data.frame(expand.grid(
-    Time = unique(c(interventionTime - timediffs,
-                    interventionTime + timediffs)),
+    TimeBase = unique(c(timeSwitch - timediffs,
+                        timeSwitch + timediffs)),
     Patch = experiment,
     Type = "Time series"
-  )) %>% dplyr::arrange(Time)
+  )) %>% dplyr::arrange(Time) %>% dplyr::mutate(
+    TimeIntervention = TimeBase - timeSwitch + timeAlternate,
+    PatchIntervention = patchAlternate[Patch]
+  )
 
   # Space for Time:
   # The premise is that the Space for Time researcher is looking between the
@@ -323,36 +348,31 @@ bootstrapSamples <- foreach::foreach(
     Time = interventionTime + timediffs,
     Patch = c(control, experiment),
     Type = "Space for time"
-  ))
-
-  sampling_SpaceForTime <- sampleFromResults(
-    sampling = sampling_SpaceForTime,
-    baseAbundance = resultBase$Abundance,
-    interventionAbundance = resultIntervention$Abundance[
-      interventionFirstRowSampleable,
-      ],
-    control = control,
-    interventionTime = interventionTime,
-    nSpecies = nSpecies,
-    samplingPerAbundance = samplingPerAbundance,
-    samplingFailureRate = samplingFailureRate,
-    timeInterventionRandom = timeInterventionRandom,
-    patchInterventionRandom = patchInterventionRandom
+  )) %>% dplyr::arrange(Time) %>% dplyr::mutate(
+    TimeIntervention = TimeBase - timeSwitch + timeAlternate,
+    PatchIntervention = patchAlternate[Patch]
   )
 
-  sampling_TimeSeries <- sampleFromResults(
+  sampling_SpaceForTime <- sampleFromResultsIntervention(
+    sampling = sampling_SpaceForTime,
+    baseAbundance = resultBase$Abundance,
+    interventionAbundance = resultIntervention$Abundance,
+    control = control,
+    interventionTime = timeSwitch,
+    nSpecies = nSpecies,
+    samplingPerAbundance = samplingPerAbundance,
+    samplingFailureRate = samplingFailureRate
+  )
+
+  sampling_TimeSeries <- sampleFromResultsIntervention(
     sampling = sampling_TimeSeries,
     baseAbundance = resultBase$Abundance,
-    interventionAbundance = resultIntervention$Abundance[
-      interventionFirstRowSampleable,
-      ],
+    interventionAbundance = resultIntervention$Abundance,
     control = control,
     interventionTime = interventionTime,
     nSpecies = nSpecies,
     samplingPerAbundance = samplingPerAbundance,
-    samplingFailureRate = samplingFailureRate,
-    timeInterventionRandom = timeInterventionRandom,
-    patchInterventionRandom = patchInterventionRandom
+    samplingFailureRate = samplingFailureRate
   )
 
   sampling_SpaceForTime <- computeSpeciesInControl(sampling_SpaceForTime)

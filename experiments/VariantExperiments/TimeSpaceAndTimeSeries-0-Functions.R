@@ -134,24 +134,11 @@ sampleFromResultsIntervention <- function(
   interventionTime, # Intervention Time Period
   nSpecies, # Number of species
   samplingPerAbundance, # Convert from Abundance to sample-able individuals.
-  samplingFailureRate, # Pr(Researcher Doesn't See Sample),
-  timeInterventionRandom, # Pick a random new time?
-  patchInterventionRandom # Pick a random set of patches?
+  samplingFailureRate # Pr(Researcher Doesn't See Sample)
 ) {
   # ASSUME:
   #  The intervention abundance and the result abundance are the same format
   #  with respect to the number of species (i.e. within environment columns.).
-
-  interventionTimeAlternate <- if(timeInterventionRandom) {
-    diff(range(sampling$Time
-  }
-
-  interventionPatchCorrespondence <- if(patchInterventionRandom) {
-    sample((ncol(interventionAbundance) - 1) / nSpecies)
-  } else {
-    sort(unique(sampling$Patch))
-  }
-
 
   # sampling <-
   sampling %>% dplyr::mutate(
@@ -165,15 +152,13 @@ sampleFromResultsIntervention <- function(
     # Retrieve values to begin sampling:
 
     # Location in resultAbundance (note: which.max finds first time after.)
-    TimeActualRow = which.max(baseAbundance[, 1] > Time) - 1,
+    TimeActualRow = which.max(baseAbundance[, 1] > TimeBase) - 1,
     TimeActual = baseAbundance[TimeActualRow, 1], # First res.Time > Time
-    TimeAlternateRow = ifelse(
-      timeInterventionRandom, interventionTimeAlternate,
-      which.max(interventionAbundance[, 1] > Time) - 1),
+    TimeAlternateRow = which.max(baseAbundance[, 1] > TimeIntervention) - 1,
     TimeAlternate = interventionAbundance[TimeAlternateRow, 1]
   ) %>% dplyr::group_by(
     # dplyr::rowwise doesn't work with group_modify (issue 6870 on github)
-    Time, Patch
+    TimeBase, Patch
   ) %>% dplyr::group_modify(
     .f = function(x, y) {
       if (y$Control == "Control") {
@@ -191,7 +176,19 @@ sampleFromResultsIntervention <- function(
           SamplingNonZeroAbundances = toString(nonzero(temp))
         ))
       } else {
+        temp <- interventionAbundance[
+          x$TimeAlternateRow, # First Col. = Time
+          1 + nSpecies * (x$PatchIntervention - 1) + 1:nSpecies
+        ]
 
+        return(x %>% dplyr::mutate(
+          # Abundances to know number of events:
+          SamplingAbundance = sum(temp),
+
+          # Identities and Species Weights:
+          SamplingNonZeroSpecies = toString(which(temp > 0)),
+          SamplingNonZeroAbundances = toString(nonzero(temp))
+        ))
       }
     }
   ) %>% dplyr::ungroup(
@@ -202,7 +199,7 @@ sampleFromResultsIntervention <- function(
                               size = SamplingEvents,
                               prob = 1 - samplingFailureRate)
   ) %>% dplyr::group_by(
-    Time, Patch
+    TimeBase, Patch
   ) %>% dplyr::group_modify(
     .f = function(x, y) {
       if (x$SamplingObserved) {
