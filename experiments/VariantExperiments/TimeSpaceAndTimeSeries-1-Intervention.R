@@ -7,12 +7,13 @@
 # bootstrap.
 # > runif(1) * 1e8
 # [1] 97870743
-bootstraps <- 100
-bootstrapSeed <-97870743
+bootstraps <- 10
+bootstrapSeed <-
+  97870743 # used for 2023-09-25 -> Hik6_2023-03-04, 56-6
 
 calculationsPlotLong <- FALSE
 logarithmicTimeScale <- TRUE
-relabelPoolIntervention <- FALSE
+relabelPoolIntervention <- TRUE
 timeInterventionRandom <- FALSE
 patchInterventionRandom <- FALSE
 # Libraries: ##################################################################
@@ -46,10 +47,10 @@ doParallel::registerDoParallel(clust)
 # Files: ######################################################################
 
 # Base
-fileBaseFolder <- "Data_Hik6_2023-03-04"
-fileBaseResult <- "MNA-Hik6A-Cases-Prepared-1-56-6-1.RData"
-fileBaseResult2 <- "MNA-Hik6A-Cases-Prepared-1-56-6-2.RData"
-fileBasePool <- "MNA-Hik6A-Cases-Prepared.RData"
+fileBaseFolder <- "Data_2023-09-25"
+fileBaseResult <- "MNA-ExampleExtProp-Result-Env10-Ring-5-1-1-ExtProp1.RData"
+fileBaseResult2 <- NULL
+fileBasePool <- "MNA-ExampleOutcome-PoolMats-Env10.RData"
 
 # Intervention
 fileInterventionFolder <- "Data_Hik6_2023-03-04"
@@ -399,206 +400,3 @@ parallel::stopCluster(clust)
 
 # Plotting: ###################################################################
 ### Plot 0: Sense Checking: ###################################################
-# Richness Comparison
-plot_0_Richness <- ggplot2::ggplot(
-  bootstrapSamples %>% dplyr::mutate(
-    TrueRichness = unlist(lapply(
-      strsplit(SamplingNonZeroSpecies, split = ", ", fixed = TRUE), length
-    ))
-  ),
-  ggplot2::aes(x = Time/result$ReactionTime, y = TrueRichness, color = Patch, group = Patch)
-) + ggplot2::geom_line(
-) + ggplot2::geom_line(
-  ggplot2::aes(y = SamplingAlpha * 3),
-  alpha = 0.25,
-  linetype = 2
-) + ggplot2::scale_y_continuous(
-  sec.axis = ggplot2::sec_axis(~ . / 3, name = "Richness Observed")
-) + ggplot2::facet_wrap(
-  . ~ Patch
-) + ggplot2::labs(
-  x = "Time (Units: Characteristic Times)",
-  y = "True Richness"
-)
-
-# But correlation remains low? (but significant) (For file 5-1-1)
-# with(bootstrapSamples %>% dplyr::mutate(
-#   TrueRichness = unlist(lapply(
-#     strsplit(SamplingNonZeroSpecies, split = ", ", fixed = TRUE), length
-#   ))
-# ), cor.test(TrueRichness, SamplingAlpha))
-
-plot_0_Abundance <- ggplot2::ggplot(
-  bootstrapSamples,
-  ggplot2::aes(x = Time/result$ReactionTime, y = SamplingAbundance,
-               color = Patch, group = Patch)
-) + ggplot2::geom_line(
-) + ggplot2::geom_line(
-  ggplot2::aes(y = SamplingObserved * 100),
-  alpha = 0.25,
-  linetype = 2
-) + ggplot2::scale_y_continuous(
-  name = "True Total Abundance",
-  sec.axis = ggplot2::sec_axis(~ . / 100, name = "Abundance Observed")
-) + ggplot2::facet_wrap(. ~ Patch
-) + ggplot2::labs(
-  x = "Time (Units: Characteristic Times)"
-)
-
-# Abundance is (unsurprisingly) much more correlated. (For file 5-1-1)
-# with(bootstrapSamples, cor.test(SamplingAbundance, SamplingObserved))
-
-if (calculationsPlotLong) {
-  plot_0_AbundanceSpecies <- lapply(
-    1:result$NumEnvironments,
-    function(i) RMTRCode2::LawMorton1996_PlotAbundance(
-      result$Abundance[
-        result$Abundance[, 1] > min(bootstrapSamples$Time) &
-          result$Abundance[, 1] < max(bootstrapSamples$Time)
-        , c(1, (i-1) * 200 + 1:200 + 1)], guides = FALSE
-    ) + ggplot2::scale_y_log10()
-  ) %>% patchwork::wrap_plots()
-}
-
-# bootstrapSamplesOccupancy <- bootstrapSamples %>% dplyr::group_by(
-#   Bootstrap, Time, Type, Control, TimeActualRow, TimeActual, TimeSinceStart
-# ) %>% dplyr::group_map(
-#   function(x, y) {
-#     # Per Bootstrap, Time, Patch Set (Control/Experiment)
-#     # We are reproducing our Figure 3a in principle.
-#     # Note that that would mean No. of Bootstrap plots!
-#     # It doesn't make sense to average these on a per species basis.
-#     # It might make sense, however, to average on the dominant niche
-#     # (according to the pool) though.
-#     # How do we minimise the number of plots? We can reduce to 100 + 2
-#     # by having Fig 3a equivalent have nowhere present as NA, and present
-#     # as -5 : 5 (all Control : all Experiment) and the 2 as richness plots.
-#
-#     # Second thoughts: maybe we only need the true occupancy.
-#
-#     TruePresent <- unique(unlist(
-#       strsplit(x$SamplingNonZeroSpecies, split = ", ")
-#       ))
-#
-#   }
-# )
-
-plot_0_OccupancyTrue <- (
-  speciesAbundances <- RMTRCode2::Calculate_Species(
-    result
-  )
-) %>% dplyr::group_by(
-  Time, Species
-) %>% dplyr::summarise(
-  Count = dplyr::n()
-) %>% dplyr::left_join(
-  Pool %>% dplyr::arrange(Size) %>% dplyr::mutate(SizeID = 1:nrow(Pool)),
-  by = c("Species" = "ID")
-) %>% ggplot2::ggplot(
-  ggplot2::aes(x = Time/result$ReactionTime, y = SizeID, color = Count)
-) + ggplot2::geom_point(
-  shape = '.'
-) + ggplot2::scale_color_viridis_c(
-  direction = -1, limits = c(1, 10)
-) + ggplot2::geom_hline(
-  yintercept = nrow(Pool %>% dplyr::filter(Type == Type[1])) + 0.5,
-  color = "red"
-) + ggplot2::labs(
-  x = "Time (Units: Characteristic Times)",
-  y = "Species by Size"
-) + ggplot2::theme_bw()
-
-
-(speciesAbundanceStats <- speciesAbundances %>% dplyr::group_by(
-  Time, Species
-) %>% dplyr::summarise(
-  Count = dplyr::n(),
-  AvgAbundance = mean(Abundance),
-  AvgLogAbundance = mean(log(Abundance))
-))
-
-plot_0_AbundanceAvg <- speciesAbundanceStats %>% ggplot2::ggplot(
-  ggplot2::aes(x = Time/result$ReactionTime, y = AvgAbundance,
-               color = as.character(Species), group = Species)
-) + ggplot2::geom_line(
-) + ggplot2::labs(
-  x = "Time (Units: Characteristic Times)",
-  y = "Average Abundance"
-) + ggplot2::facet_wrap(
-  . ~ Count
-) + ggplot2::theme_bw() + ggplot2::scale_y_log10(
-) + ggplot2::guides(color = "none")
-
-plot_0_AbundanceGeoAvg <- speciesAbundanceStats %>% ggplot2::ggplot(
-  ggplot2::aes(x = Time/result$ReactionTime, y = exp(AvgLogAbundance),
-               color = as.character(Species), group = Species)
-) + ggplot2::geom_line(
-) + ggplot2::labs(
-  x = "Time (Units: Characteristic Times)",
-  y = "Average Abundance (Geometric)"
-) + ggplot2::facet_wrap(
-  . ~ Count
-) + ggplot2::theme_bw() + ggplot2::scale_y_log10(
-) + ggplot2::guides(color = "none")
-
-
-# Still need to do Observed Species Abundances, consumer richness,
-# basal richness, and to add correlations to the plots.
-#
-# plot_0_Consumers <-
-
-plot_0_JaccardTrue <- bootstrapSamples %>% dplyr::filter(
-  Type == "Space for time", TimeSinceStart == 0
-) %>% dplyr::group_by(
-  Bootstrap, Time
-) %>% dplyr::group_modify(
-  .f = function(.x, .y) {
-    stopifnot(length(.x$Patch) == length(unique(.x$Patch)))
-
-    uniqueSpecies <- sort(unique(unlist(strsplit(
-      .x$SamplingNonZeroSpecies,
-      split = ", "))))
-
-    comdatmat <- matrix(0,
-                        nrow = length(.x$Patch),
-                        ncol = length(uniqueSpecies))
-    colnames(comdatmat) <- uniqueSpecies
-    rownames(comdatmat) <- .x$Patch
-
-    for(i in seq_along(.x$Patch)) {
-      # print(strsplit(.x$SamplingNonZeroSpecies[i], split = ", ")[[1]])
-      # print(strsplit(.x$SamplingNonZeroAbundances[i], split = ", ")[[1]])
-
-      comdatmat[.x$Patch[i],
-                strsplit(.x$SamplingNonZeroSpecies[i], split = ", ")[[1]]] <-
-        as.numeric(strsplit(.x$SamplingNonZeroAbundances[i], split = ", ")[[1]])
-    }
-
-    Jacs <- vegan::vegdist(method = "jaccard", x = comdatmat > 0)
-
-    data.frame(
-      Jaccard = Jacs[1:length(Jacs)],
-      Patch1 = rep(attr(Jacs, "Labels"), (length(attr(Jacs, "Labels"))-1):0),
-      Patch2 = attr(Jacs, "Labels")[
-        sequence(from = seq_along(attr(Jacs, "Labels"))[-1],
-                 nvec = (length(attr(Jacs, "Labels")) - 1):1)
-        ]
-    )
-  }
-) %>% dplyr::group_by(
-  Bootstrap, Time
-) %>% dplyr::summarise(
-  ymin = quantile(Jaccard, probs = 0.95),
-  ymax = quantile(Jaccard, probs = 0.05),
-  Jaccard = quantile(Jaccard, probs = 0.50)
-) %>% ggplot2::ggplot(
-  ggplot2::aes(x = Time/result$ReactionTime,
-               y = Jaccard, ymin = ymin, ymax = ymax)
-) + ggplot2::geom_ribbon(
-  alpha = 0.25
-) + ggplot2::geom_line(
-) + ggplot2::labs(
-  x = "Time (Units: Characteristic Times)",
-  y = "True Jaccard Dissimilarity (Presence/Absence)",
-  caption = "Inner 90% Interval and Median, Evaluated Only at (False) Disturbance Time"
-) + ggplot2::theme_bw() + ggplot2::geom_rug(sides = "b")
