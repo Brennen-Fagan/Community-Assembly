@@ -177,6 +177,9 @@ if (relabelPoolIntervention) {
 } else if (
   length(setdiff(PoolBase$ID, PoolIntervention$ID)) > 0 ||
   length(setdiff(PoolIntervention$ID, PoolBase$ID)) > 0 ) {
+  stop(
+    "relabelPoolIntervention == FALSE but different Pool IDs not implemented"
+  )
   # Pool Problems: We're not relabeling, but one pool is obv. different.
   # Nothing to do here.
 
@@ -190,6 +193,7 @@ if (relabelPoolIntervention) {
 
   if (length(MissingFromIntervention)) {
     # Need to add columns, in the right places!, to Intervention Abundance.
+
   }
 
   # Event Problems: Differences in species in pool isn't a problem for events.
@@ -247,6 +251,10 @@ lastTimeSampleable <- result$Events$Times[length(result$Events$Times)]
 lastTimeSampleable <- lastTimeSampleable - interventionGap * 2
 firstTimeSampleable <- 1000 # to make sure we're past the simulation burnin.
 
+# Enforce the first sampleable row for the intervention.
+interventionFirstRowSampleable <-
+  which.max(resultIntervention$Abundance[, 1] > firstTimeSampleable)
+
 if(logarithmicTimeScale) {
   #timediffs <- exp(seq(from = -log(interventionGap/samplingGap),
   #                 to = log(interventionGap/samplingGap),
@@ -289,7 +297,7 @@ bootstrapSamples <- foreach::foreach(
   burnin <- runif(
     n = 1, min = firstTimeSampleable, max = lastTimeSampleable
   ) # When the researchers can arrive, presume steady-state.
-  intervention <- burnin + interventionGap # When land use change "occurs".
+  interventionTime <- burnin + interventionGap # When land use change "occurs".
   # print(paste(bootstrapID, ":", toString(intervention)))
 
   # Time Series:
@@ -299,8 +307,8 @@ bootstrapSamples <- foreach::foreach(
   # They'd be interested in trying to estimate the regional pool / diversity,
   # as well as local diversity and inter-patch diversity.
   sampling_TimeSeries <- data.frame(expand.grid(
-    Time = unique(c(intervention - timediffs,
-                    intervention + timediffs)),
+    Time = unique(c(interventionTime - timediffs,
+                    interventionTime + timediffs)),
     Patch = experiment,
     Type = "Time series"
   )) %>% dplyr::arrange(Time)
@@ -312,29 +320,39 @@ bootstrapSamples <- foreach::foreach(
   # They'd also be interested in estimating the regional pool / diversity,
   # as well as local diversity and inter-patch diversity.
   sampling_SpaceForTime <- data.frame(expand.grid(
-    Time = intervention + timediffs,
+    Time = interventionTime + timediffs,
     Patch = c(control, experiment),
     Type = "Space for time"
   ))
 
   sampling_SpaceForTime <- sampleFromResults(
     sampling = sampling_SpaceForTime,
-    resultAbundance = result$Abundance,
+    baseAbundance = resultBase$Abundance,
+    interventionAbundance = resultIntervention$Abundance[
+      interventionFirstRowSampleable,
+      ],
     control = control,
-    intervention = intervention,
+    interventionTime = interventionTime,
     nSpecies = nSpecies,
     samplingPerAbundance = samplingPerAbundance,
-    samplingFailureRate = samplingFailureRate
+    samplingFailureRate = samplingFailureRate,
+    timeInterventionRandom = timeInterventionRandom,
+    patchInterventionRandom = patchInterventionRandom
   )
 
   sampling_TimeSeries <- sampleFromResults(
     sampling = sampling_TimeSeries,
-    resultAbundance = result$Abundance,
+    baseAbundance = resultBase$Abundance,
+    interventionAbundance = resultIntervention$Abundance[
+      interventionFirstRowSampleable,
+      ],
     control = control,
-    intervention = intervention,
+    interventionTime = interventionTime,
     nSpecies = nSpecies,
     samplingPerAbundance = samplingPerAbundance,
-    samplingFailureRate = samplingFailureRate
+    samplingFailureRate = samplingFailureRate,
+    timeInterventionRandom = timeInterventionRandom,
+    patchInterventionRandom = patchInterventionRandom
   )
 
   sampling_SpaceForTime <- computeSpeciesInControl(sampling_SpaceForTime)
