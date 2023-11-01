@@ -4,6 +4,45 @@ nonzero <- function(vec) {
   vec[vec!=0]
 }
 
+loadSimulation <- function(filepath1, filepath2 = NULL) {
+  file1 <- load(filepath1)
+  if (length(file1) > 1) {
+    warning("filepath1 has more than one object. Defaulting to first.")
+  }
+  file1 <- get(file1[1])
+
+  EntriesRequired <- c("Events", "Abundance")
+  if (any(! EntriesRequired %in% names(file1))) {
+    error("Events or Abundance not found in filepath1 object 1.")
+  }
+
+  if (!is.null(filepath2)) {
+    file2 <- load(filepath2)
+    if (length(file2) > 1) {
+      warning("filepath2 has more than one object. Defaulting to first.")
+    }
+    file2 <- get(file2[1])
+    if (any(! EntriesRequired %in% names(file2))) {
+      error("Events or Abundance not found in filepath2 object 1.")
+    }
+
+    EntriesToCheck <- !names(file2) %in% c("Events", "Abundance")
+
+    stopifnot(isTRUE(all.equal(file1[EntriesToCheck],
+                               file2[EntriesToCheck])))
+
+    file1$Abundance <- file1$Abundance[
+      file1$Abundance[, 1] < min(file2$Abundance[, 1]),
+      ]
+
+    file1$Events <- rbind(file1$Events, file2$Events)
+    file1$Events <- file1$Events %>% dplyr::distinct()
+    file1$Abundance <- rbind(file1$Abundance, file2$Abundance)
+  }
+
+  return(file1)
+}
+
 sampleFromResults <- function(
   resultAbundance,
   sampling, # Time and Patch to take sample from (with Type for IDing).
@@ -118,6 +157,107 @@ computeSpeciesInControl <- function(sampling) {
       )
     }
   )
+}
+
+addDistanceColumns <- function(bootstrapSamples, mindig = 1) {
+  bootstrapSamples %>% dplyr::mutate(
+    ##### Temporal Distance: ####################################################
+    TimeSinceStart = round(# Rare 1 != 1 issue.
+      TimeSinceStart,
+      digits = mindig
+    )
+    ) %>% dplyr::group_by(
+      Type, Control, Bootstrap, Patch
+    ) %>% dplyr::arrange(
+      TimeSinceStart
+    ) %>% dplyr::mutate(
+      TimeGapNumber = seq_along(TimeSinceStart),
+      TimeGapNumber = ifelse(
+        Type == "Time series" & Control == "Control",
+        rev(TimeGapNumber), TimeGapNumber
+      ) # i.e.  5, 4, 3, 2, 1, ___, 1, 2, 3, 4, 5
+    ) %>% dplyr::ungroup(
+      ##### Spatial Distance: #####################################################
+    ) %>% dplyr::group_by(
+      Type, Control, Bootstrap, TimeSinceStart
+    ) %>% dplyr::mutate(
+      DistanceFromCenter = dplyr::case_when(
+        min(Patch) == 1 & max(Patch) == 10 ~ {
+          ifelse(Patch < 5, Patch + 10, Patch) - median(
+            ifelse(Patch < 5, Patch + 10, Patch)
+          )
+        },
+        TRUE ~ Patch - median(Patch)
+      ),
+      DistanceFromCenterExpRev = ifelse(Control == "Experiment" &
+                                          Type == "Space for time",
+                                        -DistanceFromCenter,
+                                        DistanceFromCenter)
+    ) %>% dplyr::ungroup(
+      ##### Define control species: ###############################################
+    ) %>% dplyr::group_by(
+      DistanceFromCenterExpRev, Bootstrap, TimeGapNumber, Type
+    ) %>% dplyr::group_modify(
+      .f = ~ computeSpeciesInControl(.x)
+    ) %>% dplyr::ungroup(
+    )
+}
+
+SpeciesStringsToBeta <- function(
+  .x, .y,
+  SpeciesColumn = "SamplingNonZeroSpecies",
+  AbundanceColumn = "SamplingNonZeroAbundances",
+  Method = "Jaccard",
+  PresenceAbsence = TRUE
+) {
+  stopifnot(length(.x$Patch) == length(unique(.x$Patch)))
+
+  .x$Patch <- as.character(.x$Patch)
+
+  flagMeaningless <- .x$Patch[.x[[AbundanceColumn]] == ""]
+
+  uniqueSpecies <- sort(unique(unlist(strsplit(
+    .x[[SpeciesColumn]],
+    split = ", "))))
+
+  comdatmat <- matrix(0,
+                      nrow = length(.x$Patch),
+                      ncol = length(uniqueSpecies))
+  colnames(comdatmat) <- uniqueSpecies
+  rownames(comdatmat) <- .x$Patch
+
+  for(i in seq_along(.x$Patch)) {
+    # print(strsplit(.x$SamplingNonZeroSpecies[i], split = ", ")[[1]])
+    # print(strsplit(.x$SamplingNonZeroAbundances[i], split = ", ")[[1]])
+    if (SpeciesColumn == AbundanceColumn) {
+      # Abundance = Species => List of IDs with repetition for abundance.
+      vals <- table(strsplit(.x[[AbundanceColumn]][i], split = ", ")[[1]])
+      indices <- names(vals)
+    } else {
+      # Else, abundance in same order as species detected.
+      vals <- as.numeric(strsplit(.x[[AbundanceColumn]][i], split = ", ")[[1]])
+      indices <- strsplit(.x[[SpeciesColumn]][i], split = ", ")[[1]]
+    }
+
+    comdatmat[.x$Patch[i], indices] <- vals
+
+  }
+
+  if (PresenceAbsence) comdatmat <- comdatmat > 0
+
+  Jacs <- vegan::vegdist(method = tolower(Method), x = comdatmat)
+
+  data.frame(
+    Jaccard = Jacs[1:length(Jacs)],
+    Patch1 = rep(attr(Jacs, "Labels"), (length(attr(Jacs, "Labels"))-1):0),
+    Patch2 = attr(Jacs, "Labels")[
+      sequence(from = seq_along(attr(Jacs, "Labels"))[-1],
+               nvec = (length(attr(Jacs, "Labels")) - 1):1)
+      ]
+  ) %>% dplyr::mutate(
+    Meaningless = Patch1 %in% flagMeaningless | Patch2 %in% flagMeaningless
+  )
+
 }
 
 # if (calculationsBII) {
