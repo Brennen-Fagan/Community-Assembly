@@ -135,39 +135,39 @@ if (relabelPoolIntervention) {
   #   then recombine the environments as before.
 
   # Note BASE first, then INTERVENTION
-  resultBase$Abundance <- dplyr::bind_cols(
+  resultBase$Abundance <- cbind(
     resultBase$Abundance[, 1], # Time Column
-    lapply(
+    do.call(cbind, lapply(
       1:resultBase$NumEnvironments,
       function(i, ab, nspec) {
         # Time Col. + Past Env. Cols + This Env.'s Cols
         temp <- ab[, 1 + (i - 1) * nspec + (1:nspec)]
 
-        return(dplyr::bind_cols(
+        return(cbind(
           temp, matrix(0, nrow = nrow(temp), ncol = nrow(PoolIntervention))
         ))
       },
       ab = resultBase$Abundance,
       nspec = nrow(PoolBase)
-    )
+    ))
   )
 
   # Note reverse ordering!
-  resultIntervention$Abundance <- dplyr::bind_cols(
+  resultIntervention$Abundance <- cbind(
     resultIntervention$Abundance[, 1], # Time Column
-    lapply(
+    do.call(cbind, lapply(
       1:resultIntervention$NumEnvironments,
       function(i, ab, nspec) {
         # Time Col. + Past Env. Cols + This Env.'s Cols
         temp <- ab[, 1 + (i - 1) * nspec + (1:nspec)]
 
-        return(dplyr::bind_cols(
+        return(cbind(
           matrix(0, nrow = nrow(temp), ncol = nrow(PoolBase)), temp
         ))
       },
       ab = resultIntervention$Abundance,
       nspec = nrow(PoolIntervention)
-    )
+    ))
   )
 
   # Event Problems:
@@ -225,7 +225,8 @@ stopifnot(nSpecies == floor(nSpecies),
 #                        and length of monitoring.
 
 # Time after arrival that intervention takes place.
-interventionGap <- 100 * result$ReactionTime
+timeGapBase <- 100 * resultBase$ReactionTime
+timeGapIntervention <- 100 * resultIntervention$ReactionTime
 
 # What should our model of sampling be?
 # The typical one sounds like it is be in a place for a period of time,
@@ -235,7 +236,8 @@ interventionGap <- 100 * result$ReactionTime
 # difference in number of species for a single time point between C & E/D.
 # Susan and Jon agreed with In\^es above.
 # Set samplingGap to match interventionGap to make for only one time sample.
-samplingGap <- result$ReactionTime;
+samplingGapBase <- resultBase$ReactionTime;
+samplingGapIntervention <- resultIntervention$ReactionTime;
 
 # notate everything that you perceive
 samplingFailureRate <- 0.1
@@ -251,18 +253,22 @@ samplingPerAbundance <- 1/100
 lastTimeSampleable <- resultBase$Events$Times[
   length(resultBase$Events$Times)
   ]
-lastTimeSampleable <- lastTimeSampleable - interventionGap * 2
+lastTimeSampleable <-
+  lastTimeSampleable - timeGapBase * 2
 
 lastTimeSampleableAlternate <- resultIntervention$Events$Times[
   length(resultIntervention$Events$Times)
   ]
-lastTimeSampleableAlternate <- lastTimeSampleableAlternate - interventionGap * 2
+lastTimeSampleableAlternate <-
+  lastTimeSampleableAlternate - timeGapIntervention * 2
 
-firstTimeSampleable <- 1000 # to make sure we're past the simulation burnin.
+# to make sure we're past the simulation burnin.
+firstTimeSampleableBase <- 125 * resultBase$ReactionTime
+firstTimeSampleableIntervention <- 125 * resultIntervention$ReactionTime
 
 # Enforce the first sampleable row for the intervention.
 interventionFirstRowSampleable <-
-  which.max(resultIntervention$Abundance[, 1] > firstTimeSampleable)
+  which.max(resultIntervention$Abundance[, 1] > firstTimeSampleableIntervention)
 
 if(logarithmicTimeScale) {
   #timediffs <- exp(seq(from = -log(interventionGap/samplingGap),
@@ -281,7 +287,10 @@ if(logarithmicTimeScale) {
         to = log(interventionGap),
         length.out = ceiling(interventionGap/samplingGap/2))
   )))
-  timediffs <- timediffs[timediffs > min(diff(result$Abundance[, 1]))]
+  timediffs <- timediffs[timediffs > min(c(
+    diff(resultBase$Abundance[, 1]),
+    diff(resultIntervention$Abundance[, 1])
+    ))]
 } else {
   timediffs <- seq(from = samplingGap,
                    by = samplingGap,
