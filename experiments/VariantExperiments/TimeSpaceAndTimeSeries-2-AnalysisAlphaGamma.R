@@ -1,3 +1,5 @@
+preferredTimeGap <- which.max(timediffs >= result$ReactionTime*10)
+
 ### Alpha:#####################################################################
 # Note the order of operations is very relevant here.
 # We imagine that the researchers consider all samples across times to be
@@ -39,7 +41,9 @@ bootstrapSamplesDeltaAlpha <- bootstrapSamples %>% dplyr::group_by(
 )
 
 bootstrapSamplesPairedAlpha <- bootstrapSamples %>% dplyr::mutate(
-  TimeSinceStart = round(TimeSinceStart, digits = 1) # Rare 1 != 1 issue.
+  TimeSinceStart = round(# Rare 1 != 1 issue.
+    TimeSinceStart,
+    digits = ceiling(-log10(min(diff(result$Abundance[, 1])))))
 ) %>% dplyr::group_by(
   Type, Control, Bootstrap, Patch
 ) %>% dplyr::arrange(
@@ -103,7 +107,9 @@ bootstrapSamplesPairedAlpha <- bootstrapSamples %>% dplyr::mutate(
 )
 
 bootstrapSamplesTimedAlpha <- bootstrapSamples %>% dplyr::mutate(
-  TimeSinceStart = round(TimeSinceStart, digits = 1) # Rare 1 != 1 issue.
+  TimeSinceStart = round(# Rare 1 != 1 issue.
+    TimeSinceStart,
+    digits = ceiling(-log10(min(diff(result$Abundance[, 1])))))
 ) %>% dplyr::group_by(
   Type, Control, Bootstrap, Patch
 ) %>% dplyr::arrange(
@@ -113,7 +119,7 @@ bootstrapSamplesTimedAlpha <- bootstrapSamples %>% dplyr::mutate(
   TimeGapNumber = ifelse(
     Type == "Time series" & Control == "Control",
     rev(TimeGapNumber), TimeGapNumber
-  ) # i.e.  5, 4, 3, 2, 1, ___, 1, 2, 3, 4, 5
+  ), # i.e.  5, 4, 3, 2, 1, ___, 1, 2, 3, 4, 5
 ) %>% dplyr::ungroup(
 ) %>% dplyr::group_by(
   Bootstrap, TimeGapNumber, Type
@@ -196,6 +202,207 @@ bootstrapSamplesDeltaGamma <- bootstrapSamples %>% dplyr::group_by(
   values_to = "Difference of Number of Species across Patches"
 )
 
+### Beta: #####################################################################
+# Break into pairs across time and space that test the effect of temporal and
+# spatial distance.
+bootstrapSamplesPairedBeta <- bootstrapSamples %>% addDistanceColumns(
+  mindig = ceiling(-log10(min(diff(result$Abundance[, 1]))))
+) %>% dplyr::mutate(
+  Patch = ifelse(
+    Control == "Experiment",
+    paste0(Patch, "E"),
+    paste0(Patch, "C")
+  )
+)
+
+##### Perform Beta for all, control, !control: ################################
+# Note we want to do this twice:
+#    once for fixed patches and
+#    once for fixed times.
+
+bootstrapSamplesPairedBeta_all <-
+  bootstrapSamplesPairedBeta %>% dplyr::filter(
+    TimeGapNumber == preferredTimeGap
+  ) %>% dplyr::group_by(
+    DistanceFromCenterExpRev, Bootstrap, Type
+  ) %>% dplyr::group_modify(
+    .f = SpeciesStringsToBeta,
+    SpeciesColumn = "SamplingIDs",
+    AbundanceColumn = "SamplingIDs"
+  ) %>% dplyr::rename(
+    `Jaccard, All` = Jaccard,
+    `Meaningless, All` = Meaningless
+  )
+
+bootstrapSamplesPairedBeta_control <-
+  bootstrapSamplesPairedBeta %>% dplyr::filter(
+    TimeGapNumber == preferredTimeGap
+  ) %>% dplyr::group_by(
+    DistanceFromCenterExpRev, Bootstrap, Type
+  ) %>% dplyr::group_modify(
+    .f = SpeciesStringsToBeta,
+    SpeciesColumn = "SamplingIDsNative",
+    AbundanceColumn = "SamplingIDsNative"
+  ) %>% dplyr::rename(
+    `Jaccard, Det. In Control` = Jaccard,
+    `Meaningless, Det. In Control` = Meaningless
+  )
+
+bootstrapSamplesPairedBeta_notcontrol <-
+  bootstrapSamplesPairedBeta %>% dplyr::filter(
+    TimeGapNumber == preferredTimeGap
+  ) %>% dplyr::group_by(
+    DistanceFromCenterExpRev, Bootstrap, Type
+  ) %>% dplyr::group_modify(
+    .f = SpeciesStringsToBeta,
+    SpeciesColumn = "SamplingIDsInvasive",
+    AbundanceColumn = "SamplingIDsInvasive"
+  ) %>% dplyr::rename(
+    `Jaccard, Not Det. In Control` = Jaccard,
+    `Meaningless, Not Det. In Control` = Meaningless
+  )
+
+bootstrapSamplesTimedBeta_all <-
+  bootstrapSamplesPairedBeta %>% dplyr::filter(
+    DistanceFromCenterExpRev == 0
+  ) %>% dplyr::group_by(
+    TimeGapNumber, Bootstrap, Type
+  ) %>% dplyr::group_modify(
+    .f = SpeciesStringsToBeta,
+    SpeciesColumn = "SamplingIDs",
+    AbundanceColumn = "SamplingIDs"
+  ) %>% dplyr::rename(
+    `Jaccard, All` = Jaccard,
+    `Meaningless, All` = Meaningless
+  )
+
+bootstrapSamplesTimedBeta_control <-
+  bootstrapSamplesPairedBeta %>% dplyr::filter(
+    DistanceFromCenterExpRev == 0
+  ) %>% dplyr::group_by(
+    TimeGapNumber, Bootstrap, Type
+  ) %>% dplyr::group_modify(
+    .f = SpeciesStringsToBeta,
+    SpeciesColumn = "SamplingIDsNative",
+    AbundanceColumn = "SamplingIDsNative"
+  ) %>% dplyr::rename(
+    `Jaccard, Det. In Control` = Jaccard,
+    `Meaningless, Det. In Control` = Meaningless
+  )
+
+bootstrapSamplesTimedBeta_notcontrol <-
+  bootstrapSamplesPairedBeta %>% dplyr::filter(
+    DistanceFromCenterExpRev == 0
+  ) %>% dplyr::group_by(
+    TimeGapNumber, Bootstrap, Type
+  ) %>% dplyr::group_modify(
+    .f = SpeciesStringsToBeta,
+    SpeciesColumn = "SamplingIDsInvasive",
+    AbundanceColumn = "SamplingIDsInvasive"
+  ) %>% dplyr::rename(
+    `Jaccard, Not Det. In Control` = Jaccard,
+    `Meaningless, Not Det. In Control` = Meaningless
+  )
+
+# Collect and organize the format
+bootstrapSamplesTimedBeta <- dplyr::full_join(
+  bootstrapSamplesTimedBeta_all,
+  bootstrapSamplesTimedBeta_control,
+  by = c("TimeGapNumber", "Bootstrap", "Type", "Patch1", "Patch2")
+) %>% dplyr::full_join(
+  bootstrapSamplesTimedBeta_notcontrol,
+  by = c("TimeGapNumber", "Bootstrap", "Type", "Patch1", "Patch2")
+) %>% tidyr::pivot_longer(
+  cols = -c("TimeGapNumber", "Bootstrap", "Type", "Patch1", "Patch2"),
+  names_to = c("Measure", "Subset"),
+  names_sep = ", "
+) %>% tidyr::pivot_wider(
+  names_from = "Measure", values_from = "value"
+)
+
+bootstrapSamplesPairedBeta <- dplyr::full_join(
+  bootstrapSamplesPairedBeta_all,
+  bootstrapSamplesPairedBeta_control,
+  by = c("DistanceFromCenterExpRev", "Bootstrap", "Type", "Patch1", "Patch2")
+) %>% dplyr::full_join(
+  bootstrapSamplesPairedBeta_notcontrol,
+  by = c("DistanceFromCenterExpRev", "Bootstrap", "Type", "Patch1", "Patch2")
+) %>% tidyr::pivot_longer(
+  cols = -c("DistanceFromCenterExpRev", "Bootstrap", "Type", "Patch1", "Patch2"),
+  names_to = c("Measure", "Subset"),
+  names_sep = ", "
+) %>% tidyr::pivot_wider(
+  names_from = "Measure", values_from = "value"
+)
+
+##### Combine the results into a single dataframe: ############################
+
+# bootstrapSamplesPairedAlpha <- bootstrapSamples %>% dplyr::mutate(
+#   TimeSinceStart = round(# Rare 1 != 1 issue.
+#     TimeSinceStart,
+#     digits = ceiling(-log10(min(diff(result$Abundance[, 1])))))
+# ) %>% dplyr::group_by(
+#   Type, Control, Bootstrap, Patch
+# ) %>% dplyr::arrange(
+#   TimeSinceStart
+# ) %>% dplyr::mutate(
+#   TimeGapNumber = seq_along(TimeSinceStart),
+#   TimeGapNumber = ifelse(
+#     Type == "Time series" & Control == "Control",
+#     rev(TimeGapNumber), TimeGapNumber
+#   ) # i.e.  5, 4, 3, 2, 1, ___, 1, 2, 3, 4, 5
+# ) %>% dplyr::group_by(
+#   # Average across patches first.
+#   Type, Control, Bootstrap, TimeSinceStart
+# ) %>% dplyr::mutate(
+#   DistanceFromCenter = dplyr::case_when(
+#     min(Patch) == 1 & max(Patch) == 10 ~ {
+#       ifelse(Patch < 5, Patch + 10, Patch) - median(
+#         ifelse(Patch < 5, Patch + 10, Patch)
+#       )
+#     },
+#     TRUE ~ Patch - median(Patch)
+#   ),
+#   DistanceFromCenterExpRev = ifelse(Control == "Experiment" &
+#                                       Type == "Space for time",
+#                                     -DistanceFromCenter,
+#                                     DistanceFromCenter)
+# ) %>% dplyr::ungroup(
+# ) %>% dplyr::group_by(
+#   DistanceFromCenterExpRev, Bootstrap, TimeGapNumber, Type
+# ) %>% dplyr::group_modify(
+#   .f = ~ computeSpeciesInControl(.x)
+# ) %>% dplyr::ungroup(
+# ) %>% dplyr::group_by(
+#   DistanceFromCenterExpRev, Bootstrap, TimeGapNumber, Type, Control
+# ) %>% dplyr::summarise( # Effectively a rename, but useful struct. for later.
+#   AverageSamplingAlpha = mean(SamplingAlpha),
+#   AverageSamplingAlphaNative = mean(SamplingAlphaNative),
+#   AverageSamplingAlphaInvasive = mean(SamplingAlphaInvasive),
+#   .groups = "drop"
+# ) %>% dplyr::group_by(
+#   # Then perform difference by converting control to negatives and adding.
+#   DistanceFromCenterExpRev, Bootstrap, TimeGapNumber, Type
+# ) %>% dplyr::mutate(
+#   dplyr::across(
+#     .cols = AverageSamplingAlpha : AverageSamplingAlphaInvasive,
+#     .fns = ~ ifelse(Control == "Control", -.x, .x)
+#   )
+# ) %>% dplyr::summarise(
+#   DeltaAverageSamplingAlpha = sum(AverageSamplingAlpha),
+#   DeltaAverageSamplingAlphaNative = sum(AverageSamplingAlphaNative),
+#   DeltaAverageSamplingAlphaInvasive = sum(AverageSamplingAlphaInvasive),
+#   .groups = "drop"
+# ) %>% dplyr::rename(
+#   `Overall` = DeltaAverageSamplingAlpha,
+#   `Detected in Control` = DeltaAverageSamplingAlphaNative,
+#   `Not Detected in Control` = DeltaAverageSamplingAlphaInvasive
+# ) %>% tidyr::pivot_longer(
+#   cols = c(`Overall`, `Detected in Control`, `Not Detected in Control`),
+#   names_to = "Species Subset",
+#   values_to = "Difference of Average Number of Species in Patch"
+# )
+
 # Plotting: ###################################################################
 ### Plot 1: Change in Local Richness: #########################################
 plot_1_DeltaAlpha <- ggplot2::ggplot(
@@ -242,65 +449,9 @@ plot_1_DeltaAlpha <- ggplot2::ggplot(
 #   ), cor.test(`Space for time`, `Time series`)
 # )
 
-### Plot 2: ###################################################################
-plot_2_DeltaGamma <- ggplot2::ggplot(
-  bootstrapSamplesDeltaGamma,
-  ggplot2::aes(
-    x = Type,
-    y = `Difference of Number of Species across Patches`
-  )
-) + ggplot2::geom_violin(
-) + ggplot2::geom_boxplot(
-  width = .1,
-  notch = TRUE
-) + ggplot2::geom_line(
-  ggplot2::aes(group = Bootstrap),
-  alpha = 0.1
-) + ggplot2::facet_wrap(
-  `Species Subset` ~ .
-) + ggplot2::labs(
-  title = paste0("Delta Gamma"),
-  subtitle = "Difference is Experiment - Control",
-  caption = paste0("file: ", file_result)
-)
-
-### Plot 3: ###################################################################
-# plot_1_PairedAlpha <- ggplot2::ggplot(
-#   bootstrapSamplesPairedAlpha,
-#   ggplot2::aes(
-#     x = Type,
-#     y = `Difference of Average Number of Species in Patch`
-#   )
-# ) + ggplot2::geom_violin(
-# ) + ggplot2::geom_boxplot(
-#   width = 0.1,
-#   notch = TRUE
-# ) + ggplot2::geom_line(
-#   data = bootstrapSamplesPairedAlpha %>% dplyr::left_join(
-#     bootstrapSamplesPairedAlpha %>% dplyr::group_by(
-#       Bootstrap, DistanceFromCenterExpRev
-#     ) %>% dplyr::filter(
-#       `Species Subset` == "Overall"
-#     ) %>% dplyr::arrange(Type) %>% dplyr::summarise(
-#       Slope = diff(`Difference of Average Number of Species in Patch`)
-#     ),
-#     by = c("Bootstrap", "DistanceFromCenterExpRev")
-#   ),
-#   ggplot2::aes(group = Bootstrap, color = Slope),
-#   alpha = 0.2
-# ) + ggplot2::facet_grid(
-#   factor(`Species Subset`, ordered = TRUE, levels = c(
-#     "Overall", "Detected in Control", "Not Detected in Control"
-#   )) ~ DistanceFromCenterExpRev + TimeGapNumber
-# ) + ggplot2::labs(
-#   title = "Paired Alpha",
-#   subtitle = "Difference is Experiment - Control",
-#   caption = paste0("file: ", file_result)
-# ) + ggplot2::scale_color_viridis_c(option = "C")
-
 target <- bootstrapSamplesPairedAlpha %>% dplyr::filter(
   DistanceFromCenterExpRev == 0,
-  TimeGapNumber == 10
+  TimeGapNumber == preferredTimeGap
 )
 
 plot_1_PairedAlphaStart <- ggplot2::ggplot(
@@ -413,7 +564,10 @@ plot_1_TimedAlphaTimeGaps <- ggplot2::ggplot(
     "Overall", "Detected in Control", "Not Detected in Control"
   )) ~ .#DistanceFromCenterExpRev + TimeGapNumber
 ) + ggplot2::labs(
-  title = "Paired Alpha, Average over Patches, Varying Gaps",
+  title = paste0(
+    "Paired Alpha, Average over Patches, Varying Gaps",
+    if (logarithmicTimeScale) ", Log Scale X")
+    ,
   subtitle = "Difference is Experiment - Control",
   caption = paste0("file: ", file_result)
 )
@@ -461,7 +615,10 @@ plot_1_PairedAlphaTimeGaps_Ribbon <- ggplot2::ggplot(
     "Overall", "Detected in Control", "Not Detected in Control"
   )) ~ Type
 ) + ggplot2::labs(
-  title = "Paired Alpha, Maximal Distance, Varying Gaps",
+  title = paste0(
+    "Paired Alpha, Maximal Distance, Varying Gaps",
+    if (logarithmicTimeScale) ", Log Scale X")
+  ,
   subtitle = "Difference is Experiment - Control",
   caption = paste0("file: ", file_result),
   ylab = "Difference of Average Number of Species in Patch"
@@ -469,7 +626,7 @@ plot_1_PairedAlphaTimeGaps_Ribbon <- ggplot2::ggplot(
 
 target <- bootstrapSamplesPairedAlpha %>% dplyr::filter(
   # DistanceFromCenterExpRev == 0
-  TimeGapNumber == 10
+  TimeGapNumber == preferredTimeGap
 ) %>% dplyr::group_by(
   Type, DistanceFromCenterExpRev, `Species Subset`
 ) %>% dplyr::rename(
@@ -563,4 +720,128 @@ plot_1_TimedAlphaTimeGaps_Ribbon <- ggplot2::ggplot(
   subtitle = "Difference is Experiment - Control",
   caption = paste0("file: ", file_result),
   ylab = "Difference of Average Number of Species in Patch"
+)
+
+### Plot 2: ###################################################################
+plot_2_DeltaGamma <- ggplot2::ggplot(
+  bootstrapSamplesDeltaGamma,
+  ggplot2::aes(
+    x = Type,
+    y = `Difference of Number of Species across Patches`
+  )
+) + ggplot2::geom_violin(
+) + ggplot2::geom_boxplot(
+  width = .1,
+  notch = TRUE
+) + ggplot2::geom_line(
+  ggplot2::aes(group = Bootstrap),
+  alpha = 0.1
+) + ggplot2::facet_wrap(
+  `Species Subset` ~ .
+) + ggplot2::labs(
+  title = paste0("Delta Gamma"),
+  subtitle = "Difference is Experiment - Control",
+  caption = paste0("file: ", file_result)
+)
+
+### Plot 3: ###################################################################
+target <- bootstrapSamplesPairedBeta %>% dplyr::filter(
+  !Meaningless
+) %>% dplyr::group_by(
+  Type, DistanceFromCenterExpRev, `Subset`
+) %>% dplyr::rename(
+  y = `Jaccard`
+) %>% dplyr::summarise(
+  yminp = min(y),
+  ymin1 = quantile(y, probs = 0.025),
+  ymin2 = quantile(y, probs = 0.25),
+  ymedian = quantile(y, probs = 0.5),
+  ymean = mean(y),
+  ymax1 = quantile(y, probs = 1 - 0.25),
+  ymax2 = quantile(y, probs = 1 - 0.025),
+  ymaxp = max(y),
+  .groups = "drop"
+)
+
+plot_1_PairedBetaDistGaps_Ribbon <- ggplot2::ggplot(
+  target,
+  ggplot2::aes(
+    x = DistanceFromCenterExpRev,
+    fill = Type, group = Type, color = Type
+  )
+) + ggplot2::geom_ribbon( # Inner
+  ggplot2::aes(ymin = ymin2,
+               ymax = ymax1), alpha = 0.3
+) + ggplot2::geom_ribbon( # Outer
+  ggplot2::aes(ymin = ymin1,
+               ymax = ymax2), alpha = 0.2
+) + ggplot2::geom_line(
+  ggplot2::aes(y = ymedian), linetype = "dotted"
+) + ggplot2::geom_line(
+  ggplot2::aes(y = ymean), linetype = "dashed"
+) + ggplot2::geom_point( # Minimum detected
+  ggplot2::aes(y = yminp), shape = 22, alpha = 0.4
+) + ggplot2::geom_point( # Maximum detected
+  ggplot2::aes(y = ymaxp), shape = 22, alpha = 0.4
+) + ggplot2::facet_grid(
+  factor(`Subset`, ordered = TRUE, levels = c(
+    "All", "Det. In Control", "Not Det. In Control"
+  )) ~ Type
+) + ggplot2::labs(
+  title = "Paired Alpha, Varying Distance, Gap = 10 * lambda",
+  subtitle = "Presence/Absence Beta Dissimilarity",
+  caption = paste0("file: ", file_result),
+  ylab = "Jaccard Dissimilarity"
+)
+
+target <- bootstrapSamplesTimedBeta %>% dplyr::filter(
+  !Meaningless
+) %>% dplyr::group_by(
+  Type, TimeGapNumber, `Subset`
+) %>% dplyr::rename(
+  y = `Jaccard`
+) %>% dplyr::summarise(
+  yminp = min(y),
+  ymin1 = quantile(y, probs = 0.025),
+  ymin2 = quantile(y, probs = 0.25),
+  ymedian = quantile(y, probs = 0.5),
+  ymean = mean(y),
+  ymax1 = quantile(y, probs = 1 - 0.25),
+  ymax2 = quantile(y, probs = 1 - 0.025),
+  ymaxp = max(y),
+  .groups = "drop"
+)
+
+plot_1_TimedBetaTimeGaps_Ribbon <- ggplot2::ggplot(
+  target,
+  ggplot2::aes(
+    x = TimeGapNumber,
+    fill = Type, group = Type, color = Type
+  )
+) + ggplot2::geom_ribbon( # Inner
+  ggplot2::aes(ymin = ymin2,
+               ymax = ymax1), alpha = 0.3
+) + ggplot2::geom_ribbon( # Outer
+  ggplot2::aes(ymin = ymin1,
+               ymax = ymax2), alpha = 0.2
+) + ggplot2::geom_line(
+  ggplot2::aes(y = ymedian), linetype = "dotted"
+) + ggplot2::geom_line(
+  ggplot2::aes(y = ymean), linetype = "dashed"
+) + ggplot2::geom_point( # Minimum detected
+  ggplot2::aes(y = yminp), shape = 22, alpha = 0.4
+) + ggplot2::geom_point( # Maximum detected
+  ggplot2::aes(y = ymaxp), shape = 22, alpha = 0.4
+) + ggplot2::facet_grid(
+  factor(`Subset`, ordered = TRUE, levels = c(
+    "All", "Det. In Control", "Not Det. In Control"
+  )) ~ Type
+) + ggplot2::labs(
+  title = paste0(
+    "Paired Alpha, Maximal Distance, Varying Time Gap",
+    if (logarithmicTimeScale) ", Log Scale X")
+  ,
+  subtitle = "Presence/Absence Beta Dissimilarity",
+  caption = paste0("file: ", file_result),
+  ylab = "Jaccard Dissimilarity"
 )
