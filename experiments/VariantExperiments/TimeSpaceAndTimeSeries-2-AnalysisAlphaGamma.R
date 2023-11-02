@@ -1,4 +1,13 @@
-preferredTimeGap <- which.max(timediffs >= result$ReactionTime*10)
+# Fix naming differences and bootstraps vs interventions differences.
+if (exists("result")) {
+  preferredTimeGap <- which.max(timediffs >= result$ReactionTime*10)
+  files_ <- file_result
+  result_ <- result
+} else if (exists("resultBase")) {
+  preferredTimeGap <- which.max(timediffs >= 10) # resultBase's time rescaled.
+  result_ <- resultBase
+  files_ <- paste(fileBaseResult, fileInterventionResult, collapse = ", ")
+}
 
 ### Alpha:#####################################################################
 # Note the order of operations is very relevant here.
@@ -43,7 +52,7 @@ bootstrapSamplesDeltaAlpha <- bootstrapSamples %>% dplyr::group_by(
 bootstrapSamplesPairedAlpha <- bootstrapSamples %>% dplyr::mutate(
   TimeSinceStart = round(# Rare 1 != 1 issue.
     TimeSinceStart,
-    digits = ceiling(-log10(min(diff(result$Abundance[, 1])))))
+    digits = ceiling(-log10(min(diff(result_$Abundance[, 1])))))
 ) %>% dplyr::group_by(
   Type, Control, Bootstrap, Patch
 ) %>% dplyr::arrange(
@@ -109,7 +118,7 @@ bootstrapSamplesPairedAlpha <- bootstrapSamples %>% dplyr::mutate(
 bootstrapSamplesTimedAlpha <- bootstrapSamples %>% dplyr::mutate(
   TimeSinceStart = round(# Rare 1 != 1 issue.
     TimeSinceStart,
-    digits = ceiling(-log10(min(diff(result$Abundance[, 1])))))
+    digits = ceiling(-log10(min(diff(result_$Abundance[, 1])))))
 ) %>% dplyr::group_by(
   Type, Control, Bootstrap, Patch
 ) %>% dplyr::arrange(
@@ -206,7 +215,7 @@ bootstrapSamplesDeltaGamma <- bootstrapSamples %>% dplyr::group_by(
 # Break into pairs across time and space that test the effect of temporal and
 # spatial distance.
 bootstrapSamplesPairedBeta <- bootstrapSamples %>% addDistanceColumns(
-  mindig = ceiling(-log10(min(diff(result$Abundance[, 1]))))
+  mindig = ceiling(-log10(min(diff(result_$Abundance[, 1]))))
 ) %>% dplyr::mutate(
   Patch = ifelse(
     Control == "Experiment",
@@ -435,7 +444,7 @@ plot_1_DeltaAlpha <- ggplot2::ggplot(
 ) + ggplot2::labs(
   title = "Delta Alpha",
   subtitle = "Difference is Experiment - Control",
-  caption = paste0("file: ", file_result)
+  caption = paste0("file: ", files_)
 ) + ggplot2::scale_color_viridis_c(option = "C")
 
 # Note: Can try to establish if there is correlation here.
@@ -484,7 +493,7 @@ plot_1_PairedAlphaStart <- ggplot2::ggplot(
 ) + ggplot2::labs(
   title = "Paired Alpha, Maximal Distance, Gap = 10 * lambda",
   subtitle = "Difference is Experiment - Control",
-  caption = paste0("file: ", file_result)
+  caption = paste0("file: ", files_)
 ) + ggplot2::scale_color_viridis_c(option = "C")
 
 target <- bootstrapSamplesPairedAlpha %>% dplyr::filter(
@@ -512,11 +521,11 @@ plot_1_PairedAlphaTimeGaps <- ggplot2::ggplot(
 ) + ggplot2::labs(
   title = "Paired Alpha, Maximal Distance, Varying Gaps",
   subtitle = "Difference is Experiment - Control",
-  caption = paste0("file: ", file_result)
+  caption = paste0("file: ", files_)
 )
 
 target <- bootstrapSamplesPairedAlpha %>% dplyr::filter(
-  TimeGapNumber %in% c(10)
+  TimeGapNumber %in% c(preferredTimeGap)
 )
 
 plot_1_PairedAlphaPairGaps <- ggplot2::ggplot(
@@ -539,7 +548,7 @@ plot_1_PairedAlphaPairGaps <- ggplot2::ggplot(
 ) + ggplot2::labs(
   title = "Paired Alpha, Varying Distance, Gap = 10 * lambda",
   subtitle = "Difference is Experiment - Control",
-  caption = paste0("file: ", file_result)
+  caption = paste0("file: ", files_)
 )
 
 target <- bootstrapSamplesTimedAlpha %>% dplyr::filter(
@@ -569,7 +578,7 @@ plot_1_TimedAlphaTimeGaps <- ggplot2::ggplot(
     if (logarithmicTimeScale) ", Log Scale X")
     ,
   subtitle = "Difference is Experiment - Control",
-  caption = paste0("file: ", file_result)
+  caption = paste0("file: ", files_)
 )
 
 target <- bootstrapSamplesPairedAlpha %>% dplyr::filter(
@@ -620,7 +629,7 @@ plot_1_PairedAlphaTimeGaps_Ribbon <- ggplot2::ggplot(
     if (logarithmicTimeScale) ", Log Scale X")
   ,
   subtitle = "Difference is Experiment - Control",
-  caption = paste0("file: ", file_result),
+  caption = paste0("file: ", files_),
   ylab = "Difference of Average Number of Species in Patch"
 )
 
@@ -670,7 +679,7 @@ plot_1_PairedAlphaPairGaps_Ribbon <- ggplot2::ggplot(
 ) + ggplot2::labs(
   title = "Paired Alpha, Varying Distance, Gap = 10 * lambda",
   subtitle = "Difference is Experiment - Control",
-  caption = paste0("file: ", file_result),
+  caption = paste0("file: ", files_),
   ylab = "Difference of Average Number of Species in Patch"
 )
 
@@ -718,7 +727,7 @@ plot_1_TimedAlphaTimeGaps_Ribbon <- ggplot2::ggplot(
 ) + ggplot2::labs(
   title = "Paired Alpha, Average over Patches, Varying Gaps",
   subtitle = "Difference is Experiment - Control",
-  caption = paste0("file: ", file_result),
+  caption = paste0("file: ", files_),
   ylab = "Difference of Average Number of Species in Patch"
 )
 
@@ -741,7 +750,7 @@ plot_2_DeltaGamma <- ggplot2::ggplot(
 ) + ggplot2::labs(
   title = paste0("Delta Gamma"),
   subtitle = "Difference is Experiment - Control",
-  caption = paste0("file: ", file_result)
+  caption = paste0("file: ", files_)
 )
 
 ### Plot 3: ###################################################################
@@ -790,7 +799,7 @@ plot_1_PairedBetaDistGaps_Ribbon <- ggplot2::ggplot(
 ) + ggplot2::labs(
   title = "Paired Beta, Varying Distance, Gap = 10 * lambda",
   subtitle = "Presence/Absence Beta Dissimilarity",
-  caption = paste0("file: ", file_result),
+  caption = paste0("file: ", files_),
   ylab = "Jaccard Dissimilarity"
 )
 
@@ -842,6 +851,7 @@ plot_1_TimedBetaTimeGaps_Ribbon <- ggplot2::ggplot(
     if (logarithmicTimeScale) ", Log Scale X")
   ,
   subtitle = "Presence/Absence Beta Dissimilarity",
-  caption = paste0("file: ", file_result),
+  caption = paste0("file: ", files_),
   ylab = "Jaccard Dissimilarity"
 )
+
