@@ -9,6 +9,8 @@ if (exists("result")) {
   files_ <- paste(fileBaseResult, fileInterventionResult, collapse = ", ")
 }
 
+ylimRichnessChange <- c(-10, 10)
+
 ### Alpha:#####################################################################
 # Note the order of operations is very relevant here.
 # We imagine that the researchers consider all samples across times to be
@@ -377,7 +379,11 @@ plot_1_DeltaAlpha <- ggplot2::ggplot(
   title = "Delta Alpha",
   subtitle = "Difference is Experiment - Control",
   caption = paste0("file: ", files_)
-) + ggplot2::scale_color_viridis_c(option = "C")
+) + ggplot2::scale_color_viridis_c(
+  option = "C"
+  ) + ggplot2::coord_cartesian(
+    ylim = ylimRichnessChange
+  )
 
 # Note: Can try to establish if there is correlation here.
 # with(
@@ -426,7 +432,11 @@ plot_1_PairedAlphaStart <- ggplot2::ggplot(
   title = "Paired Alpha, Maximal Distance, Gap = 10 * lambda",
   subtitle = "Difference is Experiment - Control",
   caption = paste0("file: ", files_)
-) + ggplot2::scale_color_viridis_c(option = "C")
+) + ggplot2::scale_color_viridis_c(
+  option = "C"
+  ) + ggplot2::coord_cartesian(
+  ylim = ylimRichnessChange
+)
 
 target <- bootstrapSamplesPairedAlpha %>% dplyr::filter(
   DistanceFromCenterExpRev == 0,
@@ -454,6 +464,8 @@ plot_1_PairedAlphaTimeGaps <- ggplot2::ggplot(
   title = "Paired Alpha, Maximal Distance, Varying Gaps",
   subtitle = "Difference is Experiment - Control",
   caption = paste0("file: ", files_)
+) + ggplot2::coord_cartesian(
+  ylim = ylimRichnessChange
 )
 
 target <- bootstrapSamplesPairedAlpha %>% dplyr::filter(
@@ -481,6 +493,8 @@ plot_1_PairedAlphaPairGaps <- ggplot2::ggplot(
   title = "Paired Alpha, Varying Distance, Gap = 10 * lambda",
   subtitle = "Difference is Experiment - Control",
   caption = paste0("file: ", files_)
+) + ggplot2::coord_cartesian(
+  ylim = ylimRichnessChange
 )
 
 target <- bootstrapSamplesTimedAlpha %>% dplyr::filter(
@@ -511,6 +525,8 @@ plot_1_TimedAlphaTimeGaps <- ggplot2::ggplot(
     ,
   subtitle = "Difference is Experiment - Control",
   caption = paste0("file: ", files_)
+) + ggplot2::coord_cartesian(
+  ylim = ylimRichnessChange
 )
 
 target <- bootstrapSamplesPairedAlpha %>% dplyr::filter(
@@ -563,6 +579,8 @@ plot_1_PairedAlphaTimeGaps_Ribbon <- ggplot2::ggplot(
   subtitle = "Difference is Experiment - Control",
   caption = paste0("file: ", files_),
   ylab = "Difference of Average Number of Species in Patch"
+) + ggplot2::coord_cartesian(
+  ylim = ylimRichnessChange
 )
 
 target <- bootstrapSamplesPairedAlpha %>% dplyr::filter(
@@ -613,6 +631,8 @@ plot_1_PairedAlphaPairGaps_Ribbon <- ggplot2::ggplot(
   subtitle = "Difference is Experiment - Control",
   caption = paste0("file: ", files_),
   ylab = "Difference of Average Number of Species in Patch"
+) + ggplot2::coord_cartesian(
+  ylim = ylimRichnessChange
 )
 
 target <- bootstrapSamplesTimedAlpha %>% dplyr::filter(
@@ -661,6 +681,8 @@ plot_1_TimedAlphaTimeGaps_Ribbon <- ggplot2::ggplot(
   subtitle = "Difference is Experiment - Control",
   caption = paste0("file: ", files_),
   ylab = "Difference of Average Number of Species in Patch"
+) + ggplot2::coord_cartesian(
+  ylim = ylimRichnessChange
 )
 
 ### Plot 2: ###################################################################
@@ -683,6 +705,8 @@ plot_2_DeltaGamma <- ggplot2::ggplot(
   title = paste0("Delta Gamma"),
   subtitle = "Difference is Experiment - Control",
   caption = paste0("file: ", files_)
+) + ggplot2::coord_cartesian(
+  ylim = ylimRichnessChange
 )
 
 ### Plot 3: ###################################################################
@@ -733,6 +757,8 @@ plot_1_PairedBetaDistGaps_Ribbon <- ggplot2::ggplot(
   subtitle = "Presence/Absence Beta Dissimilarity",
   caption = paste0("file: ", files_),
   ylab = "Jaccard Dissimilarity"
+) + ggplot2::coord_cartesian(
+  ylim = c(0, 1)
 )
 
 target <- bootstrapSamplesTimedBeta %>% dplyr::filter(
@@ -785,5 +811,7 @@ plot_1_TimedBetaTimeGaps_Ribbon <- ggplot2::ggplot(
   subtitle = "Presence/Absence Beta Dissimilarity",
   caption = paste0("file: ", files_),
   ylab = "Jaccard Dissimilarity"
+) + ggplot2::coord_cartesian(
+  ylim = c(0, 1)
 )
 

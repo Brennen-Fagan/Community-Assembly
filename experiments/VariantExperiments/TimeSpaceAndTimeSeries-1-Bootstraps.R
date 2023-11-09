@@ -286,6 +286,8 @@ plot_0_Richness <- ggplot2::ggplot(
 ) + ggplot2::labs(
   x = "Time (Units: Characteristic Times)",
   y = "True Richness"
+) + ggplot2::coord_cartesian(
+  ylim = c(0, 30)
 )
 
 # But correlation remains low? (but significant) (For file 5-1-1)
@@ -436,4 +438,8 @@ plot_0_JaccardTrue <- bootstrapSamples %>% dplyr::filter(
   x = "Time (Units: Characteristic Times)",
   y = "True Jaccard Dissimilarity (Presence/Absence)",
   caption = "Inner 90% Interval and Median, Evaluated Only at (False) Disturbance Time"
-) + ggplot2::theme_bw() + ggplot2::geom_rug(sides = "b")
+) + ggplot2::theme_bw() + ggplot2::geom_rug(
+  sides = "b"
+  ) + ggplot2::coord_cartesian(
+  ylim = c(0, 1)
+)
