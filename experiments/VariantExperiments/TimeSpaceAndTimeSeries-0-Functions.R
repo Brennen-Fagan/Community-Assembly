@@ -249,7 +249,7 @@ computeSpeciesInControl <- function(sampling, Time = "Time") {
   ) %>% unique()
 
   sampling %>% dplyr::group_by(
-    dplyr::all_of(Time), Patch
+    dplyr::across(dplyr::all_of(Time)), Patch
   ) %>% dplyr::group_modify(
     .f = function(x, y) {
       splitSamplingIDs <- strsplit(x$SamplingIDs, ", ", fixed = T)[[1]]

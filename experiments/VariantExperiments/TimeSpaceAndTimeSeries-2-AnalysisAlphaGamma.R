@@ -128,7 +128,7 @@ bootstrapSamplesTimedAlpha <- bootstrapSamples %>% dplyr::mutate(
   TimeGapNumber = ifelse(
     Type == "Time series" & Control == "Control",
     rev(TimeGapNumber), TimeGapNumber
-  ), # i.e.  5, 4, 3, 2, 1, ___, 1, 2, 3, 4, 5
+  ) # i.e.  5, 4, 3, 2, 1, ___, 1, 2, 3, 4, 5
 ) %>% dplyr::ungroup(
 ) %>% dplyr::group_by(
   Bootstrap, TimeGapNumber, Type
@@ -343,74 +343,6 @@ bootstrapSamplesPairedBeta <- dplyr::full_join(
 ) %>% tidyr::pivot_wider(
   names_from = "Measure", values_from = "value"
 )
-
-##### Combine the results into a single dataframe: ############################
-
-# bootstrapSamplesPairedAlpha <- bootstrapSamples %>% dplyr::mutate(
-#   TimeSinceStart = round(# Rare 1 != 1 issue.
-#     TimeSinceStart,
-#     digits = ceiling(-log10(min(diff(result$Abundance[, 1])))))
-# ) %>% dplyr::group_by(
-#   Type, Control, Bootstrap, Patch
-# ) %>% dplyr::arrange(
-#   TimeSinceStart
-# ) %>% dplyr::mutate(
-#   TimeGapNumber = seq_along(TimeSinceStart),
-#   TimeGapNumber = ifelse(
-#     Type == "Time series" & Control == "Control",
-#     rev(TimeGapNumber), TimeGapNumber
-#   ) # i.e.  5, 4, 3, 2, 1, ___, 1, 2, 3, 4, 5
-# ) %>% dplyr::group_by(
-#   # Average across patches first.
-#   Type, Control, Bootstrap, TimeSinceStart
-# ) %>% dplyr::mutate(
-#   DistanceFromCenter = dplyr::case_when(
-#     min(Patch) == 1 & max(Patch) == 10 ~ {
-#       ifelse(Patch < 5, Patch + 10, Patch) - median(
-#         ifelse(Patch < 5, Patch + 10, Patch)
-#       )
-#     },
-#     TRUE ~ Patch - median(Patch)
-#   ),
-#   DistanceFromCenterExpRev = ifelse(Control == "Experiment" &
-#                                       Type == "Space for time",
-#                                     -DistanceFromCenter,
-#                                     DistanceFromCenter)
-# ) %>% dplyr::ungroup(
-# ) %>% dplyr::group_by(
-#   DistanceFromCenterExpRev, Bootstrap, TimeGapNumber, Type
-# ) %>% dplyr::group_modify(
-#   .f = ~ computeSpeciesInControl(.x)
-# ) %>% dplyr::ungroup(
-# ) %>% dplyr::group_by(
-#   DistanceFromCenterExpRev, Bootstrap, TimeGapNumber, Type, Control
-# ) %>% dplyr::summarise( # Effectively a rename, but useful struct. for later.
-#   AverageSamplingAlpha = mean(SamplingAlpha),
-#   AverageSamplingAlphaNative = mean(SamplingAlphaNative),
-#   AverageSamplingAlphaInvasive = mean(SamplingAlphaInvasive),
-#   .groups = "drop"
-# ) %>% dplyr::group_by(
-#   # Then perform difference by converting control to negatives and adding.
-#   DistanceFromCenterExpRev, Bootstrap, TimeGapNumber, Type
-# ) %>% dplyr::mutate(
-#   dplyr::across(
-#     .cols = AverageSamplingAlpha : AverageSamplingAlphaInvasive,
-#     .fns = ~ ifelse(Control == "Control", -.x, .x)
-#   )
-# ) %>% dplyr::summarise(
-#   DeltaAverageSamplingAlpha = sum(AverageSamplingAlpha),
-#   DeltaAverageSamplingAlphaNative = sum(AverageSamplingAlphaNative),
-#   DeltaAverageSamplingAlphaInvasive = sum(AverageSamplingAlphaInvasive),
-#   .groups = "drop"
-# ) %>% dplyr::rename(
-#   `Overall` = DeltaAverageSamplingAlpha,
-#   `Detected in Control` = DeltaAverageSamplingAlphaNative,
-#   `Not Detected in Control` = DeltaAverageSamplingAlphaInvasive
-# ) %>% tidyr::pivot_longer(
-#   cols = c(`Overall`, `Detected in Control`, `Not Detected in Control`),
-#   names_to = "Species Subset",
-#   values_to = "Difference of Average Number of Species in Patch"
-# )
 
 # Plotting: ###################################################################
 ### Plot 1: Change in Local Richness: #########################################
