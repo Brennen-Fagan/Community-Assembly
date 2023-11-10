@@ -1,12 +1,14 @@
 # Fix naming differences and bootstraps vs interventions differences.
 if (exists("result")) {
   preferredTimeGap <- which.max(timediffs >= result$ReactionTime*10)
-  files_ <- file_result
   result_ <- result
+  files_ <- file_result
+  timeColumn <- "Time"
 } else if (exists("resultBase")) {
   preferredTimeGap <- which.max(timediffs >= 10) # resultBase's time rescaled.
   result_ <- resultBase
   files_ <- paste(fileBaseResult, fileInterventionResult, collapse = ", ")
+  timeColumn <- "TimeBase"
 }
 
 ylimRichnessChange <- c(-10, 10)
@@ -85,7 +87,7 @@ bootstrapSamplesPairedAlpha <- bootstrapSamples %>% dplyr::mutate(
 ) %>% dplyr::group_by(
   DistanceFromCenterExpRev, Bootstrap, TimeGapNumber, Type
 ) %>% dplyr::group_modify(
-  .f = ~ computeSpeciesInControl(.x)
+  .f = ~ computeSpeciesInControl(.x, Time = timeColumn)
 ) %>% dplyr::ungroup(
 ) %>% dplyr::group_by(
   DistanceFromCenterExpRev, Bootstrap, TimeGapNumber, Type, Control
@@ -135,7 +137,7 @@ bootstrapSamplesTimedAlpha <- bootstrapSamples %>% dplyr::mutate(
 ) %>% dplyr::group_by(
   Bootstrap, TimeGapNumber, Type
 ) %>% dplyr::group_modify(
-  .f = ~ computeSpeciesInControl(.x)
+  .f = ~ computeSpeciesInControl(.x, Time = timeColumn)
 ) %>% dplyr::ungroup(
 ) %>% dplyr::group_by(
   Bootstrap, TimeGapNumber, Type, Control
