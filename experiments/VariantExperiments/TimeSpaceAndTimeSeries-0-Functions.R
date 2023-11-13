@@ -267,7 +267,7 @@ computeSpeciesInControl <- function(sampling, Time = "Time") {
   )
 }
 
-addDistanceColumns <- function(bootstrapSamples, mindig = 1) {
+addDistanceColumns <- function(bootstrapSamples, mindig = 1, Time = "Time") {
   bootstrapSamples %>% dplyr::mutate(
     ##### Temporal Distance: ####################################################
     TimeSinceStart = round(# Rare 1 != 1 issue.
@@ -306,7 +306,7 @@ addDistanceColumns <- function(bootstrapSamples, mindig = 1) {
     ) %>% dplyr::group_by(
       DistanceFromCenterExpRev, Bootstrap, TimeGapNumber, Type
     ) %>% dplyr::group_modify(
-      .f = ~ computeSpeciesInControl(.x)
+      .f = ~ computeSpeciesInControl(.x, Time = Time)
     ) %>% dplyr::ungroup(
     )
 }

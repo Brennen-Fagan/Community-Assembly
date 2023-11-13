@@ -219,7 +219,8 @@ bootstrapSamplesDeltaGamma <- bootstrapSamples %>% dplyr::group_by(
 # Break into pairs across time and space that test the effect of temporal and
 # spatial distance.
 bootstrapSamplesPairedBeta <- bootstrapSamples %>% addDistanceColumns(
-  mindig = ceiling(-log10(min(diff(result_$Abundance[, 1]))))
+  mindig = ceiling(-log10(min(diff(result_$Abundance[, 1])))),
+  Time = timeColumn
 ) %>% dplyr::mutate(
   Patch = ifelse(
     Control == "Experiment",
