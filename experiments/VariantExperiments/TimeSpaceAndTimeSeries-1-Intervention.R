@@ -469,7 +469,7 @@ plot_0_OccupancyTrue <- (
     File = "Base"
   ) %>% dplyr::left_join(
     PoolBase %>%
-      dplyr::arrange(Size) %>% dplyr::mutate(SizeID = 1:nrow(Pool)),
+      dplyr::arrange(Size) %>% dplyr::mutate(SizeID = 1:nrow(PoolBase)),
     by = c("Species" = "ID")
   ),
   RMTRCode2::Calculate_Species(
@@ -478,11 +478,11 @@ plot_0_OccupancyTrue <- (
     File = "Intervention"
   ) %>% dplyr::left_join(
     PoolIntervention %>%
-      dplyr::arrange(Size) %>% dplyr::mutate(SizeID = 1:nrow(Pool)),
+      dplyr::arrange(Size) %>% dplyr::mutate(SizeID = 1:nrow(PoolIntervention)),
     by = c("Species" = "ID")
   ))
 ) %>% dplyr::group_by(
-  Time, Species, File
+  Time, Species, File, SizeID
 ) %>% dplyr::summarise(
   Count = dplyr::n()
 ) %>% ggplot2::ggplot(
@@ -512,6 +512,12 @@ plot_0_OccupancyTrue <- (
 
 plot_0_JaccardTrue <- bootstrapSamples %>% dplyr::filter(
   Type == "Space for time", TimeSinceStart == 0
+)  %>% dplyr::mutate(
+  Time = dplyr::case_when(
+    Control == "Control" ~ TimeBase,
+    Control == "Experiment" ~ TimeIntervention,
+    TRUE ~ NA_real_
+  )
 ) %>% dplyr::group_by(
   Bootstrap, Time, Control
 ) %>% dplyr::group_modify(
@@ -531,9 +537,12 @@ plot_0_JaccardTrue <- bootstrapSamples %>% dplyr::filter(
 ) + ggplot2::labs(
   x = "Time (Units: Characteristic Times)",
   y = "True Jaccard Dissimilarity (Presence/Absence)",
-  caption = "Inner 90% Interval and Median, Evaluated Only at (False) Disturbance Time"
+  caption = paste0("file: ", paste(fileBaseResult, fileInterventionResult))
+  # caption = "Inner 90% Interval and Median, Evaluated Only at (False) Disturbance Time"
 ) + ggplot2::theme_bw() + ggplot2::geom_rug(
   sides = "b"
 ) + ggplot2::coord_cartesian(
   ylim = c(0, 1)
+) + ggplot2::facet_wrap(
+  . ~ Control, ncol = 2
 )
