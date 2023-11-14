@@ -10,7 +10,8 @@
 bootstraps <- 100
 bootstrapSeed <-
   # 97870743 # used for 2023-09-25, 5 -> Hik6_2023-03-04, 56-6
-  21139057 # used for 2023-09-25, 5 -> Inf
+  # 21139057 # used for 2023-09-25, 5 -> Inf
+  38427042 # used for 2023-11-13, 5 -> HIK6 5
 
 calculationsPlotLong <- FALSE
 logarithmicTimeScale <- TRUE
@@ -48,14 +49,14 @@ doParallel::registerDoParallel(clust)
 # Files: ######################################################################
 
 # Base
-fileBaseFolder <- "Data_2023-09-25"
+fileBaseFolder <- "Data_2023-11-13"
 fileBaseResult <- "MNA-ExampleExtProp-Result-Env10-Ring-5-1-1-ExtProp1.RData"
 fileBaseResult2 <- NULL
 fileBasePool <- "MNA-ExampleOutcome-PoolMats-Env10.RData"
 
 # Intervention
-fileInterventionFolder <- "Data_2023-09-25"
-fileInterventionResult <- "MNA-ExampleExtProp-Result-Env10-Ring-Inf-1-1-ExtProp1.RData"
+fileInterventionFolder <- "Data_2023-11-13"
+fileInterventionResult <- "MNA-ExampleExtProp-Result-Env10-Ring-5-1-1-ExtProp1HIK6.RData"
 fileInterventionResult2 <- NULL
 fileInterventionPool <- "MNA-ExampleOutcome-PoolMats-Env10.RData"
 
@@ -429,3 +430,110 @@ parallel::stopCluster(clust)
 
 # Plotting: ###################################################################
 ### Plot 0: Sense Checking: ###################################################
+
+plot_0_Richness <- ggplot2::ggplot(
+  bootstrapSamples %>% dplyr::mutate(
+    TrueRichness = unlist(lapply(
+      strsplit(SamplingNonZeroSpecies, split = ", ", fixed = TRUE), length
+    ))
+  ) %>% dplyr::mutate(
+    Time = dplyr::case_when(
+      Control == "Control" ~ TimeBase,
+      Control == "Experiment" ~ TimeIntervention,
+      TRUE ~ NA_real_
+    )
+  ),
+  ggplot2::aes(x = Time, y = TrueRichness,
+               color = Patch, group = Patch)
+) + ggplot2::geom_line(
+) + ggplot2::geom_line(
+  ggplot2::aes(y = SamplingAlpha * 3),
+  alpha = 0.25,
+  linetype = 2
+) + ggplot2::scale_y_continuous(
+  sec.axis = ggplot2::sec_axis(~ . / 3, name = "Richness Observed")
+) + ggplot2::facet_wrap(
+  Control ~ Patch
+) + ggplot2::labs(
+  x = "Time (Units: Characteristic Times)",
+  y = "True Richness",
+  caption = paste0("file: ", paste(fileBaseResult, fileInterventionResult))
+) + ggplot2::coord_cartesian(
+  ylim = c(0, 30)
+)
+
+plot_0_OccupancyTrue <- (
+  speciesAbundances <- rbind(RMTRCode2::Calculate_Species(
+    resultBase
+  ) %>% dplyr::mutate(
+    File = "Base"
+  ) %>% dplyr::left_join(
+    PoolBase %>%
+      dplyr::arrange(Size) %>% dplyr::mutate(SizeID = 1:nrow(Pool)),
+    by = c("Species" = "ID")
+  ),
+  RMTRCode2::Calculate_Species(
+    resultIntervention
+  ) %>% dplyr::mutate(
+    File = "Intervention"
+  ) %>% dplyr::left_join(
+    PoolIntervention %>%
+      dplyr::arrange(Size) %>% dplyr::mutate(SizeID = 1:nrow(Pool)),
+    by = c("Species" = "ID")
+  ))
+) %>% dplyr::group_by(
+  Time, Species, File
+) %>% dplyr::summarise(
+  Count = dplyr::n()
+) %>% ggplot2::ggplot(
+  ggplot2::aes(x = Time, y = SizeID, color = Count)
+) + ggplot2::geom_point(
+  shape = '.'
+) + ggplot2::scale_color_viridis_c(
+  direction = -1, limits = c(1, 10)
+) + ggplot2::geom_hline(
+  data = data.frame(
+    yintercept = c(
+      nrow(PoolBase %>% dplyr::filter(Type == Type[1])) + 0.5,
+      nrow(PoolIntervention %>% dplyr::filter(Type == Type[1])) + 0.5
+    ),
+    File = c("Base", "Intervention")
+  ),
+  mapping = ggplot2::aes(yintercept = yintercept),
+  color = "red"
+) + ggplot2::labs(
+  x = "Time (Units: Characteristic Times)",
+  y = "Species by Size",
+  caption = paste0("file: ", paste(fileBaseResult, fileInterventionResult))
+) + ggplot2::theme_bw(
+) + ggplot2::facet_wrap(
+  . ~ File, ncol = 2
+)
+
+plot_0_JaccardTrue <- bootstrapSamples %>% dplyr::filter(
+  Type == "Space for time", TimeSinceStart == 0
+) %>% dplyr::group_by(
+  Bootstrap, Time, Control
+) %>% dplyr::group_modify(
+  .f = SpeciesStringsToBeta
+) %>% dplyr::group_by(
+  Bootstrap, Time, Control
+) %>% dplyr::summarise(
+  ymin = quantile(Jaccard, probs = 0.95),
+  ymax = quantile(Jaccard, probs = 0.05),
+  Jaccard = quantile(Jaccard, probs = 0.50)
+) %>% ggplot2::ggplot(
+  ggplot2::aes(x = Time,
+               y = Jaccard, ymin = ymin, ymax = ymax)
+) + ggplot2::geom_ribbon(
+  alpha = 0.25
+) + ggplot2::geom_line(
+) + ggplot2::labs(
+  x = "Time (Units: Characteristic Times)",
+  y = "True Jaccard Dissimilarity (Presence/Absence)",
+  caption = "Inner 90% Interval and Median, Evaluated Only at (False) Disturbance Time"
+) + ggplot2::theme_bw() + ggplot2::geom_rug(
+  sides = "b"
+) + ggplot2::coord_cartesian(
+  ylim = c(0, 1)
+)
