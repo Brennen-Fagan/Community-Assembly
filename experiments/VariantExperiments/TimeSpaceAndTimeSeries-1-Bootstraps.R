@@ -18,8 +18,9 @@ bootstrapSeed <-
   # 36641133 # Used for 2023-07-06
   # 56901098 # Used for 2023-09-23
   # 83418616 # Used for 2023-09-24
-  12854863 # Used for 2023-09-25
+  # 12854863 # Used for 2023-09-25
   # 99701559 # Used for Hik6_2023-03-04, 56-6
+  11460190 # Used for 2023-11-13, Medium, not HIK6
 
 calculationsPlotLong <- FALSE
 logarithmicTimeScale <- TRUE
@@ -57,8 +58,8 @@ file_result2 <- NULL # "MNA-Hik6A-Cases-Prepared-1-56-6-2.RData"
 file_pool <-
   #"MNA-Hik6A-Cases-Prepared.RData"
   "MNA-ExampleOutcome-PoolMats-Env10.RData"
-load(file.path(directory, "Data_2023-09-25", file_result))
-load(file.path(directory, "Data_2023-09-25", file_pool))
+load(file.path(directory, "Data_2023-11-13", file_result))
+load(file.path(directory, "Data_2023-11-13", file_pool))
 
 if (!is.null(file_result2)) {
   results1 <- results
