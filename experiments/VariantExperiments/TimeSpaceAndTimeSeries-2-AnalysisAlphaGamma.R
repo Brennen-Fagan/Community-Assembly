@@ -650,7 +650,7 @@ plot_2_DeltaGamma <- ggplot2::ggplot(
 )
 
 ### Plot 3: ###################################################################
-target <- bootstrapSamplesPairedBeta %>% dplyr::filter(
+target <- bootstrapSamplesPairedBeta_Jaccard %>% dplyr::filter(
   !Meaningless
 ) %>% dplyr::group_by(
   Type, DistanceFromCenterExpRev, `Subset`
@@ -701,7 +701,7 @@ plot_1_PairedBetaDistGaps_Ribbon <- ggplot2::ggplot(
   ylim = c(0, 1)
 )
 
-target <- bootstrapSamplesTimedBeta %>% dplyr::filter(
+target <- bootstrapSamplesTimedBeta_Jaccard %>% dplyr::filter(
   !Meaningless
 ) %>% dplyr::group_by(
   Type, TimeGapNumber, `Subset`
@@ -751,6 +751,111 @@ plot_1_TimedBetaTimeGaps_Ribbon <- ggplot2::ggplot(
   subtitle = "Presence/Absence Beta Dissimilarity",
   caption = paste0("file: ", files_),
   ylab = "Jaccard Dissimilarity"
+) + ggplot2::coord_cartesian(
+  ylim = c(0, 1)
+)
+
+target <- bootstrapSamplesPairedBeta_BrayCurtis %>% dplyr::filter(
+  !Meaningless
+) %>% dplyr::group_by(
+  Type, DistanceFromCenterExpRev, `Subset`
+) %>% dplyr::rename(
+  y = `Bray`
+) %>% dplyr::summarise(
+  yminp = min(y),
+  ymin1 = quantile(y, probs = 0.025),
+  ymin2 = quantile(y, probs = 0.25),
+  ymedian = quantile(y, probs = 0.5),
+  ymean = mean(y),
+  ymax1 = quantile(y, probs = 1 - 0.25),
+  ymax2 = quantile(y, probs = 1 - 0.025),
+  ymaxp = max(y),
+  .groups = "drop"
+)
+
+plot_1_PairedBetaDistGaps_Ribbon_BrayCurtis <- ggplot2::ggplot(
+  target,
+  ggplot2::aes(
+    x = DistanceFromCenterExpRev,
+    fill = Type, group = Type, color = Type
+  )
+) + ggplot2::geom_ribbon( # Inner
+  ggplot2::aes(ymin = ymin2,
+               ymax = ymax1), alpha = 0.3
+) + ggplot2::geom_ribbon( # Outer
+  ggplot2::aes(ymin = ymin1,
+               ymax = ymax2), alpha = 0.2
+) + ggplot2::geom_line(
+  ggplot2::aes(y = ymedian), linetype = "dotted"
+) + ggplot2::geom_line(
+  ggplot2::aes(y = ymean), linetype = "dashed"
+) + ggplot2::geom_point( # Minimum detected
+  ggplot2::aes(y = yminp), shape = 22, alpha = 0.4
+) + ggplot2::geom_point( # Maximum detected
+  ggplot2::aes(y = ymaxp), shape = 22, alpha = 0.4
+) + ggplot2::facet_grid(
+  factor(`Subset`, ordered = TRUE, levels = c(
+    "All", "Det. In Control", "Not Det. In Control"
+  )) ~ Type
+) + ggplot2::labs(
+  title = "Paired Beta, Varying Distance, Gap = 10 * lambda",
+  subtitle = "Beta Dissimilarity",
+  caption = paste0("file: ", files_),
+  ylab = "Bray-Curtis Dissimilarity"
+) + ggplot2::coord_cartesian(
+  ylim = c(0, 1)
+)
+
+target <- bootstrapSamplesTimedBeta_BrayCurtis %>% dplyr::filter(
+  !Meaningless
+) %>% dplyr::group_by(
+  Type, TimeGapNumber, `Subset`
+) %>% dplyr::rename(
+  y = `Bray`
+) %>% dplyr::summarise(
+  yminp = min(y),
+  ymin1 = quantile(y, probs = 0.025),
+  ymin2 = quantile(y, probs = 0.25),
+  ymedian = quantile(y, probs = 0.5),
+  ymean = mean(y),
+  ymax1 = quantile(y, probs = 1 - 0.25),
+  ymax2 = quantile(y, probs = 1 - 0.025),
+  ymaxp = max(y),
+  .groups = "drop"
+)
+
+plot_1_TimedBetaTimeGaps_Ribbon_BrayCurtis <- ggplot2::ggplot(
+  target,
+  ggplot2::aes(
+    x = TimeGapNumber,
+    fill = Type, group = Type, color = Type
+  )
+) + ggplot2::geom_ribbon( # Inner
+  ggplot2::aes(ymin = ymin2,
+               ymax = ymax1), alpha = 0.3
+) + ggplot2::geom_ribbon( # Outer
+  ggplot2::aes(ymin = ymin1,
+               ymax = ymax2), alpha = 0.2
+) + ggplot2::geom_line(
+  ggplot2::aes(y = ymedian), linetype = "dotted"
+) + ggplot2::geom_line(
+  ggplot2::aes(y = ymean), linetype = "dashed"
+) + ggplot2::geom_point( # Minimum detected
+  ggplot2::aes(y = yminp), shape = 22, alpha = 0.4
+) + ggplot2::geom_point( # Maximum detected
+  ggplot2::aes(y = ymaxp), shape = 22, alpha = 0.4
+) + ggplot2::facet_grid(
+  factor(`Subset`, ordered = TRUE, levels = c(
+    "All", "Det. In Control", "Not Det. In Control"
+  )) ~ Type
+) + ggplot2::labs(
+  title = paste0(
+    "Paired Beta, Maximal Distance, Varying Time Gap",
+    if (logarithmicTimeScale) ", Log Scale X")
+  ,
+  subtitle = "Beta Dissimilarity",
+  caption = paste0("file: ", files_),
+  ylab = "Bray-Curtis Dissimilarity"
 ) + ggplot2::coord_cartesian(
   ylim = c(0, 1)
 )
