@@ -353,10 +353,11 @@ SpeciesStringsToBeta <- function(
 
   if (PresenceAbsence) comdatmat <- comdatmat > 0
 
+  # Short for Jaccard, our default.
   Jacs <- vegan::vegdist(method = tolower(Method), x = comdatmat)
 
   data.frame(
-    Jaccard = Jacs[1:length(Jacs)],
+    Beta = Jacs[1:length(Jacs)],
     Patch1 = rep(attr(Jacs, "Labels"), (length(attr(Jacs, "Labels"))-1):0),
     Patch2 = attr(Jacs, "Labels")[
       sequence(from = seq_along(attr(Jacs, "Labels"))[-1],

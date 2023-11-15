@@ -81,8 +81,8 @@ bootstrapSamplesPairedAlpha <- bootstrapSamples %>% dplyr::mutate(
   ),
   DistanceFromCenterExpRev = ifelse(Control == "Experiment" &
                                       Type == "Space for time",
-                                   -DistanceFromCenter,
-                                   DistanceFromCenter)
+                                    -DistanceFromCenter,
+                                    DistanceFromCenter)
 ) %>% dplyr::ungroup(
 ) %>% dplyr::group_by(
   DistanceFromCenterExpRev, Bootstrap, TimeGapNumber, Type
@@ -218,7 +218,7 @@ bootstrapSamplesDeltaGamma <- bootstrapSamples %>% dplyr::group_by(
 ### Beta: #####################################################################
 # Break into pairs across time and space that test the effect of temporal and
 # spatial distance.
-bootstrapSamplesPairedBeta <- bootstrapSamples %>% addDistanceColumns(
+bootstrapSamplesPairedBeta_source <- bootstrapSamples %>% addDistanceColumns(
   mindig = ceiling(-log10(min(diff(result_$Abundance[, 1])))),
   Time = timeColumn
 ) %>% dplyr::mutate(
@@ -234,119 +234,119 @@ bootstrapSamplesPairedBeta <- bootstrapSamples %>% addDistanceColumns(
 #    once for fixed patches and
 #    once for fixed times.
 
-bootstrapSamplesPairedBeta_all <-
-  bootstrapSamplesPairedBeta %>% dplyr::filter(
+postfixes <- c(", All", ", Det. In Control", ", Not Det. In Control")
+betacolumns <- c("SamplingIDs", "SamplingIDsNative", "SamplingIDsInvasive")
+
+# # Prepared looks like, with indicator as the first grouping variable.
+# bootstrapSamplesPairedBeta_source %>% dplyr::filter(
+#   TimeGapNumber == preferredTimeGap
+# ) %>% dplyr::group_by(
+#   DistanceFromCenterExpRev, Bootstrap, Type
+# )
+# # or like
+# bootstrapSamplesPairedBeta_source %>% dplyr::filter(
+#   DistanceFromCenterExpRev == 0
+# ) %>% dplyr::group_by(
+#   TimeGapNumber, Bootstrap, Type
+# )
+
+ConvertPreparedToBeta <- function(
+  prepared, columns, method, presenceabsence, postfixes, indicator
+) {
+  # Generate the Beta Diversities Across the Columns
+  retval <- lapply(
+    columns,
+    function(Column, dat, method) {
+      temp <- dat %>% dplyr::group_modify(
+        .f = SpeciesStringsToBeta,
+        SpeciesColumn = Column,
+        AbundanceColumn = Column,
+        PresenceAbsence = presenceabsence
+      )
+      colnames(temp)[colnames(temp) == "Beta"] <- method
+      return(temp)
+    },
+    dat = prepared,
+    method = method
+  )
+
+  # Rename in preparation for combining.
+  retval <- lapply(
+    seq_along(retval),
+    function(i, dat, postfixes) {
+      indices <- which(colnames(dat[[i]]) %in% c(method, "Meaningless"))
+      colnames(dat[[i]])[indices] <-
+        paste0(colnames(dat[[i]])[indices], postfixes[i])
+      dat[[i]]
+    },
+    dat = retval, postfixes = postfixes
+  )
+
+  # Combine
+  retval <- dplyr::full_join(
+    retval[[1]],
+    retval[[2]],
+    by = c(dplyr::all_of(indicator), "Bootstrap", "Type", "Patch1", "Patch2")
+  ) %>% dplyr::full_join(
+    retval[[3]],
+    by = c(dplyr::all_of(indicator), "Bootstrap", "Type", "Patch1", "Patch2")
+  ) %>% tidyr::pivot_longer(
+    cols = -c(dplyr::all_of(indicator), "Bootstrap", "Type", "Patch1", "Patch2"),
+    names_to = c("Measure", "Subset"),
+    names_sep = ", "
+  ) %>% tidyr::pivot_wider(
+    names_from = "Measure", values_from = "value"
+  )
+
+  return(retval)
+}
+
+bootstrapSamplesPairedBeta_Jaccard <- ConvertPreparedToBeta(
+  bootstrapSamplesPairedBeta_source %>% dplyr::filter(
     TimeGapNumber == preferredTimeGap
   ) %>% dplyr::group_by(
     DistanceFromCenterExpRev, Bootstrap, Type
-  ) %>% dplyr::group_modify(
-    .f = SpeciesStringsToBeta,
-    SpeciesColumn = "SamplingIDs",
-    AbundanceColumn = "SamplingIDs"
-  ) %>% dplyr::rename(
-    `Jaccard, All` = Jaccard,
-    `Meaningless, All` = Meaningless
-  )
-
-bootstrapSamplesPairedBeta_control <-
-  bootstrapSamplesPairedBeta %>% dplyr::filter(
-    TimeGapNumber == preferredTimeGap
-  ) %>% dplyr::group_by(
-    DistanceFromCenterExpRev, Bootstrap, Type
-  ) %>% dplyr::group_modify(
-    .f = SpeciesStringsToBeta,
-    SpeciesColumn = "SamplingIDsNative",
-    AbundanceColumn = "SamplingIDsNative"
-  ) %>% dplyr::rename(
-    `Jaccard, Det. In Control` = Jaccard,
-    `Meaningless, Det. In Control` = Meaningless
-  )
-
-bootstrapSamplesPairedBeta_notcontrol <-
-  bootstrapSamplesPairedBeta %>% dplyr::filter(
-    TimeGapNumber == preferredTimeGap
-  ) %>% dplyr::group_by(
-    DistanceFromCenterExpRev, Bootstrap, Type
-  ) %>% dplyr::group_modify(
-    .f = SpeciesStringsToBeta,
-    SpeciesColumn = "SamplingIDsInvasive",
-    AbundanceColumn = "SamplingIDsInvasive"
-  ) %>% dplyr::rename(
-    `Jaccard, Not Det. In Control` = Jaccard,
-    `Meaningless, Not Det. In Control` = Meaningless
-  )
-
-bootstrapSamplesTimedBeta_all <-
-  bootstrapSamplesPairedBeta %>% dplyr::filter(
-    DistanceFromCenterExpRev == 0
-  ) %>% dplyr::group_by(
-    TimeGapNumber, Bootstrap, Type
-  ) %>% dplyr::group_modify(
-    .f = SpeciesStringsToBeta,
-    SpeciesColumn = "SamplingIDs",
-    AbundanceColumn = "SamplingIDs"
-  ) %>% dplyr::rename(
-    `Jaccard, All` = Jaccard,
-    `Meaningless, All` = Meaningless
-  )
-
-bootstrapSamplesTimedBeta_control <-
-  bootstrapSamplesPairedBeta %>% dplyr::filter(
-    DistanceFromCenterExpRev == 0
-  ) %>% dplyr::group_by(
-    TimeGapNumber, Bootstrap, Type
-  ) %>% dplyr::group_modify(
-    .f = SpeciesStringsToBeta,
-    SpeciesColumn = "SamplingIDsNative",
-    AbundanceColumn = "SamplingIDsNative"
-  ) %>% dplyr::rename(
-    `Jaccard, Det. In Control` = Jaccard,
-    `Meaningless, Det. In Control` = Meaningless
-  )
-
-bootstrapSamplesTimedBeta_notcontrol <-
-  bootstrapSamplesPairedBeta %>% dplyr::filter(
-    DistanceFromCenterExpRev == 0
-  ) %>% dplyr::group_by(
-    TimeGapNumber, Bootstrap, Type
-  ) %>% dplyr::group_modify(
-    .f = SpeciesStringsToBeta,
-    SpeciesColumn = "SamplingIDsInvasive",
-    AbundanceColumn = "SamplingIDsInvasive"
-  ) %>% dplyr::rename(
-    `Jaccard, Not Det. In Control` = Jaccard,
-    `Meaningless, Not Det. In Control` = Meaningless
-  )
-
-# Collect and organize the format
-bootstrapSamplesTimedBeta <- dplyr::full_join(
-  bootstrapSamplesTimedBeta_all,
-  bootstrapSamplesTimedBeta_control,
-  by = c("TimeGapNumber", "Bootstrap", "Type", "Patch1", "Patch2")
-) %>% dplyr::full_join(
-  bootstrapSamplesTimedBeta_notcontrol,
-  by = c("TimeGapNumber", "Bootstrap", "Type", "Patch1", "Patch2")
-) %>% tidyr::pivot_longer(
-  cols = -c("TimeGapNumber", "Bootstrap", "Type", "Patch1", "Patch2"),
-  names_to = c("Measure", "Subset"),
-  names_sep = ", "
-) %>% tidyr::pivot_wider(
-  names_from = "Measure", values_from = "value"
+  ),
+  columns = betacolumns,
+  method = "Jaccard", presenceabsence = TRUE,
+  postfixes = postfixes,
+  indicator = "DistanceFromCenterExpRev"
 )
 
-bootstrapSamplesPairedBeta <- dplyr::full_join(
-  bootstrapSamplesPairedBeta_all,
-  bootstrapSamplesPairedBeta_control,
-  by = c("DistanceFromCenterExpRev", "Bootstrap", "Type", "Patch1", "Patch2")
-) %>% dplyr::full_join(
-  bootstrapSamplesPairedBeta_notcontrol,
-  by = c("DistanceFromCenterExpRev", "Bootstrap", "Type", "Patch1", "Patch2")
-) %>% tidyr::pivot_longer(
-  cols = -c("DistanceFromCenterExpRev", "Bootstrap", "Type", "Patch1", "Patch2"),
-  names_to = c("Measure", "Subset"),
-  names_sep = ", "
-) %>% tidyr::pivot_wider(
-  names_from = "Measure", values_from = "value"
+bootstrapSamplesPairedBeta_BrayCurtis <- ConvertPreparedToBeta(
+  bootstrapSamplesPairedBeta_source %>% dplyr::filter(
+    TimeGapNumber == preferredTimeGap
+  ) %>% dplyr::group_by(
+    DistanceFromCenterExpRev, Bootstrap, Type
+  ),
+  columns = betacolumns,
+  method = "Bray", presenceabsence = FALSE,
+  postfixes = postfixes,
+  indicator = "DistanceFromCenterExpRev"
+)
+
+bootstrapSamplesTimedBeta_Jaccard <- ConvertPreparedToBeta(
+  bootstrapSamplesPairedBeta_source %>% dplyr::filter(
+    DistanceFromCenterExpRev == 0
+  ) %>% dplyr::group_by(
+    TimeGapNumber, Bootstrap, Type
+  ),
+  columns = betacolumns,
+  method = "Jaccard", presenceabsence = TRUE,
+  postfixes = postfixes,
+  indicator = "TimeGapNumber"
+)
+
+bootstrapSamplesTimedBeta_BrayCurtis <- ConvertPreparedToBeta(
+  bootstrapSamplesPairedBeta_source %>% dplyr::filter(
+    DistanceFromCenterExpRev == 0
+  ) %>% dplyr::group_by(
+    TimeGapNumber, Bootstrap, Type
+  ),
+  columns = betacolumns,
+  method = "Bray", presenceabsence = FALSE,
+  postfixes = postfixes,
+  indicator = "TimeGapNumber"
 )
 
 # Plotting: ###################################################################
@@ -364,13 +364,13 @@ plot_1_DeltaAlpha <- ggplot2::ggplot(
 ) + ggplot2::geom_line(
   data = bootstrapSamplesDeltaAlpha %>% dplyr::left_join(
     bootstrapSamplesDeltaAlpha %>% dplyr::group_by(
-    Bootstrap
-  ) %>% dplyr::filter(
-    `Species Subset` == "Overall"
-  ) %>% dplyr::arrange(Type) %>% dplyr::summarise(
-    Slope = diff(`Difference of Average Number of Species in Patch`)
-  ),
-  by = "Bootstrap"
+      Bootstrap
+    ) %>% dplyr::filter(
+      `Species Subset` == "Overall"
+    ) %>% dplyr::arrange(Type) %>% dplyr::summarise(
+      Slope = diff(`Difference of Average Number of Species in Patch`)
+    ),
+    by = "Bootstrap"
   ),
   ggplot2::aes(group = Bootstrap, color = Slope),
   alpha = 0.2
@@ -384,9 +384,9 @@ plot_1_DeltaAlpha <- ggplot2::ggplot(
   caption = paste0("file: ", files_)
 ) + ggplot2::scale_color_viridis_c(
   option = "C"
-  ) + ggplot2::coord_cartesian(
-    ylim = ylimRichnessChange
-  )
+) + ggplot2::coord_cartesian(
+  ylim = ylimRichnessChange
+)
 
 # Note: Can try to establish if there is correlation here.
 # with(
@@ -437,7 +437,7 @@ plot_1_PairedAlphaStart <- ggplot2::ggplot(
   caption = paste0("file: ", files_)
 ) + ggplot2::scale_color_viridis_c(
   option = "C"
-  ) + ggplot2::coord_cartesian(
+) + ggplot2::coord_cartesian(
   ylim = ylimRichnessChange
 )
 
@@ -525,7 +525,7 @@ plot_1_TimedAlphaTimeGaps <- ggplot2::ggplot(
   title = paste0(
     "Paired Alpha, Average over Patches, Varying Gaps",
     if (logarithmicTimeScale) ", Log Scale X")
-    ,
+  ,
   subtitle = "Difference is Experiment - Control",
   caption = paste0("file: ", files_)
 ) + ggplot2::coord_cartesian(
