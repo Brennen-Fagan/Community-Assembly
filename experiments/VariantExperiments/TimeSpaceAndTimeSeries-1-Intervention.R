@@ -525,12 +525,12 @@ plot_0_JaccardTrue <- bootstrapSamples %>% dplyr::filter(
 ) %>% dplyr::group_by(
   Bootstrap, Time, Control
 ) %>% dplyr::summarise(
-  ymin = quantile(Jaccard, probs = 0.95),
-  ymax = quantile(Jaccard, probs = 0.05),
-  Jaccard = quantile(Jaccard, probs = 0.50)
+  ymin = quantile(Beta, probs = 0.95),
+  ymax = quantile(Beta, probs = 0.05),
+  Beta = quantile(Beta, probs = 0.50)
 ) %>% ggplot2::ggplot(
   ggplot2::aes(x = Time,
-               y = Jaccard, ymin = ymin, ymax = ymax)
+               y = Beta, ymin = ymin, ymax = ymax)
 ) + ggplot2::geom_ribbon(
   alpha = 0.25
 ) + ggplot2::geom_line(
