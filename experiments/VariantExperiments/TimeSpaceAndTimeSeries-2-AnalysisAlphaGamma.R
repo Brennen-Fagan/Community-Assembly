@@ -22,14 +22,11 @@ ylimRichnessChange <- c(-10, 10)
 # experiment.
 # Edit: This reflects In\'es's idea that it is the difference between number of
 # species between control and experiment.
-bootstrapSamplesDeltaAlpha <- bootstrapSamples %>% dplyr::mutate(
-  TrueAlpha = unlist(lapply(strsplit(SamplingNonZeroSpecies, ", "), length))
-) %>% dplyr::group_by(
+bootstrapSamplesDeltaAlpha <- bootstrapSamples %>% dplyr::group_by(
   # Average across patches first.
   Type, Control, Bootstrap
 ) %>% dplyr::summarise(
   AverageSamplingAlpha = mean(SamplingAlpha),
-  AverageTrueAlpha = mean(TrueAlpha),
   AverageSamplingAlphaNative = mean(SamplingAlphaNative),
   AverageSamplingAlphaInvasive = mean(SamplingAlphaInvasive),
   .groups = "drop"
@@ -43,17 +40,15 @@ bootstrapSamplesDeltaAlpha <- bootstrapSamples %>% dplyr::mutate(
   )
 ) %>% dplyr::summarise(
   DeltaAverageSamplingAlpha = sum(AverageSamplingAlpha),
-  DeltaAverageTrueAlpha = sum(AverageTrueAlpha),
   DeltaAverageSamplingAlphaNative = sum(AverageSamplingAlphaNative),
   DeltaAverageSamplingAlphaInvasive = sum(AverageSamplingAlphaInvasive),
   .groups = "drop"
 ) %>% dplyr::rename(
   `Overall` = DeltaAverageSamplingAlpha,
-  `True` = DeltaAverageTrueAlpha,
   `Detected in Control` = DeltaAverageSamplingAlphaNative,
   `Not Detected in Control` = DeltaAverageSamplingAlphaInvasive
 ) %>% tidyr::pivot_longer(
-  cols = c(`Overall`, `True`, `Detected in Control`, `Not Detected in Control`),
+  cols = c(`Overall`, `Detected in Control`, `Not Detected in Control`),
   names_to = "Species Subset",
   values_to = "Difference of Average Number of Species in Patch"
 )
@@ -318,7 +313,7 @@ plot_1_DeltaAlpha <- ggplot2::ggplot(
   alpha = 0.2
 ) + ggplot2::facet_wrap(
   factor(`Species Subset`, ordered = TRUE, levels = c(
-    "True", "Overall", "Detected in Control", "Not Detected in Control"
+    "Overall", "Detected in Control", "Not Detected in Control"
   )) ~ .
 ) + ggplot2::labs(
   title = "Delta Alpha",
