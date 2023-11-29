@@ -257,7 +257,7 @@ computeSpeciesInControl <- function(sampling,
     dplyr::across(dplyr::all_of(Time)), Patch
   ) %>% dplyr::group_modify(
     .f = function(x, y) {
-      splitIDs <- strsplit(x[, IDColNum], ", ", fixed = T)[[1]]
+      splitIDs <- strsplit(x[[IDColumn]], ", ", fixed = T)[[1]]
       iDsInControl <- splitIDs %in% controlSpecies
 
       # Note: group_by (Patch) enforces Alpha / Local scale
