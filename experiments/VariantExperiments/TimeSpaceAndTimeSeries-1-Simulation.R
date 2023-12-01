@@ -8,6 +8,14 @@
 # runif(1) * 1e8
 simulations <- 100
 simulationsDictionaryChoice <- 1
+interventionChoice <- 
+  1. # The change does not occur, but the scientists don't know that!
+  # 2. # The change occurs, is discontinuous, and local, e.g. forest fire.
+  # 3. # The change is slow and local, e.g. gradual deforestation.
+  # 4. # The change occurs on all patches, e.g. climate change.
+  # 5. # Two changes, one following 2, the other 4.
+  # 6. # Two changes, one following 3, the other 4.
+
 cores <- 3
 
 simulationsDictionary <- data.frame(
@@ -90,17 +98,31 @@ stopifnot(length(.sFile1) == length(.sFile2),
     0, simulation$Abundance[, -1]
   )
   
+  # Interesting problem: we need everything to be on the same time scales.
+  # We already use the reaction times as our best proxy/control of the time
+  # scale, so we'll reformat all of the times using those.
+  simulation$Abundance[, 1] <-
+    simulation$Abundance[, 1] / simulation$ReactionTime
+  simulation$Events$Times <-
+    simulation$Events$Times / simulation$ReactionTime
+  
   load(fpool)
   
+  # Some files we might be interested in have multiple pools bundled.
+  # This code uses the file names to extract the correct one.
   if (exists("pools") && !exists("Pool")) {
     IDNumbers <- sub(basename(file1), pattern = ".RData", replacement = "")
     IDNumbers <- strsplit(IDNumbers, split = "-", fixed = TRUE)[[1]]
-    IDNumbers <- IDNumbers[(which(IDNumbers == "Prepared") + 1):length(IDNumbers)]
+    IDNumbers <- IDNumbers[
+      (which(IDNumbers == "Prepared") + 1):length(IDNumbers)
+      ]
     IDNumbers <- as.numeric(IDNumbers)
-    Pool <- pools[[cases$Parameters[IDNumbers[2]]]][[cases$System[IDNumbers[2]]]]
-    # Why 2? 1 == File / Main Case, 2 == row of cases (derived from row of CSV)
+    Pool <- pools[[cases$Parameters[IDNumbers[2]]]][[
+      cases$System[IDNumbers[2]]
+      ]]
+    # Why 2? 1 == File / Main Case, 2 == row of cases (derived from CSV row)
     # 3 == The seeds used, 4 == which part of the simulation was saved.
-    # Note 3 and 4 are optional if all simulations of a row were saved together.
+    # Note 3 & 4 are optional if all simulations of a row were saved together.
   }
   
   return(list(
@@ -116,3 +138,33 @@ stopifnot(length(.sFile1) == length(.sFile2),
 }
 
 # Setup and Framing: ##########################################################
+# (Supposing omniscience == know all information about the present, !future:)
+# Two researchers, an omniscient recorder, and a dimension hopping omniscient 
+# recorder come upon a set of sites after having been told that the
+# local government has designated them for some form of land use change
+# (e.g. fertilizer, w/e). The first researcher arrives with some time
+# before the change is implemented and will compare the sites before and after 
+# the land use change. The second researcher is too late and needs to compare
+# instead with surrounding sites that did not undergo the land use change.
+# Meanwhile the omniscient recorder knows the actual changes (no sampling), and
+# the dimension hopper *also* knows what would have happened if the land use 
+# change did not, in fact, occur.
+#
+# Furthermore, suppose that there are 6 universes, each with a separate change:
+#   1. The change does not occur, but the scientists don't know that!
+#   2. The change occurs, is discontinuous, and local, e.g. forest fire.
+#   3. The change is slow and local, e.g. gradual deforestation.
+#   4. The change occurs on all patches, e.g. climate change.
+#   5. Two changes, one following 2, the other 4.
+#   6. Two changes, one following 3, the other 4.
+#
+# How do the four observers' results differ between each other in each universe?
+# Consider the impact of sites monitored (incl. quantity),
+#                        monitoring effectiveness (e.g. sampling intensity),
+#                        and length of monitoring.
+#
+# For comparability, interventions are all considered to start at the same time,
+# but the samples we compare may be midway through or after interventions, esp.
+# when comparing slow to fast or immediate interventions.
+
+
