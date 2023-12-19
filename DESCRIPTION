@@ -1,7 +1,7 @@
 Package: RMTRCode2
 Type: Package
 Title: Community Assembly (Sensu Law and Morton 1996) in an Archipelago with Dispersal
-Version: 0.2
+Version: 0.2.1
 Date: 2023-02-17
 Author: Brennen Fagan
 Maintainer: Brennen Fagan <brennen.fagan@york.ac.uk>
