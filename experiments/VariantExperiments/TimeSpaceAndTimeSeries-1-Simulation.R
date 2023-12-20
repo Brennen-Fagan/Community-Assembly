@@ -8,18 +8,18 @@
 # runif(1) * 1e8
 simulations <- 100
 simulationsDictionaryChoice <- 1
-interventionChoice <- 
+interventionChoice <-
   1. # The change does not occur, but the scientists don't know that!
-  # 2. # The change occurs, is discontinuous, and local, e.g. forest fire.
-  # 3. # The change is slow and local, e.g. gradual deforestation.
-  # 4. # The change occurs on all patches, e.g. climate change.
-  # 5. # Two changes, one following 2, the other 4.
-  # 6. # Two changes, one following 3, the other 4.
+# 2. # The change occurs, is discontinuous, and local, e.g. forest fire.
+# 3. # The change is slow and local, e.g. gradual deforestation.
+# 4. # The change occurs on all patches, e.g. climate change.
+# 5. # Two changes, one following 2, the other 4.
+# 6. # Two changes, one following 3, the other 4.
 
 cores <- 3
 
 simulationsDictionary <- data.frame(
-  SourceSimulations = c( 
+  SourceSimulations = c(
     # Sets of files, as a string, that can be split with ", ".
     # NOTE: Files should be generated with same parameters for comparability.
     # NOTE: Use file.path if you need files in directories.
@@ -90,14 +90,14 @@ stopifnot(length(.sFile1) == length(.sFile2),
   fpool = iterators::iter(.sFile2)
 ) %op% {
   simulation <- loadSimulation(file1, if(file2 != "NA") file2)
-  
+
   # Make sure we clear out any extinct abundances:
   simulation$Abundance[, -1] <- ifelse(
     simulation$Abundance[, -1] <
       simulation$Parameters$EliminationThreshold,
     0, simulation$Abundance[, -1]
   )
-  
+
   # Interesting problem: we need everything to be on the same time scales.
   # We already use the reaction times as our best proxy/control of the time
   # scale, so we'll reformat all of the times using those.
@@ -105,9 +105,9 @@ stopifnot(length(.sFile1) == length(.sFile2),
     simulation$Abundance[, 1] / simulation$ReactionTime
   simulation$Events$Times <-
     simulation$Events$Times / simulation$ReactionTime
-  
+
   load(fpool)
-  
+
   # Some files we might be interested in have multiple pools bundled.
   # This code uses the file names to extract the correct one.
   if (exists("pools") && !exists("Pool")) {
@@ -124,7 +124,7 @@ stopifnot(length(.sFile1) == length(.sFile2),
     # 3 == The seeds used, 4 == which part of the simulation was saved.
     # Note 3 & 4 are optional if all simulations of a row were saved together.
   }
-  
+
   return(list(
     ID = id,
     File1 = file1,
@@ -139,15 +139,15 @@ stopifnot(length(.sFile1) == length(.sFile2),
 
 # Setup and Framing: ##########################################################
 # (Supposing omniscience == know all information about the present, !future:)
-# Two researchers, an omniscient recorder, and a dimension hopping omniscient 
+# Two researchers, an omniscient recorder, and a dimension hopping omniscient
 # recorder come upon a set of sites after having been told that the
 # local government has designated them for some form of land use change
 # (e.g. fertilizer, w/e). The first researcher arrives with some time
-# before the change is implemented and will compare the sites before and after 
+# before the change is implemented and will compare the sites before and after
 # the land use change. The second researcher is too late and needs to compare
 # instead with surrounding sites that did not undergo the land use change.
 # Meanwhile the omniscient recorder knows the actual changes (no sampling), and
-# the dimension hopper *also* knows what would have happened if the land use 
+# the dimension hopper *also* knows what would have happened if the land use
 # change did not, in fact, occur.
 #
 # Furthermore, suppose that there are 6 universes, each with a separate change:
@@ -167,7 +167,7 @@ stopifnot(length(.sFile1) == length(.sFile2),
 # but the samples we compare may be midway through or after interventions, esp.
 # when comparing slow to fast or immediate interventions.
 
-# Choose a sigmoidal interpolation between the matrices. 
+# Choose a sigmoidal interpolation between the matrices.
 # Problem: we want no deviation at 0 or t = timespan, but not too much in mid.
 # Crit. Value = first numb. in tanh. 4 => 2% dev at edge, ~75% done in mid. 50%.
 # Require: Output is a function.
@@ -175,13 +175,40 @@ stopifnot(length(.sFile1) == length(.sFile2),
 interpolateMatrices <- function(matrix1, matrix2, timespan) {
   stopifnot(dim(matrix1) == dim(matrix2))
   force(matrix1);force(matrix2);force(timespan)
-  function(t) {
+  function(t, ...) {
     matrix1 + (matrix2 - matrix1) * (tanh(4 * (t/timespan - 0.5)) + 1) / 2
   }
 }
-
-simulateIntervention <- function(
-  base, time, interactionMatrixFunction, reproductionRateFunction
-) {
-  PerCapitaDynamics
+switchMatrices <- function(matrix1, matrix2, time) {
+  stopifnot(dim(matrix1) == dim(matrix2))
+  force(matrix1);force(matrix2);force(timespan)
+  function(t, ...) {
+    if (t < time) {
+      matrix1
+    } else if (t > time) {
+      matrix2
+    } else {
+      (matrix1 + matrix2)/2
+    }
+  }
 }
+
+# If we've coded things correctly, we should be able to re-run our original
+# RMTRCode2::MultipleNumericalAssembly_Dispersal(...) simulation.
+# Recall that this function
+#   1) can start from arbitrary initial populations and times,
+#   2) does not need the interaction matrices themselves,
+#   3) only needs the pool size to not change, the rest of the pool can,
+#   4) can take the fixed events list, and
+#   5) can take any PerCapitaDynamics that accepts (t, y, parms) arguments.
+# Downsides:
+#   1) we'll have to fix a characteristic rate. Pick the most frequent sampling.
+#   2) The DispersalMatrix will need to remain fixed.
+
+# In order to charge ahead then, we need to
+#   1) pick a base file and history,
+#   2) reformat it to meet the MNAD criteria,
+#   3) create a PerCapitaDynamics function to pass to MNAD.
+# The last of these can have some preparation ahead of time.
+
+
