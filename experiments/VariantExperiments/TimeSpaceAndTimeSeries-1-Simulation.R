@@ -15,6 +15,8 @@ interventionChoice <-
 # 4. # The change occurs on all patches, e.g. climate change.
 # 5. # Two changes, one following 2, the other 4.
 # 6. # Two changes, one following 3, the other 4.
+# 2, 3 are interaction matrix changes.
+# 4 is inspired from Amarasekare's 2019(?) paper on temperature -> pred-prey.
 
 cores <- 1
 
@@ -60,6 +62,9 @@ simulationsDictionary <- data.frame(
       file.path("Data_2023-09-26",
                 "MNA-ExampleOutcome-PoolMats-Env10.RData")
       ), collapse = ", ")
+  ),
+  DynamicsFunction = c(
+    "RMTRCode2::PerCapitaDynamics_Type1"
   ),
   Seeds = c(# runif(1) * 1e8
     69148611
@@ -159,7 +164,6 @@ stopifnot(length(.sFile1) == length(.sFile2),
   # The * 2 makes sure we're also outside the burnout as well as that we have
   # enough time for sampling.
 
-
   return(list(
     ID = id,
     File1 = file1,
@@ -169,6 +173,7 @@ stopifnot(length(.sFile1) == length(.sFile2),
     NSpec = nrow(Pool),
     Simulation = simulation,
     Pool = Pool,
+    InteractionMatrices = InteractionMatrices,
     IntervenableTimes = c(
       125, # Identified by inspection.
       lastTimeSampleable
@@ -260,6 +265,24 @@ interpolateMatrices <- function(matrix1, matrix2, timespan, switchtime = 0) {
   }
 }
 
+### Retreive the stored dynamics function: ####################################
+DynFunc <- strsplit(.s$DynamicsFunction, split = "::")
+if (length(DynFunc) > 1) {
+  stop(paste0("Too many Dynamics Functions provided: ", length(DynFunc)))
+} else {
+  DynFunc <- DynFunc[[1]]
+}
+if (length(DynFunc) > 2) {
+  stop(paste0("Too many parts to Dynamics Function provided: ",
+              length(DynFunc)))
+} else if (length(DynFunc) == 2) {
+  DynFunc <- get(DynFunc[2], envir = loadNamespace(DynFunc[1]))
+} else if (length(DynFunc) == 1) {
+  DynFunc <- get(DynFunc[1])
+} else {
+  stop("No parts found for Dynamics Function.")
+}
+
 # Intervention Simulation: ####################################################
 # If we've coded things correctly, we should be able to re-run our original
 # RMTRCode2::MultipleNumericalAssembly_Dispersal(...) simulation.
@@ -280,10 +303,41 @@ interpolateMatrices <- function(matrix1, matrix2, timespan, switchtime = 0) {
 
 results <- foreach::foreach(
   id = 1:simulationsNumber,
-  s = iterators::iter(.s),
-  .options.RNG = simulationsDictionary$Seeds
+  s = iterators::iter(.s), # Picks Base File and History (not random!).
+  .options.RNG = simulationsDictionary$Seeds,
+  .combine = "rbind",
+  .packages = c("dplyr")
 ) %dorng% {
-  # Pick a random time to start sampling from.
+  # Pick a random patch as control, rest as experiment.
+  # is adding 1:5 (or w/e) okay? Yes, we're assuming contiguous patches.
+  control <- ((sample.int(nPatches, 1) + 1:(nPatches / 2) ) %% nPatches) + 1
+  # print(paste(bootstrapID, ":", toString(control)))
+  experiment <- c(1:nPatches)[!c(1:nPatches) %in% control]
+  # print(paste(bootstrapID, ":", toString(experiment)))
+
+  # Pick a random time to start the intervention and sampling from.
+  timeIntervention <- runif(
+    n = 1, min = s$IntervenableTimes[1], max = s$IntervenableTimes[2]
+  )
+
+  timeInterventionRow <- which.max(
+    s$Simulation$Abundance[, 1] > timeIntervention
+  ) - 1
+
+  # Create the intervention per capita dynamics.
+  # DynFunc follows archetype of formal arguments:
+  #  1) ReproductionRate, 2) InteractionMatrices, 3) NumEnvironments.
+  # TODO: Add support (how? partial completion?) for other arguments,
+  #       e.g. Mutualistic1's SpeciesTypes and Saturations.
+  PerCapDyn <- switch(
+    interventionChoice,
+    DynFunc(actTrivially(s$Pool$ReproductionRate),
+            actTrivially(s$InteractionMatrices),
+            s$NEnvs),
+    DynFunc()
+  )
+
+  # Perform the intervention simulation.
 
   # Note to thin the sampling times if they are smaller than the minimum
   # timelength difference in the data.
