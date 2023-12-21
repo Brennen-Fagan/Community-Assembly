@@ -61,7 +61,7 @@ simulationsDictionary <- data.frame(
                 "MNA-ExampleOutcome-PoolMats-Env10.RData"),
       file.path("Data_2023-09-26",
                 "MNA-ExampleOutcome-PoolMats-Env10.RData")
-      ), collapse = ", ")
+    ), collapse = ", ")
   ),
   DynamicsFunction = c(
     "RMTRCode2::PerCapitaDynamics_Type1"
@@ -226,8 +226,8 @@ if(samplingTimeScaleLogarithmic) {
   ))))
 } else {
   samplingTimes <- seq(from = 0,
-                   by = samplingMaxTime/samplingQuantity,
-                   to = samplingMaxTime)
+                       by = samplingMaxTime/samplingQuantity,
+                       to = samplingMaxTime)
 }
 
 ### Interventions: ############################################################
@@ -246,6 +246,19 @@ switchMatrices <- function(matrix1, matrix2, switchtime) {
     }
   }
 }
+switchMatrixLists <- function(matrixlist1, matrixlist2, switchtimes) {
+  stopifnot(length(matrixlist1) == length(matrixlist2))
+  stopifnot(length(matrixlist1) == length(switchtimes) ||
+              length(switchtimes) == 1)
+  lapply(seq_along(matrixlist1), function(i, m1, m2, st) {
+    switchMatrices(m1[[i]], m2[[i]], st[i])
+  },
+  m1 = matrixlist1, m2 = matrixlist2,
+  st = if (length(switchtimes) == 1) {
+    rep(switchtimes, length(matrixlist1))
+  } else {switchtimes}
+  )
+}
 # Choose a sigmoidal interpolation between the matrices.
 # Problem: we want no deviation at 0 or t = timespan, but not too much in mid.
 # Crit. Value = first numb. in tanh. 4 => 2% dev at edge, ~75% done in mid. 50%.
@@ -256,13 +269,33 @@ interpolateMatrices <- function(matrix1, matrix2, timespan, switchtime = 0) {
   force(matrix1);force(matrix2);force(timespan)
   function(t, ...) {
     # if (t < switchtime) {
-      # matrix1
+    # matrix1
     # } else {
-      matrix1 + (matrix2 - matrix1) * (
-        tanh(4 * ( (t - switchtime) /timespan - 0.5)) + 1
-      ) / 2
+    matrix1 + (matrix2 - matrix1) * (
+      tanh(4 * ( (t - switchtime) /timespan - 0.5)) + 1
+    ) / 2
     # }
   }
+}
+interpolateMatrixLists <- function(
+  matrixlist1, matrixlist2, timespans, switchtimes
+) {
+  stopifnot(length(matrixlist1) == length(matrixlist2))
+  stopifnot(length(matrixlist1) == length(timespans) ||
+              length(timespans) == 1)
+  stopifnot(length(matrixlist1) == length(switchtimes) ||
+              length(switchtimes) == 1)
+  lapply(seq_along(matrixlist1), function(i, m1, m2, ts, st) {
+    interpolateMatrices(m1[[i]], m2[[i]], ts[i], st[i])
+  },
+  m1 = matrixlist1, m2 = matrixlist2,
+  ts = if (length(timespans) == 1) {
+    rep(timespans, length(matrixlist1))
+  } else {timespans},
+  st = if (length(switchtimes) == 1) {
+    rep(switchtimes, length(matrixlist1))
+  } else {switchtimes}
+  )
 }
 
 ### Retreive the stored dynamics function: ####################################
@@ -331,9 +364,20 @@ results <- foreach::foreach(
   #       e.g. Mutualistic1's SpeciesTypes and Saturations.
   PerCapDyn <- switch(
     interventionChoice,
+    # 1. # The change does not occur, but the scientists don't know that!
     DynFunc(actTrivially(s$Pool$ReproductionRate),
             actTrivially(s$InteractionMatrices),
             s$NEnvs),
+    # 2. # The change occurs, is discontinuous, and local, e.g. forest fire.
+    DynFunc(actTrivially(s$Pool$ReproductionRate),
+            switchMatrixLists()),
+    # 3. # The change is slow and local, e.g. gradual deforestation.
+    DynFunc(),
+    # 4. # The change occurs on all patches, e.g. climate change.
+    DynFunc(),
+    # 5. # Two changes, one following 2, the other 4.
+    DynFunc(),
+    # 6. # Two changes, one following 3, the other 4.
     DynFunc()
   )
 
