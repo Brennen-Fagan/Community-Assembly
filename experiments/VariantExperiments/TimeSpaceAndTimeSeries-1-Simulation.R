@@ -87,13 +87,21 @@ simulationsDictionary <- data.frame(
 
 interventionDictionary <- data.frame(
   DynamicsFunction = c(
+    "RMTRCode2::PerCapitaDynamics_Type1",
+    "RMTRCode2::PerCapitaDynamics_Type1",
     "RMTRCode2::PerCapitaDynamics_Type1"
   ),
   InteractionMatrixFunction = c(
+    "RMTRCode2::LawMorton1996_CommunityMat",
+    "RMTRCode2::LawMorton1996_CommunityMat",
     "RMTRCode2::LawMorton1996_CommunityMat"
   ),
   InteractionMatrixArguments = c(
-    "Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1)"
+    # I can't find a better way to create partials here then as strings.
+    # Suggestions welcome!
+    "Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1)",
+    "Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.2)",
+    "Parameters = c(0.01, 10, 0.5, 0.2, 100, 0)"
   )
 )[interventionParameterChoice, ]
 
@@ -321,22 +329,33 @@ interpolateMatrixLists <- function(
 }
 
 ### Retreive the stored dynamics function: ####################################
-DynFunc <- strsplit(.s$DynamicsFunction, split = "::")
-if (length(DynFunc) > 1) {
-  stop(paste0("Too many Dynamics Functions provided: ", length(DynFunc)))
-} else {
-  DynFunc <- DynFunc[[1]]
+retrieveFunction <- function(funcstring) {
+  funcstring <- strsplit(funcstring, split = "::")
+  if (length(funcstring) > 1) {
+    stop(paste0("Too many functions provided in string: ", length(funcstring)))
+  } else {
+    funcstring <- funcstring[[1]]
+  }
+  if (length(funcstring) > 2) {
+    stop(paste0("Too many parts to function provided: ",
+                length(funcstring)))
+  } else if (length(funcstring) == 2) {
+    funcstring <- get(funcstring[2], envir = loadNamespace(funcstring[1]))
+  } else if (length(funcstring) == 1) {
+    funcstring <- get(funcstring[1])
+  } else {
+    stop("No parts found for function.")
+  }
+  return(funcstring)
 }
-if (length(DynFunc) > 2) {
-  stop(paste0("Too many parts to Dynamics Function provided: ",
-              length(DynFunc)))
-} else if (length(DynFunc) == 2) {
-  DynFunc <- get(DynFunc[2], envir = loadNamespace(DynFunc[1]))
-} else if (length(DynFunc) == 1) {
-  DynFunc <- get(DynFunc[1])
-} else {
-  stop("No parts found for Dynamics Function.")
-}
+
+dynFunc <- retrieveFunction(interventionDictionary$DynamicsFunction)
+intMatFunc <- purrr::partial(
+  retrieveFunction(interventionDictionary$InteractionMatrixFunction),
+  eval(parse(text = interventionDictionary$InteractionMatrixArguments))
+  # Better solution desired!
+)
+
 
 # Intervention Simulation: ####################################################
 # If we've coded things correctly, we should be able to re-run our original
