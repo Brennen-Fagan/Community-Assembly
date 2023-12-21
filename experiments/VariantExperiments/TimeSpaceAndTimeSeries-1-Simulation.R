@@ -18,6 +18,23 @@ interventionChoice <-
 # 2, 3 are interaction matrix changes.
 # 4 is inspired from Amarasekare's 2019(?) paper on temperature -> pred-prey.
 
+interventionParameterChoice <- # Valid for some interventions
+  1. # 2,3: Intervention Matrix with Base Parameters
+# 2. # 2,3: Intervention Matrix with High Variance:Mean Ratio (0.1 -> 0.2)
+# 3. # 2,3: Intervention Matrix with Low Variance:Mean Ratio (0.1 -> 0)
+# 4. # NI, 4: Base parameters for changing LM1996.
+# 5. # NI, 5: Base parameters for changing Amarasekare2019.
+
+interventionTimeSpan <- 20 # for interventionChoices 3 and 4 only.
+# 20 seems like a good number to afford strong sampling on the transition
+# with still consistent sampling after the transition is effectively finished
+# for samplingMaxTime = 250 and Quantity = 100.
+
+samplingMaxTime <- 250 # This is roughly twice the observed burn-in time from 0.
+samplingQuantity <- 100 # Not guaranteed!
+samplingTimeScaleLogarithmic <- TRUE
+calculationsPlotLong <- FALSE
+
 cores <- 1
 
 # NOTE: Might be able to improve by splitting and collapsing Sources 1 and 2.
@@ -63,18 +80,22 @@ simulationsDictionary <- data.frame(
                 "MNA-ExampleOutcome-PoolMats-Env10.RData")
     ), collapse = ", ")
   ),
-  DynamicsFunction = c(
-    "RMTRCode2::PerCapitaDynamics_Type1"
-  ),
   Seeds = c(# runif(1) * 1e8
     69148611
   )
 )[simulationsDictionaryChoice, ]
 
-samplingMaxTime <- 250 # This is roughly twice the observed burn-in time from 0.
-samplingQuantity <- 100 # Not guaranteed!
-samplingTimeScaleLogarithmic <- TRUE
-calculationsPlotLong <- FALSE
+interventionDictionary <- data.frame(
+  DynamicsFunction = c(
+    "RMTRCode2::PerCapitaDynamics_Type1"
+  ),
+  InteractionMatrixFunction = c(
+    "RMTRCode2::LawMorton1996_CommunityMat"
+  ),
+  InteractionMatrixArguments = c(
+    "Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1)"
+  )
+)[interventionParameterChoice, ]
 
 # Libraries: ##################################################################
 library(dplyr)
@@ -216,11 +237,12 @@ stopifnot(length(.sFile1) == length(.sFile2),
 if(samplingTimeScaleLogarithmic) {
   # This version is symmetric on the log scale, centred on 1 time unit,
   # and ends at the time gap. Number of sampling times not guaranteed.
+  # The centre is chosen for its relevance to the characteristic time scale.
   samplingTimes <- c(0, unique(exp(c(
-    seq(from = 0,
+    seq(from = log(1),
         to = -log(samplingMaxTime),
         length.out = floor(samplingQuantity/2)),
-    seq(from = 0,
+    seq(from = log(1),
         to = log(samplingMaxTime),
         length.out = ceiling(samplingQuantity/2))
   ))))
@@ -370,15 +392,23 @@ results <- foreach::foreach(
             s$NEnvs),
     # 2. # The change occurs, is discontinuous, and local, e.g. forest fire.
     DynFunc(actTrivially(s$Pool$ReproductionRate),
-            switchMatrixLists()),
+            switchMatrixLists(s$InteractionMatrices,
+                              ,
+                              switchtimes = timeIntervention
+                              ),
+            s$NEnvs),
     # 3. # The change is slow and local, e.g. gradual deforestation.
-    DynFunc(),
+    DynFunc(actTrivially(s$Pool$ReproductionRate),
+            interpolateMatrixLists(s$InteractionMatrices,
+                                   ,
+                                   switchtimes = timeIntervention),
+            s$NEnvs),
     # 4. # The change occurs on all patches, e.g. climate change.
-    DynFunc(),
+    {stop("Not Implemented") DynFunc()},
     # 5. # Two changes, one following 2, the other 4.
-    DynFunc(),
+    {stop("Not Implemented") DynFunc()},
     # 6. # Two changes, one following 3, the other 4.
-    DynFunc()
+    {stop("Not Implemented") DynFunc()}
   )
 
   # Perform the intervention simulation.
