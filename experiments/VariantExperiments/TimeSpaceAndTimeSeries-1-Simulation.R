@@ -354,6 +354,8 @@ intMatFunc <- purrr::partial(
   retrieveFunction(interventionDictionary$InteractionMatrixFunction),
   eval(parse(text = interventionDictionary$InteractionMatrixArguments))
   # Better solution desired!
+  # Might need to use something like stackoverflow.com/a/47012149
+  # in the case of multiple arguments.
 )
 
 
@@ -403,6 +405,8 @@ results <- foreach::foreach(
   #  1) ReproductionRate, 2) InteractionMatrices, 3) NumEnvironments.
   # TODO: Add support (how? partial completion?) for other arguments,
   #       e.g. Mutualistic1's SpeciesTypes and Saturations.
+  # Below is roughly the idea, but we need to act differently between
+  # the control and the experimental cases.
   PerCapDyn <- switch(
     interventionChoice,
     # 1. # The change does not occur, but the scientists don't know that!
@@ -411,23 +415,33 @@ results <- foreach::foreach(
             s$NEnvs),
     # 2. # The change occurs, is discontinuous, and local, e.g. forest fire.
     DynFunc(actTrivially(s$Pool$ReproductionRate),
-            switchMatrixLists(s$InteractionMatrices,
-                              ,
-                              switchtimes = timeIntervention
-                              ),
+            switchMatrixLists(
+              s$InteractionMatrices,
+              RMTRCode2::CreateEnvironmentInteractions(
+                Pool = s$Pool, NumEnvironments = s$NEnvs,
+                ComputeInteractionMatrix = intMatFunc
+              ),
+              switchtimes = timeIntervention
+            ),
             s$NEnvs),
     # 3. # The change is slow and local, e.g. gradual deforestation.
     DynFunc(actTrivially(s$Pool$ReproductionRate),
-            interpolateMatrixLists(s$InteractionMatrices,
-                                   ,
-                                   switchtimes = timeIntervention),
+            interpolateMatrixLists(
+              s$InteractionMatrices,
+              RMTRCode2::CreateEnvironmentInteractions(
+                Pool = s$Pool, NumEnvironments = s$NEnvs,
+                ComputeInteractionMatrix = intMatFunc
+              ),
+              timespans = interventionTimeSpan,
+              switchtimes = timeIntervention
+            ),
             s$NEnvs),
     # 4. # The change occurs on all patches, e.g. climate change.
-    {stop("Not Implemented") DynFunc()},
+    {stop("Not Implemented"); DynFunc()},
     # 5. # Two changes, one following 2, the other 4.
-    {stop("Not Implemented") DynFunc()},
+    {stop("Not Implemented"); DynFunc()},
     # 6. # Two changes, one following 3, the other 4.
-    {stop("Not Implemented") DynFunc()}
+    {stop("Not Implemented"); DynFunc()}
   )
 
   # Perform the intervention simulation.
