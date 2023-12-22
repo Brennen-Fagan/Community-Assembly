@@ -80,7 +80,7 @@ simulationsDictionary <- data.frame(
                 "MNA-ExampleOutcome-PoolMats-Env10.RData")
     ), collapse = ", ")
   ),
-  Seeds = c(# runif(1) * 1e8
+  Seeds = c(# runif(1) * 1e8 # Unsure if this should be in the interventionDic.
     69148611
   )
 )[simulationsDictionaryChoice, ]
@@ -411,31 +411,61 @@ results <- foreach::foreach(
     interventionChoice,
     # 1. # The change does not occur, but the scientists don't know that!
     DynFunc(actTrivially(s$Pool$ReproductionRate),
-            actTrivially(s$InteractionMatrices),
+            actTrivially(s$InteractionMatrices$Mats),
             s$NEnvs),
     # 2. # The change occurs, is discontinuous, and local, e.g. forest fire.
-    DynFunc(actTrivially(s$Pool$ReproductionRate),
-            switchMatrixLists(
-              s$InteractionMatrices,
-              RMTRCode2::CreateEnvironmentInteractions(
-                Pool = s$Pool, NumEnvironments = s$NEnvs,
-                ComputeInteractionMatrix = intMatFunc
+    {
+      experimentMats <- RMTRCode2::CreateEnvironmentInteractions(
+        Pool = s$Pool, NumEnvironments = length(experiment),
+        ComputeInteractionMatrix = intMatFunc
+      )
+      mats <- list()
+      eMindex <- 1
+      for(i in 1:s$NEnvs) {
+        if (i %in% control) {
+          mats[[i]] <- s$InteractionMatrices$Mats[[i]]
+        } else if (i %in% experiment) {
+          mats[[i]] <- experimentMats$Mats[[eMindex]]
+          eMindex <- eMindex + 1
+        } else {
+          stop("An environment is not allocated to control or experiment.")
+        }
+      }
+      DynFunc(actTrivially(s$Pool$ReproductionRate),
+              switchMatrixLists(
+                s$InteractionMatrices$Mats,
+                mats,
+                switchtimes = timeIntervention
               ),
-              switchtimes = timeIntervention
-            ),
-            s$NEnvs),
+              s$NEnvs)
+    },
     # 3. # The change is slow and local, e.g. gradual deforestation.
-    DynFunc(actTrivially(s$Pool$ReproductionRate),
-            interpolateMatrixLists(
-              s$InteractionMatrices,
-              RMTRCode2::CreateEnvironmentInteractions(
-                Pool = s$Pool, NumEnvironments = s$NEnvs,
-                ComputeInteractionMatrix = intMatFunc
+    {
+      experimentMats <- RMTRCode2::CreateEnvironmentInteractions(
+        Pool = s$Pool, NumEnvironments = length(experiment),
+        ComputeInteractionMatrix = intMatFunc
+      )
+      mats <- list()
+      eMindex <- 1
+      for(i in 1:s$NEnvs) {
+        if (i %in% control) {
+          mats[[i]] <- s$InteractionMatrices$Mats[[i]]
+        } else if (i %in% experiment) {
+          mats[[i]] <- experimentMats$Mats[[eMindex]]
+          eMindex <- eMindex + 1
+        } else {
+          stop("An environment is not allocated to control or experiment.")
+        }
+      }
+      DynFunc(actTrivially(s$Pool$ReproductionRate),
+              interpolateMatrixLists(
+                s$InteractionMatrices,
+                mats,
+                timespans = interventionTimeSpan,
+                switchtimes = timeIntervention
               ),
-              timespans = interventionTimeSpan,
-              switchtimes = timeIntervention
-            ),
-            s$NEnvs),
+              s$NEnvs)
+    },
     # 4. # The change occurs on all patches, e.g. climate change.
     {stop("Not Implemented"); DynFunc()},
     # 5. # Two changes, one following 2, the other 4.
