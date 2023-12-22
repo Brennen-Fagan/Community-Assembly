@@ -102,6 +102,12 @@ interventionDictionary <- data.frame(
     "Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1)",
     "Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.2)",
     "Parameters = c(0.01, 10, 0.5, 0.2, 100, 0)"
+  ),
+  DispersalResistance = c(
+    Inf, Inf, Inf
+  ),
+  DispersalFormat = c(
+    "Ring", "Ring", "Ring"
   )
 )[interventionParameterChoice, ]
 
@@ -379,16 +385,16 @@ intMatFunc <- purrr::partial(
 
 results <- foreach::foreach(
   id = 1:simulationsNumber,
-  s = iterators::iter(.s), # Picks Base File and History (not random!).
+  s = iterators::iter(.s, recycle = TRUE), # File and History (not random!).
   .options.RNG = simulationsDictionary$Seeds,
   .combine = "rbind",
   .packages = c("dplyr")
 ) %dorng% {
   # Pick a random patch as control, rest as experiment.
   # is adding 1:5 (or w/e) okay? Yes, we're assuming contiguous patches.
-  control <- ((sample.int(nPatches, 1) + 1:(nPatches / 2) ) %% nPatches) + 1
+  control <- ((sample.int(s$NEnvs, 1) + 1:(s$NEnvs / 2) ) %% s$NEnvs) + 1
   # print(paste(bootstrapID, ":", toString(control)))
-  experiment <- c(1:nPatches)[!c(1:nPatches) %in% control]
+  experiment <- c(1:s$NEnvs)[!c(1:s$NEnvs) %in% control]
   # print(paste(bootstrapID, ":", toString(experiment)))
 
   # Pick a random time to start the intervention and sampling from.
@@ -400,8 +406,10 @@ results <- foreach::foreach(
     s$Simulation$Abundance[, 1] > timeIntervention
   ) - 1
 
+  stopifnot(timeInterventionRow > 0)
+
   # Create the intervention per capita dynamics.
-  # DynFunc follows archetype of formal arguments:
+  # DynFunc follows archetype with formal arguments:
   #  1) ReproductionRate, 2) InteractionMatrices, 3) NumEnvironments.
   # TODO: Add support (how? partial completion?) for other arguments,
   #       e.g. Mutualistic1's SpeciesTypes and Saturations.
@@ -475,6 +483,72 @@ results <- foreach::foreach(
   )
 
   # Perform the intervention simulation.
+
+  ## Events
+  eventsPostIntervention <-
+    s$Events %>% dplyr::filter(Times >
+                                 s$Simulation$Abundance[timeInterventionRow, 1])
+  # Why not timeIntervention? To make sure that we don't miss out on an event.
+  # Possibly unnecessary.
+
+  # Distance Matrix
+  if (interventionDictionary$DispersalFormat == "None") {
+    DistanceMatrix <- Matrix::sparseMatrix(
+      i = s$NEnvs, j = s$NEnvs, x = 0)
+  }
+  if (Space == "Ring" || Space == "Line")
+    DistanceMatrix <- Matrix::bandSparse(
+      s$NEnvs, k = c(-1, 1),
+      diagonals = list(
+        rep(interventionDictionary$DispersalResistance, s$NEnvs - 1),
+        rep(interventionDictionary$DispersalResistance, s$NEnvs - 1))
+    )
+  if (Space == "Ring") {
+    DistanceMatrix[s$NEnvs, 1] <-
+      interventionDictionary$DispersalResistance
+    DistanceMatrix[1, s$NEnvs] <-
+      interventionDictionary$DispersalResistance
+  }
+  if (Space == "Full") {
+    DistanceMatrix <- matrix(1, nrow = s$NEnvs, ncol = s$NEnvs)
+    diag(DistanceMatrix) <- 0
+  }
+
+  DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
+    EnvironmentDistances = DistanceMatrix,
+    SpeciesSpeeds = if(is.null(s$Pool$Speed)) {
+      rep(1, nrow(s$Pool))
+    } else {
+      rep(SpeciesSpeeds, nrow(s$Pool))
+    }
+  )
+
+  ## Pick fastest sampling characteristic rate.
+  if (exists("experimentMats")) {
+    charRate <- max(1/s$Simulation$ReactionTime,
+                    unlist(lapply(experimentMats, function(mat) {
+                      abs(eigen(mat, only.values = TRUE)$values)
+                    })))
+  } else {
+    charRate <- 1/s$Simulation$ReactionTime
+  }
+
+  ## Simulation
+  interventionSimulation <- RMTRCode2::MultipleNumericalAssembly_Dispersal(
+    PopulationInitial = s$Simulation$Abundance[timeInterventionRow, -1],
+    TimeInitial = s$Simulation$Abundance[timeInterventionRow, 1],
+    # This induces a slight delay compared to starting AT the intervention.
+    Pool = s$Pool,
+    NumEnvironments = s$NEnvs,
+    Events = eventsPostIntervention,
+    PerCapitaDynamics = PerCapDyn,
+    DispersalMatrix = DispersalMatrix,
+    EliminationThreshold = s$Simulation$Parameters$EliminationThreshold,
+    ArrivalDensity = s$Simulation$Parameters$ArrivalDensity,
+    MaximumTimeStep = s$Simulation$Parameters$MaximumTimeStep,
+    BetweenEventSteps = s$Simulation$Parameters$BetweenEventSteps,
+    CharacteristicRate = charRate
+  )
 
   # Note to thin the sampling times if they are smaller than the minimum
   # timelength difference in the data.
