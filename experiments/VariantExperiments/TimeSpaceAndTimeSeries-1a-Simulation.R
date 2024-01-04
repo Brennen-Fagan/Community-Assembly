@@ -3,6 +3,8 @@
 # we are now introducing a simulation based intervention.
 # Please see the previous files for some design choices, although we aim to
 # improve design at each stage.
+# For file management, we'll split up the sampling into a second file.
+# We'll pass through as records relevant simulation/intervention details.
 
 # Create a Master seed, which we'll use to generate simulation seeds.
 # runif(1) * 1e8
@@ -30,10 +32,11 @@ interventionTimeSpan <- 20 # for interventionChoices 3 and 4 only.
 # with still consistent sampling after the transition is effectively finished
 # for samplingMaxTime = 250 and Quantity = 100.
 
+#TODO MOVE TO SEQUEL.
 samplingMaxTime <- 250 # This is roughly twice the observed burn-in time from 0.
 samplingQuantity <- 100 # Not guaranteed!
 samplingTimeScaleLogarithmic <- TRUE
-calculationsPlotLong <- FALSE
+# calculationsPlotLong <- FALSE
 
 cores <- 1
 
@@ -533,6 +536,10 @@ results <- foreach::foreach(
     charRate <- 1/s$Simulation$ReactionTime
   }
 
+  #TODO: Undo the time scale normalisation on the event and simulation times.
+  # This is because they weren't performed on the simulation parameters
+  # (i.e. the species interactions, dispersal, and species properties).
+
   ## Simulation
   interventionSimulation <- RMTRCode2::MultipleNumericalAssembly_Dispersal(
     PopulationInitial = s$Simulation$Abundance[timeInterventionRow, -1],
@@ -547,9 +554,11 @@ results <- foreach::foreach(
     ArrivalDensity = s$Simulation$Parameters$ArrivalDensity,
     MaximumTimeStep = s$Simulation$Parameters$MaximumTimeStep,
     BetweenEventSteps = s$Simulation$Parameters$BetweenEventSteps,
-    CharacteristicRate = charRate
+    CharacteristicRate = charRate,
+    # Using the ellipsis pass through feature:
+    TimeIntervention = timeIntervention,
+
   )
 
-  # Note to thin the sampling times if they are smaller than the minimum
-  # timelength difference in the data.
+  # Save results so we can sample in the next file.
 }
