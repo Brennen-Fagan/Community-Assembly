@@ -416,17 +416,18 @@ results <- foreach::foreach(
   .combine = "rbind",
   .packages = c("dplyr")
 ) %dorng% {
+  fullID <- paste0(simulationsDictionaryChoice, "-",
+                   interventionChoice, "-",
+                   interventionParameterChoice, "-",
+                   id, "-",
+                   s$ID)
   filename <- file.path(datfolder, paste0(
-    "TSTS_Simulation_",
-    simulationsDictionaryChoice, "-",
-    interventionChoice, "-",
-    interventionParameterChoice, "-",
-    id, "-", s$ID
+    "TSTS_Simulation_", fullID, ".RData"
   ))
   if (file.exists(filename)) {
     load(filename)
-    if(exists("retval")) {
-      return(retval)
+    if(exists("interventionSimulation")) {
+      return(interventionSimulation)
     } else {
       stop(paste("Bad file:", filename))
     }
@@ -461,7 +462,7 @@ results <- foreach::foreach(
   PerCapDyn <- switch(
     interventionChoice,
     # 1. # The change does not occur, but the scientists don't know that!
-    DynFunc(actTrivially(s$Pool$ReproductionRate),
+    dynFunc(actTrivially(s$Pool$ReproductionRate),
             actTrivially(s$InteractionMatrices$Mats),
             s$NEnvs),
     # 2. # The change occurs, is discontinuous, and local, e.g. forest fire.
@@ -482,7 +483,7 @@ results <- foreach::foreach(
           stop("An environment is not allocated to control or experiment.")
         }
       }
-      DynFunc(actTrivially(s$Pool$ReproductionRate),
+      dynFunc(actTrivially(s$Pool$ReproductionRate),
               switchMatrixLists(
                 s$InteractionMatrices$Mats,
                 mats,
@@ -508,7 +509,7 @@ results <- foreach::foreach(
           stop("An environment is not allocated to control or experiment.")
         }
       }
-      DynFunc(actTrivially(s$Pool$ReproductionRate),
+      dynFunc(actTrivially(s$Pool$ReproductionRate),
               interpolateMatrixLists(
                 s$InteractionMatrices,
                 mats,
@@ -601,8 +602,24 @@ results <- foreach::foreach(
     CharacteristicRate = charRate,
     # Using the ellipsis pass through feature:
     TimeIntervention = timeIntervention,
-    PrevReactionTime = s$Simulation$ReactionTime
+    PrevReactionTime = s$Simulation$ReactionTime,
+    FullID = fullID,
+    ExperimentPatches = experiment,
+    ExperimentTime = timeIntervention,
+    if (interventionChoice == 3) ExperimentTimeSpan = interventionTimeSpan
   )
 
+  # NOTE: For time consistency, we need to use the *original* timescale,
+  # as opposed to the one that is newly resolved.
+  # TODO: Ask Jon, Susan about this choice to verify.
+  interventionSimulation$Abundance[, 1] <-
+    interventionSimulation$Abundance[, 1] * s$Simulation$ReactionTime
+  interventionSimulation$Events$Times <-
+    interventionSimulation$Events$Times * s$Simulation$ReactionTime
+
+
   # Save results so we can sample in the next file.
+  save(interventionSimulation, file = filename)
+
+  return(interventionSimulation)
 }
