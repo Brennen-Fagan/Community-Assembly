@@ -617,9 +617,9 @@ results <- foreach::foreach(
   # as opposed to the one that is newly resolved.
   # TODO: Ask Jon, Susan about this choice to verify.
   interventionSimulation$Abundance[, 1] <-
-    interventionSimulation$Abundance[, 1] * s$Simulation$ReactionTime
+    interventionSimulation$Abundance[, 1] / s$Simulation$ReactionTime
   interventionSimulation$Events$Times <-
-    interventionSimulation$Events$Times * s$Simulation$ReactionTime
+    interventionSimulation$Events$Times / s$Simulation$ReactionTime
 
 
   # Save results so we can sample in the next file.
