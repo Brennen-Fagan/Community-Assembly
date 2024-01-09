@@ -5,6 +5,7 @@
 # improve design at each stage.
 # For file management, we'll split up the sampling into a second file.
 # We'll pass through as records relevant simulation/intervention details.
+# TODO: Consider if the introduction should be split off into a file 0.
 
 # Create a Master seed, which we'll use to generate simulation seeds.
 # runif(1) * 1e8
@@ -143,6 +144,17 @@ if (cores > 1) {
 }
 
 # Files: ######################################################################
+directory <- "." # Should be "VariantExperiments"
+datfolder <- file.path(
+  directory,
+  paste0(
+    "TSTS_Simulations_", # Separate the Name (TSTS) and Type (Simulations)
+    simulationsDictionaryChoice, "-", # Bundle the Triple
+    interventionChoice, "-",
+    interventionParameterChoice, "_", # Separate the Date
+    Sys.Date())
+)
+
 # Convert the simulationsDictionary into proper file pairs.
 .sSeed <- simulationsDictionary$Seeds
 .sFile1 <- strsplit(simulationsDictionary$SourceSimulations, split = ", ")[[1]]
@@ -285,10 +297,12 @@ switchMatrices <- function(matrix1, matrix2, switchtime) {
     }
   }
 }
+
 switchMatrixLists <- function(matrixlist1, matrixlist2, switchtimes) {
   stopifnot(length(matrixlist1) == length(matrixlist2))
   stopifnot(length(matrixlist1) == length(switchtimes) ||
               length(switchtimes) == 1)
+
   lapply(seq_along(matrixlist1), function(i, m1, m2, st) {
     switchMatrices(m1[[i]], m2[[i]], st[i])
   },
@@ -298,6 +312,7 @@ switchMatrixLists <- function(matrixlist1, matrixlist2, switchtimes) {
   } else {switchtimes}
   )
 }
+
 # Choose a sigmoidal interpolation between the matrices.
 # Problem: we want no deviation at 0 or t = timespan, but not too much in mid.
 # Crit. Value = first numb. in tanh. 4 => 2% dev at edge, ~75% done in mid. 50%.
@@ -311,11 +326,12 @@ interpolateMatrices <- function(matrix1, matrix2, timespan, switchtime = 0) {
     # matrix1
     # } else {
     matrix1 + (matrix2 - matrix1) * (
-      tanh(4 * ( (t - switchtime) /timespan - 0.5)) + 1
+      tanh(4 * ( (t - switchtime) / timespan - 0.5)) + 1
     ) / 2
     # }
   }
 }
+
 interpolateMatrixLists <- function(
   matrixlist1, matrixlist2, timespans, switchtimes
 ) {
@@ -324,16 +340,18 @@ interpolateMatrixLists <- function(
               length(timespans) == 1)
   stopifnot(length(matrixlist1) == length(switchtimes) ||
               length(switchtimes) == 1)
-  lapply(seq_along(matrixlist1), function(i, m1, m2, ts, st) {
-    interpolateMatrices(m1[[i]], m2[[i]], ts[i], st[i])
-  },
-  m1 = matrixlist1, m2 = matrixlist2,
-  ts = if (length(timespans) == 1) {
-    rep(timespans, length(matrixlist1))
-  } else {timespans},
-  st = if (length(switchtimes) == 1) {
-    rep(switchtimes, length(matrixlist1))
-  } else {switchtimes}
+
+  lapply(
+    seq_along(matrixlist1), function(i, m1, m2, ts, st) {
+      interpolateMatrices(m1[[i]], m2[[i]], ts[i], st[i])
+    },
+    m1 = matrixlist1, m2 = matrixlist2,
+    ts = if (length(timespans) == 1) {
+      rep(timespans, length(matrixlist1))
+    } else {timespans},
+    st = if (length(switchtimes) == 1) {
+      rep(switchtimes, length(matrixlist1))
+    } else {switchtimes}
   )
 }
 
@@ -359,6 +377,7 @@ retrieveFunction <- function(funcstring) {
 }
 
 dynFunc <- retrieveFunction(interventionDictionary$DynamicsFunction)
+
 intMatFunc <- purrr::partial(
   retrieveFunction(interventionDictionary$InteractionMatrixFunction),
   eval(parse(text = interventionDictionary$InteractionMatrixArguments))
@@ -386,6 +405,10 @@ intMatFunc <- purrr::partial(
 #   2) reformat it to meet the MNAD criteria,
 #   3) create a PerCapitaDynamics function to pass to MNAD.
 
+# WARNING: doRNG generates random seeds in a way that makes the *order* of the
+# iterations (but not their order of evaluation) important.
+# Changing the order of iterations (e.g. id = simulationsNumber:1) WILL change
+# the random seed assigned to a given iteration!!!
 results <- foreach::foreach(
   id = 1:simulationsNumber,
   s = iterators::iter(.s, recycle = TRUE), # File and History (not random!).
@@ -393,6 +416,22 @@ results <- foreach::foreach(
   .combine = "rbind",
   .packages = c("dplyr")
 ) %dorng% {
+  filename <- file.path(datfolder, paste0(
+    "TSTS_Simulation_",
+    simulationsDictionaryChoice, "-",
+    interventionChoice, "-",
+    interventionParameterChoice, "-",
+    id, "-", s$ID
+  ))
+  if (file.exists(filename)) {
+    load(filename)
+    if(exists("retval")) {
+      return(retval)
+    } else {
+      stop(paste("Bad file:", filename))
+    }
+  }
+
   # Pick a random patch as control, rest as experiment.
   # is adding 1:5 (or w/e) okay? Yes, we're assuming contiguous patches.
   control <- ((sample.int(s$NEnvs, 1) + 1:(s$NEnvs / 2) ) %% s$NEnvs) + 1
@@ -418,6 +457,7 @@ results <- foreach::foreach(
   #       e.g. Mutualistic1's SpeciesTypes and Saturations.
   # Below is roughly the idea, but we need to act differently between
   # the control and the experimental cases.
+  # TODO: Turn this into a function?
   PerCapDyn <- switch(
     interventionChoice,
     # 1. # The change does not occur, but the scientists don't know that!
@@ -536,9 +576,13 @@ results <- foreach::foreach(
     charRate <- 1/s$Simulation$ReactionTime
   }
 
-  #TODO: Undo the time scale normalisation on the event and simulation times.
-  # This is because they weren't performed on the simulation parameters
+  # Undo the time scale normalisation on the event and simulation times.
+  # This is because transforms weren't performed on the simulation parameters
   # (i.e. the species interactions, dispersal, and species properties).
+  s$Simulation$Abundance[, 1] <-
+    s$Simulation$Abundance[, 1] * s$Simulation$ReactionTime
+  s$Simulation$Events$Times <-
+    s$Simulation$Events$Times * s$Simulation$ReactionTime
 
   ## Simulation
   interventionSimulation <- RMTRCode2::MultipleNumericalAssembly_Dispersal(
@@ -557,7 +601,7 @@ results <- foreach::foreach(
     CharacteristicRate = charRate,
     # Using the ellipsis pass through feature:
     TimeIntervention = timeIntervention,
-
+    PrevReactionTime = s$Simulation$ReactionTime
   )
 
   # Save results so we can sample in the next file.
