@@ -303,14 +303,14 @@ switchMatrixLists <- function(matrixlist1, matrixlist2, switchtimes) {
   stopifnot(length(matrixlist1) == length(switchtimes) ||
               length(switchtimes) == 1)
 
-  lapply(seq_along(matrixlist1), function(i, m1, m2, st) {
+  Matrix::bdiag(lapply(seq_along(matrixlist1), function(i, m1, m2, st) {
     switchMatrices(m1[[i]], m2[[i]], st[i])
   },
   m1 = matrixlist1, m2 = matrixlist2,
   st = if (length(switchtimes) == 1) {
     rep(switchtimes, length(matrixlist1))
   } else {switchtimes}
-  )
+  ))
 }
 
 # Choose a sigmoidal interpolation between the matrices.
@@ -341,7 +341,7 @@ interpolateMatrixLists <- function(
   stopifnot(length(matrixlist1) == length(switchtimes) ||
               length(switchtimes) == 1)
 
-  lapply(
+  Matrix::bdiag(lapply(
     seq_along(matrixlist1), function(i, m1, m2, ts, st) {
       interpolateMatrices(m1[[i]], m2[[i]], ts[i], st[i])
     },
@@ -352,7 +352,7 @@ interpolateMatrixLists <- function(
     st = if (length(switchtimes) == 1) {
       rep(switchtimes, length(matrixlist1))
     } else {switchtimes}
-  )
+  ))
 }
 
 ### Retreive the stored dynamics function: ####################################
@@ -463,7 +463,7 @@ results <- foreach::foreach(
     interventionChoice,
     # 1. # The change does not occur, but the scientists don't know that!
     dynFunc(actTrivially(s$Pool$ReproductionRate),
-            actTrivially(s$InteractionMatrices$Mats),
+            actTrivially(Matrix::bdiag(s$InteractionMatrices$Mats)),
             s$NEnvs),
     # 2. # The change occurs, is discontinuous, and local, e.g. forest fire.
     {
@@ -530,30 +530,32 @@ results <- foreach::foreach(
 
   ## Events
   eventsPostIntervention <-
-    s$Events %>% dplyr::filter(Times >
+    s$Simulation$Events %>% dplyr::filter(Times >
                                  s$Simulation$Abundance[timeInterventionRow, 1])
   # Why not timeIntervention? To make sure that we don't miss out on an event.
   # Possibly unnecessary.
+  eventsPostIntervention$Success <- NA
 
   # Distance Matrix
   if (interventionDictionary$DispersalFormat == "None") {
     DistanceMatrix <- Matrix::sparseMatrix(
       i = s$NEnvs, j = s$NEnvs, x = 0)
   }
-  if (Space == "Ring" || Space == "Line")
+  if (interventionDictionary$DispersalFormat == "Ring" ||
+      interventionDictionary$DispersalFormat == "Line")
     DistanceMatrix <- Matrix::bandSparse(
       s$NEnvs, k = c(-1, 1),
       diagonals = list(
         rep(interventionDictionary$DispersalResistance, s$NEnvs - 1),
         rep(interventionDictionary$DispersalResistance, s$NEnvs - 1))
     )
-  if (Space == "Ring") {
+  if (interventionDictionary$DispersalFormat == "Ring") {
     DistanceMatrix[s$NEnvs, 1] <-
       interventionDictionary$DispersalResistance
     DistanceMatrix[1, s$NEnvs] <-
       interventionDictionary$DispersalResistance
   }
-  if (Space == "Full") {
+  if (interventionDictionary$DispersalFormat == "Full") {
     DistanceMatrix <- matrix(1, nrow = s$NEnvs, ncol = s$NEnvs)
     diag(DistanceMatrix) <- 0
   }
@@ -582,8 +584,8 @@ results <- foreach::foreach(
   # (i.e. the species interactions, dispersal, and species properties).
   s$Simulation$Abundance[, 1] <-
     s$Simulation$Abundance[, 1] * s$Simulation$ReactionTime
-  s$Simulation$Events$Times <-
-    s$Simulation$Events$Times * s$Simulation$ReactionTime
+  eventsPostIntervention$Times <-
+    eventsPostIntervention$Times * s$Simulation$ReactionTime
 
   ## Simulation
   interventionSimulation <- RMTRCode2::MultipleNumericalAssembly_Dispersal(
