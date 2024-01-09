@@ -12,8 +12,8 @@
 simulationsNumber <- 10
 simulationsDictionaryChoice <- 1
 interventionChoice <-
-  1. # The change does not occur, but the scientists don't know that!
-# 2. # The change occurs, is discontinuous, and local, e.g. forest fire.
+# 1. # The change does not occur, but the scientists don't know that!
+ 2. # The change occurs, is discontinuous, and local, e.g. forest fire.
 # 3. # The change is slow and local, e.g. gradual deforestation.
 # 4. # The change occurs on all patches, e.g. climate change.
 # 5. # Two changes, one following 2, the other 4.
@@ -380,6 +380,7 @@ dynFunc <- retrieveFunction(interventionDictionary$DynamicsFunction)
 
 intMatFunc <- purrr::partial(
   retrieveFunction(interventionDictionary$InteractionMatrixFunction),
+  ... =, # otherwise, partialised arguments occur first.
   eval(parse(text = interventionDictionary$InteractionMatrixArguments))
   # Better solution desired!
   # Might need to use something like stackoverflow.com/a/47012149
@@ -605,6 +606,7 @@ results <- foreach::foreach(
     MaximumTimeStep = s$Simulation$Parameters$MaximumTimeStep,
     BetweenEventSteps = s$Simulation$Parameters$BetweenEventSteps,
     CharacteristicRate = charRate,
+    Verbose = True,
     # Using the ellipsis pass through feature:
     ReactionTimePrev = s$Simulation$ReactionTime,
     FullID = fullID,
@@ -627,3 +629,25 @@ results <- foreach::foreach(
 
   return(interventionSimulation)
 }
+
+# Useful double check:
+# par(mfrow = c(5, 5))
+# for(j in which(
+#   apply(
+#     s$Simulation$Abundance[timeInterventionRow:nrow(s$Simulation$Abundance),],
+#     MARGIN = 2,
+#     FUN = function(x) any(x > s$Simulation$Parameters$EliminationThreshold))) |
+#   apply(
+#     interventionSimulation$Abundance, MARGIN = 2,
+#     FUN = function(x) any(x > s$Simulation$Parameters$EliminationThreshold))
+# ) {
+#
+#   plot(
+#     s$Simulation$Abundance[timeInterventionRow:nrow(s$Simulation$Abundance), 1],
+#     s$Simulation$Abundance[timeInterventionRow:nrow(s$Simulation$Abundance), i],
+#     type = "l", col = "red", main = i)
+#   lines(
+#     interventionSimulation$Abundance[, 1],
+#     interventionSimulation$Abundance[, i],
+#     col = "blue", lty = 2)
+# }
