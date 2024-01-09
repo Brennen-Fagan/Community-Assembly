@@ -529,12 +529,15 @@ results <- foreach::foreach(
   # Perform the intervention simulation.
 
   ## Events
-  eventsPostIntervention <-
-    s$Simulation$Events %>% dplyr::filter(Times >
-                                 s$Simulation$Abundance[timeInterventionRow, 1])
+  # Note formatting is a list containing a data.frame named Events.
+  # Note that this is in normalized time units.
+  eventsPostIntervention <- list(
+    Events = s$Simulation$Events %>% dplyr::filter(
+      Times > s$Simulation$Abundance[timeInterventionRow, 1]
+      ))
   # Why not timeIntervention? To make sure that we don't miss out on an event.
   # Possibly unnecessary.
-  eventsPostIntervention$Success <- NA
+  eventsPostIntervention$Events$Success <- NA
 
   # Distance Matrix
   if (interventionDictionary$DispersalFormat == "None") {
@@ -584,8 +587,8 @@ results <- foreach::foreach(
   # (i.e. the species interactions, dispersal, and species properties).
   s$Simulation$Abundance[, 1] <-
     s$Simulation$Abundance[, 1] * s$Simulation$ReactionTime
-  eventsPostIntervention$Times <-
-    eventsPostIntervention$Times * s$Simulation$ReactionTime
+  eventsPostIntervention$Events$Times <-
+    eventsPostIntervention$Events$Times * s$Simulation$ReactionTime
 
   ## Simulation
   interventionSimulation <- RMTRCode2::MultipleNumericalAssembly_Dispersal(
@@ -603,12 +606,11 @@ results <- foreach::foreach(
     BetweenEventSteps = s$Simulation$Parameters$BetweenEventSteps,
     CharacteristicRate = charRate,
     # Using the ellipsis pass through feature:
-    TimeIntervention = timeIntervention,
-    PrevReactionTime = s$Simulation$ReactionTime,
+    ReactionTimePrev = s$Simulation$ReactionTime,
     FullID = fullID,
-    ExperimentPatches = experiment,
-    ExperimentTime = timeIntervention,
-    if (interventionChoice == 3) ExperimentTimeSpan = interventionTimeSpan
+    PatchesIntervention = experiment,
+    TimeIntervention = timeIntervention,
+    if (interventionChoice == 3) TimeSpanIntervention = interventionTimeSpan
   )
 
   # NOTE: For time consistency, we need to use the *original* timescale,
