@@ -318,8 +318,8 @@ switchMatrixLists2 <- function(matrixlist1, matrixlist2, switchtime) {
   # Note: only accepts 1 switchtime.
   #       multiple would require steps.
   stopifnot(length(matrixlist1) == length(matrixlist2))
-  stopifnot(length(matrixlist1) == length(switchtimes) ||
-              length(switchtimes) == 1)
+  stopifnot(length(matrixlist1) == length(switchtime) ||
+              length(switchtime) == 1)
   stopifnot(isTRUE(all.equal(lapply(matrixlist1, dim),
                              lapply(matrixlist2, dim))))
 
@@ -336,7 +336,7 @@ switchMatrixLists2 <- function(matrixlist1, matrixlist2, switchtime) {
 # Require: Output: t = timespan / 2 => out = (mat1 + mat2) / 2.
 interpolateMatrices <- function(matrix1, matrix2, timespan, switchtime = 0) {
   stopifnot(dim(matrix1) == dim(matrix2))
-  force(matrix1);force(matrix2);force(timespan)
+  force(matrix1);force(matrix2);force(timespan);force(switchtime)
   function(t, ...) {
     # if (t < switchtime) {
     # matrix1
@@ -374,8 +374,10 @@ interpolateMatrixLists <- function(
 interpolateMatrixLists2 <- function(matrixlist1, matrixlist2,
                                     timespan, switchtime) {
   stopifnot(length(matrixlist1) == length(matrixlist2))
-  stopifnot(length(matrixlist1) == length(switchtimes) ||
-              length(switchtimes) == 1)
+  stopifnot(#length(matrixlist1) == length(switchtime) ||
+              length(switchtime) == 1)
+  stopifnot(#length(matrixlist1) == length(timespan) ||
+              length(timespan) == 1)
   stopifnot(isTRUE(all.equal(lapply(matrixlist1, dim),
                              lapply(matrixlist2, dim))))
 
@@ -521,7 +523,7 @@ results <- foreach::foreach(
               switchMatrixLists2(
                 s$InteractionMatrices$Mats,
                 mats,
-                switchtimes = timeIntervention * s$Simulation$ReactionTime
+                switchtime = timeIntervention * s$Simulation$ReactionTime
               ),
               s$NEnvs)
     },
@@ -547,8 +549,8 @@ results <- foreach::foreach(
               interpolateMatrixLists2(
                 s$InteractionMatrices,
                 mats,
-                timespans = interventionTimeSpan * s$Simulation$ReactionTime,
-                switchtimes = timeIntervention * s$Simulation$ReactionTime
+                timespan = interventionTimeSpan * s$Simulation$ReactionTime,
+                switchtime = timeIntervention * s$Simulation$ReactionTime
               ),
               s$NEnvs)
     },
