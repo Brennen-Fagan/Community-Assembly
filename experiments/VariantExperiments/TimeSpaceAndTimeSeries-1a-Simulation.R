@@ -22,8 +22,8 @@ interventionChoice <-
 # 4 is inspired from Amarasekare's 2019(?) paper on temperature -> pred-prey.
 
 interventionParameterChoice <- # Valid for some interventions
-  1. # 2,3: Intervention Matrix with Base Parameters
-# 2. # 2,3: Intervention Matrix with High Variance:Mean Ratio (0.1 -> 0.2)
+# 1. # 2,3: Intervention Matrix with Base Parameters
+ 2. # 2,3: Intervention Matrix with High Variance:Mean Ratio (0.1 -> 0.2)
 # 3. # 2,3: Intervention Matrix with Low Variance:Mean Ratio (0.1 -> 0)
 # 4. # NI, 4: Base parameters for changing LM1996.
 # 5. # NI, 5: Base parameters for changing Amarasekare2019.
@@ -155,6 +155,9 @@ datfolder <- file.path(
     interventionParameterChoice, "_", # Separate the Date
     Sys.Date())
 )
+if (!dir.exists(datfolder)) {
+  dir.create(datfolder)
+}
 
 # Convert the simulationsDictionary into proper file pairs.
 .sSeed <- simulationsDictionary$Seeds
@@ -611,7 +614,7 @@ results <- foreach::foreach(
   ## Pick fastest sampling characteristic rate.
   if (exists("experimentMats")) {
     charRate <- max(1/s$Simulation$ReactionTime,
-                    unlist(lapply(experimentMats, function(mat) {
+                    unlist(lapply(experimentMats$Mats, function(mat) {
                       abs(eigen(mat, only.values = TRUE)$values)
                     })))
   } else {
@@ -641,7 +644,7 @@ results <- foreach::foreach(
     MaximumTimeStep = s$Simulation$Parameters$MaximumTimeStep,
     BetweenEventSteps = s$Simulation$Parameters$BetweenEventSteps,
     CharacteristicRate = charRate,
-    Verbose = True,
+    Verbose = TRUE,
     # Using the ellipsis pass through feature:
     ReactionTimePrev = s$Simulation$ReactionTime,
     FullID = fullID,
@@ -667,22 +670,32 @@ results <- foreach::foreach(
 
 # Useful double check:
 # par(mfrow = c(5, 5))
+# if (!exists("timeInterventionRow")) {
+#   timeInterventionRow <- which.max(
+#     s$Simulation$Abundance[, 1] >
+#       interventionSimulation$Ellipsis$TimeIntervention
+#   ) - 1
+# }
 # for(j in which(
 #   apply(
 #     s$Simulation$Abundance[timeInterventionRow:nrow(s$Simulation$Abundance),],
 #     MARGIN = 2,
-#     FUN = function(x) any(x > s$Simulation$Parameters$EliminationThreshold))) |
+#     FUN = function(x) any(x > s$Simulation$Parameters$EliminationThreshold)) |
 #   apply(
 #     interventionSimulation$Abundance, MARGIN = 2,
-#     FUN = function(x) any(x > s$Simulation$Parameters$EliminationThreshold))
+#     FUN = function(x) any(x > s$Simulation$Parameters$EliminationThreshold)))
 # ) {
 #
 #   plot(
 #     s$Simulation$Abundance[timeInterventionRow:nrow(s$Simulation$Abundance), 1],
-#     s$Simulation$Abundance[timeInterventionRow:nrow(s$Simulation$Abundance), i],
-#     type = "l", col = "red", main = i)
+#     s$Simulation$Abundance[timeInterventionRow:nrow(s$Simulation$Abundance), j],
+#     type = "l", col = "red", main = j,
+#     ylim = c(0, max(
+#       s$Simulation$Abundance[timeInterventionRow:nrow(s$Simulation$Abundance), j],
+#       interventionSimulation$Abundance[, j]
+#       )))
 #   lines(
 #     interventionSimulation$Abundance[, 1],
-#     interventionSimulation$Abundance[, i],
+#     interventionSimulation$Abundance[, j],
 #     col = "blue", lty = 2)
 # }
