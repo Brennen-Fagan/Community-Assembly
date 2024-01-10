@@ -9,7 +9,7 @@
 
 # Create a Master seed, which we'll use to generate simulation seeds.
 # runif(1) * 1e8
-simulationsNumber <- 10
+simulationsNumber <- 1
 simulationsDictionaryChoice <- 1
 interventionChoice <-
 # 1. # The change does not occur, but the scientists don't know that!
@@ -34,6 +34,7 @@ interventionTimeSpan <- 20 # for interventionChoices 3 and 4 only.
 # for samplingMaxTime = 250 and Quantity = 100.
 
 #TODO MOVE TO SEQUEL.
+# Note: these are on the characteristic scale, rather than the normal scale.
 samplingMaxTime <- 250 # This is roughly twice the observed burn-in time from 0.
 samplingQuantity <- 100 # Not guaranteed!
 samplingTimeScaleLogarithmic <- TRUE
@@ -313,6 +314,21 @@ switchMatrixLists <- function(matrixlist1, matrixlist2, switchtimes) {
   ))
 }
 
+switchMatrixLists2 <- function(matrixlist1, matrixlist2, switchtime) {
+  # Note: only accepts 1 switchtime.
+  #       multiple would require steps.
+  stopifnot(length(matrixlist1) == length(matrixlist2))
+  stopifnot(length(matrixlist1) == length(switchtimes) ||
+              length(switchtimes) == 1)
+  stopifnot(isTRUE(all.equal(lapply(matrixlist1, dim),
+                             lapply(matrixlist2, dim))))
+
+  matrix1 <- Matrix::bdiag(matrixlist1)
+  matrix2 <- Matrix::bdiag(matrixlist2)
+
+  switchMatrices(matrix1, matrix2, switchtime = switchtime)
+}
+
 # Choose a sigmoidal interpolation between the matrices.
 # Problem: we want no deviation at 0 or t = timespan, but not too much in mid.
 # Crit. Value = first numb. in tanh. 4 => 2% dev at edge, ~75% done in mid. 50%.
@@ -353,6 +369,21 @@ interpolateMatrixLists <- function(
       rep(switchtimes, length(matrixlist1))
     } else {switchtimes}
   ))
+}
+
+interpolateMatrixLists2 <- function(matrixlist1, matrixlist2,
+                                    timespan, switchtime) {
+  stopifnot(length(matrixlist1) == length(matrixlist2))
+  stopifnot(length(matrixlist1) == length(switchtimes) ||
+              length(switchtimes) == 1)
+  stopifnot(isTRUE(all.equal(lapply(matrixlist1, dim),
+                             lapply(matrixlist2, dim))))
+
+  matrix1 <- Matrix::bdiag(matrixlist1)
+  matrix2 <- Matrix::bdiag(matrixlist2)
+
+  interpolateMatrices(matrix1, matrix2,
+                      timespan = timespan, switchtime = switchtime)
 }
 
 ### Retreive the stored dynamics function: ####################################
@@ -460,6 +491,8 @@ results <- foreach::foreach(
   # Below is roughly the idea, but we need to act differently between
   # the control and the experimental cases.
   # TODO: Turn this into a function?
+  # NOTE: Times inside this function are on the original scale,
+  #       NOT the characteristic.
   PerCapDyn <- switch(
     interventionChoice,
     # 1. # The change does not occur, but the scientists don't know that!
@@ -485,10 +518,10 @@ results <- foreach::foreach(
         }
       }
       dynFunc(actTrivially(s$Pool$ReproductionRate),
-              switchMatrixLists(
+              switchMatrixLists2(
                 s$InteractionMatrices$Mats,
                 mats,
-                switchtimes = timeIntervention
+                switchtimes = timeIntervention * s$Simulation$ReactionTime
               ),
               s$NEnvs)
     },
@@ -511,11 +544,11 @@ results <- foreach::foreach(
         }
       }
       dynFunc(actTrivially(s$Pool$ReproductionRate),
-              interpolateMatrixLists(
+              interpolateMatrixLists2(
                 s$InteractionMatrices,
                 mats,
-                timespans = interventionTimeSpan,
-                switchtimes = timeIntervention
+                timespans = interventionTimeSpan * s$Simulation$ReactionTime,
+                switchtimes = timeIntervention * s$Simulation$ReactionTime
               ),
               s$NEnvs)
     },
