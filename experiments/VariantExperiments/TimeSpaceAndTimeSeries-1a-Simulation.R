@@ -648,9 +648,11 @@ results <- foreach::foreach(
     # Using the ellipsis pass through feature:
     ReactionTimePrev = s$Simulation$ReactionTime,
     FullID = fullID,
-    PatchesIntervention = experiment,
-    TimeIntervention = timeIntervention, # NOTE: characteristic scale!
-    if (interventionChoice == 3) TimeSpanIntervention = interventionTimeSpan
+    Intervention = list(# NOTE: characteristic scale!
+      Patches = experiment,
+      Time = timeIntervention,
+      if (interventionChoice == 3) TimeSpan = interventionTimeSpan
+    )
   )
 
   # NOTE: For time consistency, we need to use the *original* timescale,
