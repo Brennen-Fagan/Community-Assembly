@@ -22,8 +22,8 @@ interventionChoice <-
 # 4 is inspired from Amarasekare's 2019(?) paper on temperature -> pred-prey.
 
 interventionParameterChoice <- # Valid for some interventions
- 1. # 2,3: Intervention Matrix with Base Parameters
-# 2. # 2,3: Intervention Matrix with High Variance:Mean Ratio (0.1 -> 0.2)
+# 1. # 2,3: Intervention Matrix with Base Parameters
+ 2. # 2,3: Intervention Matrix with High Variance:Mean Ratio (0.1 -> 0.2)
 # 3. # 2,3: Intervention Matrix with Low Variance:Mean Ratio (0.1 -> 0)
 # 4. # NI, 4: Base parameters for changing LM1996.
 # 5. # NI, 5: Base parameters for changing Amarasekare2019.
@@ -651,7 +651,8 @@ results <- foreach::foreach(
     Intervention = list(# NOTE: characteristic scale!
       Patches = experiment,
       Time = timeIntervention,
-      if (interventionChoice == 3) TimeSpan = interventionTimeSpan
+      OriginalRow = timeInterventionRow,
+      TimeSpan = if (interventionChoice == 3) interventionTimeSpan
     )
   )
 
