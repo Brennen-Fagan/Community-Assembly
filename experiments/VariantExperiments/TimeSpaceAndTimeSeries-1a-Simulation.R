@@ -23,8 +23,8 @@ interventionChoice <-
 
 interventionParameterChoice <- # Valid for some interventions
 # 1. # 2,3: Intervention Matrix with Base Parameters
- 2. # 2,3: Intervention Matrix with High Variance:Mean Ratio (0.1 -> 0.2)
-# 3. # 2,3: Intervention Matrix with Low Variance:Mean Ratio (0.1 -> 0)
+# 2. # 2,3: Intervention Matrix with High Variance:Mean Ratio (0.1 -> 0.2)
+ 3. # 2,3: Intervention Matrix with Low Variance:Mean Ratio (0.1 -> 0)
 # 4. # NI, 4: Base parameters for changing LM1996.
 # 5. # NI, 5: Base parameters for changing Amarasekare2019.
 
@@ -578,7 +578,10 @@ results <- foreach::foreach(
   # Possibly unnecessary.
   eventsPostIntervention$Events$Success <- NA
 
-  # Distance Matrix
+  # TODO: Move this out of the loop to make it more accessible as an
+  #       intervention choice. We'll then want to convert to a function
+  #       in order to enable varying temporal changes.
+  ## Distance Matrix
   if (interventionDictionary$DispersalFormat == "None") {
     DistanceMatrix <- Matrix::sparseMatrix(
       i = s$NEnvs, j = s$NEnvs, x = 0)
@@ -656,8 +659,8 @@ results <- foreach::foreach(
     )
   )
 
-  # NOTE: For time consistency, we need to use the *original* timescale,
-  # as opposed to the one that is newly resolved.
+  # NOTE: For time consistency, we need to use the characteristic timescale,
+  # as opposed to the evaluation timescale that is newly resolved.
   # TODO: Ask Jon, Susan about this choice to verify.
   interventionSimulation$Abundance[, 1] <-
     interventionSimulation$Abundance[, 1] / s$Simulation$ReactionTime
@@ -676,7 +679,7 @@ results <- foreach::foreach(
 # if (!exists("timeInterventionRow")) {
 #   timeInterventionRow <- which.max(
 #     s$Simulation$Abundance[, 1] >
-#       interventionSimulation$Ellipsis$TimeIntervention
+#       interventionSimulation$Ellipsis$Intervention$Time
 #   ) - 1
 # }
 # for(j in which(
