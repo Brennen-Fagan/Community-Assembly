@@ -12,9 +12,9 @@
 simulationsNumber <- 1
 simulationsDictionaryChoice <- 1
 interventionChoice <-
-# 1. # The change does not occur, but the scientists don't know that!
+ 1. # The change does not occur, but the scientists don't know that!
 # 2. # The change occurs, is discontinuous, and local, e.g. forest fire.
- 3. # The change is slow and local, e.g. gradual deforestation.
+# 3. # The change is slow and local, e.g. gradual deforestation.
 # 4. # The change occurs on all patches, e.g. climate change.
 # 5. # Two changes, one following 2, the other 4.
 # 6. # Two changes, one following 3, the other 4.
@@ -22,9 +22,9 @@ interventionChoice <-
 # 4 is inspired from Amarasekare's 2019(?) paper on temperature -> pred-prey.
 
 interventionParameterChoice <- # Valid for some interventions
-# 1. # 2,3: Intervention Matrix with Base Parameters
+ 1. # 2,3: Intervention Matrix with Base Parameters
 # 2. # 2,3: Intervention Matrix with High Variance:Mean Ratio (0.1 -> 0.2)
- 3. # 2,3: Intervention Matrix with Low Variance:Mean Ratio (0.1 -> 0)
+# 3. # 2,3: Intervention Matrix with Low Variance:Mean Ratio (0.1 -> 0)
 # 4. # NI, 4: Base parameters for changing LM1996.
 # 5. # NI, 5: Base parameters for changing Amarasekare2019.
 
