@@ -1,9 +1,9 @@
 LawMorton1996_species <- function(
-  Basal,
-  Consumer,
-  Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1), # Table 2 values.
-  LogBodySize = c(-2, -1, -1, 0), # c(-2, -1) for Basal, c(-1, 0) for Consumer
-  seed = NULL
+    Basal,
+    Consumer,
+    Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1), # Table 2 values.
+    LogBodySize = c(-2, -1, -1, 0), # c(-2, -1) for Basal, c(-1, 0) for Consumer
+    seed = NULL
 ) {
   stopifnot(Basal > 0)
   stopifnot(Consumer >= 0)
@@ -67,8 +67,8 @@ LawMorton1996_species <- function(
 }
 
 LawMorton1996_aij <- function(
-  Species_i, Species_j, k = c(0.01, 10, 0.5, 0.2, 100, 0.1), # Table 2 values.
-  CompetitionBasal = 0, Connectance = 1, DiagParam = 0 # Suggested by Jon.
+    Species_i, Species_j, k = c(0.01, 10, 0.5, 0.2, 100, 0.1), # Table 2 values.
+    CompetitionBasal = 0, Connectance = 1, DiagParam = 0 # Suggested by Jon.
 ) {
   # returns 'p's for the effect of j on i, aij
 
@@ -183,11 +183,12 @@ LawMorton1996_aij <- function(
 }
 
 LawMorton1996_CommunityMat <- function(
-  Pool, Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1), seed = NULL,
-  Competition = 0, Mutualism = 0, # Suggestion from Coyte 2015, in [0, 1]
-  CompetitionBasal = 0,
-  Connectance = 1, # in [0, 1]
-  DiagParam = 0) {
+    Pool, Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1), seed = NULL,
+    Competition = 0, Mutualism = 0, # Suggestion from Coyte 2015, in [0, 1]
+    CompetitionBasal = 0,
+    Connectance = 1, # in [0, 1]
+    DiagParam = 0,
+    ConstrainP = NULL) {
 
   if (!is.null(seed)) {
     if (exists(".Random.seed")) {
@@ -216,9 +217,21 @@ LawMorton1996_CommunityMat <- function(
     }
     p <- LawMorton1996_aij(i, j, Parameters, CompetitionBasal,
                            Connectance, DiagParam)
-    retval <- ifelse(p == 0,
-                     0,
-                     sign(p) * rtruncnorm(0, Inf, abs(p), abs(p) * Parameters[6]))
+
+    retval <- ifelse(
+      p == 0,
+      0,
+      if(!is.null(ConstrainP)) {
+        sign(p) * rtruncnorm(0, Inf, abs(p), abs(p) * Parameters[6])
+      } else {
+        with(
+          list(Range = UpdateTruncNormBounds(
+            ConstrainP, 0, Inf, abs(p), abs(p) * Parameters[6]
+          )),
+          sign(p) * rtruncnorm(Range[1], Range[2], abs(p), abs(p) * Parameters[6])
+        )
+      }
+    )
     if (!is.na(nsval) & exists("oSeed")) {
       set.seed(oSeed)
     }
@@ -259,10 +272,10 @@ LawMorton1996_CommunityMat <- function(
 }
 
 LawMorton1996_NumIntegration <- function(
-  A, R, X,
-  OuterTimeStepSize = 1000,
-  InnerTimeStepSize = 1,
-  Tolerance = 0
+    A, R, X,
+    OuterTimeStepSize = 1000,
+    InnerTimeStepSize = 1,
+    Tolerance = 0
 ) {
   # A = matrix of aij's (community matrix)
   # R = vector of ri's (basic reproduction rate)
@@ -287,9 +300,9 @@ LawMorton1996_NumIntegration <- function(
 }
 
 LawMorton1996_PlotAbundance <- function(
-  Abundance,
-  Sequence = NULL,
-  guides = TRUE
+    Abundance,
+    Sequence = NULL,
+    guides = TRUE
 ) {
 
   colnames(Abundance) <- c("Time", format(1:(ncol(Abundance) - 1)))
