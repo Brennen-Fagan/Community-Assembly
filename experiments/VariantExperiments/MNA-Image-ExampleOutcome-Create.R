@@ -14,7 +14,7 @@ EventRateModifiers <- c(1, 1) # Immigration, Extirpation
 LMParameters <- c(0.01, 10, 0.5, 0.2, 100, 0.1)
 LMLogBodySize <- c(-2, -1, -1, 0)
 
-PerIslandDistance <- 10^c(9:-1) # 10^5 # Inf # 10^0
+PerIslandDistance <- 10^c(Inf, 9:0) # 10^5 # Inf # 10^0
 SpeciesSpeeds <- 1
 Space <- match.arg("Ring", c("None", "Ring", "Line", "Full"))
 
@@ -25,8 +25,8 @@ ExtinctionProportion <- 1
 MaximumTimeStep <- 1 # Maximum time solver can proceed without elimination.
 BetweenEventSteps <- 10 # Number of steps to reach next event to smooth.
 
-CalculatePoolAndMatrices <- FALSE
-dir <- paste0("Data_", "2023-09-22")#Sys.Date()) # getSrcDirectory(function(){})
+CalculatePoolAndMatrices <- TRUE
+dir <- paste0("Data_", "2024-01-18")#Sys.Date()) # getSrcDirectory(function(){})
 
 if (!dir.exists(dir)) {
   dir.create(dir, showWarnings = FALSE)
@@ -39,17 +39,26 @@ if (!dir.exists(dir)) {
 # [1] 53606086 70944574 40035408 # Data_2023-09-24
 # [1]  5005152 70117044 42048254 # Data_2023-09-25
 # [1] 77776934  9954265 47259175 # Data_2023-09-26
+# [1] 38427042 12032489 28665115 # Data_2024-01-17; Low PValues (0, 0.16) Matrix
+# [1] 75027622 64713671 21957601 # Data_2024-01-18; High P (0.84, 1) Matrix
 seeds <- c(
   # 11365664, 91994571, 20423344 # Data_2023-07-06
-   65566924, 64305636, 14447307 # Data_2023-09-22
+  # 65566924, 64305636, 14447307 # Data_2023-09-22
   # 71113291, 29907014, 76606233 # Data_2023-09-23
   # 53606086, 70944574, 40035408 # Data_2023-09-24
-  # 5005152, 70117044, 42048254 # Data_2023-09-25
+  #  5005152, 70117044, 42048254 # Data_2023-09-25
   # 77776934,  9954265, 47259175 # Data_2023-09-26
+  # 38427042, 12032489, 28665115 # Data_2024-01-17
+   75027622, 64713671, 21957601 # Data_2024-01-18
 )
 PoolSeed <- seeds[1]
 EnvironmentSeed <- seeds[2]
 HistorySeed <- seeds[3]
+
+ConstrainTruncNormPs <- # Need to be NULL or two ordered probabilities.
+  # NULL # DEFAULT
+  # c(0, pnorm(-1)) # Data_2024-01-17; -1 Std. Dev. or more Extreme.
+   c(pnorm(+1), 1) # Data_2024-01-18; +1 Std. Dev. or more Extreme.
 
 # Setup: #######################################################################
 
@@ -67,7 +76,8 @@ if (CalculatePoolAndMatrices) {
     Pool = Pool, NumEnvironments = Environments,
     ComputeInteractionMatrix = RMTRCode2::LawMorton1996_CommunityMat,
     Parameters = LMParameters,
-    EnvironmentSeeds = EnvironmentSeed
+    EnvironmentSeeds = EnvironmentSeed,
+    ConstrainP = ConstrainTruncNormPs
   )
   save(Pool, InteractionMatrices,
        file = file.path(dir, paste0(
