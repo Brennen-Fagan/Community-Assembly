@@ -221,7 +221,7 @@ LawMorton1996_CommunityMat <- function(
     retval <- ifelse(
       p == 0,
       0,
-      if(!is.null(ConstrainP)) {
+      if(is.null(ConstrainP)) {
         sign(p) * rtruncnorm(0, Inf, abs(p), abs(p) * Parameters[6])
       } else {
         with(
