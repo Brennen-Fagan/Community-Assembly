@@ -10,10 +10,14 @@
 # Create a Master seed, which we'll use to generate simulation seeds.
 # runif(1) * 1e8
 simulationsNumber <- 1
-simulationsDictionaryChoice <- 1
+simulationsDictionaryChoice <-
+# 1 # Example set with infinite disp. res.
+ 2 # Single Run with Interaction Matrix with PConstrain set to c(0, pnorm(-1))
+# 3 # Single Run with Interaction Matrix with PConstrain set to c(pnorm(+1), 1)
+
 interventionChoice <-
- 1. # The change does not occur, but the scientists don't know that!
-# 2. # The change occurs, is discontinuous, and local, e.g. forest fire.
+# 1. # The change does not occur, but the scientists don't know that!
+ 2. # The change occurs, is discontinuous, and local, e.g. forest fire.
 # 3. # The change is slow and local, e.g. gradual deforestation.
 # 4. # The change occurs on all patches, e.g. climate change.
 # 5. # Two changes, one following 2, the other 4.
@@ -22,13 +26,15 @@ interventionChoice <-
 # 4 is inspired from Amarasekare's 2019(?) paper on temperature -> pred-prey.
 
 interventionParameterChoice <- # Valid for some interventions
- 1. # 2,3: Intervention Matrix with Base Parameters
+# 1. # 2,3: Intervention Matrix with Base Parameters
 # 2. # 2,3: Intervention Matrix with High Variance:Mean Ratio (0.1 -> 0.2)
 # 3. # 2,3: Intervention Matrix with Low Variance:Mean Ratio (0.1 -> 0)
 # 4. # NI, 4: Base parameters for changing LM1996.
 # 5. # NI, 5: Base parameters for changing Amarasekare2019.
+ 6. # 2,3: Intervention Matrix with Constrained Sampling (pnorm(1), 1)
+# 7. # 2,3: Intervention Matrix with Constrained Sampling (0, pnorm(-1))
 
-interventionTimeSpan <- 20 # for interventionChoices 3 and 4 only.
+interventionTimeSpan <- 200 # for interventionChoices 3 and 4 only.
 # 20 seems like a good number to afford strong sampling on the transition
 # with still consistent sampling after the transition is effectively finished
 # for samplingMaxTime = 250 and Quantity = 100.
@@ -60,6 +66,14 @@ simulationsDictionary <- data.frame(
                 "MNA-ExampleExtProp-Result-Env10-Ring-Inf-1-1-ExtProp1.RData"),
       file.path("Data_2023-09-26",
                 "MNA-ExampleExtProp-Result-Env10-Ring-Inf-1-1-ExtProp1.RData")
+    ), collapse = ", "),
+    paste0(c(
+      file.path("Data_2024-01-17",
+                "MNA-ExampleExtProp-Result-Env10-Ring-Inf-1-1-ExtProp1.RData")
+    ), collapse = ", "),
+    paste0(c(
+      file.path("Data_2024-01-18",
+                "MNA-ExampleExtProp-Result-Env10-Ring-Inf-1-1-ExtProp1.RData")
     ), collapse = ", ")
   ),
   SourceSimulations2 = c(
@@ -67,7 +81,9 @@ simulationsDictionary <- data.frame(
     # NOTE: Files here should be second halves of files in SourceSimulations.
     # NOTE: Use "NA" if a corresponding second half does not exist.
     # NOTE: Use file.path if you need files in directories.
-    paste0(c("NA", "NA", "NA", "NA", "NA"), collapse = ", ")
+    paste0(c("NA", "NA", "NA", "NA", "NA"), collapse = ", "),
+    paste0(c("NA"), collapse = ", "),
+    paste0(c("NA"), collapse = ", ")
   ),
   SourcePools = c(
     # Sets of files, as a string, that can be split with ", ".
@@ -83,10 +99,20 @@ simulationsDictionary <- data.frame(
                 "MNA-ExampleOutcome-PoolMats-Env10.RData"),
       file.path("Data_2023-09-26",
                 "MNA-ExampleOutcome-PoolMats-Env10.RData")
+    ), collapse = ", "),
+    paste0(c(
+      file.path("Data_2024-01-17",
+                "MNA-ExampleOutcome-PoolMats-Env10.RData")
+    ), collapse = ", "),
+    paste0(c(
+      file.path("Data_2024-01-18",
+                "MNA-ExampleOutcome-PoolMats-Env10.RData")
     ), collapse = ", ")
   ),
   Seeds = c(# runif(1) * 1e8 # Unsure if this should be in the interventionDic.
-    69148611
+    69148611,
+    35181045,
+    79180721
   )
 )[simulationsDictionaryChoice, ]
 
@@ -94,10 +120,18 @@ interventionDictionary <- data.frame(
   DynamicsFunction = c(
     "RMTRCode2::PerCapitaDynamics_Type1",
     "RMTRCode2::PerCapitaDynamics_Type1",
+    "RMTRCode2::PerCapitaDynamics_Type1",
+    NA,
+    NA,
+    "RMTRCode2::PerCapitaDynamics_Type1",
     "RMTRCode2::PerCapitaDynamics_Type1"
   ),
   InteractionMatrixFunction = c(
     "RMTRCode2::LawMorton1996_CommunityMat",
+    "RMTRCode2::LawMorton1996_CommunityMat",
+    "RMTRCode2::LawMorton1996_CommunityMat",
+    NA,
+    NA,
     "RMTRCode2::LawMorton1996_CommunityMat",
     "RMTRCode2::LawMorton1996_CommunityMat"
   ),
@@ -106,13 +140,17 @@ interventionDictionary <- data.frame(
     # Suggestions welcome!
     "Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1)",
     "Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.2)",
-    "Parameters = c(0.01, 10, 0.5, 0.2, 100, 0)"
+    "Parameters = c(0.01, 10, 0.5, 0.2, 100, 0)",
+    NA,
+    NA,
+    "ConstrainP = c(pnorm(1), 1)",
+    "ConstrainP = c(0, pnorm(-1))"
   ),
   DispersalResistance = c(
-    Inf, Inf, Inf
+    Inf, Inf, Inf, NA, NA, Inf, Inf
   ),
   DispersalFormat = c(
-    "Ring", "Ring", "Ring"
+    "Ring", "Ring", "Ring", NA, NA, "Ring", "Ring"
   )
 )[interventionParameterChoice, ]
 
@@ -414,13 +452,24 @@ retrieveFunction <- function(funcstring) {
 
 dynFunc <- retrieveFunction(interventionDictionary$DynamicsFunction)
 
+# Need to use stackoverflow.com/a/47012149 to convert our arguments to a list.
+callMeMaybe2 = function(listofcharargs) {
+  Charargs = unlist(listofcharargs)
+  if(is.null(Charargs)) return(alist())
+  eval(parse(
+    text = paste0("alist(",
+                  paste(parse(text = Charargs),
+                        collapse = ","),")")
+  ))
+}
+
 intMatFunc <- purrr::partial(
   retrieveFunction(interventionDictionary$InteractionMatrixFunction),
   ... =, # otherwise, partialised arguments occur first.
-  eval(parse(text = interventionDictionary$InteractionMatrixArguments))
-  # Better solution desired!
-  # Might need to use something like stackoverflow.com/a/47012149
-  # in the case of multiple arguments.
+  !!!callMeMaybe2(interventionDictionary$InteractionMatrixArguments)
+  # !!! suggested by Bing Chat. Not obvious how it evaluates the list.
+  # Prompt 'R purrr, using a list of arguments to partialize a function'.
+  # 2024/01/19
 )
 
 
