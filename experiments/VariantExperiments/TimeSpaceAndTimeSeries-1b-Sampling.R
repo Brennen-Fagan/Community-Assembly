@@ -58,6 +58,7 @@ samplingSeed <- switch(
   "TSTS_Simulations_3-3-7_2024-01-22" = 52689997#,
 )
 
+### Fix format change during development: #####################################
 defaultTimeSpan <- function(iTS) {
   # Up through 22/01/2024, I had been using either
   # timespan = 20 (1-1-1 through 1-3-3) or
@@ -79,12 +80,20 @@ defaultTimeSpan <- function(iTS) {
       "TSTS_Simulations_2-3-6_2024-01-19" = 200,
       "TSTS_Simulations_3-1-7_2024-01-22" = 200,
       "TSTS_Simulations_3-2-7_2024-01-22" = 200,
-      "TSTS_Simulations_3-3-7_2024-01-22" = 200#,
+      "TSTS_Simulations_3-3-7_2024-01-22" = 200,
+      100 # "Default"
     ))
   } else {
     return(iTS)
   }
 }
+
+### Folder Implied Properties: ################################################
+datfolder_properties <- strsplit(datfolder, split = "_")
+stopifnot(length(datfolder_properties) == 1,
+          datfolder_properties[[1]][1] == "TSTS",
+          datfolder_properties[[1]][2] == "Simulations")
+datfolder_properties[[1]][4] <- as.Date(datfolder_properties[[1]][4])
 
 # Load Data: ##################################################################
 if (!pipeline) {
@@ -95,6 +104,10 @@ if (!pipeline) {
   })
 } else {
   stopifnot(exists("results"))
+}
+
+if (datfolder_properties[[1]][4] <= as.Date("2024-01-22")) {
+  results <- lapply(results...)
 }
 
 # Libraries: ##################################################################

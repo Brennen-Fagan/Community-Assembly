@@ -373,6 +373,7 @@ bootstrapSamples <- foreach::foreach(
 
   # print(paste(bootstrapID, "made it."))
 
+  # Note: Conflates Sampling with the Intervention.
   sampling_SpaceForTime <- sampleFromResultsIntervention(
     sampling = sampling_SpaceForTime,
     baseAbundance = resultBase$Abundance,
