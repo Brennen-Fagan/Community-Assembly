@@ -5,8 +5,8 @@
 # improve design at each stage.
 # For file management, we'll split up the sampling into a second file.
 # We'll pass through as records relevant simulation/intervention details.
-# TODO: Consider if the introduction should be split off into a file 0.
 
+# Parameters: #################################################################
 # Create a Master seed, which we'll use to generate simulation seeds.
 # runif(1) * 1e8
 simulationsNumber <- 1
@@ -39,7 +39,6 @@ interventionTimeSpan <- 200 # for interventionChoices 3 and 4 only.
 # with still consistent sampling after the transition is effectively finished
 # for samplingMaxTime = 250 and Quantity = 100.
 
-#TODO MOVE TO SEQUEL.
 # Note: these are on the characteristic scale, rather than the normal scale.
 samplingMaxTime <- 250 # This is roughly twice the observed burn-in time from 0.
 
@@ -297,8 +296,6 @@ stopifnot(length(.sFile1) == length(.sFile2),
 # but the samples we compare may be midway through or after interventions, esp.
 # when comparing slow to fast or immediate interventions.
 
-
-
 ### Retreive the stored dynamics function: ####################################
 dynFunc <- retrieveFunction(interventionDictionary$DynamicsFunction)
 
@@ -338,7 +335,7 @@ results <- foreach::foreach(
   id = 1:simulationsNumber,
   s = iterators::iter(.s, recycle = TRUE), # File and History (not random!).
   .options.RNG = simulationsDictionary$Seeds,
-  .combine = "rbind",
+  #.combine = "rbind", # Each result is a list of different objects.
   .packages = c("dplyr")
 ) %dorng% {
   fullID <- paste0(simulationsDictionaryChoice, "-",
@@ -543,7 +540,8 @@ results <- foreach::foreach(
       Patches = experiment,
       Time = timeIntervention,
       OriginalRow = timeInterventionRow,
-      TimeSpan = if (interventionChoice == 3) interventionTimeSpan
+      Type = interventionChoice,
+      TimeSpan = interventionTimeSpan
     )
     # TODO: Decide what seeds should be included
     # TODO: Decide what to do about the pool
