@@ -12,13 +12,13 @@
 simulationsNumber <- 1
 simulationsDictionaryChoice <-
 # 1 # Example set with infinite disp. res.
- 2 # Single Run with Interaction Matrix with PConstrain set to c(0, pnorm(-1))
-# 3 # Single Run with Interaction Matrix with PConstrain set to c(pnorm(+1), 1)
+# 2 # Single Run with Interaction Matrix with PConstrain set to c(0, pnorm(-1))
+ 3 # Single Run with Interaction Matrix with PConstrain set to c(pnorm(+1), 1)
 
 interventionChoice <-
 # 1. # The change does not occur, but the scientists don't know that!
- 2. # The change occurs, is discontinuous, and local, e.g. forest fire.
-# 3. # The change is slow and local, e.g. gradual deforestation.
+# 2. # The change occurs, is discontinuous, and local, e.g. forest fire.
+ 3. # The change is slow and local, e.g. gradual deforestation.
 # 4. # The change occurs on all patches, e.g. climate change.
 # 5. # Two changes, one following 2, the other 4.
 # 6. # Two changes, one following 3, the other 4.
@@ -31,8 +31,8 @@ interventionParameterChoice <- # Valid for some interventions
 # 3. # 2,3: Intervention Matrix with Low Variance:Mean Ratio (0.1 -> 0)
 # 4. # NI, 4: Base parameters for changing LM1996.
 # 5. # NI, 5: Base parameters for changing Amarasekare2019.
- 6. # 2,3: Intervention Matrix with Constrained Sampling (pnorm(1), 1)
-# 7. # 2,3: Intervention Matrix with Constrained Sampling (0, pnorm(-1))
+# 6. # 2,3: Intervention Matrix with Constrained Sampling (pnorm(1), 1)
+ 7. # 2,3: Intervention Matrix with Constrained Sampling (0, pnorm(-1))
 
 interventionTimeSpan <- 200 # for interventionChoices 3 and 4 only.
 # 20 seems like a good number to afford strong sampling on the transition
@@ -42,9 +42,6 @@ interventionTimeSpan <- 200 # for interventionChoices 3 and 4 only.
 #TODO MOVE TO SEQUEL.
 # Note: these are on the characteristic scale, rather than the normal scale.
 samplingMaxTime <- 250 # This is roughly twice the observed burn-in time from 0.
-samplingQuantity <- 100 # Not guaranteed!
-samplingTimeScaleLogarithmic <- TRUE
-# calculationsPlotLong <- FALSE
 
 cores <- 1
 
@@ -156,11 +153,7 @@ interventionDictionary <- data.frame(
 
 # Libraries: ##################################################################
 library(dplyr)
-library(tidyr)
-library(tibble)
 library(purrr)
-library(ggplot2)
-library(patchwork)
 
 library(RMTRCode2)
 
@@ -172,6 +165,7 @@ library(doRNG)
 
 directory <- '.' # VariousExperiments folder.
 source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
+source(file.path(directory, "TimeSpaceAndTimeSeries-0-Interventions.R"))
 
 # Parallelization: ############################################################
 if (cores > 1) {
@@ -303,166 +297,12 @@ stopifnot(length(.sFile1) == length(.sFile2),
 # but the samples we compare may be midway through or after interventions, esp.
 # when comparing slow to fast or immediate interventions.
 
-### Sampling Regime: ##########################################################
-# The times (with t = 0 == the intervention time) at which we should sample.
-if(samplingTimeScaleLogarithmic) {
-  # This version is symmetric on the log scale, centred on 1 time unit,
-  # and ends at the time gap. Number of sampling times not guaranteed.
-  # The centre is chosen for its relevance to the characteristic time scale.
-  samplingTimes <- c(0, unique(exp(c(
-    seq(from = log(1),
-        to = -log(samplingMaxTime),
-        length.out = floor(samplingQuantity/2)),
-    seq(from = log(1),
-        to = log(samplingMaxTime),
-        length.out = ceiling(samplingQuantity/2))
-  ))))
-} else {
-  samplingTimes <- seq(from = 0,
-                       by = samplingMaxTime/samplingQuantity,
-                       to = samplingMaxTime)
-}
 
-### Interventions: ############################################################
-actTrivially <- function(elem) {force(elem); function(...){elem}}
-
-switchMatrices <- function(matrix1, matrix2, switchtime) {
-  stopifnot(dim(matrix1) == dim(matrix2))
-  force(matrix1);force(matrix2);force(switchtime)
-  function(t, ...) {
-    if (t < switchtime) {
-      matrix1
-    } else if (t > switchtime) {
-      matrix2
-    } else {
-      (matrix1 + matrix2)/2
-    }
-  }
-}
-
-switchMatrixLists <- function(matrixlist1, matrixlist2, switchtimes) {
-  stopifnot(length(matrixlist1) == length(matrixlist2))
-  stopifnot(length(matrixlist1) == length(switchtimes) ||
-              length(switchtimes) == 1)
-
-  Matrix::bdiag(lapply(seq_along(matrixlist1), function(i, m1, m2, st) {
-    switchMatrices(m1[[i]], m2[[i]], st[i])
-  },
-  m1 = matrixlist1, m2 = matrixlist2,
-  st = if (length(switchtimes) == 1) {
-    rep(switchtimes, length(matrixlist1))
-  } else {switchtimes}
-  ))
-}
-
-switchMatrixLists2 <- function(matrixlist1, matrixlist2, switchtime) {
-  # Note: only accepts 1 switchtime.
-  #       multiple would require steps.
-  stopifnot(length(matrixlist1) == length(matrixlist2))
-  stopifnot(length(matrixlist1) == length(switchtime) ||
-              length(switchtime) == 1)
-  stopifnot(isTRUE(all.equal(lapply(matrixlist1, dim),
-                             lapply(matrixlist2, dim))))
-
-  matrix1 <- Matrix::bdiag(matrixlist1)
-  matrix2 <- Matrix::bdiag(matrixlist2)
-
-  switchMatrices(matrix1, matrix2, switchtime = switchtime)
-}
-
-# Choose a sigmoidal interpolation between the matrices.
-# Problem: we want no deviation at 0 or t = timespan, but not too much in mid.
-# Crit. Value = first numb. in tanh. 4 => 2% dev at edge, ~75% done in mid. 50%.
-# Require: Output is a function.
-# Require: Output: t = timespan / 2 => out = (mat1 + mat2) / 2.
-interpolateMatrices <- function(matrix1, matrix2, timespan, switchtime = 0) {
-  stopifnot(dim(matrix1) == dim(matrix2))
-  force(matrix1);force(matrix2);force(timespan);force(switchtime)
-  function(t, ...) {
-    # if (t < switchtime) {
-    # matrix1
-    # } else {
-    matrix1 + (matrix2 - matrix1) * (
-      tanh(4 * ( (t - switchtime) / timespan - 0.5)) + 1
-    ) / 2
-    # }
-  }
-}
-
-interpolateMatrixLists <- function(
-  matrixlist1, matrixlist2, timespans, switchtimes
-) {
-  stopifnot(length(matrixlist1) == length(matrixlist2))
-  stopifnot(length(matrixlist1) == length(timespans) ||
-              length(timespans) == 1)
-  stopifnot(length(matrixlist1) == length(switchtimes) ||
-              length(switchtimes) == 1)
-
-  Matrix::bdiag(lapply(
-    seq_along(matrixlist1), function(i, m1, m2, ts, st) {
-      interpolateMatrices(m1[[i]], m2[[i]], ts[i], st[i])
-    },
-    m1 = matrixlist1, m2 = matrixlist2,
-    ts = if (length(timespans) == 1) {
-      rep(timespans, length(matrixlist1))
-    } else {timespans},
-    st = if (length(switchtimes) == 1) {
-      rep(switchtimes, length(matrixlist1))
-    } else {switchtimes}
-  ))
-}
-
-interpolateMatrixLists2 <- function(matrixlist1, matrixlist2,
-                                    timespan, switchtime) {
-  stopifnot(length(matrixlist1) == length(matrixlist2))
-  stopifnot(#length(matrixlist1) == length(switchtime) ||
-              length(switchtime) == 1)
-  stopifnot(#length(matrixlist1) == length(timespan) ||
-              length(timespan) == 1)
-  stopifnot(isTRUE(all.equal(lapply(matrixlist1, dim),
-                             lapply(matrixlist2, dim))))
-
-  matrix1 <- Matrix::bdiag(matrixlist1)
-  matrix2 <- Matrix::bdiag(matrixlist2)
-
-  interpolateMatrices(matrix1, matrix2,
-                      timespan = timespan, switchtime = switchtime)
-}
 
 ### Retreive the stored dynamics function: ####################################
-retrieveFunction <- function(funcstring) {
-  funcstring <- strsplit(funcstring, split = "::")
-  if (length(funcstring) > 1) {
-    stop(paste0("Too many functions provided in string: ", length(funcstring)))
-  } else {
-    funcstring <- funcstring[[1]]
-  }
-  if (length(funcstring) > 2) {
-    stop(paste0("Too many parts to function provided: ",
-                length(funcstring)))
-  } else if (length(funcstring) == 2) {
-    funcstring <- get(funcstring[2], envir = loadNamespace(funcstring[1]))
-  } else if (length(funcstring) == 1) {
-    funcstring <- get(funcstring[1])
-  } else {
-    stop("No parts found for function.")
-  }
-  return(funcstring)
-}
-
 dynFunc <- retrieveFunction(interventionDictionary$DynamicsFunction)
 
 # Need to use stackoverflow.com/a/47012149 to convert our arguments to a list.
-callMeMaybe2 = function(listofcharargs) {
-  Charargs = unlist(listofcharargs)
-  if(is.null(Charargs)) return(alist())
-  eval(parse(
-    text = paste0("alist(",
-                  paste(parse(text = Charargs),
-                        collapse = ","),")")
-  ))
-}
-
 intMatFunc <- purrr::partial(
   retrieveFunction(interventionDictionary$InteractionMatrixFunction),
   ... =, # otherwise, partialised arguments occur first.
@@ -471,7 +311,6 @@ intMatFunc <- purrr::partial(
   # Prompt 'R purrr, using a list of arguments to partialize a function'.
   # 2024/01/19
 )
-
 
 # Intervention Simulation: ####################################################
 # If we've coded things correctly, we should be able to re-run our original
@@ -706,6 +545,9 @@ results <- foreach::foreach(
       OriginalRow = timeInterventionRow,
       TimeSpan = if (interventionChoice == 3) interventionTimeSpan
     )
+    # TODO: Decide what seeds should be included
+    # TODO: Decide what to do about the pool
+    # TODO: Decide what to do about the old/new interaction matrices.
   )
 
   # NOTE: For time consistency, we need to use the characteristic timescale,

@@ -6,6 +6,17 @@ nonzero <- function(vec) {
   vec[vec!=0]
 }
 
+# Need to use stackoverflow.com/a/47012149 to convert our arguments to a list.
+callMeMaybe2 <- function(listofcharargs) {
+  Charargs = unlist(listofcharargs)
+  if(is.null(Charargs)) return(alist())
+  eval(parse(
+    text = paste0("alist(",
+                  paste(parse(text = Charargs),
+                        collapse = ","),")")
+  ))
+}
+
 ### Loading: ##################################################################
 loadSimulation <- function(filepath1, filepath2 = NULL) {
   file1 <- load(filepath1)
@@ -44,6 +55,26 @@ loadSimulation <- function(filepath1, filepath2 = NULL) {
   }
 
   return(file1)
+}
+
+retrieveFunction <- function(funcstring) {
+  funcstring <- strsplit(funcstring, split = "::")
+  if (length(funcstring) > 1) {
+    stop(paste0("Too many functions provided in string: ", length(funcstring)))
+  } else {
+    funcstring <- funcstring[[1]]
+  }
+  if (length(funcstring) > 2) {
+    stop(paste0("Too many parts to function provided: ",
+                length(funcstring)))
+  } else if (length(funcstring) == 2) {
+    funcstring <- get(funcstring[2], envir = loadNamespace(funcstring[1]))
+  } else if (length(funcstring) == 1) {
+    funcstring <- get(funcstring[1])
+  } else {
+    stop("No parts found for function.")
+  }
+  return(funcstring)
 }
 
 ### Sampling: #################################################################
