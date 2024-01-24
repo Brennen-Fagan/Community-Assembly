@@ -1,5 +1,5 @@
 # Introduction: ###############################################################
-# As a sequel to TimeSpaceAndTimeSeries-1-Bootstrap.R and -1-Intervention.R,
+# As a sequel to TimeSpaceAndTimeSeries-1a-Bootstrap.R and -2a-Intervention.R,
 # we are now introducing a simulation based intervention.
 # Please see the previous files for some design choices, although we aim to
 # improve design at each stage.

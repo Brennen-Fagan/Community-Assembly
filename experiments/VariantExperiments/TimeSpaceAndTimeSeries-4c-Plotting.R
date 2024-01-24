@@ -1,5 +1,5 @@
 # Introduction: ###############################################################
-# Follows TimeSpaceAndTimeSeries-1b-Sampling.R
+# Follows TimeSpaceAndTimeSeries-4b-Sampling.R
 
 stopifnot(exists("samples"))
 

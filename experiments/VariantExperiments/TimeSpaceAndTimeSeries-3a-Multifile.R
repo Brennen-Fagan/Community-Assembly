@@ -1,6 +1,6 @@
 # Introduction: ###############################################################
-# As a sequel to TimeSpaceAndTimeSeries-1-Bootstrap.R and 
-# TimeSpaceAndTimeSeries-1-Intervention.R, we are now introducing an actual 
+# As a sequel to TimeSpaceAndTimeSeries-1a-Bootstrap.R and 
+# TimeSpaceAndTimeSeries-2a-Intervention.R, we are now introducing an actual 
 # (file-substitution) intervention that is not limited to a single file pair.
 # Please see the previous files for some design choices.
 

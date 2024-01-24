@@ -1,5 +1,5 @@
 # Introduction: ###############################################################
-# As a sequel to TimeSpaceAndTimeSeries-1-Bootstrap.R,
+# As a sequel to TimeSpaceAndTimeSeries-1a-Bootstrap.R,
 # we are now introducing an actual (file-substitution) intervention.
 # Please see the previous file for some design choices.
 
