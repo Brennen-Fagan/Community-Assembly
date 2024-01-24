@@ -48,12 +48,132 @@ samples <- lapply(
     return(get(names))
   })
 
+diversities <- lapply(
+  dir(datfolders, full.names = TRUE, pattern = "Diversity"), function(x) {
+    names <- load(x)
+    stopifnot(length(names) == 1)
+    return(get(names))
+  })
+
+presences <- lapply(
+  dir(datfolders, full.names = TRUE, pattern = "Presence"), function(x) {
+    names <- load(x)
+    stopifnot(length(names) == 1)
+    return(get(names))
+  })
+
 stopifnot(length(results) >= length(datfolders),
-          length(samples) == length(datfolders))
+          length(samples) == length(datfolders),
+          length(diversities) == length(results),
+          length(presences) == length(results))
 
-# Convert to diversity metrics: ###############################################
+# Convert formats for plotting: ###############################################
 
+diversities <- do.call(rbind, lapply(diversities, function(d) {
+  id <- strsplit(d$Ellipsis$FullID, "-", fixed = TRUE)[[1]]
+  d$Diversities %>% dplyr::mutate(
+    SimulationSet = id[1],
+    InterventionType = id[2],
+    InterventionParameters = id[3],
+    SimulationNumber = id[4],
+    ParentFileNumber = id[5]
+  )
+}))
 
+diversityRibbons <- diversities %>% dplyr::filter(
+  !(Environment %in% c("Mean", "Gamma")),
+  Measurement == "Richness" | Measurement == "Jaccard"
+) %>%  dplyr::group_by(
+  Time,
+  SimulationSet, InterventionType, InterventionParameters,
+  SimulationNumber, ParentFileNumber,
+  Measurement
+) %>% dplyr::summarise(
+  Low = unlist(dplyr::across(dplyr::any_of("Value"),
+                             .fns = ~ quantile(.x, p = 0.1, na.rm = TRUE))),
+  High = unlist(dplyr::across(dplyr::any_of("Value"),
+                              .fns = ~ quantile(.x, p = 0.9, na.rm = TRUE))),
+  .groups = "drop"
+)
 
+diversities <- diversities %>% dplyr::mutate(
+  Measurement2 = dplyr::case_when(
+    Measurement == "Jaccard" ~ "Spatial Diss.",
+    Measurement == "Richness" & Environment == "Gamma" ~ "Regional Rich.",
+    Measurement == "Richness" & Environment == "Mean" ~ "Local Rich.", # Panel
+    Measurement == "Richness"  ~ "Local Rich.", # Otherwise
+    TRUE ~ Measurement
+  )
+)
 
+# Plotting: ###################################################################
 
+### Presence Plots: ###########################################################
+
+### Diversity Plots: ##########################################################
+PLOT_B <- ggplot2::ggplot(
+  Diversity %>% dplyr::filter(
+    Measurement2 %in% c("Spatial Diss.", "Local Rich.", "Regional Rich."),
+    Environment != "Mean"
+  ),
+  ggplot2::aes(
+    x = Time,
+    y = Value,
+    color = pasteCustom(Dispersal, Space)
+  )
+) + ggplot2::geom_line(
+  # alpha = 0.4,
+  mapping = ggplot2::aes(
+    group = interaction(Dispersal, Environment),
+    alpha = ifelse(Measurement2 == "Regional Rich.", 1, 0.4)
+  )
+) + ggplot2::geom_line(
+  data = Diversity %>% dplyr::filter(
+    Measurement2 %in% c("Spatial Diss.", "Local Rich.", "Regional Rich."),
+    Environment == "Mean"
+  ),
+  size = 1.5
+) + ggplot2::geom_ribbon(
+  data = dplyr::bind_rows(
+    DiversityRibbons,
+    DiversityRibbons_Gamma
+  ) %>% dplyr::mutate(
+    Measurement2 = dplyr::case_when(
+      Measurement == "Jaccard" ~ "Spatial Diss.",
+      Measurement == "Richness" ~ "Local Rich.",
+      TRUE ~ Measurement
+    )
+  ),
+  mapping = ggplot2::aes(
+    ymin = Low,
+    ymax = High,
+    x = Time,
+    fill = pasteCustom(Dispersal, Space)
+  ),
+  alpha = 0.4,
+  inherit.aes = FALSE
+) + ggplot2::theme_bw(
+) + ggplot2::labs(
+  y = "Value", # Number of Species",
+  x = paste0("Time, ", divide_time_by, " units"),
+  tag = "b)"
+  # x = ""
+) + ggplot2::theme(
+  plot.tag.position = c(0.02, 0.98),
+  strip.text.x = ggplot2::element_text(size = 8)
+) + ggplot2::scale_color_manual(
+  name = legend_bl_name,
+  values = c("darkorange", "plum1", "cyan")
+) + ggplot2::scale_fill_manual(
+  name = legend_bl_name,
+  values = c("darkorange4", "plum4", "cyan4")
+) + ggplot2::facet_wrap(
+  . ~ factor(
+    Measurement2, ordered = T,
+    levels = c("Local Rich.", "Regional Rich.", "Spatial Diss.")
+  ), nrow = 1, scales = "free_y"
+) + ggplot2::scale_alpha(guide = "none") + ggplot2::coord_cartesian(
+  ylim = c(0, NA)
+)
+
+### Sampling Plots: ###########################################################

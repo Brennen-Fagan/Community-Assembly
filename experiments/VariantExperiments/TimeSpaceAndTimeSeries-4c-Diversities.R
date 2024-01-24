@@ -50,8 +50,8 @@ Diversity <- foreach::foreach(
   filename <- file.path(
     dirname(x),
     paste0(x_properties[[1]][1],
-                     "_Diversity_",
-                     x_properties[[1]][3])
+           "_Diversity_",
+           x_properties[[1]][3])
   )
   
   if(file.exists(filename)) {
@@ -87,9 +87,12 @@ SpeciesPresence <- foreach::foreach(
   stopifnot(length(x_properties) == 1,
             x_properties[[1]][1] == "TSTS",
             x_properties[[1]][2] == "Simulation")
-  filename <- paste0(x_properties[[1]][1],
-                     "_Presence_",
-                     x_properties[[1]][3])
+  filename <- file.path(
+    dirname(x),
+    paste0(x_properties[[1]][1],
+           "_Presence_",
+           x_properties[[1]][3])
+  )
   
   if(file.exists(filename)) {
     load(filename)
