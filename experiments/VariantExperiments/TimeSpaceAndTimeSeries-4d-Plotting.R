@@ -26,6 +26,7 @@ datfolders <- c(
 
 # Libraries: ##################################################################
 library(dplyr)
+library(tidyr)
 
 library(ggplot2)
 library(patchwork)
@@ -69,25 +70,58 @@ stopifnot(length(results) >= length(datfolders),
 
 # Convert formats for plotting: ###############################################
 
+### Diversity: ################################################################
 diversities <- do.call(rbind, lapply(diversities, function(d) {
   id <- strsplit(d$Ellipsis$FullID, "-", fixed = TRUE)[[1]]
+  controlPatches <- as.character(d$Ellipsis$Intervention$Patches)
+  if (identical(controlPatches, character(0))) {
+    controlPatches <- as.character(d$Ellipsis$PatchesIntervention)
+  }
   d$Diversities %>% dplyr::mutate(
     SimulationSet = id[1],
     InterventionType = id[2],
     InterventionParameters = id[3],
     SimulationNumber = id[4],
     ParentFileNumber = id[5]
+  ) %>% tidyr::separate(
+    # Acknowledge that we have two patch types and that can be important.
+    Environment, into = c("Environment1", "Environment2"),
+    sep = " ", remove = FALSE, fill = "right"
+  ) %>% dplyr::mutate(
+    InControl = ((Environment1 %in% controlPatches) +
+                   ifelse(!is.na(Environment2),
+                          (Environment2 %in% controlPatches),
+                          0))
+    # I.e. Single Patch: 0 if Experiment, 1 if Control
+    #      Double Patch: 0 if both Experiment, 1 if Mixed, 2 if both Control
+    #      Region      : 0
   )
 }))
 
-diversityRibbons <- diversities %>% dplyr::filter(
-  !(Environment %in% c("Mean", "Gamma")),
-  Measurement == "Richness" | Measurement == "Jaccard"
+# Computationally does not seem feasible to run on the entire thing!!
+diversitiesRounded <- diversities %>% dplyr::filter(
+  round(Time) <= 10000
 ) %>%  dplyr::group_by(
-  Time,
-  SimulationSet, InterventionType, InterventionParameters,
+  round(Time), # Time
+  Environment,
+  SimulationSet, InterventionType, InterventionParameters, # Run
+  SimulationNumber, ParentFileNumber, InControl,
+  Measurement # Measurement
+) %>% dplyr::summarise(
+  Value = median(Value)
+) %>% dplyr::rename(
+  Time = `round(Time)`
+)
+
+diversityRibbons <- diversitiesRounded %>% dplyr::filter(
+  !(Environment %in% c("Mean", "Gamma")), # Not Gamma
+  Measurement == "Richness" | Measurement == "Jaccard", # Not PoolType Specific
+  (InControl == 0 & is.na(Environment2)) | (InControl == 1) # Mix/Intervention
+) %>%  dplyr::group_by(
+  Time, # Time
+  SimulationSet, InterventionType, InterventionParameters, # Run
   SimulationNumber, ParentFileNumber,
-  Measurement
+  Measurement # Measurement
 ) %>% dplyr::summarise(
   Low = unlist(dplyr::across(dplyr::any_of("Value"),
                              .fns = ~ quantile(.x, p = 0.1, na.rm = TRUE))),
@@ -96,7 +130,25 @@ diversityRibbons <- diversities %>% dplyr::filter(
   .groups = "drop"
 )
 
-diversities <- diversities %>% dplyr::mutate(
+diversityRibbons_Gamma <- diversitiesRounded %>% dplyr::filter(
+  (Environment %in% c("Gamma")),
+  Measurement == "Richness"
+) %>%  dplyr::group_by(
+  Time, # Time
+  SimulationSet, InterventionType, InterventionParameters, # Run
+  SimulationNumber, ParentFileNumber,
+  Measurement # Measurement
+) %>% dplyr::summarise(
+  Low = unlist(dplyr::across(dplyr::any_of("Value"),
+                             .fns = ~ quantile(.x, p = 0.1, na.rm = TRUE))),
+  High = unlist(dplyr::across(dplyr::any_of("Value"),
+                              .fns = ~ quantile(.x, p = 0.9, na.rm = TRUE))),
+  .groups = "drop"
+) %>% dplyr::mutate(
+  Measurement = "Regional Rich."
+)
+
+diversitiesRounded <- diversitiesRounded %>% dplyr::mutate(
   Measurement2 = dplyr::case_when(
     Measurement == "Jaccard" ~ "Spatial Diss.",
     Measurement == "Richness" & Environment == "Gamma" ~ "Regional Rich.",
@@ -112,7 +164,7 @@ diversities <- diversities %>% dplyr::mutate(
 
 ### Diversity Plots: ##########################################################
 PLOT_B <- ggplot2::ggplot(
-  Diversity %>% dplyr::filter(
+  diversities %>% dplyr::filter(
     Measurement2 %in% c("Spatial Diss.", "Local Rich.", "Regional Rich."),
     Environment != "Mean"
   ),
