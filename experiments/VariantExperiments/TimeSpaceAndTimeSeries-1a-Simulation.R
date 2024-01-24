@@ -542,6 +542,12 @@ results <- foreach::foreach(
       OriginalRow = timeInterventionRow,
       Type = interventionChoice,
       TimeSpan = interventionTimeSpan
+    ),
+    OriginalRun = list(# For comparing to counterfactual no intervention.
+      FPool = s$FPool,
+      File1 = s$File1,
+      File2 = s$File2,
+      PoolTypes = table(s$Pool$Type)
     )
     # TODO: Decide what seeds should be included
     # TODO: Decide what to do about the pool
@@ -561,6 +567,11 @@ results <- foreach::foreach(
   save(interventionSimulation, file = filename)
 
   return(interventionSimulation)
+}
+
+# Cleanup: ####################################################################
+if (exists("clust")) {
+  parallel::stopCluster(clust)
 }
 
 # Useful double check:
