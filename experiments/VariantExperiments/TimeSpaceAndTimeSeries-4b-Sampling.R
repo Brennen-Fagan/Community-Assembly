@@ -33,10 +33,10 @@ if (!pipeline) {
   # "TSTS_Simulations_1-3-3_2024-01-15"
   # "TSTS_Simulations_2-1-6_2024-01-19"
   # "TSTS_Simulations_2-2-6_2024-01-19"
-   "TSTS_Simulations_2-3-6_2024-01-19"
+  # "TSTS_Simulations_2-3-6_2024-01-19"
   # "TSTS_Simulations_3-1-7_2024-01-22"
   # "TSTS_Simulations_3-2-7_2024-01-22"
-  # "TSTS_Simulations_3-3-7_2024-01-22"
+   "TSTS_Simulations_3-3-7_2024-01-22"
 } else {
   # pipeline mode implies that everything should already be defined!!!
   stopifnot(exists("datfolder"))
@@ -121,14 +121,26 @@ if(file.exists(filename)) {
   warning(paste(filename, "already exists."))
 }
 
+# Libraries: ##################################################################
+library(dplyr)
+
+library(parallel)
+library(iterators)
+library(doParallel)
+library(foreach)
+library(doRNG)
+
+source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
+source(file.path(directory, "TimeSpaceAndTimeSeries-0-Interventions.R"))
+
 # Load Data: ##################################################################
 if (!pipeline) {
   results <- lapply(dir(datfolder, full.names = TRUE,
                         pattern = "Simulation"), function(x) {
-    names <- load(x)
-    stopifnot(length(names) == 1) # Should only be one thing in each file.
-    return(get(names))
-  })
+                          names <- load(x)
+                          stopifnot(length(names) == 1) # Should only be one thing in each file.
+                          return(get(names))
+                        })
 } else {
   stopifnot(exists("results"))
 }
@@ -147,18 +159,6 @@ if (as.Date(datfolder_properties[[1]][4], format = "%Y-%m-%d") <=
     return(x)
   })
 }
-
-# Libraries: ##################################################################
-library(dplyr)
-
-library(parallel)
-library(iterators)
-library(doParallel)
-library(foreach)
-library(doRNG)
-
-source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
-source(file.path(directory, "TimeSpaceAndTimeSeries-0-Interventions.R"))
 
 # Parallelization: ############################################################
 if (cores > 1) {
