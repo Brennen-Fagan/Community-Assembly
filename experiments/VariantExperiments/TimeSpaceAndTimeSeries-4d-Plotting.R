@@ -339,8 +339,8 @@ PLOT_T_diffs <- ggplot2::ggplot(
   ggplot2::aes(x = Time, y = Species, color = InterventionDifference)
 ) + ggplot2::geom_point(
   shape = '.'
-) + ggplot2::scale_color_viridis_c(
-  # palette = "RdYlBu",
+) + ggplot2::scale_color_distiller(
+  palette = "RdYlBu",
   # direction = -1,
   # limits = c(-5, 5)
 ) + ggplot2::facet_grid(

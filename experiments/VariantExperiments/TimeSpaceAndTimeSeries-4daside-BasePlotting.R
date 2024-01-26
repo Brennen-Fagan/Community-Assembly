@@ -78,7 +78,7 @@ if (exists("clust")) {
   parallel::stopCluster(clust)
 }
 
-diversities2 <- do.call(rbind, lapply(diversities, function(d) {
+diversities2 <- do.call(rbind, lapply(Diversity, function(d) {
   id <- d$Ellipsis
   d$Diversities %>% dplyr::mutate(
     Directory = dirname(id),
@@ -205,17 +205,17 @@ PLOT_B <- ggplot2::ggplot(
 ) + ggplot2::theme(
   # plot.tag.position = c(0.02, 0.98),
   strip.text.x = ggplot2::element_text(size = 8)
-) + ggplot2::scale_color_manual(
-  name = "Run",
+# ) + ggplot2::scale_color_manual(
+#   name = "Run",
   # values = colors,
   # breaks = paste0(colorNameKeys, ".1"),
   # labels = colorNameKeys,
-  aesthetics = c("colour", "fill")
-) + ggplot2::facet_wrap(
-  . ~ factor(
+  # aesthetics = c("colour", "fill")
+) + ggplot2::facet_grid(
+  factor(
     Measurement2, ordered = T,
     levels = c("Local Rich.", "Regional Rich.", "Spatial Diss.")
-  ), nrow = 1, scales = "free_y"
+  ) ~ Directory, scales = "free_y"
 ) + ggplot2::scale_alpha(guide = "none") + ggplot2::coord_cartesian(
   ylim = c(0, NA)
 )
