@@ -1,4 +1,5 @@
 library(RMTRCode2)
+library(dplyr)
 library(Matrix)
 library(parallel)
 library(doParallel)
@@ -27,7 +28,7 @@ PoolPatchNicheIntervention <- TRUE
 LMParameters <- c(0.01, 10, 0.5, 0.2, 100, 0.1)
 LMLogBodySize <- c(-2, -1, -1, 0)
 
-PerIslandDistance <- 10^c(0) # 10^5 # Inf # 10^0
+PerIslandDistance <- 10^c(Inf) # 10^5 # Inf # 10^0
 SpeciesSpeeds <- 1
 Space <- match.arg("Ring", c("None", "Ring", "Line", "Full"))
 
@@ -374,15 +375,15 @@ records <- foreach::foreach(
     )
   }))
 
-  Events <- Events %>% dplyr::left_join(
+  Events$Events <- Events$Events %>% dplyr::left_join(
     patchesIdentities, by = c("Environment" = "Patch"), suffix = c("", "_Patch")
   ) %>% dplyr::filter(# Reduce initial over-joining.
-    Times >= TimeMin_Patch,
-    Times <= TimeMax_Patch
+    Times >= TimeMin,
+    Times <= TimeMax
   ) %>% dplyr::left_join(
     Pool, by = c("Species" = "ID"), suffix = c("", "_Pool")
   ) %>% dplyr::filter(
-    Type_Patch == Niche_Cat_Pool
+    Type_Patch == Niche_Cat
   ) %>% dplyr::select(
     Times, Species, Environment, Type, Success
   )
@@ -401,6 +402,15 @@ records <- foreach::foreach(
     Verbose = TRUE
   )
 
+  EventsUnfiltered$Events <- dplyr::left_join(
+    EventsUnfiltered$Events %>% dplyr::select(-Success),
+    result$Events,
+    by = c("Times", "Species", "Environment", "Type")
+  )
+
+  # Added Missed Events with NA Success.
+  result$Events <- EventsUnfiltered$Events
+
   save(result,
        file = file.path(dir, paste0(
          "MNA-ExampleExtProp-Result-Env", Environments,
@@ -409,7 +419,7 @@ records <- foreach::foreach(
                    pattern = "-", replacement = "_", fixed = TRUE),
          "-", EventRateModifiers[1], "-", EventRateModifiers[2],
          "-ExtProp", ExtinctionProportion,
-         if(PoolPatchNicheIntervention) "-Intervention"
+         if(PoolPatchNicheIntervention) "-Intervention",
          ".RData")
        )
   )
