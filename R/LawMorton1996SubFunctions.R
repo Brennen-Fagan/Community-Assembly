@@ -59,7 +59,7 @@ LawMorton1996_species <- function(
 
   if (!is.null(seed)) {
     if (exists("oldSeed")) {
-      set.seed(oldSeed)
+      .Random.seed <<- oldSeed
     }
   }
 
@@ -249,8 +249,10 @@ LawMorton1996_CommunityMat <- function(
     }
   }
 
-  if (!is.null(seed) & exists("oldSeed")) {
-    set.seed(oldSeed)
+  if (!is.null(seed)) {
+    if (exists("oldSeed")) {
+      .Random.seed <<- oldSeed
+    }
   }
 
   return(theMatrix)
