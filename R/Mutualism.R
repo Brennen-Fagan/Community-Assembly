@@ -65,6 +65,7 @@ Mutualism_species <- function(
   if (!is.null(seed)) {
     if (exists("oldSeed")) {
       set.seed(oldSeed)
+      .Random.seed <<- oldSeed
     }
   }
 
@@ -101,7 +102,7 @@ Mutualism_saturation <- function(
 
   if (!is.null(seed)) {
     if (exists("oldSeed")) {
-      set.seed(oldSeed)
+      .Random.seed <<- oldSeed
     }
   }
 
@@ -142,7 +143,7 @@ Mutualism_CommunityMat <- function(
 
   if (!is.null(seed)) {
     if (exists("oldSeed")) {
-      set.seed(oldSeed)
+      .Random.seed <<- oldSeed
     }
   }
 
@@ -189,7 +190,7 @@ Mutualism_CommunityMat_ByBlock <- function(
 
   if (!is.null(seed)) {
     if (exists("oldSeed")) {
-      set.seed(oldSeed)
+      .Random.seed <<- oldSeed
     }
   }
 
