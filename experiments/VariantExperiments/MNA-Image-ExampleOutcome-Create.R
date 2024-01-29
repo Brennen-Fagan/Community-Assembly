@@ -14,7 +14,7 @@ EventRateModifiers <- c(1, 1) # Immigration, Extirpation
 LMParameters <- c(0.01, 10, 0.5, 0.2, 100, 0.1)
 LMLogBodySize <- c(-2, -1, -1, 0)
 
-PerIslandDistance <- 10^c(Inf, 9:0) # 10^5 # Inf # 10^0
+PerIslandDistance <- 10^c(0) # 10^5 # Inf # 10^0
 SpeciesSpeeds <- 1
 Space <- match.arg("Ring", c("None", "Ring", "Line", "Full"))
 
@@ -25,8 +25,9 @@ ExtinctionProportion <- 1
 MaximumTimeStep <- 1 # Maximum time solver can proceed without elimination.
 BetweenEventSteps <- 10 # Number of steps to reach next event to smooth.
 
-CalculatePoolAndMatrices <- TRUE
-dir <- paste0("Data_", "2024-01-18")#Sys.Date()) # getSrcDirectory(function(){})
+CalculatePoolAndMatrices <- FALSE
+dir <- paste0("Data_", "2024-01-29")#Sys.Date())
+# getSrcDirectory(function(){})
 
 if (!dir.exists(dir)) {
   dir.create(dir, showWarnings = FALSE)
@@ -41,6 +42,7 @@ if (!dir.exists(dir)) {
 # [1] 77776934  9954265 47259175 # Data_2023-09-26
 # [1] 38427042 12032489 28665115 # Data_2024-01-17; Low PValues (0, 0.16) Matrix
 # [1] 75027622 64713671 21957601 # Data_2024-01-18; High P (0.84, 1) Matrix
+# [1] 54497638 90525137 12496702 # Data_2024-01-29; Binary Patch Niche
 seeds <- c(
   # 11365664, 91994571, 20423344 # Data_2023-07-06
   # 65566924, 64305636, 14447307 # Data_2023-09-22
@@ -49,18 +51,116 @@ seeds <- c(
   #  5005152, 70117044, 42048254 # Data_2023-09-25
   # 77776934,  9954265, 47259175 # Data_2023-09-26
   # 38427042, 12032489, 28665115 # Data_2024-01-17
-   75027622, 64713671, 21957601 # Data_2024-01-18
+  # 75027622, 64713671, 21957601 # Data_2024-01-18
+   54497638, 90525137, 12496702 # Data_2024-01-29
 )
 PoolSeed <- seeds[1]
 EnvironmentSeed <- seeds[2]
 HistorySeed <- seeds[3]
 
 ConstrainTruncNormPs <- # Need to be NULL or two ordered probabilities.
-  # NULL # DEFAULT
+   NULL # DEFAULT
   # c(0, pnorm(-1)) # Data_2024-01-17; -1 Std. Dev. or more Extreme.
-   c(pnorm(+1), 1) # Data_2024-01-18; +1 Std. Dev. or more Extreme.
+  # c(pnorm(+1), 1) # Data_2024-01-18; +1 Std. Dev. or more Extreme.
 
 # Setup: #######################################################################
+
+# https://stats.stackexchange.com/a/313138
+# Note the edit to the y.dual. Possible change from diag's 2017 behaviour?
+complement_whuber <- function(y, rho, x, threshold=1e-12) {
+  #
+  # Process the arguments.
+  #
+  if(!is.matrix(y)) y <- matrix(y, ncol=1)
+  d <- ncol(y)
+  n <- nrow(y)
+  y <- scale(y, center=FALSE) # Makes computations simpler
+  if (missing(x)) x <- rnorm(n)
+  #
+  # Remove the effects of `y` on `x`.
+  #
+  e <- residuals(lm(x ~ y))
+  #
+  # Calculate the coefficient `sigma` of `e` so that the correlation of
+  # `y` with the linear combination y.dual %*% rho + sigma*e is the desired
+  # vector.
+  #
+  y.dual <- with(
+    svd(y),
+    (n-1)*u %*%
+      diag(ifelse(d > threshold, 1/d, 0), # Failed in the ncol(y) == 1 case.
+           nrow = ncol(u), ncol = ncol(v)) %*%
+      t(v))
+  sigma2 <- c((1 - rho %*% cov(y.dual) %*% rho) / var(e))
+  #
+  # Return this linear combination.
+  #
+  if (sigma2 >= 0) {
+    sigma <- sqrt(sigma2)
+    z <- y.dual %*% rho + sigma*e
+  } else {
+    warning("Correlations are impossible.")
+    z <- rep(0, n)
+  }
+  return(z)
+}
+
+# Works better the larger the pool is. More entries entails more flexibility.
+calculateNumericNiche <- function( # Wrapper for complement_whuber.
+  # NOTE: FUNCTION USES LINEARITY; PROBABLY DOESN'T MAKE SENSE FOR CATEGORICAL
+  pool, # Pool to be mutated.
+  nicheValues, # Numeric values to modify. No required distribution.
+  correlations, # intensity of *linear* relationship with pool.
+  correlationColumns # Columns to use for the correlations. Characters.
+) {# Returns the pool with a new column
+
+  stopifnot(length(correlationColumns) == length(correlations))
+
+  niches <- complement_whuber(
+    pool[, correlationColumns], correlations, nicheValues
+  )
+
+  return(niches)
+}
+
+# calculate rather than mutate because we're not directly adding to the Pool.
+calculateCategoricalNiche <- function(
+  pool, # Pool to be mutated.
+  functions, # Output probabilities for each category of the trait. List.
+  correlationColumns, # Columns input for each function.
+  seed
+) {# Returns the pool with a new column
+
+  if (!is.null(seed)) {
+    if (exists(".Random.seed")) {
+      oldSeed <- .Random.seed
+    }
+    set.seed(seed)
+  }
+
+  probs <- matrix(unlist(lapply(
+    seq_along(functions),
+    function(i, pool) functions[[i]](pool[, correlationColumns]),
+    pool = pool
+  )), ncol = length(functions)) # populates down columns.
+  # Each row will be a species.
+
+  niches <- apply(probs, MARGIN = 1, FUN = function(ps) {
+    which(rmultinom(1, 1, ps) == 1)
+  })
+
+  if (!is.null(names(functions))) {
+    niches <- names(functions)[niches]
+  }
+
+  if (!is.null(seed)) {
+    if (exists("oldSeed")) {
+      .Random.seed <<- oldSeed
+    }
+  }
+
+  return(niches)
+}
 
 ## Pools and Interaction Matrices: #############################################
 if (CalculatePoolAndMatrices) {
