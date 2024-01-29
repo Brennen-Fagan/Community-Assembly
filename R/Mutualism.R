@@ -64,7 +64,6 @@ Mutualism_species <- function(
 
   if (!is.null(seed)) {
     if (exists("oldSeed")) {
-      set.seed(oldSeed)
       .Random.seed <<- oldSeed
     }
   }
