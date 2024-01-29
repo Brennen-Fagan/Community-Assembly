@@ -11,6 +11,15 @@ Environments <- 10
 EventsEach <- Environments * ceiling(sum(Species) * (log(sum(Species) + 0)))
 EventRateModifiers <- c(1, 1) # Immigration, Extirpation
 
+PoolPatchNiche <- TRUE
+PoolPatchNicheSplit <- c(0, 0.5, 0.5) # Core, Niche1, Niche2, ...
+#                        Core is always present (Generalist).
+stopifnot(!PoolPatchNiche ||
+            sum(PoolPatchNicheSplit) == 1)
+AdjustImmigration <- TRUE #
+stopifnot(!AdjustImmigration ||
+            all(PoolPatchNicheSplit[-1] == PoolPatchNicheSplit[2]))
+
 LMParameters <- c(0.01, 10, 0.5, 0.2, 100, 0.1)
 LMLogBodySize <- c(-2, -1, -1, 0)
 
@@ -25,7 +34,7 @@ ExtinctionProportion <- 1
 MaximumTimeStep <- 1 # Maximum time solver can proceed without elimination.
 BetweenEventSteps <- 10 # Number of steps to reach next event to smooth.
 
-CalculatePoolAndMatrices <- FALSE
+CalculatePoolAndMatrices <- TRUE
 dir <- paste0("Data_", "2024-01-29")#Sys.Date())
 # getSrcDirectory(function(){})
 
@@ -52,11 +61,14 @@ seeds <- c(
   # 77776934,  9954265, 47259175 # Data_2023-09-26
   # 38427042, 12032489, 28665115 # Data_2024-01-17
   # 75027622, 64713671, 21957601 # Data_2024-01-18
-   54497638, 90525137, 12496702 # Data_2024-01-29
+   54497638, 90525137, 12496702, 34126575 # Data_2024-01-29
 )
 PoolSeed <- seeds[1]
 EnvironmentSeed <- seeds[2]
 HistorySeed <- seeds[3]
+if (PoolPatchNiche) {
+  NicheSeed <- seeds[4]
+}
 
 ConstrainTruncNormPs <- # Need to be NULL or two ordered probabilities.
    NULL # DEFAULT
@@ -105,6 +117,7 @@ complement_whuber <- function(y, rho, x, threshold=1e-12) {
   return(z)
 }
 
+# TODO: Could be better by not providing the entire pool.
 # Works better the larger the pool is. More entries entails more flexibility.
 calculateNumericNiche <- function( # Wrapper for complement_whuber.
   # NOTE: FUNCTION USES LINEARITY; PROBABLY DOESN'T MAKE SENSE FOR CATEGORICAL
@@ -171,6 +184,23 @@ if (CalculatePoolAndMatrices) {
     LogBodySize = LMLogBodySize,
     seed = PoolSeed
   )
+
+  if (PoolPatchNiche) {
+    PoolPatchNicheFunctions <- lapply(
+      PoolPatchNicheSplit, function(p) function(x) {rep(p, nrow(x))}
+    )
+    names(PoolPatchNicheFunctions) <-
+      c("Core", paste0("Niche", 1:(length(PoolPatchNiche) - 1)))
+
+    Pool <- Pool %>% dplyr::mutate(
+      Niche_Cat = calculateCategoricalNiche(
+        Pool,
+        functions = PoolPatchNicheFunctions,
+        correlationColumns = c("ID", "Size", "Type"), # for later usage.
+        seed = NicheSeed
+        )
+    )
+  }
 
   InteractionMatrices <- RMTRCode2::CreateEnvironmentInteractions(
     Pool = Pool, NumEnvironments = Environments,
