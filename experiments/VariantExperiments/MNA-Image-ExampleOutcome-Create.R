@@ -8,7 +8,10 @@ library(iterators)
 # Parameters: ##################################################################
 Species <- c(Basal = 34, Consumer = 66) * 2
 Environments <- 10
-EventsEach <- Environments * ceiling(sum(Species) * (log(sum(Species) + 0)))
+EventsEach <- Environments * ceiling(sum(Species) * (log(sum(Species) + 0))) *
+  # 1 # DEFAULT
+  2 # Data_2024-01-29; Binary Patch Niche. Make sure we're extra burnt in.
+
 EventRateModifiers <- c(1, 1) # Immigration, Extirpation
 
 PoolPatchNiche <- TRUE
@@ -19,6 +22,7 @@ stopifnot(!PoolPatchNiche ||
 AdjustImmigration <- TRUE #
 stopifnot(!AdjustImmigration ||
             all(PoolPatchNicheSplit[-1] == PoolPatchNicheSplit[2]))
+PoolPatchNicheIntervention <- TRUE
 
 LMParameters <- c(0.01, 10, 0.5, 0.2, 100, 0.1)
 LMLogBodySize <- c(-2, -1, -1, 0)
@@ -61,19 +65,22 @@ seeds <- c(
   # 77776934,  9954265, 47259175 # Data_2023-09-26
   # 38427042, 12032489, 28665115 # Data_2024-01-17
   # 75027622, 64713671, 21957601 # Data_2024-01-18
-   54497638, 90525137, 12496702, 34126575 # Data_2024-01-29
+  54497638, 90525137, 12496702, 34126575, 87083934 # Data_2024-01-29
 )
 PoolSeed <- seeds[1]
 EnvironmentSeed <- seeds[2]
 HistorySeed <- seeds[3]
 if (PoolPatchNiche) {
   NicheSeed <- seeds[4]
+  if (PoolPatchNicheIntervention) {
+    InterventionSeed <- seeds[5]
+  }
 }
 
 ConstrainTruncNormPs <- # Need to be NULL or two ordered probabilities.
-   NULL # DEFAULT
-  # c(0, pnorm(-1)) # Data_2024-01-17; -1 Std. Dev. or more Extreme.
-  # c(pnorm(+1), 1) # Data_2024-01-18; +1 Std. Dev. or more Extreme.
+  NULL # DEFAULT
+# c(0, pnorm(-1)) # Data_2024-01-17; -1 Std. Dev. or more Extreme.
+# c(pnorm(+1), 1) # Data_2024-01-18; +1 Std. Dev. or more Extreme.
 
 # Setup: #######################################################################
 
@@ -198,7 +205,7 @@ if (CalculatePoolAndMatrices) {
         functions = PoolPatchNicheFunctions,
         correlationColumns = c("ID", "Size", "Type"), # for later usage.
         seed = NicheSeed
-        )
+      )
     )
   }
 
@@ -222,13 +229,21 @@ if (CalculatePoolAndMatrices) {
 # Note: eigenvalues of block matrices are the eigenvalues of the blocks.
 CharacteristicRate <- max(unlist(lapply(
   InteractionMatrices$Mats, function(m) {abs(eigen(m)$values)}
-  )))
+)))
+
+ArrivalRateCorrection <- 1
+if (PoolPatchNiche && AdjustImmigration) {
+  # Multiplier to increase rate to compensate for the decreased eligibles.
+  # If we have (e.g.) 1/4 ineligible, then rate 3/4th as high.
+  # So we correct by dividing by the effective eligible pool.
+  ArrivalRateCorrection <- 1 / (sum(PoolPatchNicheSplit[1:2]))
+}
 
 Events <- RMTRCode2::CreateAssemblySequence(
   Species = sum(Species),
   NumEnvironments = Environments,
-  ArrivalEvents = EventsEach * EventRateModifiers[1],
-  ArrivalRate = CharacteristicRate * EventRateModifiers[1],
+  ArrivalEvents = EventsEach * EventRateModifiers[1] * ArrivalRateCorrection,
+  ArrivalRate = CharacteristicRate * EventRateModifiers[1] * ArrivalRateCorrection,
   ArrivalFUN = RMTRCode2::ArrivalFUN_Example2,
   ExtinctEvents = EventsEach * EventRateModifiers[2],
   ExtinctRate = CharacteristicRate * EventRateModifiers[2],
@@ -238,7 +253,8 @@ Events <- RMTRCode2::CreateAssemblySequence(
 
 print(combinations <-
         table(Events$Events$Species,
-              Events$Events$Environment))
+              Events$Events$Environment,
+              Events$Events$Type))
 if(any(combinations == 0)) {warning(
   "Exists a species which doesn't immigrate to an environment."
 )}
@@ -265,7 +281,7 @@ records <- foreach::foreach(
   #   "BetweenEventSteps"),
   .export = "reprate",
   .packages = "RMTRCode2"
-) %dopar% {
+) %do% {
   print(paste(dist, "in"))
   # table(Pool)
   pool <- data.frame(n = 1:sum(Species))#Hack
@@ -311,6 +327,66 @@ records <- foreach::foreach(
   # print(paste(dist, "fun"))
   print(record <- Sys.time())
 
+  # !!!Technical Debt!!!
+  # TODO: Implement correctly by creating a patch dataframe structure
+  # that is used inside (a derivative of) MNA_Dispersal and handled by
+  # EliminationAndNeutralEvents. The new versions should be able to
+  # check patch specific identity and refuse it, or to have the PerCapDyn
+  # create a penalty or other functional form to interact with continuous
+  # and categorical niches and how well species niche matches patch niche.
+  #
+  # Instead, what we're doing here is to create a copy of the events,
+  # provide one to the simulation and remove the success column from the other,
+  # join the success column after the simulation to the preserved one,
+  # and then put the preserved one in place of the actually used.
+  # That way, the one provided by the simulation can have entries removed
+  # (due to mismatch between categorical pool and patch niches).
+  # In the process, we'll need half full time on the characteristic scale
+  # in order to set when the intervention takes place.
+
+  EventsUnfiltered <- Events
+  timeMax <- max(Events$Events$Time) * CharacteristicRate
+  timeSwitch <- (timeMax - 1000) / 2 + 1000 # 1000 as a techdebt burn-in
+
+  if (PoolPatchNicheIntervention) {
+    if (exists(".Random.seed")) {
+      oldSeed <- .Random.seed
+    }
+    # Pick a random patch as control, rest as experiment.
+    # is adding 1:5 (or w/e) okay? Yes, we're assuming contiguous patches.
+    control <- ((sample.int(Environments, 1) + 1:(Environments / 2) ) %% Environments) + 1
+    # print(paste(bootstrapID, ":", toString(control)))
+    experiment <- c(1:Environments)[!c(1:Environments) %in% control]
+    # print(paste(bootstrapID, ":", toString(experiment)))
+    if (exists("oldSeed")) {
+      .Random.seed <- oldSeed
+    }
+  } else {
+    control <- 1:Environments
+  }
+
+  patchesIdentities <- do.call(rbind, lapply(1:Environments, function(i) {
+    data.frame(
+      Patch = i,
+      Type = if(i %in% control) 1 else c(1, 2),
+      TimeMin = if(i %in% control) -Inf else c(-Inf, timeSwitch),
+      TimeMax = if(i %in% control) Inf else c(timeSwitch, Inf)
+    )
+  }))
+
+  Events <- Events %>% dplyr::left_join(
+    patchesIdentities, by = c("Environment" = "Patch"), suffix = c("", "_Patch")
+  ) %>% dplyr::filter(# Reduce initial over-joining.
+    Times >= TimeMin_Patch,
+    Times <= TimeMax_Patch
+  ) %>% dplyr::left_join(
+    Pool, by = c("Species" = "ID"), suffix = c("", "_Pool")
+  ) %>% dplyr::filter(
+    Type_Patch == Niche_Cat_Pool
+  ) %>% dplyr::select(
+    Times, Species, Environment, Type, Success
+  )
+
   result <- theFun(
     pool, NumEnvironments = Environments,
     InteractionMatrices = InteractionMatrices,
@@ -332,7 +408,9 @@ records <- foreach::foreach(
          "-", gsub(round(log10(dist)),
                    pattern = "-", replacement = "_", fixed = TRUE),
          "-", EventRateModifiers[1], "-", EventRateModifiers[2],
-         "-ExtProp", ExtinctionProportion, ".RData")
+         "-ExtProp", ExtinctionProportion,
+         if(PoolPatchNicheIntervention) "-Intervention"
+         ".RData")
        )
   )
   print(Sys.time())
