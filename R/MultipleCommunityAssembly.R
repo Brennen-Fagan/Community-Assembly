@@ -97,7 +97,7 @@ CreateEnvironmentInteractions <- function(
     set.seed(EnvironmentSeeds)
     EnvironmentSeeds <- 1E8 * runif(NumEnvironments)
     if (exists("oldSeed")) {
-      set.seed(oldSeed)
+      .Random.seed <<- oldSeed
     }
   }
 
@@ -120,7 +120,7 @@ CreateEnvironmentInteractions <- function(
       retval <- ComputeInteractionMatrix(ModifyPool(pool), ...)
 
       if (exists("oldSeed")) {
-        set.seed(oldSeed)
+        .Random.seed <<- oldSeed
       }
 
       return(retval)
@@ -203,7 +203,7 @@ CreateAssemblySequence <- function(
     Events <- with(Events, Events[order(Times), ])
 
     if (exists("oldSeed")) {
-      set.seed(oldSeed)
+      .Random.seed <<- oldSeed
     }
   }
 
