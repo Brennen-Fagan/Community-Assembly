@@ -198,7 +198,7 @@ if (CalculatePoolAndMatrices) {
       PoolPatchNicheSplit, function(p) function(x) {rep(p, nrow(x))}
     )
     names(PoolPatchNicheFunctions) <-
-      c("Core", paste0("Niche", 1:(length(PoolPatchNiche) - 1)))
+      c("Core", paste0("Niche", 1:(length(PoolPatchNicheSplit) - 1)))
 
     Pool <- Pool %>% dplyr::mutate(
       Niche_Cat = calculateCategoricalNiche(
@@ -348,6 +348,7 @@ records <- foreach::foreach(
   EventsUnfiltered <- Events
   timeMax <- max(Events$Events$Time) * CharacteristicRate
   timeSwitch <- (timeMax - 1000) / 2 + 1000 # 1000 as a techdebt burn-in
+  timeSwitch <- timeSwitch / CharacteristicRate # Convert back.
 
   if (PoolPatchNicheIntervention) {
     if (exists(".Random.seed")) {
@@ -373,7 +374,13 @@ records <- foreach::foreach(
       TimeMin = if(i %in% control) -Inf else c(-Inf, timeSwitch),
       TimeMax = if(i %in% control) Inf else c(timeSwitch, Inf)
     )
-  }))
+  })) %>% dplyr::mutate(
+    Type = if(PoolPatchNicheSplit[1] > 0) {
+      c("Core", paste0("Niche", 1:(length(PoolPatchNicheSplit) - 1)))[Type]
+    } else {
+      paste0("Niche", 1:(length(PoolPatchNicheSplit) - 1))[Type]
+    }
+  )
 
   Events$Events <- Events$Events %>% dplyr::left_join(
     patchesIdentities, by = c("Environment" = "Patch"), suffix = c("", "_Patch")
@@ -383,7 +390,7 @@ records <- foreach::foreach(
   ) %>% dplyr::left_join(
     Pool, by = c("Species" = "ID"), suffix = c("", "_Pool")
   ) %>% dplyr::filter(
-    Type_Patch == Niche_Cat
+    Type_Patch == Niche_Cat | Type == "Extinct"
   ) %>% dplyr::select(
     Times, Species, Environment, Type, Success
   )
