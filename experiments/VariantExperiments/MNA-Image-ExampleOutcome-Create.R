@@ -217,7 +217,7 @@ if (CalculatePoolAndMatrices) {
     EnvironmentSeeds = EnvironmentSeed,
     ConstrainP = ConstrainTruncNormPs
   )
-  save(Pool, InteractionMatrices,
+  save(Pool, InteractionMatrices, PoolSeed, EnvironmentSeed, NicheSeed,
        file = file.path(dir, paste0(
          "MNA-ExampleOutcome-PoolMats-Env", Environments, ".RData")))
 } else {
@@ -354,6 +354,7 @@ records <- foreach::foreach(
     if (exists(".Random.seed")) {
       oldSeed <- .Random.seed
     }
+    set.seed(InterventionSeed)
     # Pick a random patch as control, rest as experiment.
     # is adding 1:5 (or w/e) okay? Yes, we're assuming contiguous patches.
     control <- ((sample.int(Environments, 1) + 1:(Environments / 2) ) %% Environments) + 1
@@ -372,7 +373,7 @@ records <- foreach::foreach(
       Patch = i,
       Type = if(i %in% control) 1 else c(1, 2),
       TimeMin = if(i %in% control) -Inf else c(-Inf, timeSwitch),
-      TimeMax = if(i %in% control) Inf else c(timeSwitch, Inf)
+      TimeMax = if(i %in% control) +Inf else c(timeSwitch, +Inf)
     )
   })) %>% dplyr::mutate(
     Type = if(PoolPatchNicheSplit[1] > 0) {
@@ -406,7 +407,24 @@ records <- foreach::foreach(
     ExtinctionProportion = ExtinctionProportion,
     MaximumTimeStep = MaximumTimeStep,
     BetweenEventSteps = BetweenEventSteps,
-    Verbose = TRUE
+    Verbose = TRUE,
+    # Using the ellipsis pass through feature:
+    Intervention = list(# NOTE: characteristic scale!
+      Patches = experiment,
+      Time = timeSwitch,
+      Type = "Niche: Patch, Discrete, ImmigrationGate",
+      # It's a Niche Intervention on the Patches that change discretely.
+      # The effect is via a gate on the immigration that prevents arrivals.
+      PatchIdentities = patchesIdentities,
+      FullHistory = EventsUnfiltered %>% dplyr::select(-Success),
+      TimeSpan = 200, # Taking a guess here: ~ 20,000 characteristic units.
+      # Intervention should take place ~10,500.
+      # Defaults focus sampling around half TimeSpan but continue to 2 times.
+      # 20 is about the length of 1 event of each type to each patch.
+      # 200 with defaults gets 13, 25, 35,... with many around 100.
+      Seed = InterventionSeed
+    ),
+    Timescale = "Simulation"
   )
 
   EventsUnfiltered$Events <- dplyr::left_join(
