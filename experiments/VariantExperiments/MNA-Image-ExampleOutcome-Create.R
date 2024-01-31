@@ -73,9 +73,9 @@ EnvironmentSeed <- seeds[2]
 HistorySeed <- seeds[3]
 if (PoolPatchNiche) {
   NicheSeed <- seeds[4]
-  if (PoolPatchNicheIntervention) {
+  # if (PoolPatchNicheIntervention) {
     InterventionSeed <- seeds[5]
-  }
+  # }
 }
 
 ConstrainTruncNormPs <- # Need to be NULL or two ordered probabilities.
@@ -366,6 +366,7 @@ records <- foreach::foreach(
     }
   } else {
     control <- 1:Environments
+    experiment <- c(1:Environments)[!c(1:Environments) %in% control]
   }
 
   patchesIdentities <- do.call(rbind, lapply(1:Environments, function(i) {
@@ -416,7 +417,7 @@ records <- foreach::foreach(
       # It's a Niche Intervention on the Patches that change discretely.
       # The effect is via a gate on the immigration that prevents arrivals.
       PatchIdentities = patchesIdentities,
-      FullHistory = EventsUnfiltered %>% dplyr::select(-Success),
+      FullHistory = EventsUnfiltered$Events %>% dplyr::select(-Success),
       TimeSpan = 200, # Taking a guess here: ~ 20,000 characteristic units.
       # Intervention should take place ~10,500.
       # Defaults focus sampling around half TimeSpan but continue to 2 times.
