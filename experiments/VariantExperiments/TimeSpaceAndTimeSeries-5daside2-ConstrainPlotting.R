@@ -2,7 +2,16 @@
 options(bitmapType = "cairo")
 
 datfolders <- c(
-  "Data_2024-01-29"
+  "TSTS_Simulations_2-1-6_2024-01-19",
+  "TSTS_Simulations_2-2-6_2024-01-19",
+  "TSTS_Simulations_2-3-6_2024-01-19",
+  "TSTS_Simulations_3-1-7_2024-01-22",
+  "TSTS_Simulations_3-2-7_2024-01-22",
+  "TSTS_Simulations_3-3-7_2024-01-22"
+)
+poolfolders <- c(
+  "Data_2024-01-17",
+  "Data_2024-01-18"
 )
 # Libraries: ##################################################################
 library(dplyr)
@@ -19,7 +28,7 @@ source("TimeSpaceAndTimeSeries-0-Functions.R")
 # Load Data: ##################################################################
 
 results <- lapply(
-  dir(datfolders, full.names = TRUE, pattern = "Result"), function(x) {
+  dir(datfolders, full.names = TRUE, pattern = "(Simulation|Result)"), function(x) {
     names <- load(x)
     stopifnot(length(names) == 1)
     return(get(names))
@@ -47,7 +56,7 @@ presences <- lapply(
   })
 
 poolmats <- lapply(
-  dir(datfolders, full.names = TRUE, pattern = "PoolMats"), function(x) {
+  dir(poolfolders, full.names = TRUE, pattern = "PoolMats"), function(x) {
     names <- load(x)
     return(c(mget(names), "Dir" = x))
   })
@@ -58,7 +67,7 @@ poolmats <- lapply(
 
 # Plotting: ###################################################################
 # Parameters
-targetpatches <- c(2, 7) # 2 is experimental
+# targetpatches <- c(2, 7) # 2 is experimental
 
 ### Plot of maximally distant true diversities, not separated by niche. #######
 # We use the precomputed diversities. We expect experimental patch above,
@@ -71,15 +80,22 @@ Div_rounding <- 1
 diversitiesPlottable <- do.call(
   rbind,
   diversities %>% lapply(function(d) {
-    fileproperties <- strsplit(basename(d$Dir), split = "_", fixed = TRUE)[[1]]
+    targetpatches <- d$Ellipsis$Intervention$Patches[3]
+    targetpatches <- c(targetpatches, ((targetpatches + 4) %% 10) + 1)
 
-    if (d$Ellipsis$Timescale == "Simulation") {
-      d$Diversities$Time <- d$Diversities$Time / d$Ellipsis$ReactionTime
+    fileproperties <- strsplit(basename(d$Dir), split = "([_]|[.])")[[1]][3]
+    fileproperties <- strsplit(fileproperties, split = "-", fixed = TRUE)[[1]]
+
+    # In this case, timescale is characteristic, not simulation.
+    # if (d$Ellipsis$Timescale == "Simulation") {
+      # d$Diversities$Time <- d$Diversities$Time / d$Ellipsis$ReactionTime
       # d$Ellipsis$Intervention$Time <-
       #   d$Ellipsis$Intervention$Time / d$Ellipsis$ReactionTime
-    }
+    # }
 
-    d$Diversities %>% dplyr::mutate(
+    d$Diversities %>% dplyr::filter(
+      Environment %in% targetpatches
+    ) %>% dplyr::mutate(
       Time = round(Time / Div_rounding) * Div_rounding
     ) %>% dplyr::group_by(
       Time, Environment, Measurement
@@ -88,161 +104,109 @@ diversitiesPlottable <- do.call(
       Count = dplyr::n(),
       .groups = "drop"
     ) %>% dplyr::mutate(
-      Space = fileproperties[4],
-      Intervention = ifelse(
-        fileproperties[length(fileproperties)] == "Intervention.RData",
-        "Pool Swap", "No Intervention")
+      Space = "Inf",
+      Intervention = paste(
+        dplyr::case_when(
+          fileproperties[1] == 2 ~ "Low",
+          fileproperties[1] == 3 ~ "High"
+        ),
+        dplyr::case_when(
+          fileproperties[3] == 6 ~ "High",
+          fileproperties[3] == 7 ~ "Low"
+        ),
+        sep = "_"
+      ),
+      InterventionSpeed =
+        dplyr::case_when(
+          fileproperties[2] == 1 ~ "None",
+          fileproperties[2] == 2 ~ "Fast",
+          fileproperties[2] == 3 ~ "Slow"
+        ),
+      Control = Environment == targetpatches[2]
     )
   })
 )
 
-Div_spacechoice <- "Inf"
+# Div_interventionchoice <- c("Low_High", "High_Low")[2]
+for(Div_interventionchoice in c("Low_High", "High_Low")) {
 
 Div_experiment <- ggplot2::ggplot(
   diversitiesPlottable %>% dplyr::filter(
-    Space == Div_spacechoice,
-    Environment %in% as.character(targetpatches[1]),
+    Intervention == Div_interventionchoice,
+    # Environment %in% as.character(targetpatches[1]),
+    Control == FALSE,
     Measurement == "Richness"
   ),
   ggplot2::aes(
     x = Time,
     y = Value,
-    color = Intervention,
-    linetype = Intervention
+    color = InterventionSpeed,
+    linetype = InterventionSpeed
   )
 ) + ggplot2::geom_line(
   show.legend = FALSE
 ) + ggplot2::scale_color_manual(
   values = c(
-    "No Intervention" = "#44546a",
-    "Pool Swap" = "#ed7d31"
+    "None" = "#44546a",
+    "Fast" = "#5b9bd5",
+    "Slow" = "#ed7d31"
   )
 ) + ggplot2::ylab(
-  paste0("Richness\n(Patch", targetpatches[1], ")")
+  paste0("Richness\n(", "Experiment", " Patch)")
 ) + ggplot2::coord_cartesian(
   ylim = range(diversitiesPlottable %>% dplyr::filter(
-    Space == Div_spacechoice, Environment != "Gamma",
+    Intervention == Div_interventionchoice, Environment != "Gamma",
     Measurement == "Richness"
   ) %>% dplyr::pull(Value))
-) + ggplot2::geom_vline(
-  xintercept = # SAFE ONLY IN OUR SPECIFIC CASE
-    (diversities[[1]]$Ellipsis$Intervention$Time /
-    diversities[[1]]$Ellipsis$ReactionTime)
+# ) + ggplot2::geom_vline( # All values already after intervention...
+#   xintercept = # SAFE ONLY IN OUR SPECIFIC CASE
+#     (diversities[[1]]$Ellipsis$Intervention$Time /
+#        diversities[[1]]$Ellipsis$ReactionTime)
 )
 
 Div_control <- ggplot2::ggplot(
   diversitiesPlottable %>% dplyr::filter(
-    Space == Div_spacechoice,
-    Environment %in% as.character(targetpatches[2]),
+    Intervention == Div_interventionchoice,
+    # Environment %in% as.character(targetpatches[2]),
+    Control == TRUE,
     Measurement == "Richness"
   ),
   ggplot2::aes(
     x = Time,
     y = Value,
-    color = Intervention,
-    linetype = Intervention
+    color = InterventionSpeed,
+    linetype = InterventionSpeed
   )
 ) + ggplot2::geom_line(
   show.legend = FALSE
 ) + ggplot2::scale_color_manual(
   values = c(
-    "No Intervention" = "#44546a",
-    "Pool Swap" = "#ed7d31"
+    "None" = "#44546a",
+    "Fast" = "#5b9bd5",
+    "Slow" = "#ed7d31"
   )
 ) + ggplot2::ylab(
-  paste0("Richness\n(Patch", targetpatches[2], ")")
+  paste0("Richness\n(", "Control", " Patch)")
 ) + ggplot2::coord_cartesian(
   ylim = range(diversitiesPlottable %>% dplyr::filter(
-    Space == Div_spacechoice, Environment != "Gamma",
+    Intervention == Div_interventionchoice, Environment != "Gamma",
     Measurement == "Richness"
   ) %>% dplyr::pull(Value))
-) + ggplot2::geom_vline(
-  xintercept = # SAFE ONLY IN OUR SPECIFIC CASE
-    (diversities[[1]]$Ellipsis$Intervention$Time /
-    diversities[[1]]$Ellipsis$ReactionTime)
+# ) + ggplot2::geom_vline(
+#   xintercept = # SAFE ONLY IN OUR SPECIFIC CASE
+#     (diversities[[1]]$Ellipsis$Intervention$Time /
+#        diversities[[1]]$Ellipsis$ReactionTime)
 )
 
 ggplot2::ggsave(
   Div_experiment / Div_control,
-    filename = paste0("Image-ABC-Div-",
-                      Div_spacechoice,
-                      ".png"),
+  filename = paste0("Image-PrConstrain-Div-",
+                    Div_interventionchoice,
+                    ".png"),
   width = 12, height = 8, units = "cm"
 )
+}
 
-Div_experiment_noint <- ggplot2::ggplot(
-  diversitiesPlottable %>% dplyr::filter(
-    Space == Div_spacechoice,
-    Environment %in% as.character(targetpatches[1]),
-    Measurement == "Richness",
-    Intervention == "No Intervention"
-  ),
-  ggplot2::aes(
-    x = Time,
-    y = Value,
-    color = Intervention,
-    linetype = Intervention
-  )
-) + ggplot2::geom_line(
-  show.legend = FALSE
-) + ggplot2::scale_color_manual(
-  values = c(
-    "No Intervention" = "#5b9bd5",
-    "Pool Swap" = "#ed7d31"
-  )
-) + ggplot2::ylab(
-  paste0("Richness\n(Patch", targetpatches[1], ")")
-) + ggplot2::coord_cartesian(
-  ylim = range(diversitiesPlottable %>% dplyr::filter(
-    Space == Div_spacechoice, Environment != "Gamma",
-    Measurement == "Richness"
-  ) %>% dplyr::pull(Value))
-) + ggplot2::geom_vline(
-  xintercept = # SAFE ONLY IN OUR SPECIFIC CASE
-    (diversities[[1]]$Ellipsis$Intervention$Time /
-       diversities[[1]]$Ellipsis$ReactionTime)
-)
-
-Div_control_noint <- ggplot2::ggplot(
-  diversitiesPlottable %>% dplyr::filter(
-    Space == Div_spacechoice,
-    Environment %in% as.character(targetpatches[2]),
-    Measurement == "Richness",
-    Intervention == "No Intervention"
-  ),
-  ggplot2::aes(
-    x = Time,
-    y = Value,
-    color = Intervention,
-    linetype = Intervention
-  )
-) + ggplot2::geom_line(
-  show.legend = FALSE
-) + ggplot2::scale_color_manual(
-  values = c(
-    "No Intervention" = "#44546a",
-    "Pool Swap" = "#ed7d31"
-  )
-) + ggplot2::ylab(
-  paste0("Richness\n(Patch", targetpatches[2], ")")
-) + ggplot2::coord_cartesian(
-  ylim = range(diversitiesPlottable %>% dplyr::filter(
-    Space == Div_spacechoice, Environment != "Gamma",
-    Measurement == "Richness"
-  ) %>% dplyr::pull(Value))
-) + ggplot2::geom_vline(
-  xintercept = # SAFE ONLY IN OUR SPECIFIC CASE
-    (diversities[[1]]$Ellipsis$Intervention$Time /
-       diversities[[1]]$Ellipsis$ReactionTime)
-)
-
-ggplot2::ggsave(
-  Div_experiment_noint / Div_control_noint,
-  filename = paste0("Image-ABC-Div-",
-                    Div_spacechoice,
-                    "-NoInt.png"),
-  width = 12, height = 8, units = "cm"
-)
 
 ### Plot of maximally distant true diversities, separated by species type. ####
 ### and species patch type.
@@ -252,19 +216,29 @@ ggplot2::ggsave(
 ### Plot of Sampling for Null Intervention. ###################################
 ##### Preparation: ############################################################
 # Parameters
-targettimes <- c(min(dplyr::bind_rows(samples[[1]])$TimeBase), # Pre-intervent
+targettimes <- c(min(dplyr::bind_rows(samples)$TimeBase), # Pre-intervent
                  400) # 100 is intervention
 timeType <- "Time\nFor Time"
 spaceType <- "Space\nFor Time"
 
-samplesByRun <- dplyr::bind_rows(samples[[1]]) %>% dplyr::ungroup(
+samplesByRun <- dplyr::bind_rows(samples) %>% dplyr::ungroup(
 ) %>% dplyr::group_by(
   ParentRun
   # samples[[1]][[1]] %>% dplyr::ungroup()%>% dplyr::group_by(ParentRun
 ) %>% dplyr::group_map(
   .f = function(.x, .y) {
+    controlPatches <- unique(.x$Patch[.x$PatchType == "Control"])
+    if (1 %in% controlPatches && 10 %in% controlPatches) {
+      experimentPatches <- unique(.x$Patch[.x$PatchType == "Experiment"])
+      experimentPatches <- median(experimentPatches)
+      controlPatches <- ((experimentPatches + 4) %% 10) + 1
+    } else {
+      controlPatches <- median(controlPatches)
+      experimentPatches <- ((controlPatches + 4) %% 10) + 1
+    }
+    targetpatches <- c(experimentPatches, controlPatches)
 
-    .yProperties <- strsplit(basename(as.character(.y)), "-")[[1]]
+    fileproperties <- strsplit(.y$ParentRun, split = "-", fixed = TRUE)[[1]]
 
     # Subset:
     controls <- .x %>% dplyr::filter(
@@ -302,9 +276,9 @@ samplesByRun <- dplyr::bind_rows(samples[[1]]) %>% dplyr::ungroup(
       SamplingNonZeroSpecies =
         paste0(
           strsplit(SamplingNonZeroSpecies, ", ", fixed = TRUE)[[1]][
-          as.numeric(strsplit(SamplingNonZeroAbundances, ", ",
-                              fixed = TRUE)[[1]]) > 1e-4 # TODO TECHDEBT
-        ], collapse = ", "
+            as.numeric(strsplit(SamplingNonZeroAbundances, ", ",
+                                fixed = TRUE)[[1]]) > 1e-4 # TODO TECHDEBT
+            ], collapse = ", "
         )
     ) %>% dplyr::ungroup(
     ) %>% dplyr::group_by(
@@ -348,13 +322,27 @@ samplesByRun <- dplyr::bind_rows(samples[[1]]) %>% dplyr::ungroup(
     ) %>% dplyr::mutate(
       Sampled = !grepl(pattern = "(T)", fixed = TRUE, x = `Species Subset`),
       `Species Subset (Base)` = gsub(pattern = " (T)", replacement = "",
-                                     x = `Species Subset`, fixed = TRUE)
+                                     x = `Species Subset`, fixed = TRUE),
+      Space = "Inf",
+      Intervention = paste(
+        dplyr::case_when(
+          fileproperties[1] == 2 ~ "Low",
+          fileproperties[1] == 3 ~ "High"
+        ),
+        dplyr::case_when(
+          fileproperties[3] == 6 ~ "High",
+          fileproperties[3] == 7 ~ "Low"
+        ),
+        sep = "_"
+      ),
+      InterventionSpeed =
+        dplyr::case_when(
+          fileproperties[2] == 1 ~ "None",
+          fileproperties[2] == 2 ~ "Fast",
+          fileproperties[2] == 3 ~ "Slow"
+        )
     )
 
-    combined$Space <- .yProperties[6]
-    combined$Intervention <- ifelse(
-      .yProperties[length(.yProperties)] == "Intervention.RData",
-      "Pool Swap", "No Intervention")
 
     return(combined)
   }
@@ -373,14 +361,24 @@ samplesByRun <- dplyr::bind_rows(samples[[1]]) %>% dplyr::ungroup(
 # (These are what detected in control, not detected in control, and overall
 #  are attempting to approximate.)
 
-samplesTRUTH <- dplyr::bind_rows(samples[[1]]) %>% dplyr::ungroup(
+samplesTRUTH <- dplyr::bind_rows(samples) %>% dplyr::ungroup(
 ) %>% dplyr::group_by(
   ParentRun
   # samples[[1]][[1]] %>% dplyr::ungroup(
 ) %>% dplyr::group_modify(
   .f = function(.x, .y) {
+    controlPatches <- unique(.x$Patch[.x$PatchType == "Control"])
+    if (1 %in% controlPatches && 10 %in% controlPatches) {
+      experimentPatches <- unique(.x$Patch[.x$PatchType == "Experiment"])
+      experimentPatches <- median(experimentPatches)
+      controlPatches <- ((experimentPatches + 4) %% 10) + 1
+    } else {
+      controlPatches <- median(controlPatches)
+      experimentPatches <- ((controlPatches + 4) %% 10) + 1
+    }
+    targetpatches <- c(experimentPatches, controlPatches)
 
-    .yProperties <- strsplit(basename(as.character(.y$ParentRun)), "-")[[1]]
+    fileproperties <- strsplit(.y$ParentRun, split = "-", fixed = TRUE)[[1]]
 
     truevalues <- .x %>% dplyr::filter(
       Patch == targetpatches[1] & # same time and place.
@@ -390,12 +388,27 @@ samplesTRUTH <- dplyr::bind_rows(samples[[1]]) %>% dplyr::ungroup(
       Time, Patch, PatchType, TimeBase, Control, TimeActualRow, TimeActual,
       # The bit we're going to operate on.
       SamplingNonZeroSpecies, SamplingNonZeroAbundances
+    ) %>% dplyr::mutate(
+      Space = "Inf",
+      Intervention = paste(
+        dplyr::case_when(
+          fileproperties[1] == 2 ~ "Low",
+          fileproperties[1] == 3 ~ "High"
+        ),
+        dplyr::case_when(
+          fileproperties[3] == 6 ~ "High",
+          fileproperties[3] == 7 ~ "Low"
+        ),
+        sep = "_"
+      ),
+      InterventionSpeed =
+        dplyr::case_when(
+          fileproperties[2] == 1 ~ "None",
+          fileproperties[2] == 2 ~ "Fast",
+          fileproperties[2] == 3 ~ "Slow"
+        )
     )
 
-    truevalues$Space <- .yProperties[6]
-    truevalues$Intervention <- ifelse(
-      .yProperties[length(.yProperties)] == "Intervention.RData",
-      "Pool Swap", "No Intervention")
 
     return(truevalues)
   }
@@ -421,54 +434,100 @@ samplesTRUTH <- samplesTRUTH %>% dplyr::ungroup(
                          id = speciesIDs, # TODO TECHDEBT, USE RESULTS
                          ab = speciesAbundances)
 
-    pool <- which(dirname(.y$ParentRun) ==
-                    unlist(lapply(poolmats, function(p) dirname(p$Dir))))
-    pool <- poolmats[[pool]]$Pool
+    # pool <- which(dirname(.y$ParentRun) ==
+    #                 unlist(lapply(poolmats, function(p) dirname(p$Dir))))
+    # pool <- poolmats[[pool]]$Pool
 
-    # IN OUR SPECIFIC CASE: (The column especially, but also single row)
-    speciesIDs <- speciesIDs[[1]]
-    niches <- pool$Niche_Cat[match(speciesIDs, pool$ID)]
-    nichesPool <- sort(unique(pool$Niche_Cat))
+    # # IN OUR SPECIFIC CASE: (The column especially, but also single row)
+    # speciesIDs <- speciesIDs[[1]]
+    # niches <- pool$Niche_Cat[match(speciesIDs, pool$ID)]
+    # nichesPool <- sort(unique(pool$Niche_Cat))
 
     # Split the speciesIDs up into their types.
-    niches_split <- lapply(nichesPool, function(niche) {
-      toString(speciesIDs[niches == niche])
-    })
-    niches_split <- data.frame(niches_split)
-    names(niches_split) <- nichesPool
+    # niches_split <- lapply(nichesPool, function(niche) {
+    #   toString(speciesIDs[niches == niche])
+    # })
+    # niches_split <- data.frame(niches_split)
+    # names(niches_split) <- nichesPool
 
-    .x$SamplingNonZeroSpecies <- toString(speciesIDs)
+    .x$SamplingNonZeroSpecies <- toString(speciesIDs[[1]])
 
-    return(cbind(.x, niches_split))
+    return(cbind(.x#,
+                 #niches_split
+                 ))
 
   }
 )
 
 samplesTRUTH <- samplesTRUTH %>% dplyr::ungroup(
-) %>% dplyr::mutate(
-  dplyr::across(
-    .cols = c(SamplingNonZeroSpecies, Niche1, Niche2),
-    .fns = list(Richness = function(.x) {
-      unlist(lapply(strsplit(.x, split = ", ", fixed = TRUE), length))
-    })
-  ),
-  dplyr::across(
-    .cols = dplyr::ends_with("Richness"),
-    .fns = ~ ifelse(Intervention == "No Intervention", -.x, .x)
-  )
 ) %>% dplyr::group_by(
-  Space, Patch, Time
-) %>% dplyr::summarise(
-  `Overall` = sum(SamplingNonZeroSpecies_Richness),
-  `Detected in Control` = sum(Niche1_Richness),
-  `Not Detected in Control` = sum(Niche2_Richness),
-  .groups = "drop"
+  Intervention
+) %>% dplyr::group_modify(
+  .f = function(.x, .y) {
+    Control <- .x %>% dplyr::filter(
+      InterventionSpeed == "None"
+    ) %>% dplyr::pull(
+      SamplingNonZeroSpecies
+      )
+    Control <- strsplit(Control, ", ", fixed = TRUE)[[1]]
+    Truth <- .x$SamplingNonZeroSpecies
+
+    DetectedInControl <- unlist(lapply(
+      strsplit(Truth, ", ", fixed = TRUE), function(ids) {
+        toString(ids[ids %in% Control])
+      }))
+    NotDetectedInControl <- unlist(lapply(
+      strsplit(Truth, ", ", fixed = TRUE), function(ids) {
+        toString(ids[!ids %in% Control])
+      }))
+
+    ControlRichness <- length(Control)
+
+    OverallRichness <- unlist(lapply(
+      strsplit(Truth, ", ", fixed = TRUE), function(ids) {
+        length(ids) - ControlRichness
+      }))
+    DetectedInControlRichness <- unlist(lapply(
+      strsplit(DetectedInControl, ", ", fixed = TRUE), function(ids) {
+        length(ids) - ControlRichness
+      }))
+    NotDetectedInControlRichness <- unlist(lapply(
+      strsplit(NotDetectedInControl, ", ", fixed = TRUE), function(ids) {
+        length(ids) - 0
+      }))
+
+    return(cbind(.x,
+                 "Overall" = OverallRichness,
+                 "Detected in Control" = DetectedInControlRichness,
+                 "Not Detected in Control" = NotDetectedInControlRichness))
+  }
+# ) %>% dplyr::mutate(
+#   dplyr::across(
+#     .cols = c(SamplingNonZeroSpecies, DetectedInControl, NotDetectedInControl),
+#     .fns = list(Richness = function(.x) {
+#       unlist(lapply(strsplit(.x, split = ", ", fixed = TRUE), length))
+#     })
+#   ),
+#   dplyr::across(
+#     .cols = dplyr::ends_with("Richness"),
+#     .fns = ~ ifelse(InterventionSpeed == "None", -.x, .x)
+#   )
+# ) %>% dplyr::group_by(
+#   Space, Patch, Time, Intervention, InterventionSpeed
+# ) %>% dplyr::summarise(
+#   `Overall` = sum(SamplingNonZeroSpecies_Richness),
+#   `Detected in Control` = sum(DetectedInControl_Richness),
+#   `Not Detected in Control` = sum(NotDetectedInControl_Richness),
+#   .groups = "drop"
 )
 
 ##### Plotting: ###############################################################
 
-LSR_spacechoice <- "Inf"
-ylimits <- c(-8, 8)
+# LSR_interventionchoice <- c("Low_High", "High_Low")[1]
+# LSR_speedchoice <- c("None", "Fast", "Slow")[1]
+ylimits <- c(-11, 11)
+
+
 # Patch so we don't have to re-run
 samplesByRun <- lapply(
   samplesByRun,
@@ -483,77 +542,84 @@ samplesByRun <- lapply(
   }
 )
 
-###### Plot of Local Species Richness Gain Without True Values ################
-LSR_nointervent_notrue <- dplyr::bind_rows(samplesByRun)  %>% dplyr::filter(
-  Space == LSR_spacechoice, Intervention == "No Intervention", Sampled
-) %>% dplyr::group_by(
-  `Local Species Richness Gain (vs. Control)`, Type, `Species Subset`
-) %>% dplyr::mutate(
-  `Local Species Richness Gain (vs. Control)` =
-    `Local Species Richness Gain (vs. Control)` +
-    if(length(`Local Species Richness Gain (vs. Control)`) > 1) {
-      rep(c(-1/6, 1/6), c(
-        floor(length(`Local Species Richness Gain (vs. Control)`)/2),
-        ceiling(length(`Local Species Richness Gain (vs. Control)`)/2)
-      ))
-    } else {
-      0
-    },
-  groupsize = dplyr::n()
-) %>% ggplot2::ggplot(
-  ggplot2::aes(x = Type,
-               y = `Local Species Richness Gain (vs. Control)`,
-               fill = Type)
-  # ) + ggplot2::geom_violin(
-  #   draw_quantiles = c(
-  #     #0.01, 0.05, # Only 20 samples!
-  #     0.1, 0.25, 0.5, 0.75, 0.9#,
-  #     #0.95, 0.99
-  #   )
-) + ggplot2::geom_dotplot(
-  binaxis = "y", stackdir = "center", position = "dodge", binwidth = 1/5,
-  dotsize = 1.,
-  show.legend = FALSE
-) + ggplot2::facet_wrap(
-  . ~ factor(`Species Subset (Base)`, levels = c(
-    "Overall", "Detected in Control", "Not Detected in Control"),
-    ordered = TRUE)
-) + ggplot2::coord_cartesian(
-  ylim = ylimits, expand = FALSE
-) + ggplot2::scale_y_continuous(
-  breaks = ylimits[1]:ylimits[2]
-) + ggplot2::theme(
-  panel.grid.minor.y = ggplot2::element_blank()
-) + ggplot2::scale_fill_manual(
-  values = c("#7f6000", "#b6d7a8")
-)
-ggplot2::ggsave(LSR_nointervent_notrue,
-                filename = paste0("Image-ABC-LSR-",
-                                  LSR_spacechoice,
-                                  "-NoInt-WOTrue.png"),
-                width = 12, height = 10, units = "cm"
-)
+for(LSR_interventionchoice in c("Low_High", "High_Low")) {
+  for(LSR_speedchoice in c("None", "Fast", "Slow")) {
+    
 
-###### Plot of Local Species Richness Gain With True Values ###################
-LSR_nointervent_true <- LSR_nointervent_notrue + ggplot2::geom_point(
-  data = dplyr::bind_rows(samplesByRun) %>% dplyr::filter(
-    Space == LSR_spacechoice, Intervention == "No Intervention",
-    Sampled == FALSE
-  ),
-  show.legend = FALSE
-)
-ggplot2::ggsave(LSR_nointervent_true,
-                filename = paste0("Image-ABC-LSR-",
-                                  LSR_spacechoice,
-                                  "-NoInt-WTrue.png"),
-                width = 12, height = 10, units = "cm"
-)
+###### Plot of Local Species Richness Gain Without True Values ################
+# LSR_nointervent_notrue <- dplyr::bind_rows(samplesByRun)  %>% dplyr::filter(
+#   Intervention == LSR_interventionchoice, Sampled,
+#   InterventionSpeed == LSR_speedchoice
+# ) %>% dplyr::group_by(
+#   `Local Species Richness Gain (vs. Control)`, Type, `Species Subset`
+# ) %>% dplyr::mutate(
+#   `Local Species Richness Gain (vs. Control)` =
+#     `Local Species Richness Gain (vs. Control)` +
+#     if(length(`Local Species Richness Gain (vs. Control)`) > 1) {
+#       rep(c(-1/6, 1/6), c(
+#         floor(length(`Local Species Richness Gain (vs. Control)`)/2),
+#         ceiling(length(`Local Species Richness Gain (vs. Control)`)/2)
+#       ))
+#     } else {
+#       0
+#     },
+#   groupsize = dplyr::n()
+# ) %>% ggplot2::ggplot(
+#   ggplot2::aes(x = Type,
+#                y = `Local Species Richness Gain (vs. Control)`,
+#                fill = Type)
+#   # ) + ggplot2::geom_violin(
+#   #   draw_quantiles = c(
+#   #     #0.01, 0.05, # Only 20 samples!
+#   #     0.1, 0.25, 0.5, 0.75, 0.9#,
+#   #     #0.95, 0.99
+#   #   )
+# ) + ggplot2::geom_dotplot(
+#   binaxis = "y", stackdir = "center", position = "dodge", binwidth = 1/5,
+#   dotsize = 1.,
+#   show.legend = FALSE
+# ) + ggplot2::facet_wrap(
+#   . ~ factor(`Species Subset (Base)`, levels = c(
+#     "Overall", "Detected in Control", "Not Detected in Control"),
+#     ordered = TRUE)
+# ) + ggplot2::coord_cartesian(
+#   ylim = ylimits, expand = FALSE
+# ) + ggplot2::scale_y_continuous(
+#   breaks = ylimits[1]:ylimits[2]
+# ) + ggplot2::theme(
+#   panel.grid.minor.y = ggplot2::element_blank()
+# )
+# ggplot2::ggsave(LSR_nointervent_notrue,
+#                 filename = paste0("Image-PrConstrain-LSR-",
+#                                   LSR_interventionchoice, "-",
+#                                   LSR_speedchoice,
+#                                   "-NoInt-WOTrue.png"),
+#                 width = 12, height = 10, units = "cm"
+# )
+#
+# ###### Plot of Local Species Richness Gain With True Values ###################
+# LSR_nointervent_true <- LSR_nointervent_notrue + ggplot2::geom_point(
+#   data = dplyr::bind_rows(samplesByRun) %>% dplyr::filter(
+#    Intervention == LSR_interventionchoice,
+#     Sampled == FALSE,
+#    InterventionSpeed == LSR_speedchoice
+#   ),
+#   show.legend = FALSE
+# )
+# ggplot2::ggsave(LSR_nointervent_true,
+#                 filename = paste0("Image-PrConstrain-LSR-",
+#                                   LSR_interventionchoice, "-",
+#                                   LSR_speedchoice,
+#                                   "-NoInt-WTrue.png"),
+#                 width = 12, height = 10, units = "cm"
+# )
 
 ###### Plot of Sampling for True Intervention. ################################
 
 ###### Plot of Local Species Richness Gain Without True Values ################
 LSR_intervent_notrue <- dplyr::bind_rows(samplesByRun) %>% dplyr::filter(
-  Space == LSR_spacechoice, Intervention == "Pool Swap", Sampled
+  Intervention == LSR_interventionchoice, Sampled,
+  InterventionSpeed == LSR_speedchoice
 ) %>% dplyr::group_by(
   `Local Species Richness Gain (vs. Control)`, Type, `Species Subset`
 ) %>% dplyr::mutate(
@@ -595,9 +661,11 @@ LSR_intervent_notrue <- dplyr::bind_rows(samplesByRun) %>% dplyr::filter(
 ) + ggplot2::scale_fill_manual(
   values = c("#7f6000", "#b6d7a8")
 )
+
 ggplot2::ggsave(LSR_intervent_notrue,
-                filename = paste0("Image-ABC-LSR-",
-                                  LSR_spacechoice,
+                filename = paste0("Image-PrConstrain-LSR-",
+                                  LSR_interventionchoice, "-",
+                                  LSR_speedchoice,
                                   "-Int-WOTrue.png"),
                 width = 12, height = 10, units = "cm"
 )
@@ -605,13 +673,15 @@ ggplot2::ggsave(LSR_intervent_notrue,
 ###### Plot of Local Species Richness Gain With True Values ###################
 LSR_intervent_true <- LSR_intervent_notrue + ggplot2::geom_point(
   data = dplyr::bind_rows(samplesByRun) %>% dplyr::filter(
-    Space == LSR_spacechoice, Intervention == "Pool Swap", Sampled == FALSE
+    Intervention == LSR_interventionchoice, Sampled == FALSE,
+    InterventionSpeed == LSR_speedchoice
   ),
   show.legend = FALSE
 )
 ggplot2::ggsave(LSR_intervent_true,
-                filename = paste0("Image-ABC-LSR-",
-                                  LSR_spacechoice,
+                filename = paste0("Image-PrConstrain-LSR-",
+                                  LSR_interventionchoice, "-",
+                                  LSR_speedchoice,
                                   "-Int-WTrue.png"),
                 width = 12, height = 10, units = "cm"
 )
@@ -619,7 +689,8 @@ ggplot2::ggsave(LSR_intervent_true,
 ##### Plot of Local Species Richness Gain With Counterfactual #################
 LSR_intervent_cf <- LSR_intervent_true + ggplot2::geom_point(
   data = samplesTRUTH %>% dplyr::filter(
-    Space == LSR_spacechoice
+    Intervention == LSR_interventionchoice,
+    InterventionSpeed == LSR_speedchoice
   ) %>% tidyr::pivot_longer(
     cols = `Overall`:`Not Detected in Control`,
     names_to = "Species Subset (Base)",
@@ -629,9 +700,11 @@ LSR_intervent_cf <- LSR_intervent_true + ggplot2::geom_point(
   show.legend = FALSE, color = "purple", fill = "black", shape = 7, size = 2
 )
 ggplot2::ggsave(LSR_intervent_cf,
-                filename = paste0("Image-ABC-LSR-",
-                                  LSR_spacechoice,
+                filename = paste0("Image-PrConstrain-LSR-",
+                                  LSR_interventionchoice, "-",
+                                  LSR_speedchoice,
                                   "-Int-CF.png"),
                 width = 12, height = 10, units = "cm"
 )
+}}
 
