@@ -28,7 +28,7 @@ PoolPatchNicheIntervention <- TRUE
 LMParameters <- c(0.01, 10, 0.5, 0.2, 100, 0.1)
 LMLogBodySize <- c(-2, -1, -1, 0)
 
-PerIslandDistance <- 10^c(Inf) # 10^5 # Inf # 10^0
+PerIslandDistance <- 10^c(0) # 10^5 # Inf # 10^0
 SpeciesSpeeds <- 1
 Space <- match.arg("Ring", c("None", "Ring", "Line", "Full"))
 
@@ -39,7 +39,7 @@ ExtinctionProportion <- 1
 MaximumTimeStep <- 1 # Maximum time solver can proceed without elimination.
 BetweenEventSteps <- 10 # Number of steps to reach next event to smooth.
 
-CalculatePoolAndMatrices <- TRUE
+CalculatePoolAndMatrices <- FALSE
 dir <- paste0("Data_", "2024-01-29")#Sys.Date())
 # getSrcDirectory(function(){})
 
@@ -418,7 +418,8 @@ records <- foreach::foreach(
       # The effect is via a gate on the immigration that prevents arrivals.
       PatchIdentities = patchesIdentities,
       FullHistory = EventsUnfiltered$Events %>% dplyr::select(-Success),
-      TimeSpan = 200, # Taking a guess here: ~ 20,000 characteristic units.
+      TimeSpan = 200 / CharacteristicRate,
+      # Taking a guess here: ~ 20,000 characteristic units.
       # Intervention should take place ~10,500.
       # Defaults focus sampling around half TimeSpan but continue to 2 times.
       # 20 is about the length of 1 event of each type to each patch.
