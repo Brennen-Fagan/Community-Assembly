@@ -14,13 +14,17 @@ PerCapitaDynamics_Type1 <- function(
     if (is.function(InteractionMatrix)) {
       stopifnot(isvalid(InteractionMatrix))
       function(t, y, parms = NULL) {
-        rep(ReproductionRate(t = t, y = y, parms = parms), NumEnvironments) +
+        unlist(lapply(1:NumEnvironments, function(i) {
+          ReproductionRate(t = t, y = y, parms = c(parms, Patch = i))
+        })) +
           InteractionMatrix(t = t, y = y, parms = parms) %*% y
       }
       
     } else {
       function(t, y, parms = NULL) {
-        rep(ReproductionRate(t = t, y = y, parms = parms), NumEnvironments) +
+        unlist(lapply(1:NumEnvironments, function(i) {
+          ReproductionRate(t = t, y = y, parms = c(parms, Patch = i))
+        })) +
           InteractionMatrix %*% y
       }
     }
