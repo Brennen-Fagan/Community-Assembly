@@ -46,7 +46,10 @@ dynamicsDictionaryChoice <-
   #
 dynamicsSeed <- 1
 
-# Libraries: ##################################################################
+# choose r' = r * rho ^ (sign(r)), but what rho?
+distanceDictionaryChoice <- # for m, n in [0, 1], rho(m, n) = ...
+  # 1 # 2 ^ (- euclid(m, n)) => rho in [1/2, 1] for 1-D
+  2 # 2 ^ (1 - 2 euclid(m, n)) => rho in [1/2, 2] for 1-D
 
 # Dictionaries: ###############################################################
 # > runif(3)*1e8
@@ -56,7 +59,17 @@ seedsMain <- c(
   "events"   = 73825470,
   "dynamics" = 83066253
 )
+## Other Parameters: ##########################################################
+EliminationThreshold <- 10^-4 # Below which species are removed from internals
+ArrivalDensity <- EliminationThreshold * 4 * 10 ^ 3 # Traill et al. 2007
 
+# Libraries: ##################################################################
+library(RMTRCode2)
+library(dplyr)
+library(Matrix)
+
+# Functions: ##################################################################
+# Run runif and organise in a smooth-ish ring.
 runifRing <- function(n, ...) {
   indices <- if (n %% 2) {
     # Odd (why?)
@@ -67,14 +80,54 @@ runifRing <- function(n, ...) {
   }
   sort(runif(n, ...))[indices]
 }
+
+# Discrete niche samplers.
 sample.int.normalized <- function(n, slots = 2) {
   (sample.int(slots, size = n, replace = TRUE) - 1) / (slots - 1)
 }
 sample.int.3 <- purrr::partial(sample.int.normalized, slots = 3)
 
+# Coupon Collector's Problem
+# I think this is probably higher accuracy than the previous version.
+defaultEvents <- function(
+  NumberOfEnvironments, NumberOfSpecies, constant = 3
+  ) {
+  ceiling(
+    NumberOfEnvironments * NumberOfSpecies * (
+      log(NumberOfEnvironments * NumberOfSpecies) + constant
+    )
+  )
+}
+
+rhofunction <- function(
+  base = 2, offset = 0, multiplier = 1, metric = "euclidean"
+) {
+  force(base);force(offset);force(multiplier)
+  function(m, n) {
+    base ^ (offset - multiplier * dist(
+      matrix(c(m, n), byrow = TRUE, nrow = 2), method = metric)
+    )
+  }
+}
+
+rho.2.0.1.euclidean <- rhofunction()
+rho.2.1.2.euclidean <- rhofunction(2, 1, 2)
+
+# Dictionaries: ###############################################################
+# > runif(3)*1e8
+# [1] 21622193 73825470 83066253
+seedsMain <- c(
+  "pools"    = 21622193,
+  "events"   = 73825470,
+  "dynamics" = 83066253
+)
+
 poolpatchDictionary <- data.frame(
   Basals = 34,
   Consumers = 66,
+  PoolFunction = "RMTRCode2::LawMorton1996_species",
+  PoolParameters = toString(c(0.01, 10, 0.5, 0.2, 100, 0.1)),
+  PoolDispersalSpeed = 1, # Value divided by DispersalResistance to get current.
   NumberEnvironments = 10,
   SpeciesAffinities = c(
     # Pool with no patch affinity.
@@ -124,9 +177,24 @@ dispersalDictionary <- rbind(
   ))[dispersalDictionaryChoice + 2, ]
 
 eventsDictionary <- data.frame(
-  
+  ImmigrationMultiplier = 1,
+  ImmigrationFunction = "RMTRCode2::ArrivalFUN_Example2",
+  ExtirpationMultiplier = 1,
+  ExtirpationFunction = "RMTRCode2::ExtinctFUN_Example2",
+  ExtirpationPercentage = 1,
+  EventsFunction = "defaultEvents", # Takes Number of Environments and Species.
+  EventsNumberMultiplier = c(1, 2)
 )[eventsDictionaryChoice, ]
 
 dynamicsDictionary <- data.frame(
-  
+  InteractionFunction = "RMTRCode2::LawMorton1996_CommunityMat", 
+  InteractionParameters = "toString(c(0.01, 10, 0.5, 0.2, 100, 0.1))",
+  DynamicsFunction = "RMTRCode2::PerCapitaDynamics_Type1"
 )[dynamicsDictionaryChoice, ]
+
+distanceDictionary <- data.frame(
+  rhofunction = c( # Take patch 
+    "rho.2.0.1.euclidean",
+    "rho.2.1.2.euclidean"
+  )
+)[distanceDictionaryChoice, ]
