@@ -349,7 +349,7 @@ if (exists("datfile_ppd_envir")) {
         retrieveFunction(InteractionFunction),
         ... =, # otherwise, partialised arguments occur first.
         !!!callMeMaybe2(InteractionParameters)
-        # !!! suggested by Bing Chat. Not obvious how it evaluates the list.
+        # !!! suggested by Bing Chat. Not obvious @me how it evaluates the list.
         # Prompt 'R purrr, using a list of arguments to partialize a function'.
         # 2024/01/19
       ),
@@ -405,3 +405,38 @@ if(any(combinations == 0)) {warning(
 )}
 
 # Instantiate PerCapitaDynamics: ##############################################
+# We've already built the "functional" interactions matrix, but we now need
+# to apply the transformation r' = r rho^(sign(r)) and then combine.
+
+#TODO Be careful here. If we add columns to distanceDictionary, we need to
+# adjust the call here (since a 1x1 dataframe is returned as just the entry).
+rprime <- function(t = NULL, y = NULL, parms) {
+  Pool$ReproductionRate *
+    retrieveFunction(distanceDictionary)(
+      parms$SpeciesAffinities,
+      parms$PatchAffinities
+    ) ^ sign(Pool$ReproductionRate)
+}
+
+if (is.function(InteractionMatrices$Mats[[1]])) {
+  PerCapitaDynamics <- DynamicsFunction(
+    rprime,
+    function(t, y, parms) {
+      Matrix::bdiag(lapply(
+        InteractionMatrices$Mats,
+        function(matfunc) {matfunc(t, y, parms)}
+      ))
+      },
+    poolpatchDictionary$NumberEnvironments
+  )
+} else {
+  # Treat as constant matrices
+  PerCapitaDynamics <- DynamicsFunction(
+    rprime,
+    Matrix::bdiag(InteractionMatrices$Mats),
+    poolpatchDictionary$NumberEnvironments
+  )
+}
+
+# Instantiate Dispersal Matrix: ###############################################
+
