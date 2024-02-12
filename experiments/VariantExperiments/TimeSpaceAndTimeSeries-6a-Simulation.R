@@ -284,8 +284,11 @@ if (loadPoolPatchDynamicsIfAble) {
 
 # Pools and Interaction Matrices: #############################################
 if (exists("datfile_ppd_envir")) {
+  # Pool, InteractionMatrices, DynamicsFunction, CharacteristicRate,
   Pool <- datfile_ppd_envir$Pool
   InteractionMatrices <- datfile_ppd_envir$InteractionMatrices
+  DynamicsFunction <- datfile_ppd_envir$DynamicsFunction
+  CharacteristicRate <- datfile_ppd_envir$CharacteristicRate
 } else {
   Pool <- with(poolpatchDictionary, {
     do.call(what = retrieveFunction(PoolFunction),
@@ -293,7 +296,8 @@ if (exists("datfile_ppd_envir")) {
           args = c(callMeMaybe2(as.list(strsplit(PoolParameters, "; ")[[1]])),
                    "Basal" = Basals,
                    "Consumer" = Consumers,
-                   "seed" = poolpatchSeed)
+                   "seed" = withRandom(runif(1)[1] * 1e8, seed = poolpatchSeed)
+          )
     )
   })
 
@@ -303,7 +307,10 @@ if (exists("datfile_ppd_envir")) {
       as.numeric(unlist(strsplit(SpeciesAffinities, split = ", ")))
     } else {
       # Treat as function
-      retrieveFunction(SpeciesAffinities)(Basals + Consumers)
+      withRandom(
+        retrieveFunction(SpeciesAffinities)(Basals + Consumers),
+        seed = withRandom(runif(2)[2] * 1e8, seed = poolpatchSeed)
+      )
     }
   })
 
@@ -315,7 +322,10 @@ if (exists("datfile_ppd_envir")) {
       as.numeric(unlist(strsplit(PoolDispersalSpeed, split = ", ")))
     } else {
       # Treat as function
-      retrieveFunction(PoolDispersalSpeed)(Basals + Consumers)
+      withRandom(
+        retrieveFunction(PoolDispersalSpeed)(Basals + Consumers),
+        seed = withRandom(runif(3)[3] * 1e8, seed = poolpatchSeed)
+      )
     }
   })
 
@@ -325,61 +335,73 @@ if (exists("datfile_ppd_envir")) {
   )
 
 
-  # dynFunc <- retrieveFunction(interventionDictionary$DynamicsFunction)
-  #
-  # # Need to use stackoverflow.com/a/47012149 to convert our arguments to a list.
-  # intMatFunc <- purrr::partial(
-  #   retrieveFunction(interventionDictionary$InteractionMatrixFunction),
-  #   ... =, # otherwise, partialised arguments occur first.
-  #   !!!callMeMaybe2(interventionDictionary$InteractionMatrixArguments)
-  #   # !!! suggested by Bing Chat. Not obvious how it evaluates the list.
-  #   # Prompt 'R purrr, using a list of arguments to partialize a function'.
-  #   # 2024/01/19
-  # )
+  # NOT THE FINAL PERCAPITADYNAMICS FUNCTION.
+  DynamicsFunction <- with(dynamicsDictionary, {
+    withRandom(
+      retrieveFunction(DynamicsFunction),
+      seed = withRandom(runif(1)[1] * 1e8, seed = dynamicsSeed)
+    )}
+  )
 
+  IntMatFunc <- with(dynamicsDictionary, {
+    withRandom(
+      purrr::partial(
+        retrieveFunction(InteractionFunction),
+        ... =, # otherwise, partialised arguments occur first.
+        !!!callMeMaybe2(InteractionParameters)
+        # !!! suggested by Bing Chat. Not obvious how it evaluates the list.
+        # Prompt 'R purrr, using a list of arguments to partialize a function'.
+        # 2024/01/19
+      ),
+      seed = withRandom(runif(2)[2] * 1e8, seed = dynamicsSeed)
+    )}
+  )
+
+  InteractionMatrices <- RMTRCode2::CreateEnvironmentInteractions(
+    Pool = Pool,
+    NumEnvironments = poolpatchDictionary$NumberEnvironments,
+    ComputeInteractionMatrix = IntMatFunc,
+    EnvironmentSeeds = withRandom(runif(3)[3] * 1e8, seed = dynamicsSeed)
+  )
+
+  CharacteristicRate <- max(unlist(lapply(
+    InteractionMatrices$Mats, function(m) {abs(eigen(m)$values)}
+  )))
 
   if (exists("datfile_ppd_write") && datfile_ppd_write) {
-    save(Pool, InteractionMatrices,
+    save(Pool, InteractionMatrices, DynamicsFunction, CharacteristicRate,
          poolpatchSeed, dynamicsSeed,
          file = datfile_ppd)
   }
 }
 
+# Events: #####################################################################
+EventsEach <- with(poolpatchDictionary, {
+  retrieveFunction(eventsDictionary$EventsFunction)(
+    NumberEnvironments, Basals + Consumers
+  )
+  })
 
-# {
-#   Pool <- RMTRCode2::LawMorton1996_species(
-#     Basal = Species[1],
-#     Consumer = Species[2],
-#     Parameters = LMParameters,
-#     LogBodySize = LMLogBodySize,
-#     seed = PoolSeed
-#   )
-#
-#   if (PoolPatchNiche) {
-#     PoolPatchNicheFunctions <- lapply(
-#       PoolPatchNicheSplit, function(p) function(x) {rep(p, nrow(x))}
-#     )
-#     names(PoolPatchNicheFunctions) <-
-#       c("Core", paste0("Niche", 1:(length(PoolPatchNicheSplit) - 1)))
-#
-#     Pool <- Pool %>% dplyr::mutate(
-#       Niche_Cat = calculateCategoricalNiche(
-#         Pool,
-#         functions = PoolPatchNicheFunctions,
-#         correlationColumns = c("ID", "Size", "Type"), # for later usage.
-#         seed = NicheSeed
-#       )
-#     )
-#   }
-#
-#   InteractionMatrices <- RMTRCode2::CreateEnvironmentInteractions(
-#     Pool = Pool, NumEnvironments = Environments,
-#     ComputeInteractionMatrix = RMTRCode2::LawMorton1996_CommunityMat,
-#     Parameters = LMParameters,
-#     EnvironmentSeeds = EnvironmentSeed,
-#     ConstrainP = ConstrainTruncNormPs
-#   )
-#   save(Pool, InteractionMatrices, PoolSeed, EnvironmentSeed, NicheSeed,
-#        file = file.path(dir, paste0(
-#          "MNA-ExampleOutcome-PoolMats-Env", Environments, ".RData")))
-# }
+Events <- with(eventsDictionary, {
+  RMTRCode2::CreateAssemblySequence(
+    Species = with(poolpatchDictionary, Basals + Consumers),
+    NumEnvironments = poolpatchDictionary$NumberEnvironments,
+    ArrivalEvents = EventsEach * ImmigrationMultiplier * EventsNumberMultiplier,
+    ArrivalRate = CharacteristicRate * ImmigrationMultiplier,
+    ArrivalFUN = retrieveFunction(ImmigrationFunction),
+    ExtinctEvents = EventsEach * ExtirpationMultiplier * EventsNumberMultiplier,
+    ExtinctRate = CharacteristicRate * ExtirpationMultiplier,
+    ExtinctFUN = retrieveFunction(ExtirpationFunction),
+    HistorySeed = HistorySeed
+  )}
+)
+
+print(combinations <-
+        table(Events$Events$Species,
+              Events$Events$Environment,
+              Events$Events$Type))
+if(any(combinations == 0)) {warning(
+  "Exists a species which doesn't immigrate to an environment."
+)}
+
+# Instantiate PerCapitaDynamics: ##############################################
