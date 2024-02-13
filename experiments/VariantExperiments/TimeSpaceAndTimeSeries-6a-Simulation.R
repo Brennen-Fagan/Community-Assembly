@@ -288,6 +288,7 @@ if (loadPoolPatchDynamicsIfAble) {
 if (exists("datfile_ppd_envir")) {
   # Pool, InteractionMatrices, DynamicsFunction, CharacteristicRate,
   Pool <- datfile_ppd_envir$Pool
+  PatchAffinities <- datfile_ppd_envir$PatchAffinities
   InteractionMatrices <- datfile_ppd_envir$InteractionMatrices
   DynamicsFunction <- datfile_ppd_envir$DynamicsFunction
   CharacteristicRate <- datfile_ppd_envir$CharacteristicRate
@@ -447,24 +448,50 @@ rprime <-
     }
   ) ^ sign(rep(Pool$ReproductionRate, poolpatchDictionary$NumberEnvironments))
 
-if (is.function(InteractionMatrices$Mats[[1]])) {
-  PerCapitaDynamics <- DynamicsFunction(
-    rprime,
-    function(t, y, parms) {
-      Matrix::bdiag(lapply(
-        InteractionMatrices$Mats,
-        function(matfunc) {matfunc(t, y, parms)}
-      ))
+if (is.function(rprime)) {
+  # Calculate rprime using Parms$Patch
+  if (is.function(InteractionMatrices$Mats[[1]])) {
+    # Calculate and combine interaction matrices on the fly.
+    PerCapitaDynamics <- DynamicsFunction(
+      rprime,
+      function(t, y, parms) {
+        Matrix::bdiag(lapply(
+          InteractionMatrices$Mats,
+          function(matfunc) {matfunc(t, y, parms)}
+        ))
       },
-    poolpatchDictionary$NumberEnvironments
-  )
+      poolpatchDictionary$NumberEnvironments
+    )
+  }
+  else {
+    # Just combine the interaction matrices.
+    PerCapitaDynamics <- DynamicsFunction(
+      rprime,
+      Matrix::bdiag(InteractionMatrices$Mats),
+      poolpatchDictionary$NumberEnvironments
+    )
+  }
 } else {
-  # Treat as constant matrices
-  PerCapitaDynamics <- DynamicsFunction(
-    rprime,
-    Matrix::bdiag(InteractionMatrices$Mats),
-    poolpatchDictionary$NumberEnvironments
-  )
+  # Treat rprime as constant and explicitly calculated.
+  if (is.function(InteractionMatrices$Mats[[1]])) {
+    # Calculate and combine interaction matrices on the fly.
+    PerCapitaDynamics <- DynamicsFunction(
+      rprime,
+      function(t, y, parms) {
+        Matrix::bdiag(lapply(
+          InteractionMatrices$Mats,
+          function(matfunc) {matfunc(t, y, parms)}
+        ))
+      }
+    )
+  }
+  else {
+    # Just combine the interaction matrices.
+    PerCapitaDynamics <- DynamicsFunction(
+      rprime,
+      Matrix::bdiag(InteractionMatrices$Mats)
+    )
+  }
 }
 
 # Instantiate Dispersal Matrix: ###############################################
