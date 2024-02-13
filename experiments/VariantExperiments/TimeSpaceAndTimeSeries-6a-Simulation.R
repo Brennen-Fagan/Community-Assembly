@@ -329,11 +329,26 @@ if (exists("datfile_ppd_envir")) {
     }
   })
 
-  Pool <- Pool %>% dplyr::mutate(
-    Affinity = Affinities,
-    Speed = Speeds
+  Pool <- cbind(
+    Pool,
+    Speed = Speeds,
+    Affinity = Affinities
   )
 
+  PatchAffinities <- matrix(with(poolpatchDictionary, {
+    if(is.numeric(PatchAffinities)) {
+      rep(PatchAffinities, Basals + Consumers)
+    } else if(!is.na(as.numeric(substr(PatchAffinities, 1, 1)))) {
+      # Treat as numbers
+      as.numeric(unlist(strsplit(PatchAffinities, split = ", ")))
+    } else {
+      # Treat as function
+      withRandom(
+        retrieveFunction(PatchAffinities)(NumberEnvironments),
+        seed = withRandom(runif(4)[4] * 1e8, seed = poolpatchSeed)
+      )
+    }
+  }), nrow = poolpatchDictionary$NumberEnvironments)
 
   # NOT THE FINAL PERCAPITADYNAMICS FUNCTION.
   DynamicsFunction <- with(dynamicsDictionary, {
@@ -369,7 +384,8 @@ if (exists("datfile_ppd_envir")) {
   )))
 
   if (exists("datfile_ppd_write") && datfile_ppd_write) {
-    save(Pool, InteractionMatrices, DynamicsFunction, CharacteristicRate,
+    save(Pool, PatchAffinities,
+         InteractionMatrices, DynamicsFunction, CharacteristicRate,
          poolpatchSeed, dynamicsSeed,
          file = datfile_ppd)
   }
@@ -410,13 +426,19 @@ if(any(combinations == 0)) {warning(
 
 #TODO Be careful here. If we add columns to distanceDictionary, we need to
 # adjust the call here (since a 1x1 dataframe is returned as just the entry).
-rprime <- function(t = NULL, y = NULL, parms) {
-  Pool$ReproductionRate *
-    retrieveFunction(distanceDictionary)(
-      parms$SpeciesAffinities,
-      parms$PatchAffinities
+# Not a function, so we don't need to on the fly.
+# We'll be a bit lazy here, but hopefully readable and clear.
+rprime <-
+  Pool$ReproductionRate * outer(
+    1:nrow(Pool),
+    1:length(PatchAffinities),
+    FUN = function(i, j) {
+      retrieveFunction(distanceDictionary)(
+        Pool[i, grepl("Affinity", colnames(Pool), fixed = TRUE)],
+        PatchAffinities[j, ] # Forced to be a matrix.
+      )
+    }
     ) ^ sign(Pool$ReproductionRate)
-}
 
 if (is.function(InteractionMatrices$Mats[[1]])) {
   PerCapitaDynamics <- DynamicsFunction(
