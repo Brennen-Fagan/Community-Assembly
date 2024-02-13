@@ -50,12 +50,14 @@ dispersalDictionaryChoice <-
 
 # choose r' = r * rho ^ (sign(r)), but what rho?
 distanceDictionaryChoice <- # for m, n in [0, 1], rho(m, n) = ...
-  # 1 # 2 ^ (- euclid(m, n)) => rho in [1/2, 1] for 1-D
-  2 # 2 ^ (1 - 2 euclid(m, n)) => rho in [1/2, 2] for 1-D
+  1 # 2 ^ (- euclid(m, n)) => rho in [1/2, 1] for 1-D
+  # 2 # 2 ^ (1 - 2 euclid(m, n)) => rho in [1/2, 2] for 1-D
 
 ## Other Parameters: ##########################################################
 EliminationThreshold <- 10^-4 # Below which species are removed from internals
 ArrivalDensity <- EliminationThreshold * 4 * 10 ^ 3 # Traill et al. 2007
+MaximumTimeStep <- 1 # Maximum time solver can proceed without elimination.
+BetweenEventSteps <- 10 # Number of steps to reach next event to smooth.
 
 
 directory <- "." # Should be "VariantExperiments"
@@ -408,7 +410,7 @@ Events <- with(eventsDictionary, {
     ExtinctEvents = EventsEach * ExtirpationMultiplier * EventsNumberMultiplier,
     ExtinctRate = CharacteristicRate * ExtirpationMultiplier,
     ExtinctFUN = retrieveFunction(ExtirpationFunction),
-    HistorySeed = HistorySeed
+    HistorySeed = eventsSeed
   )}
 )
 
@@ -428,17 +430,22 @@ if(any(combinations == 0)) {warning(
 # adjust the call here (since a 1x1 dataframe is returned as just the entry).
 # Not a function, so we don't need to on the fly.
 # We'll be a bit lazy here, but hopefully readable and clear.
+grid <- expand.grid(
+  pool = 1:nrow(Pool), # Fastest Varying
+  patch = 1:length(PatchAffinities) # Slower Varying.
+)
 rprime <-
-  Pool$ReproductionRate * outer(
-    1:nrow(Pool),
-    1:length(PatchAffinities),
+  rep(Pool$ReproductionRate, poolpatchDictionary$NumberEnvironments) *
+  mapply(
+    grid$pool,
+    grid$patch,
     FUN = function(i, j) {
       retrieveFunction(distanceDictionary)(
         Pool[i, grepl("Affinity", colnames(Pool), fixed = TRUE)],
         PatchAffinities[j, ] # Forced to be a matrix.
-      )
+      )[1]
     }
-    ) ^ sign(Pool$ReproductionRate)
+  ) ^ sign(rep(Pool$ReproductionRate, poolpatchDictionary$NumberEnvironments))
 
 if (is.function(InteractionMatrices$Mats[[1]])) {
   PerCapitaDynamics <- DynamicsFunction(
@@ -493,3 +500,29 @@ DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
   SpeciesSpeeds = Pool$Speed
 )
 
+# Run Simulation: #############################################################
+result <- RMTRCode2::MultipleNumericalAssembly_Dispersal(
+  Pool = Pool,
+  NumEnvironments = poolpatchDictionary$NumberEnvironments,
+  CharacteristicRate = CharacteristicRate,
+  Events = Events,
+  PerCapitaDynamics = PerCapitaDynamics,
+  DispersalMatrix = DispersalMatrix,
+  EliminationThreshold = EliminationThreshold,
+  ArrivalDensity = ArrivalDensity,
+  ExtinctionProportion = eventsDictionary$ExtirpationPercentage,
+  MaximumTimeStep = MaximumTimeStep,
+  BetweenEventSteps = BetweenEventSteps,
+  Verbose = TRUE,
+  # Using the ellipsis pass through feature:
+  Timescale = "Simulation",
+  Affinity = list(
+    PatchAffinities = PatchAffinities,
+    EffectiveReproductionRate = rprime
+  )
+)
+
+# Save Simulation: ############################################################
+save(result,
+     file = datfile
+)
