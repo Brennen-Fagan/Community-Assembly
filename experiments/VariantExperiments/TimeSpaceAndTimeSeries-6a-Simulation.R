@@ -440,3 +440,34 @@ if (is.function(InteractionMatrices$Mats[[1]])) {
 
 # Instantiate Dispersal Matrix: ###############################################
 
+DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
+  EnvironmentDistances = with(c(
+    dispersalDictionary,
+    Environments = poolpatchDictionary$NumberEnvironments
+    ), {
+    if (Configuration == "None") {
+      DistanceMatrix <- Matrix::sparseMatrix(
+        i = Environments, j = Environments, x = 0)
+    }
+    if (Configuration == "Ring" || Configuration == "Line")
+      DistanceMatrix <- Matrix::bandSparse(
+        Environments, k = c(-1, 1),
+        diagonals = list(rep(Resistance, Environments - 1),
+                         rep(Resistance, Environments - 1))
+      )
+    if (Configuration == "Ring") {
+      DistanceMatrix[Environments, 1] <- Resistance
+      DistanceMatrix[1, Environments] <- Resistance
+    }
+    if (Configuration == "Full") {
+      DistanceMatrix <- matrix(Resistance,
+                               nrow = Environments,
+                               ncol = Environments)
+      diag(DistanceMatrix) <- 0
+    }
+    DistanceMatrix
+  }
+  ),
+  SpeciesSpeeds = Pool$Speed
+)
+
