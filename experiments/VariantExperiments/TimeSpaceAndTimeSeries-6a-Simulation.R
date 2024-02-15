@@ -16,7 +16,6 @@
 
 # Easy to convert to cargs <- as.numeric(commandArgs(TRUE)) for parallel.
 
-simulationsNumber <- 1
 poolpatchDictionaryChoice <-
   1  # Pool with no patch affinity.       Patch with no affinities.
   # 2  # Pool {0, 1} patch affinities.      Patch {0, 1} affinities.
@@ -28,21 +27,27 @@ poolpatchDictionaryChoice <-
   # 8  # Pool {0, 1} patch affinities.      Patch [0, 1] affinities.
   # 9  # Pool {0, 0.5, 1} patch affinities. Patch [0, 1] affinities.
   # 10 # Pool [0, 1] patch affinities.      Patch [0, 1] affinities.
-poolpatchSeedChoice <- 1
+poolpatchSeedChoice <-
+  # 1 # Used on 2024-02-13
+  2 # Used on 2024-02-14, 2024-02-15
 
 dynamicsDictionaryChoice <-
   1 # Law and Morton 1996, Size-Structured Lotka-Volterra, Default Parameters
 #
-dynamicsSeedChoice <- 1
+dynamicsSeedChoice <-
+  # 1 # Used on 2024-02-13
+  2 # Used on 2024-02-14
 
 eventsDictionaryChoice <-
   #   Multipliers:
   # 1 # Immigration: 1, Extirpation: 1, NumberOfEvents: 1 # Default
   2 # Immigration: 1, Extirpation: 1, NumberOfEvents: 2 # For Interventions.
-eventsSeedChoice <- 1
+eventsSeedChoice <-
+  # 1 # Used on 2024-02-13
+  2 # Used on 2024-02-14 for both 1-1 and 2-1.
 
 dispersalDictionaryChoice <-
-  NA # c(NA, 0, 5)
+  NA # c(NA, 5, 0)
   # Index: Ones place is resistance to Dispersal on a log scale.
   #      : Tens place is configuration: 0* = Ring, 1* = Line, 2* = Complete.
   #      : Special: NA corresponds to no dispersal.
