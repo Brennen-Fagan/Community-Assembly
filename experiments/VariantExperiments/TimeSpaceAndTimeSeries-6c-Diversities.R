@@ -11,10 +11,11 @@ datfolders <- c(
   "TSTS_Simulations_1-1_2024-02-13",
   "TSTS_Simulations_1-1_2024-02-14",
   "TSTS_Simulations_2-1_2024-02-14",
-  "TSTS_Simulations_10-1_2024-02-15"#,
+  "TSTS_Simulations_10-1_2024-02-15",
+  "TSTS_Simulations_6-1_2024-02-15"
 )
 
-cores <- 3
+cores <- 4
 
 
 # Libraries: ##################################################################
@@ -40,7 +41,7 @@ if (cores > 1) {
 datfolders_properties <- strsplit(datfolders, split = "_")
 if ( length(datfolders_properties) > 1 &&
      with(list(x = unlist(lapply(datfolders_properties, length))),
-          all(x[1] == x)) ){
+          any(x[1] != x)) ){
   stop("Differing folder types implies differing file types.")
 }
 
@@ -54,9 +55,9 @@ if (flag == "TSTS") {
 }
 
 poolmats <- lapply(
-  dir(datfolders, full.names = TRUE, pattern = "PoolMats"), function(x) {
+  dir(datfolders, full.names = TRUE, pattern = "Pool"), function(x) {
     names <- load(x)
-    return(c(mget(names), "Dir" = x))
+    return(c(mget(names), "Dir" = dirname(x), "File" = basename(x)))
   })
 
 Diversity <- foreach::foreach(
@@ -69,7 +70,7 @@ Diversity <- foreach::foreach(
             #x_properties[[1]][1] == "TSTS",
             #x_properties[[1]][2] == "Simulation"
   )
-  
+
   filename <- file.path(
     dirname(x),
     if (flag == "TSTS") {
@@ -82,10 +83,11 @@ Diversity <- foreach::foreach(
                     collapse = "_"))
     }
   )
-  
+
   if(file.exists(filename)) {
     load(filename)
   } else {
+    print(filename)
     x_dir <- dirname(x)
     x_poolind <- which(unlist(lapply(poolmats, function(y) y$Dir == x_dir)))
     if(any(x_poolind)) {
@@ -93,74 +95,111 @@ Diversity <- foreach::foreach(
     } else {
       x_pool <- NULL
     }
-    
+
     loaded <- load(x) # names
     stopifnot(length(loaded) == 1)
     loaded <- (get(loaded)) # objects
-    
+
     if (!"ReactionTime" %in% names(loaded$Ellipsis)) {
       loaded$Ellipsis$ReactionTime <- loaded$ReactionTime
     }
-    
+
     if (!is.null(x_pool)) {
       numberOfSpecies <- nrow(x_pool)
     } else {
       numberOfSpecies <- (ncol(loaded$Abundance) - 1) / loaded$NumEnvironments
     }
-    
-    if (!is.null(x_pool) && any(grepl(pattern = "Niche", x = names(x_pool)))) {
+
+    if (!is.null(x_pool) &&
+        any(grepl(pattern = "(Niche|Affinity)", x = names(x_pool)))) {
       # Proceed for each niche, then grab the overall.
-      Niches <- grep(pattern = "Niche", x = names(x_pool), value = TRUE)
-      
+      Niches <- grep(pattern = "(Niche|Affinity)", x = names(x_pool),
+                     value = TRUE)
+
+      # This is the single niche implementation!!!
+      # We may want to, in the future, group_by all niches simultaneously.
+      # Alternatively, we may want to discretize the niches first.
+
+      x_pool <- x_pool %>% dplyr::mutate(
+        dplyr::across(
+          dplyr::all_of(Niches),
+          .fns = ~ if(length(unique(.x)) >
+                      ceiling((loaded$NumEnvironments + 1)/2)) {
+            # Where'd the formula come from? We have 10 patches, arranged in
+            # a ring. Assume that there are two patches that are maximally
+            # distant in niche space and the two paths are monotonic.
+            # These paths are of length n / 2 + 1 = 6. If we had 11, then the
+            # extra patch would be on adjacent to one of the extremes (w.l.o.g.)
+            # but then either one could be the extreme. So 11 also => 6.
+            cut(.x, breaks = ceiling((loaded$NumEnvironments + 1)/2))
+          } else {
+            .x
+          }
+        )
+        )
+
       Diversity <- lapply(
         Niches, function(colname) {
           x_pool %>% dplyr::group_by(
             dplyr::across(dplyr::all_of(colname))
-          ) %>% dplyr::group_modify(
+          ) %>% dplyr::group_map(
             .f = function(.x, .y) {
               # .x$ID is numeric!
-              idcolumns <- c(1, rep(.x$ID, loaded$NumEnvironments) +
-                               1 +  # Time Column
-                               numberOfSpecies * rep(1:loaded$NumEnvironments,
-                                                     each = length(.x$ID)) # Env Indexing
+              idcolumns <- c(
+                1,
+                rep(.x$ID, loaded$NumEnvironments) +
+                  1 +  # Time Column
+                  numberOfSpecies * rep((1:loaded$NumEnvironments) - 1,
+                                        each = length(.x$ID)) # Env Indexing
               )
               loaded_subset <- loaded
               loaded_subset$Abundance <- loaded_subset$Abundance[, idcolumns]
-              
-              RMTRCode2::Calculate_Diversity(
+
+              divs <- RMTRCode2::thinAndCalculateDiversities(#Calculate_Diversity(
                 loaded,
                 nspecies = c(Basal = sum(.x$Type == "Basal"),
-                             Consumer = sum(.x$Type == "Consumer"))
+                             Consumer = sum(.x$Type == "Consumer")),
                 # My standard approach for nspecies.
+                preferred_rows_per_event = 0.1,
+                divide_time_by = 1
               )
+
+              # thinAndCalculateDiversities yields lists
+              divs$NicheValues <- .y
+              return(divs)
             }
           )
         }
       )
-      
+
       names(Diversity) <- Niches
-      
-      Diversity$Diversities <- RMTRCode2::Calculate_Diversity(
-        loaded,
-        nspecies = c(Basal = 34, Consumer = 66) * numberOfSpecies / 100
-        # My standard approach for nspecies.
-      )
-      
+
+      Diversity$Diversities <-
+        RMTRCode2::thinAndCalculateDiversities(#Calculate_Diversity(
+          loaded,
+          nspecies = c(Basal = 34, Consumer = 66) * numberOfSpecies / 100,
+          # My standard approach for nspecies.
+          preferred_rows_per_event = 0.1,
+          divide_time_by = 1
+        )
+
       Diversity$Ellipsis <- loaded$Ellipsis
     } else {
       Diversity <- list(
-        Diversities = RMTRCode2::Calculate_Diversity(
+        Diversities = RMTRCode2::thinAndCalculateDiversities(#Calculate_Diversity(
           loaded,
-          nspecies = c(Basal = 34, Consumer = 66) * numberOfSpecies / 100
+          nspecies = c(Basal = 34, Consumer = 66) * numberOfSpecies / 100,
           # My standard approach for nspecies.
+          preferred_rows_per_event = 0.1,
+          divide_time_by = 1
         ),
         Ellipsis = loaded$Ellipsis
       )
     }
-    
+
     save(Diversity, file = filename)
   }
-  
+
   return(Diversity)
 }
 
@@ -175,7 +214,7 @@ SpeciesPresence <- foreach::foreach(
             #x_properties[[1]][1] == "TSTS",
             #x_properties[[1]][2] == "Simulation"
   )
-  
+
   filename <- file.path(
     dirname(x),
     if (flag == "TSTS") {
@@ -188,28 +227,28 @@ SpeciesPresence <- foreach::foreach(
                     collapse = "_"))
     }
   )
-  
+
   if(file.exists(filename)) {
     load(filename)
   } else {
     loaded <- load(x) # names
     stopifnot(length(loaded) == 1)
     loaded <- (get(loaded)) # objects
-    
+
     if (!"ReactionTime" %in% names(loaded$Ellipsis)) {
       loaded$Ellipsis$ReactionTime <- loaded$ReactionTime
     }
-    
+
     SpeciesPresence <- list(
       SpeciesPresences = RMTRCode2::Calculate_Species(
         loaded
       ),
       Ellipsis = loaded$Ellipsis
     )
-    
+
     save(SpeciesPresence, file = filename)
   }
-  
+
   return(SpeciesPresence)
 }
 
