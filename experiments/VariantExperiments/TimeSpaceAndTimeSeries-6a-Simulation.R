@@ -17,12 +17,12 @@
 # Easy to convert to cargs <- as.numeric(commandArgs(TRUE)) for parallel.
 
 poolpatchDictionaryChoice <-
-  1  # Pool with no patch affinity.       Patch with no affinities.
+  # 1  # Pool with no patch affinity.       Patch with no affinities.
   # 2  # Pool {0, 1} patch affinities.      Patch {0, 1} affinities.
   # 3  # Pool {0, 0.5, 1} patch affinities. Patch {0, 1} affinities.
   # 4  # Pool [0, 1] patch affinities.      Patch {0, 1} affinities.
   # 5  # Pool {0, 1} patch affinities.      Patch {0, 0.5, 1} affinities.
-  # 6  # Pool {0, 0.5, 1} patch affinities. Patch {0, 0.5, 1} affinities.
+   6  # Pool {0, 0.5, 1} patch affinities. Patch {0, 0.5, 1} affinities.
   # 7  # Pool [0, 1] patch affinities.      Patch {0, 0.5, 1} affinities.
   # 8  # Pool {0, 1} patch affinities.      Patch [0, 1] affinities.
   # 9  # Pool {0, 0.5, 1} patch affinities. Patch [0, 1] affinities.
@@ -55,8 +55,8 @@ dispersalDictionaryChoice <-
 
 # choose r' = r * rho ^ (sign(r)), but what rho?
 distanceDictionaryChoice <- # for m, n in [0, 1], rho(m, n) = ...
-  1 # 2 ^ (- euclid(m, n)) => rho in [1/2, 1] for 1-D
-  # 2 # 2 ^ (1 - 2 euclid(m, n)) => rho in [1/2, 2] for 1-D
+  # 1 # 2 ^ (- euclid(m, n)) => rho in [1/2, 1] for 1-D
+   2 # 2 ^ (1 - 2 euclid(m, n)) => rho in [1/2, 2] for 1-D
 
 ## Other Parameters: ##########################################################
 EliminationThreshold <- 10^-4 # Below which species are removed from internals
@@ -240,15 +240,23 @@ distanceDictionary <- data.frame(
 )[distanceDictionaryChoice, ]
 
 # Files: ######################################################################
+partialID <- paste0(
+  # PARAMETERS:
+  poolpatchDictionaryChoice, "-", # Bundle Inter-Simulation Constants.
+  dynamicsDictionaryChoice# , # "-",
+  # eventsDictionaryChoice, "-", # Sometimes want to change.
+  # dispersalDictionaryChoice, "-", # Commonly changed.
+  # distanceDictionaryChoice, #"-", # Sometimes changed.
+  , "_",
+  # SEEDS:
+  poolpatchSeedChoice, "-",
+  dynamicsSeedChoice
+)
 datfolder <- file.path(
   directory,
   paste0(
     "TSTS_Simulations_", # Separate the Name (TSTS) and Type (Simulations)
-    poolpatchDictionaryChoice, "-", # Bundle Inter-Simulation Constants.
-    dynamicsDictionaryChoice, # "-",
-    # eventsDictionaryChoice, "-", # Sometimes want to change.
-    # dispersalDictionaryChoice, "-", # Commonly changed.
-    # distanceDictionaryChoice, #"-", # Sometimes changed.
+    partialID,
     "_", # Separate the Date
     Sys.Date())
 )
@@ -256,17 +264,23 @@ if (!dir.exists(datfolder)) {
   dir.create(datfolder)
 }
 
+fullID <- paste0(
+  # PARAMETERS:
+  poolpatchDictionaryChoice, "-", # Bundle Inter-Simulation Constants.
+  dynamicsDictionaryChoice, "-",
+  eventsDictionaryChoice, "-", # Sometimes want to change.
+  dispersalDictionaryChoice, "-", # Commonly changed.
+  distanceDictionaryChoice #"-", # Sometimes changed.
+  , "_",
+  # SEEDS:
+  poolpatchSeedChoice, "-",
+  dynamicsSeedChoice, "-",
+  eventsSeedChoice
+)
+
 datfile <- file.path(
   datfolder,
-  paste0(
-    "TSTS_Simulation_",
-    poolpatchDictionaryChoice, "-", # Bundle Inter-Simulation Constants.
-    dynamicsDictionaryChoice, "-",
-    eventsDictionaryChoice, "-", # Sometimes want to change.
-    dispersalDictionaryChoice, "-", # Commonly changed.
-    distanceDictionaryChoice, #"-", # Sometimes changed.
-    ".RData"
-  )
+  paste0("TSTS_Simulation_", fullID, ".RData")
 )
 if (file.exists(datfile)) {
   warning(paste(datfile, "already exists and will be overwritten."))
@@ -394,7 +408,7 @@ if (exists("datfile_ppd_envir")) {
   if (exists("datfile_ppd_write") && datfile_ppd_write) {
     save(Pool, PatchAffinities,
          InteractionMatrices, DynamicsFunction, CharacteristicRate,
-         poolpatchSeed, dynamicsSeed,
+         poolpatchSeed, dynamicsSeed, ID = partialID,
          file = datfile_ppd)
   }
 }
@@ -548,6 +562,7 @@ result <- RMTRCode2::MultipleNumericalAssembly_Dispersal(
   Verbose = TRUE,
   # Using the ellipsis pass through feature:
   Timescale = "Simulation",
+  ID = fullID,
   Affinity = list(
     PatchAffinities = PatchAffinities,
     EffectiveReproductionRate = rprime
