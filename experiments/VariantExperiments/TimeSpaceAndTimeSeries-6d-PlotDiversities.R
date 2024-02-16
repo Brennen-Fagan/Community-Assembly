@@ -43,14 +43,14 @@ diversities <- lapply(
   dir(datfolders, full.names = TRUE, pattern = "Diversity"), function(x) {
     names <- load(x)
     stopifnot(length(names) == 1)
-    return(get(names))
+    return(c(get(names), "Dir" = dirname(x), "File" = basename(x)))
   })
 
 presences <- lapply(
   dir(datfolders, full.names = TRUE, pattern = "Presence"), function(x) {
     names <- load(x)
     stopifnot(length(names) == 1)
-    return(get(names))
+    return(c(get(names), "Dir" = dirname(x), "File" = basename(x)))
   })
 
 stopifnot(#length(results) >= length(datfolders),
@@ -60,43 +60,94 @@ stopifnot(#length(results) >= length(datfolders),
 
 # Convert formats for plotting: ###############################################
 
+convertThinnedDiversitiesListToDF <- function(d) {
+  rbind(
+    d$alpha %>% dplyr::select(
+      -Species
+    ) %>% tidyr::pivot_longer(
+      cols = c("Richness", "Richness_Basal", "Richness_Consumer"),
+      names_to = "Measurement", values_to = "Value"
+    ) %>% dplyr::mutate(
+      Measurement = paste("Alpha", Measurement),
+      Aggregation = NA,
+      Environment2 = NA,
+      Affinity = if("NicheValues" %in% names(d)) d$NicheValues else NA
+    ),
+    do.call(rbind, lapply(d$beta, function(b) {
+      b %>% dplyr::rename(
+        Environment = Env1,
+        Environment2 = Env2,
+        Value = Jaccard
+      ) %>% dplyr::mutate(
+        Measurement = "Beta Jaccard",
+        Aggregation = NA,
+        Affinity = if("NicheValues" %in% names(d)) d$NicheValues else NA
+      )
+    })),
+    d$gamma %>% dplyr::rename(
+      Richness_Basal = Basals,
+      Richness_Consumer = Consumers
+    ) %>% tidyr::pivot_longer(
+      cols =  c("Richness", "Richness_Basal", "Richness_Consumer"),
+      names_to = "Measurement", values_to = "Value"
+    ) %>% dplyr::mutate(
+      Measurement = paste("Gamma", Measurement),
+      Environment = NA,
+      Environment2 = NA,
+      Affinity = if("NicheValues" %in% names(d)) d$NicheValues else NA
+    )
+  )
+}
+
 ### Diversity: ################################################################
 diversities <- do.call(rbind, lapply(diversities, function(d) {
-  id <- strsplit(d$Ellipsis$FullID, "-", fixed = TRUE)[[1]]
-  InterventionPatches <- as.character(d$Ellipsis$Intervention$Patches)
-  if (identical(InterventionPatches, character(0))) {
-    InterventionPatches <- as.character(d$Ellipsis$PatchesIntervention)
+  if ("FullID" %in% names(d$Ellipsis)) {
+    id <- strsplit(
+      strsplit(d$Ellipsis$FullID, "_", fixed = "TRUE"), # Split seeds off.
+               "-", fixed = TRUE)
+  } else {
+    id <- strsplit(
+      strsplit(
+        strsplit(d$File, ".", fixed = TRUE)[[1]][1], # Remove .RData.
+        "_", fixed = TRUE)[[1]][3:4], # Remove TSTS_Type and split seeds off.
+      "-", fixed = TRUE # Separate out the id values.
+    )
   }
-  d$Diversities %>% dplyr::mutate(
-    SimulationSet = id[1],
-    InterventionType = id[2],
-    InterventionParameters = id[3],
-    SimulationNumber = id[4],
-    ParentFileNumber = id[5]
-  ) %>% tidyr::separate(
-    # Acknowledge that we have two patch types and that can be important.
-    Environment, into = c("Environment1", "Environment2"),
-    sep = " ", remove = FALSE, fill = "right"
-  ) %>% dplyr::mutate(
-    InIntervention = ((Environment1 %in% InterventionPatches) +
-                        ifelse(!is.na(Environment2),
-                               (Environment2 %in% InterventionPatches),
-                               0))
-    # I.e. Single Patch: 1 if Experiment, 0 if Control
-    #      Double Patch: 2 if both Experiment, 1 if Mixed, 0 if both Control
-    #      Region      : 0
+
+  # thinAndCalculateDiversities creates a list with alpha, beta and gamma,
+  # where beta is in turn a list separated by times.
+  # But, thinAndCalculateDiversities was *also* used on the different niche/
+  # affinities, as well as on the whole system.
+
+  retval <- convertThinnedDiversitiesListToDF(d$Diversities)
+
+  retval <- rbind(
+    retval,
+    do.call(rbind, lapply(d$Affinity, convertThinnedDiversitiesListToDF))
+  )
+
+  retval %>% dplyr::mutate(
+    PoolPatchAffinity = id[[1]][1],
+    PoolPatchAffinitySeed = id[[2]][1],
+    Interactions = id[[1]][2],
+    InteractionsSeed = id[[2]][2],
+    Events = id[[1]][3],
+    EventsSeed = id[[2]][3],
+    Dispersal = id[[1]][4],
+    NicheDistance = id[[1]][5]
   )
 }))
 
 # Computationally does not seem feasible to run on the entire thing!!
-diversitiesRounded <- diversities %>% dplyr::filter(
-  round(Time) <= 10000
-) %>%  dplyr::group_by(
+diversitiesRounded <- diversities %>%  dplyr::group_by(
   round(Time), # Time
-  Environment,
-  SimulationSet, InterventionType, InterventionParameters, # Run
-  SimulationNumber, ParentFileNumber, InIntervention, Environment1, Environment2,
-  Measurement # Measurement
+  Environment, Environment2, # Location
+  Affinity, # Effectively: Species set
+  Measurement, Aggregation, # Measurement
+
+  # By Run:
+  PoolPatchAffinity, PoolPatchAffinitySeed, Interactions, InteractionsSeed,
+  Events, EventsSeed, Dispersal, NicheDistance
 ) %>% dplyr::summarise(
   Value = median(Value)
 ) %>% dplyr::rename(
@@ -104,15 +155,17 @@ diversitiesRounded <- diversities %>% dplyr::filter(
 )
 
 diversityRibbons <- diversitiesRounded %>% dplyr::filter(
-  !(Environment %in% c("Mean", "Gamma")), # Not Gamma
-  Measurement == "Richness" | Measurement == "Jaccard", # Not PoolType Specific
-  (InIntervention == 1 & is.na(Environment2)) |
-    (InIntervention == 1) # Mix/Intervention
+  !(is.na(Environment)), # Not Gamma
+  Measurement == "Alpha Richness" |
+    Measurement == "Beta Jaccard" # Not PoolType Specific
 ) %>%  dplyr::group_by(
   Time, # Time
-  SimulationSet, InterventionType, InterventionParameters, # Run
-  SimulationNumber, ParentFileNumber,
-  Measurement # Measurement
+
+  Affinity, # Effectively: Species set
+  Measurement, Aggregation, # Measurement
+
+  PoolPatchAffinity, PoolPatchAffinitySeed, Interactions, InteractionsSeed,
+  Events, EventsSeed, Dispersal, NicheDistance
 ) %>% dplyr::summarise(
   Low = unlist(dplyr::across(dplyr::any_of("Value"),
                              .fns = ~ quantile(.x, p = 0.1, na.rm = TRUE))),
@@ -121,30 +174,37 @@ diversityRibbons <- diversitiesRounded %>% dplyr::filter(
   .groups = "drop"
 )
 
-diversityRibbons_Gamma <- diversitiesRounded %>% dplyr::filter(
-  (Environment %in% c("Gamma")),
-  Measurement == "Richness"
-) %>%  dplyr::group_by(
-  Time, # Time
-  SimulationSet, InterventionType, InterventionParameters, # Run
-  SimulationNumber, ParentFileNumber,
-  Measurement # Measurement
-) %>% dplyr::summarise(
-  Low = unlist(dplyr::across(dplyr::any_of("Value"),
-                             .fns = ~ quantile(.x, p = 0.1, na.rm = TRUE))),
-  High = unlist(dplyr::across(dplyr::any_of("Value"),
-                              .fns = ~ quantile(.x, p = 0.9, na.rm = TRUE))),
-  .groups = "drop"
+# diversityRibbons_Gamma <- diversitiesRounded %>% dplyr::filter(
+#   is.na(Environment),
+#   Measurement == "Gamma Richness"
+# ) %>%  dplyr::group_by(
+#   Time, # Time
+#
+#   Affinity, # Effectively: Species set
+#   Measurement, Aggregation, # Measurement
+#
+#   PoolPatchAffinity, PoolPatchAffinitySeed, Interactions, InteractionsSeed,
+#   Events, EventsSeed, Dispersal, NicheDistance
+# ) %>% dplyr::summarise(
+#   Low = unlist(dplyr::across(dplyr::any_of("Value"),
+#                              .fns = ~ quantile(.x, p = 0.1, na.rm = TRUE))),
+#   High = unlist(dplyr::across(dplyr::any_of("Value"),
+#                               .fns = ~ quantile(.x, p = 0.9, na.rm = TRUE))),
+#   .groups = "drop"
+# ) %>% dplyr::mutate(
+#   Measurement = "Regional Rich."
+# )
+
+diversitiesRounded <- diversitiesRounded %>% dplyr::filter(
+  Measurement %in% c(
+    "Beta Jaccard", "Gamma Gamma", "Gamma Mean", "Alpha Richness"
+  )
 ) %>% dplyr::mutate(
-  Measurement = "Regional Rich."
-)
-
-diversitiesRounded <- diversitiesRounded %>% dplyr::mutate(
   Measurement2 = dplyr::case_when(
-    Measurement == "Jaccard" ~ "Spatial Diss.",
-    Measurement == "Richness" & Environment == "Gamma" ~ "Regional Rich.",
-    Measurement == "Richness" & Environment == "Mean" ~ "Local Rich.", # Panel
-    Measurement == "Richness"  ~ "Local Rich.", # Otherwise
+    Measurement == "Beta Jaccard" ~ "Spatial Diss.",
+    Measurement == "Gamma Gamma" ~ "Regional Rich.",
+    Measurement == "Gamma Mean" ~ "Local Rich.", # Panel
+    Measurement == "Alpha Richness"  ~ "Local Rich.", # Otherwise
     TRUE ~ Measurement
   )
 )

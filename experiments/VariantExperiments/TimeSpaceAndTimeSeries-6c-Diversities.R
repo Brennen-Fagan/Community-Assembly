@@ -8,11 +8,11 @@
 
 # Parameters: #################################################################
 datfolders <- c(
-  "TSTS_Simulations_1-1_2024-02-13",
-  "TSTS_Simulations_1-1_2024-02-14",
-  "TSTS_Simulations_2-1_2024-02-14",
-  "TSTS_Simulations_10-1_2024-02-15",
-  "TSTS_Simulations_6-1_2024-02-15"
+  "TSTS_Simulations_1-1_1-1_2024-02-13",
+  "TSTS_Simulations_1-1_2-2_2024-02-14",
+  "TSTS_Simulations_2-1_2-2_2024-02-14",
+  "TSTS_Simulations_10-1_2-2_2024-02-15",
+  "TSTS_Simulations_6-1_2-2_2024-02-15"
 )
 
 cores <- 4
@@ -102,6 +102,12 @@ Diversity <- foreach::foreach(
 
     if (!"ReactionTime" %in% names(loaded$Ellipsis)) {
       loaded$Ellipsis$ReactionTime <- loaded$ReactionTime
+    }
+
+    if (loaded$Ellipsis$Timescale == "Simulation") {
+      loaded$Events$Time <- loaded$Events$Time / loaded$Ellipsis$ReactionTime
+      loaded$Abundance[, 1] <- loaded$Abundance[, 1] / loaded$Ellipsis$ReactionTime
+      loaded$Ellipsis$Timescale <- "Characteristic"
     }
 
     if (!is.null(x_pool)) {
@@ -239,9 +245,15 @@ SpeciesPresence <- foreach::foreach(
       loaded$Ellipsis$ReactionTime <- loaded$ReactionTime
     }
 
+    if (loaded$Ellipsis$Timescale == "Simulation") {
+      loaded$Events$Time <- loaded$Events$Time / loaded$Ellipsis$ReactionTime
+      loaded$Abundance[, 1] <- loaded$Abundance[, 1] / loaded$Ellipsis$ReactionTime
+      loaded$Ellipsis$Timescale <- "Characteristic"
+    }
+
     SpeciesPresence <- list(
       SpeciesPresences = RMTRCode2::Calculate_Species(
-        loaded
+        loaded, bintimes = TRUE # Not well implemented: only two states.
       ),
       Ellipsis = loaded$Ellipsis
     )
