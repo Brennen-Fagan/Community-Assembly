@@ -71,7 +71,7 @@ convertThinnedDiversitiesListToDF <- function(d) {
       Measurement = paste("Alpha", Measurement),
       Aggregation = NA,
       Environment2 = NA,
-      Affinity = if("NicheValues" %in% names(d)) as.character(d$NicheValues) else NA
+      Affinity = if("NicheValues" %in% names(d)) lapply(d$NicheValues, as.character) else NA
     ),
     do.call(rbind, lapply(d$beta, function(b) {
       b %>% dplyr::rename(
@@ -81,7 +81,7 @@ convertThinnedDiversitiesListToDF <- function(d) {
       ) %>% dplyr::mutate(
         Measurement = "Beta Jaccard",
         Aggregation = NA,
-        Affinity = if("NicheValues" %in% names(d)) as.character(d$NicheValues) else NA
+        Affinity = if("NicheValues" %in% names(d)) lapply(d$NicheValues, as.character) else NA
       )
     })),
     d$gamma %>% dplyr::rename(
@@ -95,7 +95,7 @@ convertThinnedDiversitiesListToDF <- function(d) {
       Environment = NA,
       Environment2 = NA,
       # Maybe this needs to be a lapply if we have multiple dimensions...
-      Affinity = if("NicheValues" %in% names(d)) as.character(d$NicheValues) else NA
+      Affinity = if("NicheValues" %in% names(d)) lapply(d$NicheValues, as.character) else NA
     )
   )
 }
