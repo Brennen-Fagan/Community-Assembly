@@ -71,7 +71,7 @@ convertThinnedDiversitiesListToDF <- function(d) {
       Measurement = paste("Alpha", Measurement),
       Aggregation = NA,
       Environment2 = NA,
-      Affinity = if("NicheValues" %in% names(d)) d$NicheValues else NA
+      Affinity = if("NicheValues" %in% names(d)) as.character(d$NicheValues) else NA
     ),
     do.call(rbind, lapply(d$beta, function(b) {
       b %>% dplyr::rename(
@@ -81,7 +81,7 @@ convertThinnedDiversitiesListToDF <- function(d) {
       ) %>% dplyr::mutate(
         Measurement = "Beta Jaccard",
         Aggregation = NA,
-        Affinity = if("NicheValues" %in% names(d)) d$NicheValues else NA
+        Affinity = if("NicheValues" %in% names(d)) as.character(d$NicheValues) else NA
       )
     })),
     d$gamma %>% dplyr::rename(
@@ -94,7 +94,8 @@ convertThinnedDiversitiesListToDF <- function(d) {
       Measurement = paste("Gamma", Measurement),
       Environment = NA,
       Environment2 = NA,
-      Affinity = if("NicheValues" %in% names(d)) d$NicheValues else NA
+      # Maybe this needs to be a lapply if we have multiple dimensions...
+      Affinity = if("NicheValues" %in% names(d)) as.character(d$NicheValues) else NA
     )
   )
 }
@@ -211,11 +212,21 @@ diversitiesRounded <- diversitiesRounded %>% dplyr::filter(
 
 ### Presence: #################################################################
 presences <- do.call(rbind, lapply(presences, function(p) {
-  id <- strsplit(p$Ellipsis$FullID, "-", fixed = TRUE)[[1]]
-  InterventionPatches <- as.character(p$Ellipsis$Intervention$Patches)
-  if (identical(InterventionPatches, character(0))) {
-    InterventionPatches <- as.character(p$Ellipsis$PatchesIntervention)
+  if ("FullID" %in% names(p$Ellipsis)) {
+    id <- strsplit(
+      strsplit(p$Ellipsis$FullID, "_", fixed = "TRUE"), # Split seeds off.
+      "-", fixed = TRUE)
+  } else {
+    id <- strsplit(
+      strsplit(
+        strsplit(p$File, ".", fixed = TRUE)[[1]][1], # Remove .RData.
+        "_", fixed = TRUE)[[1]][3:4], # Remove TSTS_Type and split seeds off.
+      "-", fixed = TRUE # Separate out the id values.
+    )
   }
+
+  retval <-
+
   p$SpeciesPresences %>% dplyr::mutate(
     InIntervention = Environment %in% InterventionPatches
   ) %>% dplyr::group_by(
@@ -241,7 +252,27 @@ presences <- do.call(rbind, lapply(presences, function(p) {
     SimulationNumber = id[4],
     ParentFileNumber = id[5]
   )
+
+
+
+  retval %>% dplyr::mutate(
+    PoolPatchAffinity = id[[1]][1],
+    PoolPatchAffinitySeed = id[[2]][1],
+    Interactions = id[[1]][2],
+    InteractionsSeed = id[[2]][2],
+    Events = id[[1]][3],
+    EventsSeed = id[[2]][3],
+    Dispersal = id[[1]][4],
+    NicheDistance = id[[1]][5]
+  )
 }))
+
+  retval <- convertThinnedDiversitiesListToDF(d$Diversities)
+
+  retval <- rbind(
+    retval,
+    do.call(rbind, lapply(d$Affinity, convertThinnedDiversitiesListToDF))
+  )
 
 # Plotting: ###################################################################
 
