@@ -237,6 +237,14 @@ SpeciesPresence <- foreach::foreach(
   if(file.exists(filename)) {
     load(filename)
   } else {
+    x_dir <- dirname(x)
+    x_poolind <- which(unlist(lapply(poolmats, function(y) y$Dir == x_dir)))
+    if(any(x_poolind)) {
+      x_pool <- poolmats[[x_poolind]]$Pool
+    } else {
+      x_pool <- NULL
+    }
+
     loaded <- load(x) # names
     stopifnot(length(loaded) == 1)
     loaded <- (get(loaded)) # objects
@@ -257,6 +265,21 @@ SpeciesPresence <- foreach::foreach(
       ),
       Ellipsis = loaded$Ellipsis
     )
+
+    if (!is.null(x_pool)) {
+      # Need to assign patch and species affinities in order to know how
+      # well they are pairing with each other.
+      SpeciesPresence$SpeciesPresences <-
+        SpeciesPresence$SpeciesPresences %>% dplyr::left_join(
+          x_pool %>% dplyr::select(Size, Type, dplyr::starts_with("Affinity")),
+          by = c("Species" = "ID")
+        )
+
+      SpeciesPresence$SpeciesPresences$EnvAffinity <-
+        poolmats[[x_poolind]]$PatchAffinities[
+          SpeciesPresence$SpeciesPresences$Environment,
+          ]
+    }
 
     save(SpeciesPresence, file = filename)
   }
