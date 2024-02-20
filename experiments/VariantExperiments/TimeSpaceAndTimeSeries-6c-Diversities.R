@@ -281,6 +281,11 @@ SpeciesPresence <- foreach::foreach(
         poolmats[[x_poolind]]$PatchAffinities[
           SpeciesPresence$SpeciesPresences$Environment,
           ]
+
+      # Unsure where grouping was coming from, but this might be inflating
+      # file sizes.
+      SpeciesPresence$SpeciesPresences <-
+        SpeciesPresence$SpeciesPresences %>% dplyr::ungroup()
     }
 
     save(SpeciesPresence, file = filename)
