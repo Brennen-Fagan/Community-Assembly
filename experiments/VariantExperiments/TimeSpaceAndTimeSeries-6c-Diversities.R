@@ -76,7 +76,7 @@ Diversity <- foreach::foreach(
     if (flag == "TSTS") {
       paste0(x_properties[[1]][1],
              "_Diversity_",
-             x_properties[[1]][3])
+             x_properties[[1]][3:length(x_properties[[1]])])
     } else if (flag == "Data") {
       paste0("TSTS_Diversity_",
              paste0(x_properties[[1]][5:length(x_properties[[1]])],
@@ -226,7 +226,7 @@ SpeciesPresence <- foreach::foreach(
     if (flag == "TSTS") {
       paste0(x_properties[[1]][1],
              "_Presence_",
-             x_properties[[1]][3])
+             x_properties[[1]][3:length(x_properties[[1]])])
     } else if (flag == "Data") {
       paste0("TSTS_Presence_",
              paste0(x_properties[[1]][5:length(x_properties[[1]])],
@@ -271,7 +271,9 @@ SpeciesPresence <- foreach::foreach(
       # well they are pairing with each other.
       SpeciesPresence$SpeciesPresences <-
         SpeciesPresence$SpeciesPresences %>% dplyr::left_join(
-          x_pool %>% dplyr::select(Size, Type, dplyr::starts_with("Affinity")),
+          x_pool %>% dplyr::select(
+            ID, Size, Type, dplyr::starts_with("Affinity")
+          ),
           by = c("Species" = "ID")
         )
 
