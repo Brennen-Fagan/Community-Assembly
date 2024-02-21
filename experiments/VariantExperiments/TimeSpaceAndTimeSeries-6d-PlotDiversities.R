@@ -268,9 +268,11 @@ diversitiesRounded <- diversitiesRounded %>% dplyr::filter(
 )
 
 ### Presence: #################################################################
-presences <- do.call(rbind, lapply(presences, function(p) {
-  if ("FullID" %in% names(p$Ellipsis)) {
-    id <- strsplit(
+presences <- do.call(rbind, lapply(
+  presences,
+  function(p, pPTU = pointsPerTimeUnit) {
+    if ("FullID" %in% names(p$Ellipsis)) {
+      id <- strsplit(
       strsplit(p$Ellipsis$FullID, "_", fixed = "TRUE"), # Split seeds off.
       "-", fixed = TRUE)
   } else {
@@ -282,6 +284,12 @@ presences <- do.call(rbind, lapply(presences, function(p) {
     )
   }
 
+  if ("TimeFloor" %in% names(p$SpeciesPresences)) {
+    p$SpeciesPresences <- p$SpeciesPresences %>% dplyr::rename(
+      Time = TimeFloor
+    )
+  }
+
   retval <- p$SpeciesPresences %>% dplyr::group_by(
     Species, round(Time), Environment, dplyr::contains("Affinity"), Size
   ) %>% dplyr::summarise(
@@ -289,6 +297,37 @@ presences <- do.call(rbind, lapply(presences, function(p) {
     Biomass = Abundance *  Size
   ) %>% dplyr::rename(
     Time = `round(Time)`
+  )
+
+
+  # Balanced Thinning
+
+  retval <- retval %>% dplyr::arrange(
+    Time
+  ) %>% dplyr::mutate( # Thin according to weighted time grouping.
+    TimeGroup = floor(Time * pPTU) / pPTU
+  ) %>% dplyr::group_by(
+    TimeGroup, Measurement, Aggregation, Environment, Environment2, Affinity
+  ) %>% dplyr::group_modify(
+    .f = function(.x, .y) {
+      ## Add beginning and end of time group:
+      rbind(
+        if(!unname(.y$TimeGroup) %in% .x$Time)
+          data.frame(Time = unname(.y$TimeGroup),
+                     Value = NA),
+        .x,
+        if(!any(.x$Time > unname(.y$TimeGroup) + 0.99/pPTU))
+          data.frame(Time = unname(.y$TimeGroup) + 0.99/pPTU,
+                     Value = .x[nrow(.x),]$Value)
+      )
+    }
+  ) %>% dplyr::ungroup(
+  ) %>% dplyr::group_by(
+    Measurement, Aggregation, Environment, Environment2, Affinity
+  ) %>% dplyr::mutate(
+    Value = ifelse(is.na(Value), dplyr::lag(Value), Value), # All but first
+    Weights = c(diff(Time), NA)
+  ) %>% dplyr::ungroup(
   )
 
   retval %>% dplyr::mutate(
@@ -303,20 +342,21 @@ presences <- do.call(rbind, lapply(presences, function(p) {
   )
 }))
 
-  retval <- convertThinnedDiversitiesListToDF(d$Diversities)
-
-  retval <- rbind(
-    retval,
-    do.call(rbind, lapply(d$Affinity, convertThinnedDiversitiesListToDF))
-  )
 
 # Plotting: ###################################################################
 
 ### Diversity Plots: ##########################################################
+# This works, but just barely...
+# TODO: Get separate scales (-> convert back to facet_wrap, maybe + patchwork).
+# TODO: Decide how to separate the nichedistance, which is sometimes important.
+# TODO: Color scales.
+# TODO: Add back in the intervals and median lines.
 PLOT_B <- ggplot2::ggplot(
   diversitiesRounded %>% dplyr::filter(
     Measurement2 %in% c("Spatial Diss.", "Local Rich.", "Regional Rich."),
-    Measurement != "Gamma Mean"
+    is.na(Aggregation) | Aggregation == "Gamma"
+  )  %>% dplyr::mutate(
+    Affinity = unlist(Affinity)
   ),
   ggplot2::aes(
     x = Time,
@@ -326,55 +366,59 @@ PLOT_B <- ggplot2::ggplot(
 ) + ggplot2::geom_line(
   # alpha = 0.4,
   mapping = ggplot2::aes(
-    group = interaction(Dispersal, Environment, Environment2),
+    group = paste(Dispersal, NicheDistance,
+                  PoolPatchAffinity, PoolPatchAffinitySeed, Affinity,
+                  Environment, Environment2,
+                  Measurement2),
     alpha = ifelse(Measurement2 == "Regional Rich.", 1, 0.4)
   )
-) + ggplot2::geom_line(
-  data = Diversity %>% dplyr::filter(
-    Measurement2 %in% c("Spatial Diss.", "Local Rich.", "Regional Rich."),
-    Environment == "Mean"
-  ),
-  size = 1.5
-) + ggplot2::geom_ribbon(
-  data = dplyr::bind_rows(
-    DiversityRibbons,
-    DiversityRibbons_Gamma
-  ) %>% dplyr::mutate(
-    Measurement2 = dplyr::case_when(
-      Measurement == "Jaccard" ~ "Spatial Diss.",
-      Measurement == "Richness" ~ "Local Rich.",
-      TRUE ~ Measurement
-    )
-  ),
-  mapping = ggplot2::aes(
-    ymin = Low,
-    ymax = High,
-    x = Time,
-    fill = pasteCustom(Dispersal, Space)
-  ),
-  alpha = 0.4,
-  inherit.aes = FALSE
+# ) + ggplot2::geom_line(
+#   data = diversitiesRounded %>% dplyr::filter(
+#     Measurement2 %in% c("Spatial Diss.", "Local Rich.", "Regional Rich."),
+#     Aggregation == "Mean"
+#   ),
+#   size = 1.5
+# ) + ggplot2::geom_ribbon(
+#   data = dplyr::bind_rows(
+#     DiversityRibbons,
+#     DiversityRibbons_Gamma
+#   ) %>% dplyr::mutate(
+#     Measurement2 = dplyr::case_when(
+#       Measurement == "Jaccard" ~ "Spatial Diss.",
+#       Measurement == "Richness" ~ "Local Rich.",
+#       TRUE ~ Measurement
+#     )
+#   ),
+#   mapping = ggplot2::aes(
+#     ymin = Low,
+#     ymax = High,
+#     x = Time,
+#     fill = pasteCustom(Dispersal, Space)
+#   ),
+#   alpha = 0.4,
+#   inherit.aes = FALSE
 ) + ggplot2::theme_bw(
 ) + ggplot2::labs(
   y = "Value", # Number of Species",
-  x = paste0("Time, ", divide_time_by, " units"),
-  tag = "(b)"
+  x = paste0("Time (Characteristic Scale)")#,
+  # tag = "(b)"
   # x = ""
-) + ggplot2::theme(
-  plot.tag.position = c(0.02, 0.98),
-  plot.tag = ggplot2::element_text(face = "bold"),
-  strip.text.x = ggplot2::element_text(size = 8)
-) + ggplot2::scale_color_manual(
-  name = legend_bl_name,
-  values = c("darkorange", "plum1", "cyan")
-) + ggplot2::scale_fill_manual(
-  name = legend_bl_name,
-  values = c("darkorange4", "plum4", "cyan4")
-) + ggplot2::facet_wrap(
-  . ~ factor(
+# ) + ggplot2::theme(
+#   plot.tag.position = c(0.02, 0.98),
+#   plot.tag = ggplot2::element_text(face = "bold"),
+#   strip.text.x = ggplot2::element_text(size = 8)
+# ) + ggplot2::scale_color_manual(
+#   name = legend_bl_name,
+#   values = c("darkorange", "plum1", "cyan")
+# ) + ggplot2::scale_fill_manual(
+#   name = legend_bl_name,
+#   values = c("darkorange4", "plum4", "cyan4")
+) + ggplot2::facet_grid(
+  PoolPatchAffinity + Affinity ~ factor(
     Measurement2, ordered = T,
     levels = c("Local Rich.", "Regional Rich.", "Spatial Diss.")
-  ), nrow = 1, scales = "free_y"
+  ),# ncol = 3,
+  scales = "free_y"
 ) + ggplot2::scale_alpha(guide = "none") + ggplot2::coord_cartesian(
   ylim = c(0, NA)
 )
