@@ -290,47 +290,57 @@ presences <- do.call(rbind, lapply(
     )
   }
 
-  retval <- p$SpeciesPresences %>% dplyr::group_by(
-    Species, round(Time), Environment, dplyr::contains("Affinity"), Size
-  ) %>% dplyr::summarise(
-    Abundance = mean(Abundance),
-    Biomass = Abundance *  Size
-  ) %>% dplyr::rename(
-    Time = `round(Time)`
-  )
-
+  # retval <- p$SpeciesPresences %>% dplyr::group_by(
+  #   Species, round(Time), Environment, dplyr::contains("Affinity"), Size
+  # ) %>% dplyr::summarise(
+  #   Abundance = mean(Abundance),
+  #   Biomass = Abundance *  Size
+  # ) %>% dplyr::rename(
+  #   Time = `round(Time)`
+  # )
 
   # Balanced Thinning
 
-  retval <- retval %>% dplyr::arrange(
+  retval <- p$SpeciesPresences %>% dplyr::arrange(
     Time
   ) %>% dplyr::mutate( # Thin according to weighted time grouping.
     TimeGroup = floor(Time * pPTU) / pPTU
   ) %>% dplyr::group_by(
-    TimeGroup, Measurement, Aggregation, Environment, Environment2, Affinity
+    TimeGroup, Species, Environment, Size, Type, Affinity, EnvAffinity
   ) %>% dplyr::group_modify(
     .f = function(.x, .y) {
       ## Add beginning and end of time group:
       rbind(
         if(!unname(.y$TimeGroup) %in% .x$Time)
           data.frame(Time = unname(.y$TimeGroup),
-                     Value = NA),
+                     Abundance = 0), # in presence, only present if nonzero.
+        #                          but we're now feeling in for averaging.
         .x,
         if(!any(.x$Time > unname(.y$TimeGroup) + 0.99/pPTU))
           data.frame(Time = unname(.y$TimeGroup) + 0.99/pPTU,
-                     Value = .x[nrow(.x),]$Value)
+                     Abundance = 0) # If Far => 0, if Near => keep prev value, but
+        #                       # if near, then there should be a value nearby.
       )
     }
   ) %>% dplyr::ungroup(
   ) %>% dplyr::group_by(
-    Measurement, Aggregation, Environment, Environment2, Affinity
+    Species, Environment
   ) %>% dplyr::mutate(
-    Value = ifelse(is.na(Value), dplyr::lag(Value), Value), # All but first
     Weights = c(diff(Time), NA)
   ) %>% dplyr::ungroup(
   )
 
-  retval %>% dplyr::mutate(
+  retval %>% dplyr::group_by(
+    TimeGroup, Species, Environment, Size, Type, Affinity, EnvAffinity
+  ) %>% dplyr::summarise(
+    Abundance = Hmisc::wtd.quantile(Abundance, Weights, normwt = TRUE, probs = 0.5),
+    Abundance = ifelse(Abundance < 1e-4, 0, Abundance),
+    #Value = sum(Weights * Value) / sum(Weights), # Mean
+    Time = unique(TimeGroup)[1],
+    .groups = "drop"
+  ) %>% dplyr::select(
+    -TimeGroup
+  ) %>% dplyr::mutate(
     PoolPatchAffinity = id[[1]][1],
     PoolPatchAffinitySeed = id[[2]][1],
     Interactions = id[[1]][2],
@@ -342,6 +352,38 @@ presences <- do.call(rbind, lapply(
   )
 }))
 
+diversity_cuts <- diversities %>% dplyr::select(
+  Affinity,
+  PoolPatchAffinity, PoolPatchAffinitySeed,
+  Interactions, InteractionsSeed,
+  Events, EventsSeed,
+  Dispersal, NicheDistance
+) %>% dplyr::distinct() %>% dplyr::mutate(
+  Affinity = unlist(Affinity)
+) %>% dplyr::filter(
+  !is.na(Affinity)
+  ) %>% tidyr::separate(
+    sep = ",", col = Affinity, into = c("Affinity.Lower", "Affinity.Upper"),
+    fill = "right"
+  ) %>% dplyr::mutate(
+    Affinity.Upper = ifelse(is.na(Affinity.Upper),
+                            Affinity.Lower,
+                            Affinity.Upper),
+    Affinity.Lower = gsub(pattern = "([(]|[]])", replacement = "", Affinity.Lower),
+    Affinity.Upper = gsub(pattern = "([(]|[]])", replacement = "", Affinity.Upper),
+    Affinity.Lower = as.numeric(Affinity.Lower),
+    Affinity.Upper = as.numeric(Affinity.Upper)
+  )
+
+presences <- presences %>% dplyr::left_join(
+  diversity_cuts, by = c("PoolPatchAffinity", "PoolPatchAffinitySeed",
+                         "Interactions", "InteractionsSeed",
+                         "Events", "EventsSeed",
+                         "Dispersal", "NicheDistance")
+) %>% dplyr::filter(
+  Affinity.Lower <= Affinity,
+  Affinity <= Affinity.Upper
+)
 
 # Plotting: ###################################################################
 
@@ -425,20 +467,35 @@ PLOT_B <- ggplot2::ggplot(
 
 ### Presence Plots: ###########################################################
 
+# As with dispersal plots, this is the bare minimum to be functional.
 PLOT_T <- ggplot2::ggplot(
-  presences,
-  ggplot2::aes(x = Time, y = Species, color = CountInIntervention)
+  presences %>% dplyr::filter(
+    Abundance > 0
+  ) %>% dplyr::group_by(
+    Species, Size, Type, Affinity.Lower, Affinity.Upper,
+    Time,
+    PoolPatchAffinity, PoolPatchAffinitySeed,
+    Interactions, InteractionsSeed,
+    Events, EventsSeed,
+    Dispersal, NicheDistance
+  ) %>% dplyr::summarise(
+    Count = dplyr::n(),
+    .groups = "drop"
+  ),
+  ggplot2::aes(x = Time, y = Size, color = Count)
 ) + ggplot2::geom_point(
   shape = '.'
 ) + ggplot2::scale_color_viridis_c(
   direction = -1,
-  limits = c(1, max(presences$CountInIntervention))
+  limits = c(1, 10)
 ) + ggplot2::facet_grid(
-  . ~ interaction(InterventionType, InterventionParameters)
-) + ggplot2::geom_hline(
-  yintercept = 1/3 * (ncol(results[[1]]$Abundance) - 1) / results[[1]]$NumEnvironments, color = "red"
+  Dispersal ~ paste(PoolPatchAffinitySeed,
+              NicheDistance,#) ~ paste(
+                PoolPatchAffinity, Affinity.Lower, Affinity.Upper)
+# ) + ggplot2::geom_hline(
+#   yintercept = 1/3 * (ncol(results[[1]]$Abundance) - 1) / results[[1]]$NumEnvironments, color = "red"
 ) + ggplot2::labs(
-  y = "Species Number",
+  y = "Species Size",
   x = "Time (Characteristic Scale)"#,
   # tag = "a)"
 ) + ggplot2::theme_bw(
@@ -446,38 +503,5 @@ PLOT_T <- ggplot2::ggplot(
   # axis.text.x = ggplot2::element_blank(),
   # plot.tag.position = c(0.02, 0.98)
 ) + ggplot2::scale_y_continuous(
-  limits = c(0, (ncol(results[[1]]$Abundance) - 1) / results[[1]]$NumEnvironments)
-)
-
-presences_1 <- presences %>% dplyr::filter(InterventionType == "1")
-
-PLOT_T_diffs <- ggplot2::ggplot(
-  presences %>% dplyr::left_join(
-    presences_1 %>% dplyr::select(Time, Species, CountInIntervention),
-    by = c("Time", "Species"), suffix = c("", ".1")
-  ) %>% dplyr::mutate(
-    InterventionDifference = CountInIntervention - ifelse(
-      !is.na(CountInIntervention.1), CountInIntervention.1, 0)
-  ),
-  ggplot2::aes(x = Time, y = Species, color = InterventionDifference)
-) + ggplot2::geom_point(
-  shape = '.'
-) + ggplot2::scale_color_distiller(
-  palette = "RdYlBu",
-  # direction = -1,
-  # limits = c(-5, 5)
-) + ggplot2::facet_grid(
-  . ~ interaction(InterventionType, InterventionParameters)
-) + ggplot2::geom_hline(
-  yintercept = 1/3 * (ncol(results[[1]]$Abundance) - 1) / results[[1]]$NumEnvironments, color = "red"
-) + ggplot2::labs(
-  y = "Species Number",
-  x = "Time (Characteristic Scale)"#,
-  # tag = "a)"
-) + ggplot2::theme_bw(
-) + ggplot2::theme(
-  # axis.text.x = ggplot2::element_blank(),
-  # plot.tag.position = c(0.02, 0.98)
-) + ggplot2::scale_y_continuous(
-  limits = c(0, (ncol(results[[1]]$Abundance) - 1) / results[[1]]$NumEnvironments)
+  limits = c(0, 1)
 )
