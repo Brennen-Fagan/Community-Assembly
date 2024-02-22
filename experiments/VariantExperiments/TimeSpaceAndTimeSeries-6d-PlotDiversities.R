@@ -403,7 +403,7 @@ PLOT_B <- ggplot2::ggplot(
   ggplot2::aes(
     x = Time,
     y = Value,
-    color = Dispersal
+    color = interaction(Dispersal, NicheDistance)
   )
 ) + ggplot2::geom_line(
   # alpha = 0.4,
@@ -442,7 +442,8 @@ PLOT_B <- ggplot2::ggplot(
 ) + ggplot2::theme_bw(
 ) + ggplot2::labs(
   y = "Value", # Number of Species",
-  x = paste0("Time (Characteristic Scale)")#,
+  x = paste0("Time (Characteristic Scale)"),
+  color = "Dispersal\nNicheDistance"#,
   # tag = "(b)"
   # x = ""
 # ) + ggplot2::theme(
@@ -456,10 +457,10 @@ PLOT_B <- ggplot2::ggplot(
 #   name = legend_bl_name,
 #   values = c("darkorange4", "plum4", "cyan4")
 ) + ggplot2::facet_grid(
-  PoolPatchAffinity + Affinity ~ factor(
+  factor(
     Measurement2, ordered = T,
     levels = c("Local Rich.", "Regional Rich.", "Spatial Diss.")
-  ),# ncol = 3,
+  ) ~ PoolPatchAffinity + Affinity ,# ncol = 3,
   scales = "free_y"
 ) + ggplot2::scale_alpha(guide = "none") + ggplot2::coord_cartesian(
   ylim = c(0, NA)
