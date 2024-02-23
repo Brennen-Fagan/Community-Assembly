@@ -22,21 +22,24 @@ poolpatchDictionaryChoice <-
   # 3  # Pool {0, 0.5, 1} patch affinities. Patch {0, 1} affinities.
   # 4  # Pool [0, 1] patch affinities.      Patch {0, 1} affinities.
   # 5  # Pool {0, 1} patch affinities.      Patch {0, 0.5, 1} affinities.
-   6  # Pool {0, 0.5, 1} patch affinities. Patch {0, 0.5, 1} affinities.
+  # 6  # Pool {0, 0.5, 1} patch affinities. Patch {0, 0.5, 1} affinities.
   # 7  # Pool [0, 1] patch affinities.      Patch {0, 0.5, 1} affinities.
   # 8  # Pool {0, 1} patch affinities.      Patch [0, 1] affinities.
   # 9  # Pool {0, 0.5, 1} patch affinities. Patch [0, 1] affinities.
   # 10 # Pool [0, 1] patch affinities.      Patch [0, 1] affinities.
+   11 # Pool {0, 1} patch affinities.      Patch {0.5} affinity.
 poolpatchSeedChoice <-
   # 1 # Used on 2024-02-13
-  2 # Used on 2024-02-14, 2024-02-15
+  # 2 # Used on 2024-02-14, 2024-02-15
+  3 # Used 2024-02-23
 
 dynamicsDictionaryChoice <-
   1 # Law and Morton 1996, Size-Structured Lotka-Volterra, Default Parameters
 #
 dynamicsSeedChoice <-
   # 1 # Used on 2024-02-13
-  2 # Used on 2024-02-14
+  # 2 # Used on 2024-02-14
+  3 # Used on 2024-02-23
 
 eventsDictionaryChoice <-
   #   Multipliers:
@@ -44,10 +47,11 @@ eventsDictionaryChoice <-
   2 # Immigration: 1, Extirpation: 1, NumberOfEvents: 2 # For Interventions.
 eventsSeedChoice <-
   # 1 # Used on 2024-02-13
-  2 # Used on 2024-02-14 for both 1-1 and 2-1.
+  # 2 # Used on 2024-02-14 for both 1-1 and 2-1.
+  3 # Used on 2024-02-23
 
 dispersalDictionaryChoice <-
-  NA # c(NA, 5, 0)
+  15 # c(NA, 5, 0)
   # Index: Ones place is resistance to Dispersal on a log scale.
   #      : Tens place is configuration: 0* = Ring, 1* = Line, 2* = Complete.
   #      : Special: NA corresponds to no dispersal.
@@ -63,6 +67,7 @@ EliminationThreshold <- 10^-4 # Below which species are removed from internals
 ArrivalDensity <- EliminationThreshold * 4 * 10 ^ 3 # Traill et al. 2007
 MaximumTimeStep <- 1 # Maximum time solver can proceed without elimination.
 BetweenEventSteps <- 10 # Number of steps to reach next event to smooth.
+NumberOfEnvironments <- 10 # Default, but Jon wants to try just 2.
 
 
 directory <- "." # Should be "VariantExperiments"
@@ -155,7 +160,7 @@ poolpatchDictionary <- data.frame(
           "LogBodySize = c(-2, -1, -1, 0)", sep = "; ")
   ),
   PoolDispersalSpeed = 1, # Value divided by DispersalResistance to get current.
-  NumberEnvironments = 10,
+  NumberEnvironments = NumberOfEnvironments,
   SpeciesAffinities = c(
     # Pool with no patch affinity.
     toString(rep(0, 100)),
@@ -176,7 +181,9 @@ poolpatchDictionary <- data.frame(
     # 9  # Pool {0, 0.5, 1} patch affinities. Patch [0, 1] affinities.
     "sample.int.3",
     # 10 # Pool [0, 1] patch affinities.      Patch [0, 1] affinities.
-    "runif"
+    "runif",
+    # 11 # Pool {0, 1} patch affinities.      Patch {0.5} affinity.
+    "sample.int.normalized"
   ),
   PatchAffinities = c(
     # Detection via if string begins with a numeric or a non-numeric.
@@ -192,7 +199,8 @@ poolpatchDictionary <- data.frame(
     "0, 0, 0, 0.5, 0.5, 1, 1, 1, 0.5, 0.5", # Patch {0, 0.5, 1} affinities.
     "runifRing", #                            Patch [0, 1] affinities.
     "runifRing", #                            Patch [0, 1] affinities.
-    "runifRing"  #                            Patch [0, 1] affinities.
+    "runifRing", #                            Patch [0, 1] affinities.
+    toString(rep(0.5, 10)) #                  Patch with {0.5} affinity.
   )
 )[poolpatchDictionaryChoice, ]
 poolpatchSeed <- withRandom(
