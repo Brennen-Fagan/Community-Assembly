@@ -31,7 +31,8 @@ poolpatchDictionaryChoice <-
 poolpatchSeedChoice <-
   # 1 # Used on 2024-02-13
   # 2 # Used on 2024-02-14, 2024-02-15
-  3 # Used 2024-02-23
+  # 3 # Used on 2024-02-23
+  4 # Used on 2024-02-23 for the 2 patch system
 
 dynamicsDictionaryChoice <-
   1 # Law and Morton 1996, Size-Structured Lotka-Volterra, Default Parameters
@@ -39,7 +40,8 @@ dynamicsDictionaryChoice <-
 dynamicsSeedChoice <-
   # 1 # Used on 2024-02-13
   # 2 # Used on 2024-02-14
-  3 # Used on 2024-02-23
+  # 3 # Used on 2024-02-23
+  4 # Used on 2024-02-23 for the 2 patch system
 
 eventsDictionaryChoice <-
   #   Multipliers:
@@ -48,10 +50,11 @@ eventsDictionaryChoice <-
 eventsSeedChoice <-
   # 1 # Used on 2024-02-13
   # 2 # Used on 2024-02-14 for both 1-1 and 2-1.
-  3 # Used on 2024-02-23
+  # 3 # Used on 2024-02-23
+  4 # Used on 2024-02-23 for the 2 patch system
 
 dispersalDictionaryChoice <-
-  15 # c(NA, 5, 0)
+  25 # c(NA, 5, 0)
   # Index: Ones place is resistance to Dispersal on a log scale.
   #      : Tens place is configuration: 0* = Ring, 1* = Line, 2* = Complete.
   #      : Special: NA corresponds to no dispersal.
@@ -67,7 +70,7 @@ EliminationThreshold <- 10^-4 # Below which species are removed from internals
 ArrivalDensity <- EliminationThreshold * 4 * 10 ^ 3 # Traill et al. 2007
 MaximumTimeStep <- 1 # Maximum time solver can proceed without elimination.
 BetweenEventSteps <- 10 # Number of steps to reach next event to smooth.
-NumberOfEnvironments <- 10 # Default, but Jon wants to try just 2.
+NumberOfEnvironments <- 2 # Default 10, but Jon wants to try just 2.
 
 
 directory <- "." # Should be "VariantExperiments"
@@ -140,7 +143,17 @@ rhofunction <- function(
 rho.2.0.1.euclidean <- rhofunction()
 rho.2.1.2.euclidean <- rhofunction(2, 1, 2)
 
-
+patchTypes.0.Half.1 <- function(n) {
+  toString(
+    c(0,
+      rep(0, floor((n - 2)/3)),
+      rep(0.5, ceiling((n - 2)/6)),
+      1,
+      rep(1, floor((n - 2)/3)),
+      rep(0.5, ceiling((n - 2)/6))
+    )
+  )
+}
 
 # Dictionaries: ###############################################################
 # > runif(3)*1e8
@@ -190,17 +203,20 @@ poolpatchDictionary <- data.frame(
     # If numeric, it takes it as a fixed set of affinities.
     # If non-numeric, it attempts to treat the string as a function name.
     # In the latter case, it provides ONLY NumberEnvironments as an argument.
-    toString(rep(0, 10)), #                   Patch with no affinities.
-    toString(c(rep(0, 5), rep(1, 5))), #      Patch {0, 1} affinities.
-    toString(c(rep(0, 5), rep(1, 5))), #      Patch {0, 1} affinities.
-    toString(c(rep(0, 5), rep(1, 5))), #      Patch {0, 1} affinities.
-    "0, 0, 0, 0.5, 0.5, 1, 1, 1, 0.5, 0.5", # Patch {0, 0.5, 1} affinities.
-    "0, 0, 0, 0.5, 0.5, 1, 1, 1, 0.5, 0.5", # Patch {0, 0.5, 1} affinities.
-    "0, 0, 0, 0.5, 0.5, 1, 1, 1, 0.5, 0.5", # Patch {0, 0.5, 1} affinities.
-    "runifRing", #                            Patch [0, 1] affinities.
-    "runifRing", #                            Patch [0, 1] affinities.
-    "runifRing", #                            Patch [0, 1] affinities.
-    toString(rep(0.5, 10)) #                  Patch with {0.5} affinity.
+    toString(rep(0, NumberOfEnvironments)), #           Patch no affinities.
+    toString(c(rep(0, NumberOfEnvironments/2),
+               rep(1, NumberOfEnvironments/2))), #      Patch {0, 1} affinities.
+    toString(c(rep(0, NumberOfEnvironments/2),
+               rep(1, NumberOfEnvironments/2))), #      Patch {0, 1} affinities.
+    toString(c(rep(0, NumberOfEnvironments/2),
+               rep(1, NumberOfEnvironments/2))), #      Patch {0, 1} affinities.
+    "patchTypes.0.Half.1", #                       Patch {0, 0.5, 1} affinities.
+    "patchTypes.0.Half.1", #                       Patch {0, 0.5, 1} affinities.
+    "patchTypes.0.Half.1", #                       Patch {0, 0.5, 1} affinities.
+    "runifRing", #                                      Patch [0, 1] affinities.
+    "runifRing", #                                      Patch [0, 1] affinities.
+    "runifRing", #                                      Patch [0, 1] affinities.
+    toString(rep(0.5, NumberOfEnvironments)) #          Patch {0.5} affinity.
   )
 )[poolpatchDictionaryChoice, ]
 poolpatchSeed <- withRandom(
@@ -542,7 +558,7 @@ DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
       DistanceMatrix[Environments, 1] <- Resistance
       DistanceMatrix[1, Environments] <- Resistance
     }
-    if (Configuration == "Full") {
+    if (Configuration == "Complete") {
       DistanceMatrix <- matrix(Resistance,
                                nrow = Environments,
                                ncol = Environments)
