@@ -17,6 +17,67 @@ callMeMaybe2 <- function(listofcharargs) {
   ))
 }
 
+# We need a function to generate control random values.
+# https://stackoverflow.com/a/59875367 Gwang-Jin Kim and
+# https://stackoverflow.com/a/14324316 Romain Francois (same question).
+withRandom <- function(expr, seed) {
+  if (exists(".Random.seed")) {
+    oldSeed <- .Random.seed
+    on.exit({.Random.seed <<- oldSeed})
+  }
+  set.seed(seed)
+  expr
+}
+
+### Randomness: ###############################################################
+# Run runif and organise in a smooth-ish ring.
+runifRing <- function(n, ...) {
+  indices <- if (n %% 2) {
+    # Odd (why?)
+    c(1, seq(from = 2, by = 2, to = n), seq(from = n, by = -2, to = 2))
+  } else {
+    # Even.
+    c(1, seq(from = 2, by = 2, to = n), seq(from = n - 1, by = -2, to = 2))
+  }
+  sort(runif(n, ...))[indices]
+}
+
+# Discrete niche samplers.
+sample.int.normalized <- function(n, slots = 2) {
+  (sample.int(slots, size = n, replace = TRUE) - 1) / (slots - 1)
+}
+sample.int.3 <- purrr::partial(sample.int.normalized, slots = 3)
+
+### Parameters: ###############################################################
+# reproductive rate r' = r * rho ^ (sign(r)), where rho is a function of
+# distance between patch and species in some sort of trait way.
+rhofunction <- function(
+  base = 2, offset = 0, multiplier = 1, metric = "euclidean"
+) {
+  force(base);force(offset);force(multiplier)
+  function(m, n) {
+    base ^ (offset - multiplier * dist(
+      matrix(c(m, n), byrow = TRUE, nrow = 2), method = metric)
+    )
+  }
+}
+
+rho.2.0.1.euclidean <- rhofunction()
+rho.2.1.2.euclidean <- rhofunction(2, 1, 2)
+
+# Easy ring gradients.
+patchTypes.0.Half.1 <- function(n) {
+  toString(
+    c(0,
+      rep(0, floor((n - 2)/3)),
+      rep(0.5, ceiling((n - 2)/6)),
+      1,
+      rep(1, floor((n - 2)/3)),
+      rep(0.5, ceiling((n - 2)/6))
+    )
+  )
+}
+
 ### Loading: ##################################################################
 loadSimulation <- function(filepath1, filepath2 = NULL) {
   file1 <- load(filepath1)
