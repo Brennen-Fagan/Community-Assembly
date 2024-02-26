@@ -16,6 +16,14 @@ runDictionaryChoice <-
   6 # "TSTS_Simulations_11-1_3-3_2024-02-23"
   # 7 # "TSTS_Simulations_11-1_4-4_2024-02-23"
 
+# While this code can be run in parallel, I'm generally disinclined.
+# I've not written it to suggest mass production and would rather
+# embarassingly parallel approached be used before proper foreach.
+# Concerns include memory and time commitment.
+# Foreach is used instead in order to facilitate coding and consistency.
+cores <- 1
+
+
 # Parameters: #################################################################
 # Note that many of our options here vary between a deterministic mode
 # and a stochastic mode. As such, we assign seeds still, but may not use them.
@@ -72,11 +80,27 @@ directory <- "." # Should be "VariantExperiments"
 source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-0-Interventions.R"))
 
+
 # Libraries: ##################################################################
 library(RMTRCode2)
 library(dplyr)
 library(Matrix)
 
+
+library(parallel)
+library(iterators)
+library(doParallel)
+library(foreach)
+library(doRNG)
+
+# Parallelization: ############################################################
+if (cores > 1) {
+  clust <- parallel::makeCluster(cores, outfile = "")
+  doParallel::registerDoParallel(clust)
+  `%op%` <- foreach::`%dopar%`
+} else {
+  `%op%` <- foreach::`%do%`
+}
 
 # Dictionaries: ###############################################################
 # > runif(3)*1e8
@@ -99,6 +123,15 @@ runDictionary <- data.frame(
   )
 )[runDictionaryChoice, ]
 
+# We'll pre-load the pool and patch dynamics. This allows us to infer some
+# parameters.
+datPoolMats <- dir(runDictionary,
+                   "PoolPatchDynamics.+[.]RData$",
+                   full.names = T)
+poolMats <- new.env()
+load(datPoolMats, envir = poolMats)
+NumberOfEnvironments <- length(poolMats$InteractionMatrices$Mats)
+
 interventionPatchDictionary <- data.frame(
   PatchAffinities = c(
     # Detection via if string begins with a numeric or a non-numeric.
@@ -116,8 +149,11 @@ interventionPatchDictionary <- data.frame(
     "sample.int.3", # Patches -> {0, 0.5, 1} Unif @ Random
     "runifRing", # Patches -> [0, 1] Gradient
     "runif" # Patches -> [0, 1] Unif @ Random
+  ),
+  PercentageIntervention = c(
+    rep(0.5, 9)
   )
-)[interventionPatchDictionaryChoice, ]
+)[interventionPatchDictionaryChoice, , drop = FALSE]
 interventionPatchSeed <- withRandom(
   runif(interventionPatchSeedChoice)[interventionPatchSeedChoice] * 1e8,
   seed = seedsMain$patches
@@ -125,14 +161,14 @@ interventionPatchSeed <- withRandom(
 
 interventionTimeDictionary <- data.frame(
   # Time1, Time2; called by eval(str2lang(X)) where X is the string below
-  #               and "result" is the file that is loaded.
+  #               and "loaded" is the file that is loaded.
   Time1 = c(
-    "median(result$Events$Times)",
-    "quantile(result$Events$Times, p = 0.25)"
+    "median(loaded$Events$Times)",
+    "quantile(loaded$Events$Times, p = 0.25)"
   ),
   Time2 = c(
-    "1/2 * max(result$Events$Times)",
-    "quantile(result$Events$Times, p = 0.75)"
+    "1/2 * max(loaded$Events$Times)",
+    "quantile(loaded$Events$Times, p = 0.75)"
   ),
   Method = c(# each needs a custom implementation unfortunately!
     "mean",
@@ -149,8 +185,8 @@ interventionDispersalDictionary <- rbind(
   expand.grid(
     Resistance = 10^c(0:9),
     Configuration = c("Ring", "Line", "Complete")
-  ))[ifelse(is.na(interventiondispersalDictionaryChoice),
-            1, interventiondispersalDictionaryChoice + 2), ]
+  ))[ifelse(is.na(interventionDispersalDictionaryChoice),
+            1, interventionDispersalDictionaryChoice + 2), ]
 
 interventionDistanceDictionary <- data.frame(
   rhofunction = c( # Take patch
@@ -164,14 +200,60 @@ interventionDistanceDictionary <- data.frame(
 appendID <- paste0(
   # PARAMETERS:
   interventionPatchDictionaryChoice, "-", # Bundle Inter-Simulation Constants.
+  # Where dynamics would go if necessary.
   interventionTimeDictionaryChoice, "-",
-  interventionDistanceDictionaryChoice, "-", # Sometimes want to change.
-  interventionDispersalDictionaryChoice, "-"
+  interventionDispersalDictionaryChoice, "-", # Sometimes want to change.
+  interventionDistanceDictionaryChoice
   , "_",
   # SEEDS:
   interventionPatchSeedChoice, "-",
+  # Where dynamics would go if necessary.
   interventionTimeSeedChoice
 )
 
 # Note runDictionary is only 1 column, so it provides only a singleton.
-datfiles <- dir(path = runDictionary, pattern = "_Simulation_", full.names = T)
+datfiles <- dir(path = runDictionary,
+                pattern = "Simulation.+[.]RData$",
+                full.names = T)
+
+interventionSuccess <- foreach::foreach(
+  x = iterators::iter(datfiles)
+) %op% {
+  x_properties <- strsplit(
+    strsplit(basename(x), split = ".", fixed = TRUE)[[1]][1],
+    split = "_", fixed = TRUE)
+  stopifnot(length(x_properties) == 1)
+
+  filename <- file.path(
+    dirname(x),
+    paste0(x_properties[[1]][1],
+           "_Intervention_",
+           x_properties[[1]][3],"_", x_properties[[1]][4],
+           "_", appendID,
+           if (length(x_properties[[1]]) > 4)
+             paste0("_", x_properties[[1]][4:length(x_properties[[1]])],
+                    collapse = ""),
+           ".RData")
+  )
+
+  loaded <- load(x) # names
+  stopifnot(length(loaded) == 1)
+  loaded <- (get(loaded)) # objects
+
+  PatchAffinities <- matrix(with(interventionPatchDictionary, {
+    if(is.numeric(PatchAffinities)) {
+      rep(PatchAffinities, nrow(poolMats$Pool))
+    } else if(!is.na(as.numeric(substr(PatchAffinities, 1, 1)))) {
+      # Treat as numbers
+      as.numeric(unlist(strsplit(PatchAffinities, split = ", ")))
+    } else {
+      # Treat as function
+      withRandom(
+        retrieveFunction(PatchAffinities)(NumberOfEnvironments),
+        seed = withRandom(runif(1)[1] * 1e8, seed = interventionPatchSeed)
+      )
+    }
+  }), nrow = NumberOfEnvironments)
+
+  interventionPatches <- ((sample.int(nPatches, 1) + 1:(nPatches / 2) ) %% nPatches) + 1
+}
