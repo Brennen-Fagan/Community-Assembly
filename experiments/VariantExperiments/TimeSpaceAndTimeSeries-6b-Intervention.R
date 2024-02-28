@@ -29,15 +29,15 @@ cores <- 1
 # and a stochastic mode. As such, we assign seeds still, but may not use them.
 
 interventionPatchDictionaryChoice <-
-  1 # Patches -> {0}
-  # 2 # Patches -> {0.5}
-  # 3 # Patches -> {1}
-  # 4 # Patches -> {0, 1} Gradient
-  # 5 # Patches -> {0, 1} Unif @ Random
-  # 6 # Patches -> {0, 0.5, 1} Gradient
-  # 7 # Patches -> {0, 0.5, 1} Unif @ Random
-  # 8 # Patches -> [0, 1] Gradient
-  # 9 # Patches -> [0, 1] Unif @ Random
+  1 # Random 50% Patches -> {0}
+  # 2 # Random 50% Patches -> {0.5}
+  # 3 # Random 50% Patches -> {1}
+  # 4 # Random 50% Patches -> {0, 1} Gradient
+  # 5 # Random 50% Patches -> {0, 1} Unif @ Random
+  # 6 # Random 50% Patches -> {0, 0.5, 1} Gradient Ring
+  # 7 # Random 50% Patches -> {0, 0.5, 1} Unif @ Random
+  # 8 # Random 50% Patches -> [0, 1] Gradient Ring
+  # 9 # Random 50% Patches -> [0, 1] Unif @ Random
 interventionPatchSeedChoice <-
   1 # Used on ...
 
@@ -132,7 +132,7 @@ poolMats <- new.env()
 load(datPoolMats, envir = poolMats)
 NumberOfEnvironments <- length(poolMats$InteractionMatrices$Mats)
 
-interventionPatchDictionary <- data.frame(
+interventionPatchDictionary <- expand.grid(
   PatchAffinities = c(
     # Detection via if string begins with a numeric or a non-numeric.
     # If numeric, it takes it as a fixed set of affinities.
@@ -145,14 +145,20 @@ interventionPatchDictionary <- data.frame(
     toString(c(rep(0, NumberOfEnvironments/2),
                rep(1, NumberOfEnvironments/2))), # Patches -> {0, 1} Gradient
     "sample.int.normalized", # Patches -> {0, 1} Unif @ Random
-    "patchTypes.0.Half.1", # Patches -> {0, 0.5, 1} Gradient
+    "patchTypes.0.Half.1", # Patches -> {0, 0.5, 1} Gradient Ring
     "sample.int.3", # Patches -> {0, 0.5, 1} Unif @ Random
-    "runifRing", # Patches -> [0, 1] Gradient
+    "runifRing", # Patches -> [0, 1] Gradient Ring
     "runif" # Patches -> [0, 1] Unif @ Random
   ),
-  PercentageIntervention = c(
-    rep(0.5, 9)
-  )
+  InterventionPercentage = c(
+    0.5
+  ),
+  InterventionLocation = c(
+    # Percentage seems easiest
+    NA, # == Random
+    1, # Last
+    0 # First
+  ),
 )[interventionPatchDictionaryChoice, , drop = FALSE]
 interventionPatchSeed <- withRandom(
   runif(interventionPatchSeedChoice)[interventionPatchSeedChoice] * 1e8,
@@ -216,14 +222,18 @@ datfiles <- dir(path = runDictionary,
                 pattern = "Simulation.+[.]RData$",
                 full.names = T)
 
+
+# Interventions: ##############################################################
 interventionSuccess <- foreach::foreach(
   x = iterators::iter(datfiles)
 ) %op% {
+  # Extract exposed properties.
   x_properties <- strsplit(
     strsplit(basename(x), split = ".", fixed = TRUE)[[1]][1],
     split = "_", fixed = TRUE)
   stopifnot(length(x_properties) == 1)
 
+  # Reformulate file name.
   filename <- file.path(
     dirname(x),
     paste0(x_properties[[1]][1],
@@ -236,10 +246,18 @@ interventionSuccess <- foreach::foreach(
            ".RData")
   )
 
+  # Load file.
   loaded <- load(x) # names
   stopifnot(length(loaded) == 1)
   loaded <- (get(loaded)) # objects
 
+  ### Determine Interventions: ################################################
+  # Number:
+  NumberOfInterventions <- round(
+    NumberOfEnvironments * interventionPatchDictionary$InterventionPercentage
+  )
+
+  # New values:
   PatchAffinities <- matrix(with(interventionPatchDictionary, {
     if(is.numeric(PatchAffinities)) {
       rep(PatchAffinities, nrow(poolMats$Pool))
@@ -249,11 +267,58 @@ interventionSuccess <- foreach::foreach(
     } else {
       # Treat as function
       withRandom(
-        retrieveFunction(PatchAffinities)(NumberOfEnvironments),
+        retrieveFunction(PatchAffinities)(NumberOfInterventions),
         seed = withRandom(runif(1)[1] * 1e8, seed = interventionPatchSeed)
       )
     }
-  }), nrow = NumberOfEnvironments)
+  }), nrow = NumberOfInterventions)
 
-  interventionPatches <- ((sample.int(nPatches, 1) + 1:(nPatches / 2) ) %% nPatches) + 1
+  # Locations:
+  interventionPatches <- with(interventionPatchDictionary, {
+    if (is.na(InterventionLocation)) {
+      # Random: Ring style (fill rightwards)
+      interventionPatches <- ((withRandom(
+        sample.int(NumberOfEnvironments, 1),
+        seed = withRandom(runif(2)[2] * 1e8, seed = interventionPatchSeed)
+      ) + 1 : ceiling(NumberOfEnvironments * InterventionPercentage)
+      ) %% NumberOfEnvironments) + 1
+    } else if (InterventionLocation == 0) {
+      # Left: Line style (fill inwards)
+      interventionPatches <-
+        1 : ceiling(NumberOfEnvironments * InterventionPercentage)
+    } else if (InterventionLocation == 1) {
+      # Right: Line style (fill inwards)
+      interventionPatches <-
+        ceiling(NumberOfEnvironments * (1 - InterventionPercentage)) :
+        NumberOfEnvironments
+    } else {
+      # We choose to interpret as centred so that someone can have easily
+      # understood output for 0.5 rather than skewed one direction or another.
+      # Ring style (fill symmetrically), alternate left->right->left->right
+      # (e.g. 0.5 with 10 patches 5 -> 4 -> 6 -> 3 -> 7
+      #           while 5 patches 3 -> 2 -> 4)
+      interventionPatches <-
+        round((NumberOfEnvironments - 1) * InterventionLocation) + 1
+      interventionPatches <- interventionPatches +
+        seq(from = ceiling(-NumberOfEnvironments * InterventionPercentage / 2),
+            to = floor(NumberOfEnvironments * InterventionPercentage / 2),
+            by = 1)
+    }
+  })
+
+  # Time:
+  interventionTime <- with(interventionTimeDictionary, {
+    if (Method == "mean") {
+      mean(c(eval(str2lang(Time1)), eval(str2lang(Time2))))
+    } else if(Method = "runif") {
+      withRandom(
+        runif(1, min = eval(str2lang(Time1), max = eval(str2lang(Time2)))),
+        seed = withRandom(runif(1)[1] * 1e8, seed = interventionTimeSeed)
+      )
+    } else {
+      stop(paste0("Method (Intervention Time): ", method, " not implemented."))
+    }
+  })
+
+
 }
