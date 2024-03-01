@@ -273,7 +273,7 @@ DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
     DistanceMatrix
   }
   ),
-  SpeciesSpeeds = Pool$Speed
+  SpeciesSpeeds = poolMats$Pool$Speed
 )
 
 # Interventions: ##############################################################
@@ -395,8 +395,8 @@ interventionSuccess <- foreach::foreach(
   )[as.numeric(strsplit(x_properties[[1]], "-", fixed = TRUE)[[3]][5]), ])
 
   grid <- expand.grid(
-    pool = 1:nrow(Pool), # Fastest Varying
-    patch = 1:length(PatchAffinities) # Slower Varying.
+    pool = 1:nrow(poolMats$Pool), # Fastest Varying
+    patch = 1:length(interventionPatchAffinities) # Slower Varying.
   )
   rprime <- with(poolMats, {
     mapply(
