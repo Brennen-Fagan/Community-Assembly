@@ -155,6 +155,7 @@ MultipleNumericalAssembly_Dispersal <- function(
     y = PopulationInitial,
     times = Timings,
     func = Dynamics,
+    parms = NULL,
     events = deEvents
   )
 
