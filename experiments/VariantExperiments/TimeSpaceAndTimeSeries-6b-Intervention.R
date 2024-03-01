@@ -23,6 +23,7 @@ runDictionaryChoice <-
 # Foreach is used instead in order to facilitate coding and consistency.
 cores <- 1
 
+overwriteOutput <- TRUE
 
 # Parameters: #################################################################
 # Note that many of our options here vary between a deterministic mode
@@ -158,7 +159,7 @@ interventionPatchDictionary <- expand.grid(
     NA, # == Random
     1, # Last
     0 # First
-  ),
+  )
 )[interventionPatchDictionaryChoice, , drop = FALSE]
 interventionPatchSeed <- withRandom(
   runif(interventionPatchSeedChoice)[interventionPatchSeedChoice] * 1e8,
@@ -179,6 +180,10 @@ interventionTimeDictionary <- data.frame(
   Method = c(# each needs a custom implementation unfortunately!
     "mean",
     "runif"
+  ),
+  InterventionTimespan = c(
+    0 # Instantaneous => Switch
+    # Else: Should be numeric > 0, determines timespan for interpolation.
   )
 )[interventionTimeDictionaryChoice, ]
 interventionTimeSeed <- withRandom(
@@ -186,6 +191,11 @@ interventionTimeSeed <- withRandom(
   seed = seedsMain$times
 )
 
+# TECH DEBT: Copied from 6a-simulations.R. Should be a common resource in final.
+# Furthermore, we may want to add an option to use the old dispersal;
+# many of my previous runs were the same pool-patches but different dispersals.
+# This implementation forces them to experience a new dispersal, and without a
+# proper transition (I don't think I have a dynamic dispersal function?).
 interventionDispersalDictionary <- rbind(
   data.frame(Resistance = Inf, Configuration = "None"),
   expand.grid(
@@ -222,6 +232,39 @@ datfiles <- dir(path = runDictionary,
                 pattern = "Simulation.+[.]RData$",
                 full.names = T)
 
+# Instantiate Dispersal Matrix: ###############################################
+# Copied from 6a-Simulations.R. Should the configuration "switch" be a function
+# in order to make it a common resource as well?
+DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
+  EnvironmentDistances = with(c(
+    interventionDispersalDictionary,
+    Environments = NumberOfEnvironments
+  ), {
+    if (Configuration == "None") {
+      DistanceMatrix <- Matrix::sparseMatrix(
+        i = Environments, j = Environments, x = 0)
+    }
+    if (Configuration == "Ring" || Configuration == "Line")
+      DistanceMatrix <- Matrix::bandSparse(
+        Environments, k = c(-1, 1),
+        diagonals = list(rep(Resistance, Environments - 1),
+                         rep(Resistance, Environments - 1))
+      )
+    if (Configuration == "Ring") {
+      DistanceMatrix[Environments, 1] <- Resistance
+      DistanceMatrix[1, Environments] <- Resistance
+    }
+    if (Configuration == "Complete") {
+      DistanceMatrix <- matrix(Resistance,
+                               nrow = Environments,
+                               ncol = Environments)
+      diag(DistanceMatrix) <- 0
+    }
+    DistanceMatrix
+  }
+  ),
+  SpeciesSpeeds = Pool$Speed
+)
 
 # Interventions: ##############################################################
 interventionSuccess <- foreach::foreach(
@@ -245,6 +288,15 @@ interventionSuccess <- foreach::foreach(
                     collapse = ""),
            ".RData")
   )
+
+  # Do we re-run/skip if the file already exists?
+  if (file.exists(filename)) {
+    if (overwriteOutput) {
+      warning(paste(filename, "already exists and will be overwritten."))
+    } else {
+      return(1)
+    }
+  }
 
   # Load file.
   loaded <- load(x) # names
@@ -322,3 +374,4 @@ interventionSuccess <- foreach::foreach(
 
 
 }
+
