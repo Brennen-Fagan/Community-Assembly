@@ -372,6 +372,162 @@ interventionSuccess <- foreach::foreach(
     }
   })
 
+  ##### Post-intervention adjusted intrinsic growth/decay rates: ##############
+  # TECH DEBT: Copied from 6a-Simulation.R.
+  rho <- retrieveFunction(data.frame(
+    rhofunction = c( # Take patch
+      "rho.2.0.1.euclidean",
+      "rho.2.1.2.euclidean"
+    )
+  )[as.numeric(strsplit(x_properties, "-", fixed = TRUE)[[3]][5])])
 
+  grid <- expand.grid(
+    pool = 1:nrow(Pool), # Fastest Varying
+    patch = 1:length(PatchAffinities) # Slower Varying.
+  )
+  rprime <- with(poolMats, {
+    rep(Pool$ReproductionRate, poolpatchDictionary$NumberEnvironments) *
+      mapply(
+        grid$pool, # Species
+        grid$patch, # Location
+        FUN = function(i, j) {
+          ifelse(
+            j %in% interventionPatches, # if in intervention
+            rho( # recalculate for the new patches.
+              Pool[i, grepl("Affinity", colnames(Pool), fixed = TRUE)],
+              PatchAffinities[j, ] # Forced to be a matrix.
+            )[1]^sign(Pool$ReproductionRate[i]),
+            loaded$Ellipsis$Affinity$EffectiveReproductionRate[ # else use old
+              (j - 1) * nrow(Pool) + i
+            ]
+          )
+        }
+      )
+  })
+
+  if (interventionTimeDictionary$InterventionTimespan == 0) {
+    rprime <- switchMatrices(
+      loaded$Ellipsis$Affinity$EffectiveReproductionRate,
+      rprime,
+      switchtime = interventionTime
+    )
+  } else {
+    rprime <- interpolateMatrices(
+      loaded$Ellipsis$Affinity$EffectiveReproductionRate,
+      rprime,
+      switchtime = interventionTime,
+      timespan = interventionTimeDictionary$InterventionTimespan
+    )
+  }
+
+  with(poolMats, {
+    # TECH DEBT: Copied from 6a-simulations.R
+    if (is.function(rprime)) {
+      # Calculate rprime using Parms$Patch
+      if (is.function(InteractionMatrices$Mats[[1]])) {
+        # Calculate and combine interaction matrices on the fly.
+        PerCapitaDynamics <- DynamicsFunction(
+          rprime,
+          function(t, y, parms) {
+            Matrix::bdiag(lapply(
+              InteractionMatrices$Mats,
+              function(matfunc) {matfunc(t, y, parms)}
+            ))
+          },
+          poolpatchDictionary$NumberEnvironments
+        )
+      }
+      else {
+        # Just combine the interaction matrices.
+        PerCapitaDynamics <- DynamicsFunction(
+          rprime,
+          Matrix::bdiag(InteractionMatrices$Mats),
+          poolpatchDictionary$NumberEnvironments
+        )
+      }
+    } else {
+      # Treat rprime as constant and explicitly calculated.
+      if (is.function(InteractionMatrices$Mats[[1]])) {
+        # Calculate and combine interaction matrices on the fly.
+        PerCapitaDynamics <- DynamicsFunction(
+          rprime,
+          function(t, y, parms) {
+            Matrix::bdiag(lapply(
+              InteractionMatrices$Mats,
+              function(matfunc) {matfunc(t, y, parms)}
+            ))
+          }
+        )
+      }
+      else {
+        # Just combine the interaction matrices.
+        PerCapitaDynamics <- DynamicsFunction(
+          rprime,
+          Matrix::bdiag(InteractionMatrices$Mats)
+        )
+      }
+    }
+  })
+
+  # Set new initial values based on when we fork the simulation.
+  # Note: we don't need to worry about time conversions yet because all
+  # calculations so far are in the same time scale as was provided.
+  ## Abundance
+  timeInterventionRow <- which.max(
+    loaded$Abundance[, 1] > interventionTime
+  ) - 1
+
+  timeInitial <- loaded$Abundance[timeInterventionRow, 1]
+  abundanceInitial <- loaded$Abundance[timeInterventionRow, -1]
+
+  ## Events
+  # Note formatting is a list containing a data.frame named Events.
+  eventsPostIntervention <- list(
+    Events = loaded$Events %>% dplyr::filter(
+      Times > s$Simulation$Abundance[timeInterventionRow, 1]
+    ))
+  # Why not timeIntervention? To make sure that we don't miss out on an event.
+  # Possibly unnecessary.
+  eventsPostIntervention$Events$Success <- NA
+
+  # Need to worry about time conversion here because we need to be on the
+  # simulation scale if we weren't already (to match with the rates).
+  # Run Simulation: ###########################################################
+  result <- RMTRCode2::MultipleNumericalAssembly_Dispersal(
+    # From Intervening
+    PopulationInitial = abundanceInitial,
+    TimeInitial = timeInitial,
+    # From PoolMats
+    Pool = poolMats$Pool,
+    NumEnvironments = NumberOfEnvironments,
+    CharacteristicRate = poolMats$CharacteristicRate,
+    # Recalculated
+    Events = eventsPostIntervention,
+    PerCapitaDynamics = PerCapitaDynamics,
+    DispersalMatrix = DispersalMatrix,
+    # From Loaded
+    EliminationThreshold = loaded$Parameters$EliminationThreshold,
+    ArrivalDensity = loaded$Parameters$ArrivalDensity,
+    ExtinctionProportion = loaded$Parameters$ExtinctionProportion,
+    MaximumTimeStep = loaded$Parameters$MaximumTimeStep,
+    BetweenEventSteps = loaded$Parameters$BetweenEventSteps,
+    Verbose = TRUE,
+    # Using the ellipsis pass through feature:
+    Timescale = "Simulation",
+    ID = paste0(loaded$Ellipsis$ID, "_", appendID),
+    Affinity = list(
+      PatchAffinitiesOld = loaded$Ellipsis$Affinity$PatchAffinities,
+      PatchAffinitiesIntervention = PatchAffinities,
+      PatchInterventions = interventionPatches,
+      EffectiveReproductionRate = rprime
+    )
+  )
+
+  # Save Simulation: ############################################################
+  save(result,
+       file = filename
+  )
+
+  return(0)
 }
 
