@@ -30,7 +30,7 @@ overwriteOutput <- TRUE
 # and a stochastic mode. As such, we assign seeds still, but may not use them.
 
 interventionPatchDictionaryChoice <-
-  1 # Random 50% Patches -> {0}
+  # 1 # Random 50% Patches -> {0}
   # 2 # Random 50% Patches -> {0.5}
   # 3 # Random 50% Patches -> {1}
   # 4 # Random 50% Patches -> {0, 1} Gradient
@@ -39,6 +39,15 @@ interventionPatchDictionaryChoice <-
   # 7 # Random 50% Patches -> {0, 0.5, 1} Unif @ Random
   # 8 # Random 50% Patches -> [0, 1] Gradient Ring
   # 9 # Random 50% Patches -> [0, 1] Unif @ Random
+  10 # Last 50% Patches -> {0}
+  # 11 # Last 50% Patches -> {0.5}
+  # 12 # Last 50% Patches -> {1}
+  # 13 # Last 50% Patches -> {0, 1} Gradient
+  # 14 # Last 50% Patches -> {0, 1} Unif @ Random
+  # 15 # Last 50% Patches -> {0, 0.5, 1} Gradient Ring
+  # 16 # Last 50% Patches -> {0, 0.5, 1} Unif @ Random
+  # 17 # Last 50% Patches -> [0, 1] Gradient Ring
+  # 18 # Last 50% Patches -> [0, 1] Unif @ Random
 interventionPatchSeedChoice <-
   1 # Used on ...
 
@@ -159,7 +168,8 @@ interventionPatchDictionary <- expand.grid(
     NA, # == Random
     1, # Last
     0 # First
-  )
+  ),
+  stringsAsFactors = FALSE
 )[interventionPatchDictionaryChoice, , drop = FALSE]
 interventionPatchSeed <- withRandom(
   runif(interventionPatchSeedChoice)[interventionPatchSeedChoice] * 1e8,
@@ -341,7 +351,8 @@ interventionSuccess <- foreach::foreach(
     } else if (InterventionLocation == 1) {
       # Right: Line style (fill inwards)
       interventionPatches <-
-        ceiling(NumberOfEnvironments * (1 - InterventionPercentage)) :
+        # (0.40, 0.50] of 10 means 10, 9, 8, 7, 6
+        (floor(NumberOfEnvironments * (1 - InterventionPercentage)) + 1) :
         NumberOfEnvironments
     } else {
       # We choose to interpret as centred so that someone can have easily
@@ -362,7 +373,7 @@ interventionSuccess <- foreach::foreach(
   interventionTime <- with(interventionTimeDictionary, {
     if (Method == "mean") {
       mean(c(eval(str2lang(Time1)), eval(str2lang(Time2))))
-    } else if(Method = "runif") {
+    } else if(Method == "runif") {
       withRandom(
         runif(1, min = eval(str2lang(Time1), max = eval(str2lang(Time2)))),
         seed = withRandom(runif(1)[1] * 1e8, seed = interventionTimeSeed)
@@ -379,14 +390,14 @@ interventionSuccess <- foreach::foreach(
       "rho.2.0.1.euclidean",
       "rho.2.1.2.euclidean"
     )
-  )[as.numeric(strsplit(x_properties, "-", fixed = TRUE)[[3]][5])])
+  )[as.numeric(strsplit(x_properties[[1]], "-", fixed = TRUE)[[3]][5]), ])
 
   grid <- expand.grid(
     pool = 1:nrow(Pool), # Fastest Varying
     patch = 1:length(PatchAffinities) # Slower Varying.
   )
   rprime <- with(poolMats, {
-    rep(Pool$ReproductionRate, poolpatchDictionary$NumberEnvironments) *
+    rep(Pool$ReproductionRate, NumberOfEnvironments) *
       mapply(
         grid$pool, # Species
         grid$patch, # Location
