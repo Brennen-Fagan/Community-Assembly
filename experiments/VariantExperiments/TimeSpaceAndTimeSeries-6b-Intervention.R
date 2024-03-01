@@ -417,52 +417,85 @@ interventionSuccess <- foreach::foreach(
     )
   })
 
+  # Need to specify each patch separately with how I've implemented the
+  # DynamicsFunction. (I recall wanting to have per patch stats.)
+  # Note, this is inefficient.
   if (interventionTimeDictionary$InterventionTimespan == 0) {
-    rprime <- switchMatrices(
-      loaded$Ellipsis$Affinity$EffectiveReproductionRate,
-      rprime,
-      switchtime = interventionTime
-    )
+    rprimeSwitches <- lapply(1:NumberOfEnvironments, function(i) {
+      if (i %in% interventionPatches) {
+        switchMatrices(
+          loaded$Ellipsis$Affinity$EffectiveReproductionRate[
+            (i - 1) * nrow(poolMats$Pool) + 1 : nrow(poolMats$Pool)
+            ],
+          rprime[
+            (i - 1) * nrow(poolMats$Pool) + 1 : nrow(poolMats$Pool)
+            ],
+          switchtime = interventionTime
+        )
+      } else {
+        function(t,...) rprime[
+          (i - 1) * nrow(poolMats$Pool) + 1 : nrow(poolMats$Pool)
+          ]
+      }
+    })
+    rprimef <- function(t, parms, ...) {
+      return(rprimeSwitches[[parms$Patch]](t, parms, ...))
+    }
   } else {
-    rprime <- interpolateMatrices(
-      loaded$Ellipsis$Affinity$EffectiveReproductionRate,
-      rprime,
-      switchtime = interventionTime,
-      timespan = interventionTimeDictionary$InterventionTimespan
-    )
+    rprimeSwitches <- lapply(1:NumberOfEnvironments, function(i) {
+      if (i %in% interventionPatches) {
+        interpolateMatrices(
+          loaded$Ellipsis$Affinity$EffectiveReproductionRate[
+            (i - 1) * nrow(poolMats$Pool) + 1 : nrow(poolMats$Pool)
+            ],
+          rprime[
+            (i - 1) * nrow(poolMats$Pool) + 1 : nrow(poolMats$Pool)
+            ],
+          switchtime = interventionTime,
+          timespan = interventionTimeDictionary$InterventionTimespan
+        )
+      } else {
+        function(t,...) rprime[
+          (i - 1) * nrow(poolMats$Pool) + 1 : nrow(poolMats$Pool)
+          ]
+      }
+    })
+    rprimef <- function(t, parms, ...) {
+      return(rprimeSwitches[[parms$Patch]](t, parms, ...))
+    }
   }
 
   interventionPerCapitaDynamics <- with(poolMats, {
     # TECH DEBT: Copied from 6a-simulations.R
-    if (is.function(rprime)) {
-      # Calculate rprime using Parms$Patch
+    if (is.function(rprimef)) {
+      # Calculate rprimef using Parms$Patch
       if (is.function(InteractionMatrices$Mats[[1]])) {
         # Calculate and combine interaction matrices on the fly.
         DynamicsFunction(
-          rprime,
+          rprimef,
           function(t, y, parms) {
             Matrix::bdiag(lapply(
               InteractionMatrices$Mats,
               function(matfunc) {matfunc(t, y, parms)}
             ))
           },
-          poolpatchDictionary$NumberEnvironments
+          NumberOfEnvironments
         )
       }
       else {
         # Just combine the interaction matrices.
         DynamicsFunction(
-          rprime,
+          rprimef,
           Matrix::bdiag(InteractionMatrices$Mats),
-          poolpatchDictionary$NumberEnvironments
+          NumberOfEnvironments
         )
       }
     } else {
-      # Treat rprime as constant and explicitly calculated.
+      # Treat rprimef as constant and explicitly calculated.
       if (is.function(InteractionMatrices$Mats[[1]])) {
         # Calculate and combine interaction matrices on the fly.
         DynamicsFunction(
-          rprime,
+          rprimef,
           function(t, y, parms) {
             Matrix::bdiag(lapply(
               InteractionMatrices$Mats,
@@ -474,7 +507,7 @@ interventionSuccess <- foreach::foreach(
       else {
         # Just combine the interaction matrices.
         DynamicsFunction(
-          rprime,
+          rprimef,
           Matrix::bdiag(InteractionMatrices$Mats)
         )
       }
@@ -496,7 +529,7 @@ interventionSuccess <- foreach::foreach(
   # Note formatting is a list containing a data.frame named Events.
   eventsPostIntervention <- list(
     Events = loaded$Events %>% dplyr::filter(
-      Times > s$Simulation$Abundance[timeInterventionRow, 1]
+      Times > timeInitial
     ))
   # Why not timeIntervention? To make sure that we don't miss out on an event.
   # Possibly unnecessary.
@@ -526,12 +559,15 @@ interventionSuccess <- foreach::foreach(
     Verbose = TRUE,
     # Using the ellipsis pass through feature:
     Timescale = "Simulation",
+    ParentRun = x,
     ID = paste0(loaded$Ellipsis$ID, "_", appendID),
     Affinity = list(
       PatchAffinitiesOld = loaded$Ellipsis$Affinity$PatchAffinities,
       PatchAffinitiesIntervention = PatchAffinities,
       PatchInterventions = interventionPatches,
-      EffectiveReproductionRate = rprime
+      EffectiveReproductionRateOld =
+        loaded$Ellipsis$Affinity$EffectiveReproductionRate,
+      EffectiveReproductionRateIntervention = rprime
     )
   )
 
