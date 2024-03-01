@@ -320,7 +320,9 @@ interventionSuccess <- foreach::foreach(
   )
 
   # New values:
-  PatchAffinities <- matrix(with(interventionPatchDictionary, {
+  # Note: this is technically excessive, but keeping the number of environments
+  # in total is easier for programming below.
+  interventionPatchAffinities <- matrix(with(interventionPatchDictionary, {
     if(is.numeric(PatchAffinities)) {
       rep(PatchAffinities, nrow(poolMats$Pool))
     } else if(!is.na(as.numeric(substr(PatchAffinities, 1, 1)))) {
@@ -329,11 +331,11 @@ interventionSuccess <- foreach::foreach(
     } else {
       # Treat as function
       withRandom(
-        retrieveFunction(PatchAffinities)(NumberOfInterventions),
+        retrieveFunction(PatchAffinities)(NumberOfEnvironments),
         seed = withRandom(runif(1)[1] * 1e8, seed = interventionPatchSeed)
       )
     }
-  }), nrow = NumberOfInterventions)
+  }), nrow = NumberOfEnvironments)
 
   # Locations:
   interventionPatches <- with(interventionPatchDictionary, {
@@ -397,23 +399,22 @@ interventionSuccess <- foreach::foreach(
     patch = 1:length(PatchAffinities) # Slower Varying.
   )
   rprime <- with(poolMats, {
-    rep(Pool$ReproductionRate, NumberOfEnvironments) *
-      mapply(
-        grid$pool, # Species
-        grid$patch, # Location
-        FUN = function(i, j) {
-          ifelse(
-            j %in% interventionPatches, # if in intervention
-            rho( # recalculate for the new patches.
-              Pool[i, grepl("Affinity", colnames(Pool), fixed = TRUE)],
-              PatchAffinities[j, ] # Forced to be a matrix.
-            )[1]^sign(Pool$ReproductionRate[i]),
-            loaded$Ellipsis$Affinity$EffectiveReproductionRate[ # else use old
-              (j - 1) * nrow(Pool) + i
+    mapply(
+      grid$pool, # Species
+      grid$patch, # Location
+      FUN = function(i, j) {
+        ifelse(
+          j %in% interventionPatches, # if in intervention
+          Pool$ReproductionRate[i] * rho( # recalculate for the new patches.
+            Pool[i, grepl("Affinity", colnames(Pool), fixed = TRUE)],
+            interventionPatchAffinities[j, ] # Forced to be a matrix.
+          )[1]^sign(Pool$ReproductionRate[i]),
+          loaded$Ellipsis$Affinity$EffectiveReproductionRate[ # else use old
+            (j - 1) * nrow(Pool) + i
             ]
-          )
-        }
-      )
+        )
+      }
+    )
   })
 
   if (interventionTimeDictionary$InterventionTimespan == 0) {
@@ -431,13 +432,13 @@ interventionSuccess <- foreach::foreach(
     )
   }
 
-  with(poolMats, {
+  interventionPerCapitaDynamics <- with(poolMats, {
     # TECH DEBT: Copied from 6a-simulations.R
     if (is.function(rprime)) {
       # Calculate rprime using Parms$Patch
       if (is.function(InteractionMatrices$Mats[[1]])) {
         # Calculate and combine interaction matrices on the fly.
-        PerCapitaDynamics <- DynamicsFunction(
+        DynamicsFunction(
           rprime,
           function(t, y, parms) {
             Matrix::bdiag(lapply(
@@ -450,7 +451,7 @@ interventionSuccess <- foreach::foreach(
       }
       else {
         # Just combine the interaction matrices.
-        PerCapitaDynamics <- DynamicsFunction(
+        DynamicsFunction(
           rprime,
           Matrix::bdiag(InteractionMatrices$Mats),
           poolpatchDictionary$NumberEnvironments
@@ -460,7 +461,7 @@ interventionSuccess <- foreach::foreach(
       # Treat rprime as constant and explicitly calculated.
       if (is.function(InteractionMatrices$Mats[[1]])) {
         # Calculate and combine interaction matrices on the fly.
-        PerCapitaDynamics <- DynamicsFunction(
+        DynamicsFunction(
           rprime,
           function(t, y, parms) {
             Matrix::bdiag(lapply(
@@ -472,7 +473,7 @@ interventionSuccess <- foreach::foreach(
       }
       else {
         # Just combine the interaction matrices.
-        PerCapitaDynamics <- DynamicsFunction(
+        DynamicsFunction(
           rprime,
           Matrix::bdiag(InteractionMatrices$Mats)
         )
@@ -514,7 +515,7 @@ interventionSuccess <- foreach::foreach(
     CharacteristicRate = poolMats$CharacteristicRate,
     # Recalculated
     Events = eventsPostIntervention,
-    PerCapitaDynamics = PerCapitaDynamics,
+    PerCapitaDynamics = interventionPerCapitaDynamics,
     DispersalMatrix = DispersalMatrix,
     # From Loaded
     EliminationThreshold = loaded$Parameters$EliminationThreshold,
