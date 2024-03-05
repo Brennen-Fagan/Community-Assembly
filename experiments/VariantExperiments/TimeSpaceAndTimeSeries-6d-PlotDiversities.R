@@ -6,11 +6,12 @@
 
 # This time around, plots will be generated within folder effectively.
 datfolders <- c(
-  "TSTS_Simulations_1-1_1-1_2024-02-13",
-  "TSTS_Simulations_1-1_2-2_2024-02-14",
-  "TSTS_Simulations_2-1_2-2_2024-02-14",
-  "TSTS_Simulations_10-1_2-2_2024-02-15",
-  "TSTS_Simulations_6-1_2-2_2024-02-15"
+  # "TSTS_Simulations_1-1_1-1_2024-02-13",
+  # "TSTS_Simulations_1-1_2-2_2024-02-14",
+  # "TSTS_Simulations_2-1_2-2_2024-02-14",
+  # "TSTS_Simulations_10-1_2-2_2024-02-15",
+  # "TSTS_Simulations_6-1_2-2_2024-02-15"
+  "TSTS_Simulations_11-1_4-4_2024-02-23"
 )
 # Problems with X11
 options(bitmapType = "cairo")
@@ -160,8 +161,12 @@ convertThinnedDiversitiesListToDF <- function(
 diversities <- do.call(rbind, lapply(diversities, function(d) {
   if ("FullID" %in% names(d$Ellipsis)) {
     id <- strsplit(
-      strsplit(d$Ellipsis$FullID, "_", fixed = "TRUE"), # Split seeds off.
+      strsplit(d$Ellipsis$FullID, "_", fixed = TRUE)[[1]], # Split seeds off.
                "-", fixed = TRUE)
+  } else if ("ID" %in% names(d$Ellipsis)) {
+    id <- strsplit(
+      strsplit(d$Ellipsis$ID, "_", fixed = TRUE)[[1]], # Split seeds off.
+      "-", fixed = TRUE)
   } else {
     id <- strsplit(
       strsplit(
@@ -169,6 +174,12 @@ diversities <- do.call(rbind, lapply(diversities, function(d) {
         "_", fixed = TRUE)[[1]][3:4], # Remove TSTS_Type and split seeds off.
       "-", fixed = TRUE # Separate out the id values.
     )
+  }
+
+  if (length(id) < 3) {
+    # I.e., no intervention.
+    id[[3]] <- rep(NA, 4)
+    id[[4]] <- rep(NA, 2)
   }
 
   # thinAndCalculateDiversities creates a list with alpha, beta and gamma,
@@ -191,7 +202,13 @@ diversities <- do.call(rbind, lapply(diversities, function(d) {
     Events = id[[1]][3],
     EventsSeed = id[[2]][3],
     Dispersal = id[[1]][4],
-    NicheDistance = id[[1]][5]
+    NicheDistance = id[[1]][5],
+    InterventionPatchType = id[[3]][1],
+    InterventionPatchSeed = id[[4]][1],
+    InterventionTimeType = id[[3]][2],
+    InterventionTimeSeed = id[[4]][2],
+    InterventionDispersal = id[[3]][3],
+    InterventionNicheDistance = id[[3]][4]
   )
 }))
 
@@ -204,7 +221,9 @@ diversitiesRounded <- diversities %>%  dplyr::group_by(
 
   # By Run:
   PoolPatchAffinity, PoolPatchAffinitySeed, Interactions, InteractionsSeed,
-  Events, EventsSeed, Dispersal, NicheDistance
+  Events, EventsSeed, Dispersal, NicheDistance,
+  InterventionPatchType, InterventionPatchSeed, InterventionTimeType,
+  InterventionTimeSeed, InterventionDispersal, InterventionNicheDistance
 ) %>% dplyr::summarise(
   Value = median(Value),
   .groups = "drop"
@@ -223,7 +242,9 @@ diversityRibbons <- diversitiesRounded %>% dplyr::filter(
   Measurement, Aggregation, # Measurement
 
   PoolPatchAffinity, PoolPatchAffinitySeed, Interactions, InteractionsSeed,
-  Events, EventsSeed, Dispersal, NicheDistance
+  Events, EventsSeed, Dispersal, NicheDistance,
+  InterventionPatchType, InterventionPatchSeed, InterventionTimeType,
+  InterventionTimeSeed, InterventionDispersal, InterventionNicheDistance
 ) %>% dplyr::summarise(
   Low = unlist(dplyr::across(dplyr::any_of("Value"),
                              .fns = ~ quantile(.x, p = 0.1, na.rm = TRUE))),
@@ -273,16 +294,27 @@ presences <- do.call(rbind, lapply(
   function(p, pPTU = pointsPerTimeUnit) {
     if ("FullID" %in% names(p$Ellipsis)) {
       id <- strsplit(
-      strsplit(p$Ellipsis$FullID, "_", fixed = "TRUE"), # Split seeds off.
-      "-", fixed = TRUE)
-  } else {
-    id <- strsplit(
-      strsplit(
-        strsplit(p$File, ".", fixed = TRUE)[[1]][1], # Remove .RData.
-        "_", fixed = TRUE)[[1]][3:4], # Remove TSTS_Type and split seeds off.
-      "-", fixed = TRUE # Separate out the id values.
-    )
-  }
+        strsplit(p$Ellipsis$FullID, "_", fixed = TRUE)[[1]], # Split seeds off.
+        "-", fixed = TRUE)
+    } else if ("ID" %in% names(p$Ellipsis)) {
+      id <- strsplit(
+        strsplit(p$Ellipsis$ID, "_", fixed = TRUE)[[1]], # Split seeds off.
+        "-", fixed = TRUE)
+    } else {
+      id <- strsplit(
+        strsplit(
+          strsplit(p$File, ".", fixed = TRUE)[[1]][1], # Remove .RData.
+          "_", fixed = TRUE)[[1]][3:4], # Remove TSTS_Type and split seeds off.
+        "-", fixed = TRUE # Separate out the id values.
+      )
+    }
+
+    if (length(id) < 3) {
+      # I.e., no intervention.
+      id[[3]] <- rep(NA, 4)
+      id[[4]] <- rep(NA, 2)
+    }
+
 
   if ("TimeFloor" %in% names(p$SpeciesPresences)) {
     p$SpeciesPresences <- p$SpeciesPresences %>% dplyr::rename(
@@ -348,7 +380,13 @@ presences <- do.call(rbind, lapply(
     Events = id[[1]][3],
     EventsSeed = id[[2]][3],
     Dispersal = id[[1]][4],
-    NicheDistance = id[[1]][5]
+    NicheDistance = id[[1]][5],
+    InterventionPatchType = id[[3]][1],
+    InterventionPatchSeed = id[[4]][1],
+    InterventionTimeType = id[[3]][2],
+    InterventionTimeSeed = id[[4]][2],
+    InterventionDispersal = id[[3]][3],
+    InterventionNicheDistance = id[[3]][4]
   )
 }))
 
@@ -357,7 +395,9 @@ diversity_cuts <- diversities %>% dplyr::select(
   PoolPatchAffinity, PoolPatchAffinitySeed,
   Interactions, InteractionsSeed,
   Events, EventsSeed,
-  Dispersal, NicheDistance
+  Dispersal, NicheDistance,
+  InterventionPatchType, InterventionPatchSeed, InterventionTimeType,
+  InterventionTimeSeed, InterventionDispersal, InterventionNicheDistance
 ) %>% dplyr::distinct() %>% dplyr::mutate(
   Affinity = unlist(Affinity)
 ) %>% dplyr::filter(
@@ -379,7 +419,10 @@ presences <- presences %>% dplyr::left_join(
   diversity_cuts, by = c("PoolPatchAffinity", "PoolPatchAffinitySeed",
                          "Interactions", "InteractionsSeed",
                          "Events", "EventsSeed",
-                         "Dispersal", "NicheDistance")
+                         "Dispersal", "NicheDistance",
+                         "InterventionPatchType", "InterventionPatchSeed",
+                         "InterventionTimeType", "InterventionTimeSeed",
+                         "InterventionDispersal", "InterventionNicheDistance")
 ) %>% dplyr::filter(
   Affinity.Lower <= Affinity,
   Affinity <= Affinity.Upper

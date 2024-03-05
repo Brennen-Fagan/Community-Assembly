@@ -39,24 +39,24 @@ interventionPatchDictionaryChoice <-
   # 7 # Random 50% Patches -> {0, 0.5, 1} Unif @ Random
   # 8 # Random 50% Patches -> [0, 1] Gradient Ring
   # 9 # Random 50% Patches -> [0, 1] Unif @ Random
-  10 # Last 50% Patches -> {0}
+  10 # Last 50% Patches -> {0} #TODO Did not work for two patch system?
   # 11 # Last 50% Patches -> {0.5}
   # 12 # Last 50% Patches -> {1}
-  # 13 # Last 50% Patches -> {0, 1} Gradient
+  # 13 # Last 50% Patches -> {0, 1} Gradient # <- Probably not desired.
   # 14 # Last 50% Patches -> {0, 1} Unif @ Random
-  # 15 # Last 50% Patches -> {0, 0.5, 1} Gradient Ring
   # 16 # Last 50% Patches -> {0, 0.5, 1} Unif @ Random
-  # 17 # Last 50% Patches -> [0, 1] Gradient Ring
   # 18 # Last 50% Patches -> [0, 1] Unif @ Random
+  # 40 # All Patches -> {0, 1} Gradient
+  # 41 # All Patches -> {0, 1} Unif @ Random
 interventionPatchSeedChoice <-
-  1 # Used on ...
+  1 # Used on 2024-03-01
 
 interventionTimeDictionaryChoice <-
   1 # Deterministic; set to 1/4 * max(Events$Time) + 1/2 median(Events$Time)
   # 2 # Stochastic; anywhere in [1/4 max(Events$Time), 3/4 max(Events$Time)]
   #   # For a double length run, there's at least half a run either side.
 interventionTimeSeedChoice <-
-  1 # Used on ...
+  1 # Used on 2024-03-01
 
 # Not modifying dynamics at the moment.
 # dynamicsDictionaryChoice <-
@@ -160,14 +160,15 @@ interventionPatchDictionary <- expand.grid(
     "runifRing", # Patches -> [0, 1] Gradient Ring
     "runif" # Patches -> [0, 1] Unif @ Random
   ),
-  InterventionPercentage = c(
-    0.5
-  ),
   InterventionLocation = c(
     # Percentage seems easiest
     NA, # == Random
     1, # Last
     0 # First
+  ),
+  InterventionPercentage = c(
+    0.5,
+    1
   ),
   stringsAsFactors = FALSE
 )[interventionPatchDictionaryChoice, , drop = FALSE]
@@ -563,8 +564,9 @@ interventionSuccess <- foreach::foreach(
     ID = paste0(loaded$Ellipsis$ID, "_", appendID),
     Affinity = list(
       PatchAffinitiesOld = loaded$Ellipsis$Affinity$PatchAffinities,
-      PatchAffinitiesIntervention = PatchAffinities,
+      PatchAffinitiesIntervention = interventionPatchAffinities,
       PatchInterventions = interventionPatches,
+      TimeIntervention = interventionTime,
       EffectiveReproductionRateOld =
         loaded$Ellipsis$Affinity$EffectiveReproductionRate,
       EffectiveReproductionRateIntervention = rprime

@@ -8,11 +8,13 @@
 
 # Parameters: #################################################################
 datfolders <- c(
-  "TSTS_Simulations_1-1_1-1_2024-02-13",
-  "TSTS_Simulations_1-1_2-2_2024-02-14",
-  "TSTS_Simulations_2-1_2-2_2024-02-14",
-  "TSTS_Simulations_10-1_2-2_2024-02-15",
-  "TSTS_Simulations_6-1_2-2_2024-02-15"
+  # "TSTS_Simulations_1-1_1-1_2024-02-13",
+  # "TSTS_Simulations_1-1_2-2_2024-02-14",
+  # "TSTS_Simulations_2-1_2-2_2024-02-14",
+  # "TSTS_Simulations_10-1_2-2_2024-02-15",
+  # "TSTS_Simulations_6-1_2-2_2024-02-15"
+  "TSTS_Simulations_11-1_3-3_2024-02-23",
+  "TSTS_Simulations_11-1_4-4_2024-02-23"
 )
 
 cores <- 4
@@ -62,7 +64,8 @@ poolmats <- lapply(
 
 Diversity <- foreach::foreach(
   x = iterators::iter(
-    dir(datfolders, full.names = TRUE, pattern = "(Simulation|Result)")
+    dir(datfolders, full.names = TRUE,
+        pattern = "(Simulation|Result|Intervention)")
   ), .packages = c("dplyr", "RMTRCode2")
 ) %op% {
   x_properties <- strsplit(basename(x), split = splitchar)
@@ -74,9 +77,9 @@ Diversity <- foreach::foreach(
   filename <- file.path(
     dirname(x),
     if (flag == "TSTS") {
-      paste0(x_properties[[1]][1],
-             "_Diversity_",
-             x_properties[[1]][3:length(x_properties[[1]])])
+      paste0(c(x_properties[[1]][1],
+             "Diversity",
+             x_properties[[1]][3:length(x_properties[[1]])]), collapse = "_")
     } else if (flag == "Data") {
       paste0("TSTS_Diversity_",
              paste0(x_properties[[1]][5:length(x_properties[[1]])],
@@ -212,7 +215,8 @@ Diversity <- foreach::foreach(
 
 SpeciesPresence <- foreach::foreach(
   x = iterators::iter(
-    dir(datfolders, full.names = TRUE, pattern = "(Simulation|Result)")
+    dir(datfolders, full.names = TRUE,
+        pattern = "(Simulation|Result|Intervention)")
   ), .packages = c("dplyr", "RMTRCode2")
 ) %op% {
   x_properties <- strsplit(basename(x), split = splitchar)
@@ -224,9 +228,9 @@ SpeciesPresence <- foreach::foreach(
   filename <- file.path(
     dirname(x),
     if (flag == "TSTS") {
-      paste0(x_properties[[1]][1],
-             "_Presence_",
-             x_properties[[1]][3:length(x_properties[[1]])])
+      paste0(c(x_properties[[1]][1],
+               "Presence",
+               x_properties[[1]][3:length(x_properties[[1]])]), collapse = "_")
     } else if (flag == "Data") {
       paste0("TSTS_Presence_",
              paste0(x_properties[[1]][5:length(x_properties[[1]])],
@@ -266,6 +270,8 @@ SpeciesPresence <- foreach::foreach(
       Ellipsis = loaded$Ellipsis
     )
 
+
+
     if (!is.null(x_pool)) {
       # Need to assign patch and species affinities in order to know how
       # well they are pairing with each other.
@@ -276,17 +282,51 @@ SpeciesPresence <- foreach::foreach(
           ),
           by = c("Species" = "ID")
         )
+    }
 
+    affinityNames <-
+      c("PatchAffinities", "PatchAffinitiesOld", "PatchAffinitiesIntervention")
+    affinitySlots <- which(affinityNames %in% names(loaded$Ellipsis$Affinity))
+    interventionTime <-
+      if ("TimeIntervention" %in% names(loaded$Ellipsis$Affinity)) {
+        loaded$Ellipsis$Affinity$TimeIntervention
+      } else {
+        # We'll take a proxy of the first event...
+        min(loaded$Events$Times)
+      }
+
+    if (length(affinitySlots) != 0) {
+      # If possible, take from loaded what the affinities are.
+      # Note that the affinities can change through time though!
+      SpeciesPresence$SpeciesPresences$EnvAffinity <- dplyr::case_when(
+        1 %in% affinitySlots ~
+          loaded$Ellipsis$Affinity[[affinityNames[1]]][
+            SpeciesPresence$SpeciesPresences$Environment, 1
+            ],
+        2 %in% affinitySlots &
+          SpeciesPresence$SpeciesPresences$Time < interventionTime ~
+          loaded$Ellipsis$Affinity[[affinityNames[2]]][
+            SpeciesPresence$SpeciesPresences$Environment, 1
+            ],
+        3 %in% affinitySlots &
+          SpeciesPresence$SpeciesPresences$Time >= interventionTime ~
+          loaded$Ellipsis$Affinity[[affinityNames[3]]][
+            SpeciesPresence$SpeciesPresences$Environment, 1
+            ],
+        TRUE ~ NA_integer_
+      )
+    } else if (!is.null(x_pool)) {
+      # Only stores the base patch "affinities".
       SpeciesPresence$SpeciesPresences$EnvAffinity <-
         poolmats[[x_poolind]]$PatchAffinities[
           SpeciesPresence$SpeciesPresences$Environment,
           ]
-
-      # Unsure where grouping was coming from, but this might be inflating
-      # file sizes.
-      SpeciesPresence$SpeciesPresences <-
-        SpeciesPresence$SpeciesPresences %>% dplyr::ungroup()
     }
+
+    # Unsure where grouping was coming from, but this appears to be inflating
+    # file sizes.
+    SpeciesPresence$SpeciesPresences <-
+      SpeciesPresence$SpeciesPresences %>% dplyr::ungroup()
 
     save(SpeciesPresence, file = filename)
   }
