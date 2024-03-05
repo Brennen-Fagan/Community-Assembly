@@ -108,7 +108,7 @@ Diversity <- foreach::foreach(
     }
 
     if (loaded$Ellipsis$Timescale == "Simulation") {
-      loaded$Events$Time <- loaded$Events$Time / loaded$Ellipsis$ReactionTime
+      loaded$Events$Times <- loaded$Events$Times / loaded$Ellipsis$ReactionTime
       loaded$Abundance[, 1] <- loaded$Abundance[, 1] / loaded$Ellipsis$ReactionTime
       loaded$Ellipsis$Timescale <- "Characteristic"
     }
@@ -258,7 +258,7 @@ SpeciesPresence <- foreach::foreach(
     }
 
     if (loaded$Ellipsis$Timescale == "Simulation") {
-      loaded$Events$Time <- loaded$Events$Time / loaded$Ellipsis$ReactionTime
+      loaded$Events$Times <- loaded$Events$Times / loaded$Ellipsis$ReactionTime
       loaded$Abundance[, 1] <- loaded$Abundance[, 1] / loaded$Ellipsis$ReactionTime
       loaded$Ellipsis$Timescale <- "Characteristic"
     }
@@ -304,12 +304,12 @@ SpeciesPresence <- foreach::foreach(
             SpeciesPresence$SpeciesPresences$Environment, 1
             ],
         2 %in% affinitySlots &
-          SpeciesPresence$SpeciesPresences$Time < interventionTime ~
+          SpeciesPresence$SpeciesPresences$Times < interventionTime ~
           loaded$Ellipsis$Affinity[[affinityNames[2]]][
             SpeciesPresence$SpeciesPresences$Environment, 1
             ],
         3 %in% affinitySlots &
-          SpeciesPresence$SpeciesPresences$Time >= interventionTime ~
+          SpeciesPresence$SpeciesPresences$Times >= interventionTime ~
           loaded$Ellipsis$Affinity[[affinityNames[3]]][
             SpeciesPresence$SpeciesPresences$Environment, 1
             ],
