@@ -333,6 +333,16 @@ presences <- do.call(rbind, lapply(
 
   # Balanced Thinning
 
+    minTimeDiff <- p$SpeciesPresences %>% dplyr::arrange(
+      Time
+    ) %>% dplyr::mutate( # Thin according to weighted time grouping.
+      TimeGroup = floor(Time * pPTU) / pPTU
+    ) %>% dplyr::group_by(
+      TimeGroup, Species, Environment, Size, Type, Affinity, EnvAffinity
+    ) %>% dplyr::mutate(
+      Weights = c(diff(Time), NA)
+    ) %>% dplyr::pull(Weights) %>% min(na.rm = TRUE)
+
   retval <- p$SpeciesPresences %>% dplyr::arrange(
     Time
   ) %>% dplyr::mutate( # Thin according to weighted time grouping.
@@ -349,21 +359,24 @@ presences <- do.call(rbind, lapply(
         #                          but we're now feeling in for averaging.
         .x,
         if(!any(.x$Time > unname(.y$TimeGroup) + 0.99/pPTU))
-          data.frame(Time = unname(.y$TimeGroup) + 0.99/pPTU,
+          data.frame(Time = c(max(.x$Time) + minTimeDiff,
+                              unname(.y$TimeGroup) + 0.99/pPTU),
                      Abundance = 0) # If Far => 0, if Near => keep prev value, but
         #                       # if near, then there should be a value nearby.
-      )
-    }
+      ) # Solution isn't ideal: e.g. 1, 2, 0, ...., 0, 1 gives 2 high weight.
+    }   # This does cover 1, 2, 0, ..., 0, 0 though.
   ) %>% dplyr::ungroup(
   ) %>% dplyr::group_by(
-    Species, Environment
+    Species, Environment, EnvAffinity
   ) %>% dplyr::mutate(
     Weights = c(diff(Time), NA)
   ) %>% dplyr::ungroup(
-  )
+  ) %>% dplyr::filter(!is.na(Weights))
 
   retval %>% dplyr::group_by(
     TimeGroup, Species, Environment, Size, Type, Affinity, EnvAffinity
+  ) %>% dplyr::filter(
+    sum(!is.na(Weights)) > 0
   ) %>% dplyr::summarise(
     Abundance = Hmisc::wtd.quantile(Abundance, Weights, normwt = TRUE, probs = 0.5),
     Abundance = ifelse(Abundance < 1e-4, 0, Abundance),
