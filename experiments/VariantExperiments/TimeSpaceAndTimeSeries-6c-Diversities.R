@@ -266,11 +266,16 @@ SpeciesPresence <- foreach::foreach(
     SpeciesPresence <- list(
       SpeciesPresences = RMTRCode2::Calculate_Species(
         loaded, bintimes = TRUE # Not well implemented: only two states.
-      ),
+      ) %>% dplyr::filter(Abundance > loaded$Parameters$EliminationThreshold),
       Ellipsis = loaded$Ellipsis
     )
 
-
+    if ("TimeFloor" %in% names(SpeciesPresence$SpeciesPresences)) {
+      SpeciesPresence$SpeciesPresences <-
+        SpeciesPresence$SpeciesPresences %>% dplyr::rename(
+          Time = TimeFloor
+        )
+    }
 
     if (!is.null(x_pool)) {
       # Need to assign patch and species affinities in order to know how
@@ -284,9 +289,9 @@ SpeciesPresence <- foreach::foreach(
         )
     }
 
+
     affinityNames <-
       c("PatchAffinities", "PatchAffinitiesOld", "PatchAffinitiesIntervention")
-    affinitySlots <- which(affinityNames %in% names(loaded$Ellipsis$Affinity))
     interventionTime <-
       if ("TimeIntervention" %in% names(loaded$Ellipsis$Affinity)) {
         loaded$Ellipsis$Affinity$TimeIntervention
@@ -295,26 +300,31 @@ SpeciesPresence <- foreach::foreach(
         min(loaded$Events$Times)
       }
 
-    if (length(affinitySlots) != 0) {
-      # If possible, take from loaded what the affinities are.
-      # Note that the affinities can change through time though!
-      SpeciesPresence$SpeciesPresences$EnvAffinity <- dplyr::case_when(
-        1 %in% affinitySlots ~
-          loaded$Ellipsis$Affinity[[affinityNames[1]]][
-            SpeciesPresence$SpeciesPresences$Environment, 1
-            ],
-        2 %in% affinitySlots &
-          SpeciesPresence$SpeciesPresences$Times < interventionTime ~
-          loaded$Ellipsis$Affinity[[affinityNames[2]]][
-            SpeciesPresence$SpeciesPresences$Environment, 1
-            ],
-        3 %in% affinitySlots &
-          SpeciesPresence$SpeciesPresences$Times >= interventionTime ~
-          loaded$Ellipsis$Affinity[[affinityNames[3]]][
-            SpeciesPresence$SpeciesPresences$Environment, 1
-            ],
-        TRUE ~ NA_integer_
-      )
+    if (affinityNames[1] %in% names(loaded$Ellipsis$Affinity)) {
+      SpeciesPresence$SpeciesPresences$EnvAffinity <-
+        loaded$Ellipsis$Affinity[[affinityNames[1]]][
+          SpeciesPresence$SpeciesPresences$Environment, 1
+          ]
+    } else if (
+      affinityNames[2] %in% names(loaded$Ellipsis$Affinity) &&
+      affinityNames[3] %in% names(loaded$Ellipsis$Affinity)
+    ) {
+      SpeciesPresence$SpeciesPresences <- SpeciesPresence$SpeciesPresences %>%
+        dplyr::mutate(
+          EnvAffinity = dplyr::case_when(
+            Time < interventionTime |
+              (!Environment %in% loaded$Ellipsis$Affinity$PatchInterventions) ~
+              loaded$Ellipsis$Affinity[[affinityNames[2]]][
+                Environment, 1
+                ],
+            Time >= interventionTime &
+              Environment %in% loaded$Ellipsis$Affinity$PatchInterventions ~
+              loaded$Ellipsis$Affinity[[affinityNames[3]]][
+                Environment, 1
+                ],
+            TRUE ~ NA_real_
+          )
+        )
     } else if (!is.null(x_pool)) {
       # Only stores the base patch "affinities".
       SpeciesPresence$SpeciesPresences$EnvAffinity <-
