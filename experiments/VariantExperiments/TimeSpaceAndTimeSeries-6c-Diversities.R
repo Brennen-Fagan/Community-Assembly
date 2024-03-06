@@ -165,7 +165,7 @@ Diversity <- foreach::foreach(
               loaded_subset$Abundance <- loaded_subset$Abundance[, idcolumns]
 
               divs <- RMTRCode2::thinAndCalculateDiversities(#Calculate_Diversity(
-                loaded,
+                loaded_subset,
                 nspecies = c(Basal = sum(.x$Type == "Basal"),
                              Consumer = sum(.x$Type == "Consumer")),
                 # My standard approach for nspecies.
