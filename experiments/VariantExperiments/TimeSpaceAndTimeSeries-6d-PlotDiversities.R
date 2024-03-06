@@ -57,9 +57,9 @@ presences <- lapply(
   })
 
 stopifnot(#length(results) >= length(datfolders),
-          #length(samples) == length(datfolders),
-          #length(diversities) == length(results),
-          length(presences) == length(diversities))
+  #length(samples) == length(datfolders),
+  #length(diversities) == length(results),
+  length(presences) == length(diversities))
 
 # Fixed data: #################################################################
 if (dplyr::is_grouped_df(presences[[1]]$SpeciesPresences)) {
@@ -134,8 +134,8 @@ convertThinnedDiversitiesListToDF <- function(
         .x,
         if(!any(.x$Time > unname(.y$TimeGroup) + 0.99/pPTU))
           data.frame(Time = unname(.y$TimeGroup) + 0.99/pPTU,
-                   Value = .x[nrow(.x),]$Value)
-        )
+                     Value = .x[nrow(.x),]$Value)
+      )
     }
   ) %>% dplyr::ungroup(
   ) %>% dplyr::group_by(
@@ -144,7 +144,7 @@ convertThinnedDiversitiesListToDF <- function(
     Value = ifelse(is.na(Value), dplyr::lag(Value), Value), # All but first
     Weights = c(diff(Time), NA)
   ) %>% dplyr::ungroup(
-  )
+  ) %>% dplyr::filter(!is.na(Weights), !is.na(Value))
 
   ## Summarize
   retval %>% dplyr::group_by(
@@ -162,7 +162,7 @@ diversities <- do.call(rbind, lapply(diversities, function(d) {
   if ("FullID" %in% names(d$Ellipsis)) {
     id <- strsplit(
       strsplit(d$Ellipsis$FullID, "_", fixed = TRUE)[[1]], # Split seeds off.
-               "-", fixed = TRUE)
+      "-", fixed = TRUE)
   } else if ("ID" %in% names(d$Ellipsis)) {
     id <- strsplit(
       strsplit(d$Ellipsis$ID, "_", fixed = TRUE)[[1]], # Split seeds off.
@@ -231,6 +231,33 @@ diversitiesRounded <- diversities %>%  dplyr::group_by(
   Time = `round(Time)`
 )
 
+diversitiesRounded <- diversitiesRounded %>% dplyr::filter(
+  Measurement %in% c(
+    "Beta Jaccard", "Gamma Richness", "Alpha Richness"
+  )
+) %>% dplyr::mutate(
+  Measurement2 = dplyr::case_when(
+    Measurement == "Beta Jaccard" ~ "Spatial Diss.",
+    Measurement == "Gamma Richness" & Aggregation == "Gamma" ~ "Regional Rich.",
+    Measurement == "Gamma Richness" & Aggregation == "Mean" ~ "Local Rich.", # Panel
+    Measurement == "Alpha Richness"  ~ "Local Rich.", # Otherwise
+    TRUE ~ Measurement
+  ),
+  Intervention = dplyr::case_when(
+    is.na(InterventionPatchType) ~ "No Intervention",
+    InterventionPatchType == 10 ~ "0.5, 0.5 -> 0.5, 0",
+    InterventionPatchType == 12 ~ "0.5, 0.5 -> 0.5, 1",
+    InterventionPatchType == 18 ~ "0.5, 0.5 -> 0.5, 0.6",
+    InterventionPatchType == 40 ~ "0.5, 0.5 -> 0, 1",
+    InterventionPatchType == 41 ~ "0.5, 0.5 -> 1, 1"
+  ),
+  Alignment = dplyr::case_when(
+    is.na(Affinity) ~ "All Species",
+    Affinity == 0 ~ "Type 0 Species",
+    Affinity == 1 ~ "Type 1 Species"
+  )
+)
+
 diversityRibbons <- diversitiesRounded %>% dplyr::filter(
   !(is.na(Environment)), # Not Gamma
   Measurement == "Alpha Richness" |
@@ -238,13 +265,14 @@ diversityRibbons <- diversitiesRounded %>% dplyr::filter(
 ) %>%  dplyr::group_by(
   Time, # Time
 
-  Affinity, # Effectively: Species set
-  Measurement, Aggregation, # Measurement
+  Affinity, Alignment, # Effectively: Species set
+  Measurement, Measurement2, Aggregation, # Measurement
 
   PoolPatchAffinity, PoolPatchAffinitySeed, Interactions, InteractionsSeed,
   Events, EventsSeed, Dispersal, NicheDistance,
-  InterventionPatchType, InterventionPatchSeed, InterventionTimeType,
-  InterventionTimeSeed, InterventionDispersal, InterventionNicheDistance
+  InterventionPatchType, Intervention, InterventionPatchSeed,
+  InterventionTimeType, InterventionTimeSeed,
+  InterventionDispersal, InterventionNicheDistance
 ) %>% dplyr::summarise(
   Low = unlist(dplyr::across(dplyr::any_of("Value"),
                              .fns = ~ quantile(.x, p = 0.1, na.rm = TRUE))),
@@ -274,19 +302,6 @@ diversityRibbons <- diversitiesRounded %>% dplyr::filter(
 #   Measurement = "Regional Rich."
 # )
 
-diversitiesRounded <- diversitiesRounded %>% dplyr::filter(
-  Measurement %in% c(
-    "Beta Jaccard", "Gamma Richness", "Alpha Richness"
-  )
-) %>% dplyr::mutate(
-  Measurement2 = dplyr::case_when(
-    Measurement == "Beta Jaccard" ~ "Spatial Diss.",
-    Measurement == "Gamma Richness" & Aggregation == "Gamma" ~ "Regional Rich.",
-    Measurement == "Gamma Richness" & Aggregation == "Mean" ~ "Local Rich.", # Panel
-    Measurement == "Alpha Richness"  ~ "Local Rich.", # Otherwise
-    TRUE ~ Measurement
-  )
-)
 
 ### Presence: #################################################################
 presences <- do.call(rbind, lapply(
@@ -316,22 +331,22 @@ presences <- do.call(rbind, lapply(
     }
 
 
-  if ("TimeFloor" %in% names(p$SpeciesPresences)) {
-    p$SpeciesPresences <- p$SpeciesPresences %>% dplyr::rename(
-      Time = TimeFloor
-    )
-  }
+    if ("TimeFloor" %in% names(p$SpeciesPresences)) {
+      p$SpeciesPresences <- p$SpeciesPresences %>% dplyr::rename(
+        Time = TimeFloor
+      )
+    }
 
-  # retval <- p$SpeciesPresences %>% dplyr::group_by(
-  #   Species, round(Time), Environment, dplyr::contains("Affinity"), Size
-  # ) %>% dplyr::summarise(
-  #   Abundance = mean(Abundance),
-  #   Biomass = Abundance *  Size
-  # ) %>% dplyr::rename(
-  #   Time = `round(Time)`
-  # )
+    # retval <- p$SpeciesPresences %>% dplyr::group_by(
+    #   Species, round(Time), Environment, dplyr::contains("Affinity"), Size
+    # ) %>% dplyr::summarise(
+    #   Abundance = mean(Abundance),
+    #   Biomass = Abundance *  Size
+    # ) %>% dplyr::rename(
+    #   Time = `round(Time)`
+    # )
 
-  # Balanced Thinning
+    # Balanced Thinning
 
     minTimeDiff <- p$SpeciesPresences %>% dplyr::arrange(
       Time
@@ -343,65 +358,65 @@ presences <- do.call(rbind, lapply(
       Weights = c(diff(Time), NA)
     ) %>% dplyr::pull(Weights) %>% min(na.rm = TRUE)
 
-  retval <- p$SpeciesPresences %>% dplyr::arrange(
-    Time
-  ) %>% dplyr::mutate( # Thin according to weighted time grouping.
-    TimeGroup = floor(Time * pPTU) / pPTU
-  ) %>% dplyr::group_by(
-    TimeGroup, Species, Environment, Size, Type, Affinity, EnvAffinity
-  ) %>% dplyr::group_modify(
-    .f = function(.x, .y) {
-      ## Add beginning and end of time group:
-      rbind(
-        if(!unname(.y$TimeGroup) %in% .x$Time)
-          data.frame(Time = unname(.y$TimeGroup),
-                     Abundance = 0), # in presence, only present if nonzero.
-        #                          but we're now feeling in for averaging.
-        .x,
-        if(!any(.x$Time > unname(.y$TimeGroup) + 0.99/pPTU))
-          data.frame(Time = c(max(.x$Time) + minTimeDiff,
-                              unname(.y$TimeGroup) + 0.99/pPTU),
-                     Abundance = 0) # If Far => 0, if Near => keep prev value, but
-        #                       # if near, then there should be a value nearby.
-      ) # Solution isn't ideal: e.g. 1, 2, 0, ...., 0, 1 gives 2 high weight.
-    }   # This does cover 1, 2, 0, ..., 0, 0 though.
-  ) %>% dplyr::ungroup(
-  ) %>% dplyr::group_by(
-    Species, Environment, EnvAffinity
-  ) %>% dplyr::mutate(
-    Weights = c(diff(Time), NA)
-  ) %>% dplyr::ungroup(
-  ) %>% dplyr::filter(!is.na(Weights))
+    retval <- p$SpeciesPresences %>% dplyr::arrange(
+      Time
+    ) %>% dplyr::mutate( # Thin according to weighted time grouping.
+      TimeGroup = floor(Time * pPTU) / pPTU
+    ) %>% dplyr::group_by(
+      TimeGroup, Species, Environment, Size, Type, Affinity, EnvAffinity
+    ) %>% dplyr::group_modify(
+      .f = function(.x, .y) {
+        ## Add beginning and end of time group:
+        rbind(
+          if(!unname(.y$TimeGroup) %in% .x$Time)
+            data.frame(Time = unname(.y$TimeGroup),
+                       Abundance = 0), # in presence, only present if nonzero.
+          #                          but we're now feeling in for averaging.
+          .x,
+          if(!any(.x$Time > unname(.y$TimeGroup) + 0.99/pPTU))
+            data.frame(Time = c(max(.x$Time) + minTimeDiff,
+                                unname(.y$TimeGroup) + 0.99/pPTU),
+                       Abundance = 0) # If Far => 0, if Near => keep prev value, but
+          #                       # if near, then there should be a value nearby.
+        ) # Solution isn't ideal: e.g. 1, 2, 0, ...., 0, 1 gives 2 high weight.
+      }   # This does cover 1, 2, 0, ..., 0, 0 though.
+    ) %>% dplyr::ungroup(
+    ) %>% dplyr::group_by(
+      Species, Environment, EnvAffinity
+    ) %>% dplyr::mutate(
+      Weights = c(diff(Time), NA)
+    ) %>% dplyr::ungroup(
+    ) %>% dplyr::filter(!is.na(Weights))
 
-  retval %>% dplyr::group_by(
-    TimeGroup, Species, Environment, Size, Type, Affinity, EnvAffinity
-  ) %>% dplyr::filter(
-    sum(!is.na(Weights)) > 0
-  ) %>% dplyr::summarise(
-    Abundance = Hmisc::wtd.quantile(Abundance, Weights, normwt = TRUE, probs = 0.5),
-    Abundance = ifelse(Abundance < 1e-4, 0, Abundance),
-    #Value = sum(Weights * Value) / sum(Weights), # Mean
-    Time = unique(TimeGroup)[1],
-    .groups = "drop"
-  ) %>% dplyr::select(
-    -TimeGroup
-  ) %>% dplyr::mutate(
-    PoolPatchAffinity = id[[1]][1],
-    PoolPatchAffinitySeed = id[[2]][1],
-    Interactions = id[[1]][2],
-    InteractionsSeed = id[[2]][2],
-    Events = id[[1]][3],
-    EventsSeed = id[[2]][3],
-    Dispersal = id[[1]][4],
-    NicheDistance = id[[1]][5],
-    InterventionPatchType = id[[3]][1],
-    InterventionPatchSeed = id[[4]][1],
-    InterventionTimeType = id[[3]][2],
-    InterventionTimeSeed = id[[4]][2],
-    InterventionDispersal = id[[3]][3],
-    InterventionNicheDistance = id[[3]][4]
-  )
-}))
+    retval %>% dplyr::group_by(
+      TimeGroup, Species, Environment, Size, Type, Affinity, EnvAffinity
+    ) %>% dplyr::filter(
+      sum(!is.na(Weights)) > 0
+    ) %>% dplyr::summarise(
+      Abundance = Hmisc::wtd.quantile(Abundance, Weights, normwt = TRUE, probs = 0.5),
+      Abundance = ifelse(Abundance < 1e-4, 0, Abundance),
+      #Value = sum(Weights * Value) / sum(Weights), # Mean
+      Time = unique(TimeGroup)[1],
+      .groups = "drop"
+    ) %>% dplyr::select(
+      -TimeGroup
+    ) %>% dplyr::mutate(
+      PoolPatchAffinity = id[[1]][1],
+      PoolPatchAffinitySeed = id[[2]][1],
+      Interactions = id[[1]][2],
+      InteractionsSeed = id[[2]][2],
+      Events = id[[1]][3],
+      EventsSeed = id[[2]][3],
+      Dispersal = id[[1]][4],
+      NicheDistance = id[[1]][5],
+      InterventionPatchType = id[[3]][1],
+      InterventionPatchSeed = id[[4]][1],
+      InterventionTimeType = id[[3]][2],
+      InterventionTimeSeed = id[[4]][2],
+      InterventionDispersal = id[[3]][3],
+      InterventionNicheDistance = id[[3]][4]
+    )
+  }))
 
 diversity_cuts <- diversities %>% dplyr::select(
   Affinity,
@@ -415,18 +430,18 @@ diversity_cuts <- diversities %>% dplyr::select(
   Affinity = unlist(Affinity)
 ) %>% dplyr::filter(
   !is.na(Affinity)
-  ) %>% tidyr::separate(
-    sep = ",", col = Affinity, into = c("Affinity.Lower", "Affinity.Upper"),
-    fill = "right"
-  ) %>% dplyr::mutate(
-    Affinity.Upper = ifelse(is.na(Affinity.Upper),
-                            Affinity.Lower,
-                            Affinity.Upper),
-    Affinity.Lower = gsub(pattern = "([(]|[]])", replacement = "", Affinity.Lower),
-    Affinity.Upper = gsub(pattern = "([(]|[]])", replacement = "", Affinity.Upper),
-    Affinity.Lower = as.numeric(Affinity.Lower),
-    Affinity.Upper = as.numeric(Affinity.Upper)
-  )
+) %>% tidyr::separate(
+  sep = ",", col = Affinity, into = c("Affinity.Lower", "Affinity.Upper"),
+  fill = "right"
+) %>% dplyr::mutate(
+  Affinity.Upper = ifelse(is.na(Affinity.Upper),
+                          Affinity.Lower,
+                          Affinity.Upper),
+  Affinity.Lower = gsub(pattern = "([(]|[]])", replacement = "", Affinity.Lower),
+  Affinity.Upper = gsub(pattern = "([(]|[]])", replacement = "", Affinity.Upper),
+  Affinity.Lower = as.numeric(Affinity.Lower),
+  Affinity.Upper = as.numeric(Affinity.Upper)
+)
 
 presences <- presences %>% dplyr::left_join(
   diversity_cuts, by = c("PoolPatchAffinity", "PoolPatchAffinitySeed",
@@ -443,84 +458,101 @@ presences <- presences %>% dplyr::left_join(
 
 # Plotting: ###################################################################
 
+plotDiversityOverview <- function(dRounded, dRibbon) {
+  ggplot2::ggplot(
+    dRounded %>% dplyr::filter(
+      Measurement2 %in% c("Spatial Diss.", "Local Rich.", "Regional Rich."),
+      is.na(Aggregation) | Aggregation == "Gamma"
+    )  %>% dplyr::mutate(
+      Affinity = unlist(Affinity)
+    ),
+    ggplot2::aes(
+      x = Time,
+      y = Value,
+      color = interaction(Intervention)
+    )
+  ) + ggplot2::geom_line(
+    # alpha = 0.4,
+    mapping = ggplot2::aes(
+      group = paste(Environment, Environment2, Affinity, Measurement, Aggregation,
+                    PoolPatchAffinity, PoolPatchAffinitySeed,
+                    Interactions, InteractionsSeed,
+                    Events, EventsSeed, Dispersal, NicheDistance,
+                    InterventionPatchType, InterventionPatchSeed,
+                    InterventionTimeType, InterventionTimeSeed,
+                    InterventionDispersal, InterventionNicheDistance)#,
+      # alpha = ifelse(Measurement2 == "Regional Rich.", 1, 0.4),
+      # size = ifelse(Measurement2 == "Regional Rich.", 1.2, 1)
+    ),
+    alpha = 0.6
+  ) + ggplot2::geom_line(
+    data = dRounded %>% dplyr::filter(
+      Measurement2 %in% c("Spatial Diss.", "Local Rich.", "Regional Rich."),
+      Aggregation %in% c("Mean", "Gamma")
+    ),
+    size = 1
+  ) + ggplot2::geom_ribbon(
+    data = dRibbon,
+    mapping = ggplot2::aes(
+      ymin = Low,
+      ymax = High,
+      x = Time,
+      fill = interaction(Intervention)
+    ),
+    alpha = 0.4,
+    inherit.aes = FALSE
+  ) + ggplot2::theme_bw(
+  ) + ggplot2::labs(
+    y = "Value", # Number of Species",
+    x = paste0("Time (Characteristic Scale)"),
+    color = "Intervention",
+    fill = "Intervention"#,
+    # tag = "(b)"
+    # x = ""
+    # ) + ggplot2::theme(
+    #   plot.tag.position = c(0.02, 0.98),
+    #   plot.tag = ggplot2::element_text(face = "bold"),
+    #   strip.text.x = ggplot2::element_text(size = 8)
+    # ) + ggplot2::scale_color_manual(
+    #   name = legend_bl_name,
+    #   values = c("darkorange", "plum1", "cyan")
+    # ) + ggplot2::scale_fill_manual(
+    #   name = legend_bl_name,
+    #   values = c("darkorange4", "plum4", "cyan4")
+  ) + ggplot2::facet_grid(
+    factor(
+      Measurement2, ordered = T,
+      levels = c("Local Rich.", "Regional Rich.", "Spatial Diss.")
+    ) ~ #PoolPatchAffinity +
+      #Affinity ,# ncol = 3,
+      Alignment,
+    scales = "free_y"
+  ) + ggplot2::scale_alpha(
+    guide = "none"
+  ) + ggplot2::scale_size(
+    guide = "none"
+  ) + ggplot2::coord_cartesian(
+    ylim = c(0, NA)
+  )}
+
 ### Diversity Plots: ##########################################################
 # This works, but just barely...
 # TODO: Get separate scales (-> convert back to facet_wrap, maybe + patchwork).
 # TODO: Decide how to separate the nichedistance, which is sometimes important.
 # TODO: Color scales.
 # TODO: Add back in the intervals and median lines.
-PLOT_B <- ggplot2::ggplot(
-  diversitiesRounded %>% dplyr::filter(
-    Measurement2 %in% c("Spatial Diss.", "Local Rich.", "Regional Rich."),
-    is.na(Aggregation) | Aggregation == "Gamma"
-  )  %>% dplyr::mutate(
-    Affinity = unlist(Affinity)
-  ),
-  ggplot2::aes(
-    x = Time,
-    y = Value,
-    color = interaction(Dispersal, NicheDistance)
-  )
-) + ggplot2::geom_line(
-  # alpha = 0.4,
-  mapping = ggplot2::aes(
-    group = paste(Dispersal, NicheDistance,
-                  PoolPatchAffinity, PoolPatchAffinitySeed, Affinity,
-                  Environment, Environment2,
-                  Measurement2),
-    alpha = ifelse(Measurement2 == "Regional Rich.", 1, 0.4)
-  )
-# ) + ggplot2::geom_line(
-#   data = diversitiesRounded %>% dplyr::filter(
-#     Measurement2 %in% c("Spatial Diss.", "Local Rich.", "Regional Rich."),
-#     Aggregation == "Mean"
-#   ),
-#   size = 1.5
-# ) + ggplot2::geom_ribbon(
-#   data = dplyr::bind_rows(
-#     DiversityRibbons,
-#     DiversityRibbons_Gamma
-#   ) %>% dplyr::mutate(
-#     Measurement2 = dplyr::case_when(
-#       Measurement == "Jaccard" ~ "Spatial Diss.",
-#       Measurement == "Richness" ~ "Local Rich.",
-#       TRUE ~ Measurement
-#     )
-#   ),
-#   mapping = ggplot2::aes(
-#     ymin = Low,
-#     ymax = High,
-#     x = Time,
-#     fill = pasteCustom(Dispersal, Space)
-#   ),
-#   alpha = 0.4,
-#   inherit.aes = FALSE
-) + ggplot2::theme_bw(
-) + ggplot2::labs(
-  y = "Value", # Number of Species",
-  x = paste0("Time (Characteristic Scale)"),
-  color = "Dispersal\nNicheDistance"#,
-  # tag = "(b)"
-  # x = ""
-# ) + ggplot2::theme(
-#   plot.tag.position = c(0.02, 0.98),
-#   plot.tag = ggplot2::element_text(face = "bold"),
-#   strip.text.x = ggplot2::element_text(size = 8)
-# ) + ggplot2::scale_color_manual(
-#   name = legend_bl_name,
-#   values = c("darkorange", "plum1", "cyan")
-# ) + ggplot2::scale_fill_manual(
-#   name = legend_bl_name,
-#   values = c("darkorange4", "plum4", "cyan4")
-) + ggplot2::facet_grid(
-  factor(
-    Measurement2, ordered = T,
-    levels = c("Local Rich.", "Regional Rich.", "Spatial Diss.")
-  ) ~ PoolPatchAffinity + Affinity ,# ncol = 3,
-  scales = "free_y"
-) + ggplot2::scale_alpha(guide = "none") + ggplot2::coord_cartesian(
-  ylim = c(0, NA)
-)
+PLOT_B <- plotDiversityOverview(diversitiesRounded, diversityRibbons)
+PLOT_B_subplots <- lapply(
+  unique(diversitiesRounded$Intervention), function(int) {
+    plotDiversityOverview(
+      diversitiesRounded %>% dplyr::filter(
+        Intervention %in% c(int, "No Intervention")
+      ),
+      diversityRibbons %>% dplyr::filter(
+        Intervention %in% c(int, "No Intervention")
+      )
+    )
+  })
 
 ### Presence Plots: ###########################################################
 
@@ -547,10 +579,10 @@ PLOT_T <- ggplot2::ggplot(
   limits = c(1, 10)
 ) + ggplot2::facet_grid(
   Dispersal ~ paste(PoolPatchAffinitySeed,
-              NicheDistance,#) ~ paste(
-                PoolPatchAffinity, Affinity.Lower, Affinity.Upper)
-# ) + ggplot2::geom_hline(
-#   yintercept = 1/3 * (ncol(results[[1]]$Abundance) - 1) / results[[1]]$NumEnvironments, color = "red"
+                    NicheDistance,#) ~ paste(
+                    PoolPatchAffinity, Affinity.Lower, Affinity.Upper)
+  # ) + ggplot2::geom_hline(
+  #   yintercept = 1/3 * (ncol(results[[1]]$Abundance) - 1) / results[[1]]$NumEnvironments, color = "red"
 ) + ggplot2::labs(
   y = "Species Size",
   x = "Time (Characteristic Scale)"#,
