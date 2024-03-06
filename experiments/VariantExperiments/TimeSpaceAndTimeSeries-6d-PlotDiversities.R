@@ -11,7 +11,8 @@ datfolders <- c(
   # "TSTS_Simulations_2-1_2-2_2024-02-14",
   # "TSTS_Simulations_10-1_2-2_2024-02-15",
   # "TSTS_Simulations_6-1_2-2_2024-02-15"
-  "TSTS_Simulations_11-1_4-4_2024-02-23"
+  # "TSTS_Simulations_11-1_4-4_2024-02-23"
+  "TSTS_Simulations_11-1_3-3_2024-02-23"
 )
 # Problems with X11
 options(bitmapType = "cairo")
@@ -247,9 +248,9 @@ diversitiesRounded <- diversitiesRounded %>% dplyr::filter(
     is.na(InterventionPatchType) ~ "No Intervention",
     InterventionPatchType == 10 ~ "0.5, 0.5 -> 0.5, 0",
     InterventionPatchType == 12 ~ "0.5, 0.5 -> 0.5, 1",
-    InterventionPatchType == 18 ~ "0.5, 0.5 -> 0.5, 0.6",
+    InterventionPatchType == 18 ~ "0.5, 0.5 -> 0.5, U(0,1)",
     InterventionPatchType == 40 ~ "0.5, 0.5 -> 0, 1",
-    InterventionPatchType == 41 ~ "0.5, 0.5 -> 1, 1"
+    InterventionPatchType == 41 ~ "0.5, 0.5 -> U{0, 1}"
   ),
   Alignment = dplyr::case_when(
     is.na(Affinity) ~ "All Species",
@@ -454,6 +455,15 @@ presences <- presences %>% dplyr::left_join(
 ) %>% dplyr::filter(
   Affinity.Lower <= Affinity,
   Affinity <= Affinity.Upper
+) %>% dplyr::mutate(
+  Intervention = dplyr::case_when(
+    is.na(InterventionPatchType) ~ "No Intervention",
+    InterventionPatchType == 10 ~ "0.5, 0.5 -> 0.5, 0",
+    InterventionPatchType == 12 ~ "0.5, 0.5 -> 0.5, 1",
+    InterventionPatchType == 18 ~ "0.5, 0.5 -> 0.5, U(0,1)",
+    InterventionPatchType == 40 ~ "0.5, 0.5 -> 0, 1",
+    InterventionPatchType == 41 ~ "0.5, 0.5 -> U{0, 1}"
+  )
 )
 
 # Plotting: ###################################################################
@@ -556,33 +566,59 @@ PLOT_B_subplots <- lapply(
 
 ### Presence Plots: ###########################################################
 
+presences <- presences %>% dplyr::group_by(
+  PoolPatchAffinity, PoolPatchAffinitySeed
+) %>% dplyr::arrange(
+  Size
+) %>% dplyr::mutate(
+  SizeRank = dplyr::dense_rank(Size)
+) %>% dplyr::ungroup()
+
+presencesPlotDF <- presences %>% dplyr::group_by(
+  Species, Size, SizeRank, Type, Affinity.Lower, Affinity.Upper,
+  Time,
+  PoolPatchAffinity, PoolPatchAffinitySeed,
+  Interactions, InteractionsSeed,
+  Events, EventsSeed, Dispersal, NicheDistance,
+  InterventionPatchType, InterventionPatchSeed,
+  InterventionTimeType, InterventionTimeSeed,
+  InterventionDispersal, InterventionNicheDistance,
+  Intervention
+) %>% dplyr::summarise(
+  Count = dplyr::n(),
+  EAf = toString(unique(EnvAffinity)),
+  # For checking: evidence that transitions are resulting in double counting.
+  .groups = "drop"
+) %>% dplyr::mutate(
+  TimeMax = Time + 1/pointsPerTimeUnit
+)
+
 # As with dispersal plots, this is the bare minimum to be functional.
 PLOT_T <- ggplot2::ggplot(
-  presences %>% dplyr::filter(
-    Abundance > 0
-  ) %>% dplyr::group_by(
-    Species, Size, Type, Affinity.Lower, Affinity.Upper,
-    Time,
-    PoolPatchAffinity, PoolPatchAffinitySeed,
-    Interactions, InteractionsSeed,
-    Events, EventsSeed,
-    Dispersal, NicheDistance
-  ) %>% dplyr::summarise(
-    Count = dplyr::n(),
-    .groups = "drop"
-  ),
-  ggplot2::aes(x = Time, y = Size, color = Count)
-) + ggplot2::geom_point(
-  shape = '.'
+  presencesPlotDF,
+  ggplot2::aes(x = Time, xend = TimeMax, y = SizeRank, yend = SizeRank,
+               color = Count,
+               fill = Count
+               )
+# ) + ggplot2::geom_point(
+#   #shape = '.'
+# ) + ggplot2::geom_tile(
+#   width = 1/pointsPerTimeUnit,
+#   height = 2/100, alpha = 1
+) + ggplot2::geom_segment(
 ) + ggplot2::scale_color_viridis_c(
   direction = -1,
-  limits = c(1, 10)
+  limits = c(1, length(unique(presences$Environment))),
+  aesthetics = c("colour", "fill")
 ) + ggplot2::facet_grid(
-  Dispersal ~ paste(PoolPatchAffinitySeed,
-                    NicheDistance,#) ~ paste(
-                    PoolPatchAffinity, Affinity.Lower, Affinity.Upper)
-  # ) + ggplot2::geom_hline(
-  #   yintercept = 1/3 * (ncol(results[[1]]$Abundance) - 1) / results[[1]]$NumEnvironments, color = "red"
+  Intervention ~ paste(Affinity.Lower, Affinity.Upper)
+# ) + ggplot2::geom_hline(
+#     yintercept = 0.1,
+#       #1/3 * (ncol(results[[1]]$Abundance) - 1) / results[[1]]$NumEnvironments,
+#       color = "red"
+) + ggplot2::geom_hline(
+  yintercept = min(presences$Species[presences$Type == "Consumer"]) - 0.5,
+  color = "red"
 ) + ggplot2::labs(
   y = "Species Size",
   x = "Time (Characteristic Scale)"#,
@@ -591,6 +627,5 @@ PLOT_T <- ggplot2::ggplot(
 ) + ggplot2::theme(
   # axis.text.x = ggplot2::element_blank(),
   # plot.tag.position = c(0.02, 0.98)
-) + ggplot2::scale_y_continuous(
-  limits = c(0, 1)
+# ) + ggplot2::scale_y_log10(
 )
