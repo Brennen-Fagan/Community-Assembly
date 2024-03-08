@@ -64,6 +64,7 @@ rhofunction <- function(
 
 rho.2.0.1.euclidean <- rhofunction()
 rho.2.1.2.euclidean <- rhofunction(2, 1, 2)
+rho.10.1.2.euclidean <- rhofunction(10, 1, 2)
 
 # Easy ring gradients.
 patchTypes.0.Half.1 <- function(n) {
