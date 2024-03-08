@@ -17,22 +17,13 @@
 # Easy to convert to cargs <- as.numeric(commandArgs(TRUE)) for parallel.
 
 poolpatchDictionaryChoice <-
-  # 1  # Pool with no patch affinity.       Patch with no affinities.
-  # 2  # Pool {0, 1} patch affinities.      Patch {0, 1} affinities.
-  # 3  # Pool {0, 0.5, 1} patch affinities. Patch {0, 1} affinities.
-  # 4  # Pool [0, 1] patch affinities.      Patch {0, 1} affinities.
-  # 5  # Pool {0, 1} patch affinities.      Patch {0, 0.5, 1} affinities.
-  # 6  # Pool {0, 0.5, 1} patch affinities. Patch {0, 0.5, 1} affinities.
-  # 7  # Pool [0, 1] patch affinities.      Patch {0, 0.5, 1} affinities.
-  # 8  # Pool {0, 1} patch affinities.      Patch [0, 1] affinities.
-  # 9  # Pool {0, 0.5, 1} patch affinities. Patch [0, 1] affinities.
-  # 10 # Pool [0, 1] patch affinities.      Patch [0, 1] affinities.
-   11 # Pool {0, 1} patch affinities.      Patch {0.5} affinity.
+
 poolpatchSeedChoice <-
   # 1 # Used on 2024-02-13
   # 2 # Used on 2024-02-14, 2024-02-15
   # 3 # Used on 2024-02-23
-  4 # Used on 2024-02-23 for the 2 patch system
+  # 4 # Used on 2024-02-23 for the 2 patch system
+  5 # Used on 2024-03-08
 
 dynamicsDictionaryChoice <-
   1 # Law and Morton 1996, Size-Structured Lotka-Volterra, Default Parameters
@@ -41,7 +32,8 @@ dynamicsSeedChoice <-
   # 1 # Used on 2024-02-13
   # 2 # Used on 2024-02-14
   # 3 # Used on 2024-02-23
-  4 # Used on 2024-02-23 for the 2 patch system
+  # 4 # Used on 2024-02-23 for the 2 patch system
+  5 # Used on 2024-03-08
 
 eventsDictionaryChoice <-
   #   Multipliers:
@@ -51,7 +43,8 @@ eventsSeedChoice <-
   # 1 # Used on 2024-02-13
   # 2 # Used on 2024-02-14 for both 1-1 and 2-1.
   # 3 # Used on 2024-02-23
-  4 # Used on 2024-02-23 for the 2 patch system
+  # 4 # Used on 2024-02-23 for the 2 patch system
+  5 # Used on 2024-03-08
 
 dispersalDictionaryChoice <-
   25 # c(NA, 5, 0)
@@ -63,14 +56,14 @@ dispersalDictionaryChoice <-
 # choose r' = r * rho ^ (sign(r)), but what rho?
 distanceDictionaryChoice <- # for m, n in [0, 1], rho(m, n) = ...
   # 1 # 2 ^ (- euclid(m, n)) => rho in [1/2, 1] for 1-D
-   2 # 2 ^ (1 - 2 euclid(m, n)) => rho in [1/2, 2] for 1-D
+  # 2 # 2 ^ (1 - 2 euclid(m, n)) => rho in [1/2, 2] for 1-D
+  3 # 10 ^ (1 - 2 euclid(m, n)) => rho in [1/10, 10] for 1-D
 
 ## Other Parameters: ##########################################################
 EliminationThreshold <- 10^-4 # Below which species are removed from internals
 ArrivalDensity <- EliminationThreshold * 4 * 10 ^ 3 # Traill et al. 2007
 MaximumTimeStep <- 1 # Maximum time solver can proceed without elimination.
 BetweenEventSteps <- 10 # Number of steps to reach next event to smooth.
-NumberOfEnvironments <- 2 # Default 10, but Jon wants to try just 2.
 
 
 directory <- "." # Should be "VariantExperiments"
@@ -87,6 +80,34 @@ library(Matrix)
 source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
 # Defines: retrieveFunction.
 
+# Why? so we can have single argument functions with partials.
+repFixed <- function(value = 0.5) {
+  force(value)
+  function(n) {rep(value, n)}
+}
+rep_0 <- repFixed(0)
+rep_0.5 <- repFixed()
+rep_1 <- repFixed(1)
+
+evensplit <- function(values = c(0, 1)) {
+  force(values)
+  function(n) {
+    c(rep(values, times = floor(n / length(values))),
+      if (n %% length(values) != 0) {
+        values[1:(n %% length(values))]
+      })
+  }
+}
+evensplit_01 <- evensplit()
+
+gradientline_01 <- function(n) {
+  c(rep(0, ceiling(n/2)), rep(1, floor(n/2)))
+}
+gradientline_0half1 <- function(n) {
+  left <- rep(0, floor(n / 3)); right <- rep(1, floor(n/3))
+  return(c(left, rep(0.5, n - length(left) - length(right)), right))
+}
+
 # Dictionaries: ###############################################################
 # > runif(3)*1e8
 # [1] 21622193 73825470 83066253
@@ -96,61 +117,44 @@ seedsMain <- data.frame(
   "dynamics" = 83066253
 )
 
-poolpatchDictionary <- data.frame(
-  Basals = 34,
-  Consumers = 66,
+poolpatchDictionary <- expand.grid(
+  BasalConsumerRatio = 1/2,
+  NSpecies = c(100, 200),
   PoolFunction = "RMTRCode2::LawMorton1996_species",
   PoolParameters = c(
     paste("Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1)",
           "LogBodySize = c(-2, -1, -1, 0)", sep = "; ")
   ),
   PoolDispersalSpeed = 1, # Value divided by DispersalResistance to get current.
-  NumberEnvironments = NumberOfEnvironments,
+  NumberEnvironments = c(2, 10),
   SpeciesAffinities = c(
-    # Pool with no patch affinity.
-    toString(rep(0, 100)),
-    # 2  # Pool {0, 1} patch affinities.      Patch {0, 1} affinities.
+    # Pool with {0.5} affinities.
+    "rep_0.5",
+    # 2  # Pool {0, 1} patch affinities at random.
     "sample.int.normalized",
-    # 3  # Pool {0, 0.5, 1} patch affinities. Patch {0, 1} affinities.
+    # 3  # Pool {0, 0.5, 1} patch affinities at random.
     "sample.int.3",
-    # 4  # Pool [0, 1] patch affinities.      Patch {0, 1} affinities.
+    # 4  # Pool [0, 1] patch affinities at random.
     "runif",
-    # 5  # Pool {0, 1} patch affinities.      Patch {0, 0.5, 1} affinities.
-    "sample.int.normalized",
-    # 6  # Pool {0, 0.5, 1} patch affinities. Patch {0, 0.5, 1} affinities.
-    "sample.int.3",
-    # 7  # Pool [0, 1] patch affinities.      Patch {0, 0.5, 1} affinities.
-    "runif",
-    # 8  # Pool {0, 1} patch affinities.      Patch [0, 1] affinities.
-    "sample.int.normalized",
-    # 9  # Pool {0, 0.5, 1} patch affinities. Patch [0, 1] affinities.
-    "sample.int.3",
-    # 10 # Pool [0, 1] patch affinities.      Patch [0, 1] affinities.
-    "runif",
-    # 11 # Pool {0, 1} patch affinities.      Patch {0.5} affinity.
-    "sample.int.normalized"
+    # 5  # Pool {0, 1} alternating affinities.
+    "evensplit_01"
   ),
   PatchAffinities = c(
     # Detection via if string begins with a numeric or a non-numeric.
     # If numeric, it takes it as a fixed set of affinities.
     # If non-numeric, it attempts to treat the string as a function name.
     # In the latter case, it provides ONLY NumberEnvironments as an argument.
-    toString(rep(0, NumberOfEnvironments)), #           Patch no affinities.
-    toString(c(rep(0, NumberOfEnvironments/2),
-               rep(1, NumberOfEnvironments/2))), #      Patch {0, 1} affinities.
-    toString(c(rep(0, NumberOfEnvironments/2),
-               rep(1, NumberOfEnvironments/2))), #      Patch {0, 1} affinities.
-    toString(c(rep(0, NumberOfEnvironments/2),
-               rep(1, NumberOfEnvironments/2))), #      Patch {0, 1} affinities.
-    "patchTypes.0.Half.1", #                       Patch {0, 0.5, 1} affinities.
-    "patchTypes.0.Half.1", #                       Patch {0, 0.5, 1} affinities.
-    "patchTypes.0.Half.1", #                       Patch {0, 0.5, 1} affinities.
-    "runifRing", #                                      Patch [0, 1] affinities.
-    "runifRing", #                                      Patch [0, 1] affinities.
-    "runifRing", #                                      Patch [0, 1] affinities.
-    toString(rep(0.5, NumberOfEnvironments)) #          Patch {0.5} affinity.
+    "rep_0.5", #             Patch {0.5} affinities.
+    "gradientline_01", #     Patch {0, 1} affinities. Gradient Line.
+    "evensplit_01", #        Patch {0, 1} affinities. Alternating.
+    "gradientline_0half1", # Patch {0, 0.5, 1} affinities. Gradient Line.
+    "patchTypes.0.Half.1", # Patch {0, 0.5, 1} affinities. Gradient Ring.
+    "runifRing" #            Patch [0, 1] affinities. Gradient Ring at Random.
   )
-)[poolpatchDictionaryChoice, ]
+)[poolpatchDictionaryChoice, ] %>% dplyr::mutate(
+  Basals = ceiling((1 - (1 + BasalConsumerRatio)^(-1)) * NSpecies),
+  Consumers = NSpecies - Basals
+)
 poolpatchSeed <- withRandom(
   runif(poolpatchSeedChoice)[poolpatchSeedChoice] * 1e8,
   seed = seedsMain$pools
@@ -166,7 +170,7 @@ dynamicsSeed <- withRandom(
   seed = seedsMain$dynamics
 )
 
-eventsDictionary <- data.frame(
+eventsDictionary <- expand.grid(
   ImmigrationMultiplier = 1,
   ImmigrationFunction = "RMTRCode2::ArrivalFUN_Example2",
   ExtirpationMultiplier = 1,
@@ -191,7 +195,8 @@ dispersalDictionary <- rbind(
 distanceDictionary <- data.frame(
   rhofunction = c( # Take patch
     "rho.2.0.1.euclidean",
-    "rho.2.1.2.euclidean"
+    "rho.2.1.2.euclidean",
+    "rho.10.1.2.euclidean"
   )
 )[distanceDictionaryChoice, ]
 
