@@ -17,13 +17,20 @@
 # Easy to convert to cargs <- as.numeric(commandArgs(TRUE)) for parallel.
 
 poolpatchDictionaryChoice <-
+  # 17 # 100 Species, 2 Patches, Species {0, 1} Alternating, Patches {0.5}.
+  # 18 # 200 Species, 2 Patches, Species {0, 1} Alternating, Patches {0.5}.
+  19 # 100 Species, 10 Patches, Species {0, 1} Alternating, Patches {0.5}.
+  # 20 # 200 Species, 10 Patches, Species {0, 1} Alternating, Patches {0.5}.
 
 poolpatchSeedChoice <-
   # 1 # Used on 2024-02-13
   # 2 # Used on 2024-02-14, 2024-02-15
   # 3 # Used on 2024-02-23
   # 4 # Used on 2024-02-23 for the 2 patch system
-  5 # Used on 2024-03-08
+  # 5 # Used on 2024-03-08 for choice 17 above.
+  # 6 # Used on 2024-03-08 for choice 18 above.
+  7 # Used on 2024-03-08 for choice 19 above.
+  # 8 # Used on 2024-03-08 for choice 20 above.
 
 dynamicsDictionaryChoice <-
   1 # Law and Morton 1996, Size-Structured Lotka-Volterra, Default Parameters
@@ -33,7 +40,10 @@ dynamicsSeedChoice <-
   # 2 # Used on 2024-02-14
   # 3 # Used on 2024-02-23
   # 4 # Used on 2024-02-23 for the 2 patch system
-  5 # Used on 2024-03-08
+  # 5 # Used on 2024-03-08 for choice 17 above.
+  # 6 # Used on 2024-03-08 for choice 18 above.
+  7 # Used on 2024-03-08 for choice 19 above.
+  # 8 # Used on 2024-03-08 for choice 20 above.
 
 eventsDictionaryChoice <-
   #   Multipliers:
@@ -44,10 +54,13 @@ eventsSeedChoice <-
   # 2 # Used on 2024-02-14 for both 1-1 and 2-1.
   # 3 # Used on 2024-02-23
   # 4 # Used on 2024-02-23 for the 2 patch system
-  5 # Used on 2024-03-08
+  # 5 # Used on 2024-03-08 for ppDChoice 17 above.
+  # 6 # Used on 2024-03-08 for ppDChoice 18 above.
+  7 # Used on 2024-03-08 for ppDChoice 19 above.
+  # 8 # Used on 2024-03-08 for ppDChoice 20 above.
 
 dispersalDictionaryChoice <-
-  25 # c(NA, 5, 0)
+  15 # c(NA, 5, 0)
   # Index: Ones place is resistance to Dispersal on a log scale.
   #      : Tens place is configuration: 0* = Ring, 1* = Line, 2* = Complete.
   #      : Special: NA corresponds to no dispersal.
@@ -56,8 +69,8 @@ dispersalDictionaryChoice <-
 # choose r' = r * rho ^ (sign(r)), but what rho?
 distanceDictionaryChoice <- # for m, n in [0, 1], rho(m, n) = ...
   # 1 # 2 ^ (- euclid(m, n)) => rho in [1/2, 1] for 1-D
-  # 2 # 2 ^ (1 - 2 euclid(m, n)) => rho in [1/2, 2] for 1-D
-  3 # 10 ^ (1 - 2 euclid(m, n)) => rho in [1/10, 10] for 1-D
+  2 # 2 ^ (1 - 2 euclid(m, n)) => rho in [1/2, 2] for 1-D
+  # 3 # 10 ^ (1 - 2 euclid(m, n)) => rho in [1/10, 10] for 1-D
 
 ## Other Parameters: ##########################################################
 EliminationThreshold <- 10^-4 # Below which species are removed from internals
@@ -150,7 +163,8 @@ poolpatchDictionary <- expand.grid(
     "gradientline_0half1", # Patch {0, 0.5, 1} affinities. Gradient Line.
     "patchTypes.0.Half.1", # Patch {0, 0.5, 1} affinities. Gradient Ring.
     "runifRing" #            Patch [0, 1] affinities. Gradient Ring at Random.
-  )
+  ),
+  stringsAsFactors = FALSE
 )[poolpatchDictionaryChoice, ] %>% dplyr::mutate(
   Basals = ceiling((1 - (1 + BasalConsumerRatio)^(-1)) * NSpecies),
   Consumers = NSpecies - Basals
@@ -163,7 +177,8 @@ poolpatchSeed <- withRandom(
 dynamicsDictionary <- data.frame(
   InteractionFunction = "RMTRCode2::LawMorton1996_CommunityMat",
   InteractionParameters = "Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1)",
-  DynamicsFunction = "RMTRCode2::PerCapitaDynamics_Type1"
+  DynamicsFunction = "RMTRCode2::PerCapitaDynamics_Type1",
+  stringsAsFactors = FALSE
 )[dynamicsDictionaryChoice, ]
 dynamicsSeed <- withRandom(
   runif(dynamicsSeedChoice)[dynamicsSeedChoice] * 1e8,
@@ -177,7 +192,8 @@ eventsDictionary <- expand.grid(
   ExtirpationFunction = "RMTRCode2::ExtinctFUN_Example2",
   ExtirpationPercentage = 1,
   EventsFunction = "defaultEvents", # Takes Number of Environments and Species.
-  EventsNumberMultiplier = c(1, 2)
+  EventsNumberMultiplier = c(1, 2),
+  stringsAsFactors = FALSE
 )[eventsDictionaryChoice, ]
 eventsSeed <- withRandom(
   runif(eventsSeedChoice)[eventsSeedChoice] * 1e8,
@@ -188,7 +204,8 @@ dispersalDictionary <- rbind(
   data.frame(Resistance = Inf, Configuration = "None"),
   expand.grid(
     Resistance = 10^c(0:9),
-    Configuration = c("Ring", "Line", "Complete")
+    Configuration = c("Ring", "Line", "Complete"),
+    stringsAsFactors = FALSE
   ))[ifelse(is.na(dispersalDictionaryChoice),
             1, dispersalDictionaryChoice + 2), ]
 
@@ -196,7 +213,8 @@ distanceDictionary <- data.frame(
   rhofunction = c( # Take patch
     "rho.2.0.1.euclidean",
     "rho.2.1.2.euclidean",
-    "rho.10.1.2.euclidean"
+    "rho.10.1.2.euclidean",
+    stringsAsFactors = FALSE
   )
 )[distanceDictionaryChoice, ]
 
