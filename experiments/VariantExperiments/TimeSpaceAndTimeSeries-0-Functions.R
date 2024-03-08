@@ -79,6 +79,18 @@ patchTypes.0.Half.1 <- function(n) {
   )
 }
 
+# Coupon Collector's Problem
+# I think this is probably higher accuracy than the previous version.
+defaultEvents <- function(
+  NumberOfEnvironments, NumberOfSpecies, constant = 3
+  ) {
+  ceiling(
+    NumberOfEnvironments * NumberOfSpecies * (
+      log(NumberOfEnvironments * NumberOfSpecies) + constant
+    )
+  )
+}
+
 ### Loading: ##################################################################
 loadSimulation <- function(filepath1, filepath2 = NULL) {
   file1 <- load(filepath1)
