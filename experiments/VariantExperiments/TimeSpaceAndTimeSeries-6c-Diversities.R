@@ -13,12 +13,14 @@ datfolders <- c(
   # "TSTS_Simulations_2-1_2-2_2024-02-14",
   # "TSTS_Simulations_10-1_2-2_2024-02-15",
   # "TSTS_Simulations_6-1_2-2_2024-02-15"
-  "TSTS_Simulations_11-1_3-3_2024-02-23",
-  "TSTS_Simulations_11-1_4-4_2024-02-23"
+  # "TSTS_Simulations_11-1_3-3_2024-02-23",
+  # "TSTS_Simulations_11-1_4-4_2024-02-23"
+  "TSTS_Simulations_17-1_5-5_2024-03-08"
 )
 
 cores <- 4
 
+rows_per_event <- 1
 
 # Libraries: ##################################################################
 library(dplyr)
@@ -169,7 +171,7 @@ Diversity <- foreach::foreach(
                 nspecies = c(Basal = sum(.x$Type == "Basal"),
                              Consumer = sum(.x$Type == "Consumer")),
                 # My standard approach for nspecies.
-                preferred_rows_per_event = 0.1,
+                preferred_rows_per_event = rows_per_event,
                 divide_time_by = 1
               )
 
@@ -188,7 +190,7 @@ Diversity <- foreach::foreach(
           loaded,
           nspecies = c(Basal = 34, Consumer = 66) * numberOfSpecies / 100,
           # My standard approach for nspecies.
-          preferred_rows_per_event = 0.1,
+          preferred_rows_per_event = rows_per_event,
           divide_time_by = 1
         )
 
@@ -199,7 +201,7 @@ Diversity <- foreach::foreach(
           loaded,
           nspecies = c(Basal = 34, Consumer = 66) * numberOfSpecies / 100,
           # My standard approach for nspecies.
-          preferred_rows_per_event = 0.1,
+          preferred_rows_per_event = rows_per_event,
           divide_time_by = 1
         ),
         Ellipsis = loaded$Ellipsis
