@@ -702,7 +702,7 @@ calculateAbundanceMetrics <- function(abundance, nspecies, nenvironments) {
     numSpecies = sum(nspecies)
   )
 
-  time <- abund[, 1]
+  time <- abundance[, 1]
 
   ### Alpha Diversity: ##################################################
   diversity_alpha <- lapply(
@@ -731,10 +731,10 @@ calculateAbundanceMetrics <- function(abundance, nspecies, nenvironments) {
   print("alpha")
   ### Gamma Diversity: ##################################################
   # In contrast, need to combine across environments.
-  envgamma <- env[[1]]
+  envgamma <- envs[[1]]
   if (nenvironments > 1) {
     for (i in 2:nenvironments) {
-      envgamma <- envgamma + env[[i]]
+      envgamma <- envgamma + envs[[i]]
     }
   }
 
@@ -749,14 +749,17 @@ calculateAbundanceMetrics <- function(abundance, nspecies, nenvironments) {
   names(metrics_consumer) <- paste0(names(metrics_consumer), ", Consumer")
   diversity_gamma <- cbind(Time = time,
         metrics, metrics_basal, metrics_consumer,
-        Environment = i,
+        Environment = NA,
         stringsAsFactors = FALSE)
 
+  print("gamma")
   ### Beta Diversity (Jaccard, Space): ##################################
   diversity_beta <- apply(
     abundance,
     MARGIN = 1, # Rows
     function(row, envs) {
+      thistime <- row[1]
+
       # Vegan complains about rows with all 0's.
       # The warning is generic, so we cannot silence it specifically.
       dists <- suppressWarnings(vegan::vegdist(
@@ -770,16 +773,16 @@ calculateAbundanceMetrics <- function(abundance, nspecies, nenvironments) {
       ) %>% dplyr::filter(
         Env1 < Env2
       ) %>% dplyr::mutate(
-        Time = time,
+        Time = thistime,
         BrayCurtis = dists
       )
 
       return(dataf)
     },
     envs = nenvironments
-  )
-  print("beta")
+  ) %>% dplyr::bind_rows()
 
+  print("beta")
   ### Return Diversities: ###############################################
   return(list(
     alpha = diversity_alpha,
