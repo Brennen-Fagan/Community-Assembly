@@ -13,8 +13,12 @@ runDictionaryChoice <-
   # 3 # "TSTS_Simulations_2-1_2-2_2024-02-14"
   # 4 # "TSTS_Simulations_6-1_2-2_2024-02-15"
   # 5 # "TSTS_Simulations_10-1_2-2_2024-02-15"
-  6 # "TSTS_Simulations_11-1_3-3_2024-02-23"
+  # 6 # "TSTS_Simulations_11-1_3-3_2024-02-23"
   # 7 # "TSTS_Simulations_11-1_4-4_2024-02-23"
+  # 8 # "TSTS_Simulations_17-1_5-5_2024-03-08",
+  # 9 # "TSTS_Simulations_18-1_6-6_2024-03-08",
+  10 # "TSTS_Simulations_19-1_7-7_2024-03-08",
+  # 11 # "TSTS_Simulations_20-1_8-8_2024-03-08"
 
 # While this code can be run in parallel, I'm generally disinclined.
 # I've not written it to suggest mass production and would rather
@@ -47,7 +51,7 @@ interventionPatchDictionaryChoice <-
   # 16 # Last 50% Patches -> {0, 0.5, 1} Unif @ Random
   # 18 # Last 50% Patches -> [0, 1] Unif @ Random
   # 40 # All Patches -> {0, 1} Gradient
-  # 41 # All Patches -> {0, 1} Unif @ Random
+  41 # All Patches -> {0, 1} Unif @ Random
 interventionPatchSeedChoice <-
   1 # Used on 2024-03-01
 
@@ -80,7 +84,8 @@ interventionDispersalDictionaryChoice <-
 # choose r' = r * rho ^ (sign(r)), but what rho?
 interventionDistanceDictionaryChoice <- # for m, n in [0, 1], rho(m, n) = ...
   # 1 # 2 ^ (- euclid(m, n)) => rho in [1/2, 1] for 1-D
-  2 # 2 ^ (1 - 2 euclid(m, n)) => rho in [1/2, 2] for 1-D
+  # 2 # 2 ^ (1 - 2 euclid(m, n)) => rho in [1/2, 2] for 1-D
+  3 # 10 ^ (1 - 2 euclid(m, n)) => rho in [1/10, 10] for 1-D
 
 ## Other Parameters: ##########################################################
 # Most should be pulled from the data already.
@@ -129,7 +134,11 @@ runDictionary <- data.frame(
     "TSTS_Simulations_6-1_2-2_2024-02-15",
     "TSTS_Simulations_10-1_2-2_2024-02-15",
     "TSTS_Simulations_11-1_3-3_2024-02-23",
-    "TSTS_Simulations_11-1_4-4_2024-02-23"
+    "TSTS_Simulations_11-1_4-4_2024-02-23",
+    "TSTS_Simulations_17-1_5-5_2024-03-08",
+    "TSTS_Simulations_18-1_6-6_2024-03-08",
+    "TSTS_Simulations_19-1_7-7_2024-03-08",
+    "TSTS_Simulations_20-1_8-8_2024-03-08"
   )
 )[runDictionaryChoice, ]
 
@@ -218,7 +227,9 @@ interventionDispersalDictionary <- rbind(
 interventionDistanceDictionary <- data.frame(
   rhofunction = c( # Take patch
     "rho.2.0.1.euclidean",
-    "rho.2.1.2.euclidean"
+    "rho.2.1.2.euclidean",
+    "rho.10.1.2.euclidean",
+    stringsAsFactors = FALSE
   )
 )[interventionDistanceDictionaryChoice, ]
 
@@ -391,7 +402,8 @@ interventionSuccess <- foreach::foreach(
   rho <- retrieveFunction(data.frame(
     rhofunction = c( # Take patch
       "rho.2.0.1.euclidean",
-      "rho.2.1.2.euclidean"
+      "rho.2.1.2.euclidean",
+      "rho.10.1.2.euclidean"
     )
   )[as.numeric(strsplit(x_properties[[1]], "-", fixed = TRUE)[[3]][5]), ])
 
