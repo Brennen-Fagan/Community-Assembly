@@ -683,7 +683,7 @@ thinAbundance <- function(abundance, events, threshold,
                              by = bythin), ]
 
   # Remove illegal values (that the numerical engine uses as inbetweens).
-  toEliminate <- abundance[, -1] < threshold & abundance[, -1] > 0
+  toEliminate <- abundance[, -1] < threshold # & abundance[, -1] > 0
   abundance[, -1][toEliminate] <- 0
 
   return(abundance)
