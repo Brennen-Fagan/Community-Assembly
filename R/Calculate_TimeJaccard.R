@@ -16,9 +16,9 @@ Calculate_TimeJaccard <- function(loaded, nspecies, minTime = NULL) {
     function(i, abund, numSpecies) {
       print(i)
       time <- abund[, 1]
-      env <- abund[, 1 + 1:numSpecies + numSpecies * (i - 1)]
-      env_basal <- env[, 1:nspecies[1]]
-      env_consumer <- env[, nspecies[1] + 1:nspecies[2]]
+      env <- abund[, 1 + 1:numSpecies + numSpecies * (i - 1), drop = FALSE]
+      env_basal <- env[, 1:nspecies[1], drop = FALSE]
+      env_consumer <- env[, nspecies[1] + 1:nspecies[2], drop = FALSE]
 
       consistentDistance <- max(diff(time), minTime)
       targets <- seq(from = min(time), to = max(time), by = consistentDistance)
@@ -28,7 +28,7 @@ Calculate_TimeJaccard <- function(loaded, nspecies, minTime = NULL) {
 
       helper <- function(i, r, m)
         as.numeric(suppressWarnings(vegan::vegdist(
-          x = rbind(m[r[i - 1],], m[r[i],]), method = "jaccard"
+          x = rbind(m[r[i - 1],, drop = FALSE], m[r[i],, drop = FALSE]), method = "jaccard"
         )))
 
       # Each Row is an "Environment"
