@@ -172,9 +172,11 @@ Calculate_Diversity <- function(loaded, nspecies) {
         Env2 = 1:envs
       ) %>% dplyr::filter(
         Env1 < Env2
+      ) %>% dplyr::arrange(
+        Env1, Env2
       ) %>% dplyr::mutate(
         Time = time,
-        Jaccard = as.numeric(dists)
+        Jaccard = as.vector(dists)
       )
 
       return(dataf)
@@ -400,7 +402,7 @@ not <- function(f) function(...) !f(...)
 ## Functions from Figure 4 files: #############################################
 
 # Recycling from Viking_HandleOutput_Diversity.R.
-thinAndCalculateInvadabilities <- function(loaded, dyn, dis, 
+thinAndCalculateInvadabilities <- function(loaded, dyn, dis,
                                            preferred_rows_per_event) {
   # We can't handle all of the data that we are going to be looking at;
   # a small sample had ~180k rows for ~5.3k events = ~34 rows per event.
@@ -487,7 +489,7 @@ thinAndCalculateInvadabilities <- function(loaded, dyn, dis,
 }
 
 # Recycling from SecondAttempt-Doc-Analysis2-Gallery.Rmd.
-thinAndCalculateDiversities <- function(loaded, nspecies, 
+thinAndCalculateDiversities <- function(loaded, nspecies,
                                         preferred_rows_per_event) {
   # We can't handle all of the data that we are going to be looking at;
   # a small sample had ~180k rows for ~5.3k events = ~34 rows per event.
@@ -639,9 +641,11 @@ thinAndCalculateDiversities <- function(loaded, nspecies,
         Env2 = 1:envs
       ) %>% dplyr::filter(
         Env1 < Env2
+      ) %>% dplyr::arrange(
+        Env1, Env2
       ) %>% dplyr::mutate(
         Time = time,
-        Jaccard = dists
+        Jaccard = as.vector(dists)
       )
 
       return(dataf)
@@ -968,7 +972,7 @@ AvgGammaAlphaOverTime <- function(DAG) {
     names_to = "Measurement", values_to = "Value"
   ) %>% ggplot2::ggplot(
     mapping = ggplot2::aes(
-      x = Time, y= Value, 
+      x = Time, y= Value,
       group = Measurement, color = Measurement
     )
   ) + ggplot2::geom_line(
