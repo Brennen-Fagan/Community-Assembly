@@ -709,8 +709,10 @@ calculateAbundanceMetrics <- function(abundance, nspecies, nenvironments) {
     1:nenvironments,
     function(i, abund, numSpecies) {
       env <- envs[[i]]
-      env_basal <- env[, 1:nspecies[1]]
-      env_consumer <- env[, nspecies[1] + 1:nspecies[2]]
+      env_basal <- env[, 1:nspecies[1], drop = FALSE]
+      env_consumer <- env[, nspecies[1] + 1:nspecies[2], drop = FALSE]
+      # fix a bug in vegan for single species ecosystems...
+      if(ncol(env_consumer) == 1) env_consumer <- cbind(env_consumer, 0)
       metrics <- vegan::renyi(env, hill = TRUE)
       metrics_basal <- vegan::renyi(env_basal, hill = TRUE)
       metrics_consumer <- vegan::renyi(env_consumer, hill = TRUE)
@@ -738,8 +740,10 @@ calculateAbundanceMetrics <- function(abundance, nspecies, nenvironments) {
     }
   }
 
-  env_basal <- envgamma[, 1:nspecies[1]]
-  env_consumer <- envgamma[, nspecies[1] + 1:nspecies[2]]
+  env_basal <- envgamma[, 1:nspecies[1], drop = FALSE]
+  env_consumer <- envgamma[, nspecies[1] + 1:nspecies[2], drop = FALSE]
+  # fix a bug in vegan for single species ecosystems...
+  if(ncol(env_consumer) == 1) env_consumer <- cbind(env_consumer, 0)
 
   metrics <- vegan::renyi(envgamma, hill = TRUE)
   metrics_basal <- vegan::renyi(env_basal, hill = TRUE)
@@ -772,9 +776,11 @@ calculateAbundanceMetrics <- function(abundance, nspecies, nenvironments) {
         Env2 = 1:envs
       ) %>% dplyr::filter(
         Env1 < Env2
+      ) %>% dplyr::arrange(
+        Env1, Env2
       ) %>% dplyr::mutate(
         Time = thistime,
-        BrayCurtis = dists
+        BrayCurtis = as.vector(dists)
       )
 
       return(dataf)
