@@ -1,0 +1,49 @@
+2024-04-10
+
+The user might note that the spatial beta diversity functions in 
+this folder are not 100% the same as those in HelperFunctions.R 
+(note, these may be separated into individual functions later).
+This is due to a bug detected (mea culpa!) involving a mismatch in
+the ordering of expand.grid and vegan::vegdist. The values appear
+to be correct, but they are misassigned between environment pairs
+within a given time step. I recommend usage of the RMTRCode2
+versions instead of the local versions in this folder.
+
+Is this a major problem? 
+In short, no: the bug only affects the labelling in spatial beta.
+Temporal beta is unaffected (as we only compare single time step
+to single time step, rather than all time steps simultaneously) as
+are the alpha and gamma metrics (since it is a pairwise distance
+problem). Presence, invasibility and simulation data are unaffected.
+Furthermore, spatial beta aggregates over environments are not 
+affected either, so long as all environment pairs are aggregated
+equally. The only problem that might occur is downstream from using
+the diversity data from the simulations while looking at individual
+patch pairs. In that case, the spatial beta diversity would need to
+be recalculated.
+
+This is a problem, for instance, in the otherwise unused figure
+SmallMultiples for the pairs of Spatial Jaccard with Local Richness
+and with Temporal Jaccard.
+
+What actions have been taken?
+Figure 3 images included the generation of diversity values. Visual
+inspection of the results appear to not show any differences. As
+such, I've taken the opportunity to simply remove the individual 
+versions of the functions there. 
+
+I've not done the same for Figure 4 diversity calculation functions.
+The reason for this is that the data generated for Figure 4 has been
+published, and I feel the code should reflect the publication unless
+the mistake affects the results. As such, the Figure 4 calculations
+should not be used for a new analysis.
+
+Does this invalidate the publication?
+It adds a caveat to the detailed interpretation of the data, but the
+figures all remain the same (Figure 3 used Environment Identity/-ies
+to keep lines separate, while Figure 4 averaged over Environments and
+Times, e.g. line 204 of MNA-Image-VikingOut-Figure4.R) as does all of
+the text (e.g., no numbers change). At no point were individual 
+patches compared in the 2023 publication.
+
+-- Brennen Fagan

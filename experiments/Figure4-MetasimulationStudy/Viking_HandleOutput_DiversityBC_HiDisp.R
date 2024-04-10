@@ -71,6 +71,10 @@ doParallel::registerDoParallel(clust)
 
 # Functions: ##################################################################
 
+warning(
+  "These functions incorrectly label environments for Spatial beta diversity"
+)
+
 # Recycling from SecondAttempt-Doc-Analysis2-Gallery.Rmd.
 thinAndCalculateDiversities <- function(loaded, nspecies) {
   # We can't handle all of the data that we are going to be looking at;

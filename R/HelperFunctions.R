@@ -172,9 +172,11 @@ Calculate_Diversity <- function(loaded, nspecies) {
         Env2 = 1:envs
       ) %>% dplyr::filter(
         Env1 < Env2
+      ) %>% dplyr::arrange(
+        Env1, Env2
       ) %>% dplyr::mutate(
         Time = time,
-        Jaccard = as.numeric(dists)
+        Jaccard = as.vector(dists)
       )
 
       return(dataf)
@@ -642,9 +644,11 @@ thinAndCalculateDiversities <- function(loaded, nspecies,
         Env2 = 1:envs
       ) %>% dplyr::filter(
         Env1 < Env2
+      ) %>% dplyr::arrange(
+        Env1, Env2
       ) %>% dplyr::mutate(
         Time = time,
-        Jaccard = dists
+        Jaccard = as.vector(dists)
       )
 
       return(dataf)
