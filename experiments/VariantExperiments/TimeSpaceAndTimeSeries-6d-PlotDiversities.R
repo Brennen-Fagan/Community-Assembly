@@ -14,7 +14,8 @@ datfolders <- c(
   # "TSTS_Simulations_11-1_4-4_2024-02-23"
   # "TSTS_Simulations_11-1_3-3_2024-02-23"
   # "TSTS_Simulations_17-1_5-5_2024-03-08"
-  "TSTS_Simulations_18-1_6-6_2024-03-08"
+  # "TSTS_Simulations_18-1_6-6_2024-03-08"
+  "TSTS_Simulations_19-1_7-7_2024-03-08"
 )
 
 savedir <- file.path(datfolders, "Images")
@@ -475,28 +476,28 @@ divabundsRounded <- divabunds %>%  dplyr::group_by(
 )
 
 divabundsLocalMeans <- divabundsRounded %>% dplyr::filter(
-    Measurement == "Alpha 1"
-  ) %>% dplyr::group_by(
-    Time, # Time
-    # Environment, Environment2, # Location
-    Affinity, # Effectively: Species set
-    Measurement, Aggregation, `Species Layer`, # Measurement
+  Measurement == "Alpha 1"
+) %>% dplyr::group_by(
+  Time, # Time
+  # Environment, Environment2, # Location
+  Affinity, # Effectively: Species set
+  Measurement, Aggregation, `Species Layer`, # Measurement
 
-    # By Run:
-    PoolPatchAffinity, PoolPatchAffinitySeed, Interactions, InteractionsSeed,
-    Events, EventsSeed, Dispersal, NicheDistance,
-    InterventionPatchType, InterventionPatchSeed, InterventionTimeType,
-    InterventionTimeSeed, InterventionDispersal, InterventionNicheDistance
-  ) %>% dplyr::summarise(
-    Value = mean(Value),
-    Aggregation = if (any(is.na(unique(Aggregation)))) {
-      "Mean"
-    } else {
-      paste("Mean", paste(unique(Aggregation), collapse = "-"))
-    },
-    Environment = NA, Environment2 = NA,
-    .groups = "drop"
-  )
+  # By Run:
+  PoolPatchAffinity, PoolPatchAffinitySeed, Interactions, InteractionsSeed,
+  Events, EventsSeed, Dispersal, NicheDistance,
+  InterventionPatchType, InterventionPatchSeed, InterventionTimeType,
+  InterventionTimeSeed, InterventionDispersal, InterventionNicheDistance
+) %>% dplyr::summarise(
+  Value = mean(Value),
+  Aggregation = if (any(is.na(unique(Aggregation)))) {
+    "Mean"
+  } else {
+    paste("Mean", paste(unique(Aggregation), collapse = "-"))
+  },
+  Environment = NA, Environment2 = NA,
+  .groups = "drop"
+)
 
 divabundsRounded <- dplyr::bind_rows(
   divabundsRounded,
@@ -935,7 +936,7 @@ PLOT_B_subplotsBC <- lapply(
 ggplot2::ggsave(
   filename = file.path(savedir, "Diversity.png"),
   plot = PLOT_B, width = 12, height = 8, units = "in"
-  )
+)
 
 lapply(1:length(PLOT_B_subplots), function(i) {
   lapply(1:length(PLOT_B_subplots[[i]]), function(j) {
@@ -1051,27 +1052,51 @@ presences <- presences %>% dplyr::group_by(
   SizeRank = dplyr::dense_rank(Size)
 ) %>% dplyr::ungroup()
 
-presencesPlotDF <- presences %>% dplyr::filter(
-  is.na(InterventionNicheDistance) |
-    NicheDistance == InterventionNicheDistance
-) %>% dplyr::group_by(
-  Species, Size, SizeRank, Type, Affinity.Lower, Affinity.Upper,
-  Time,
-  PoolPatchAffinity, PoolPatchAffinitySeed,
-  Interactions, InteractionsSeed,
-  Events, EventsSeed, Dispersal, NicheDistance,
-  InterventionPatchType, InterventionPatchSeed,
-  InterventionTimeType, InterventionTimeSeed,
-  InterventionDispersal, InterventionNicheDistance,
-  Intervention
-) %>% dplyr::summarise(
-  Count = dplyr::n(),
-  EAf = toString(unique(EnvAffinity)),
-  # For checking: evidence that transitions are resulting in double counting.
-  .groups = "drop"
-) %>% dplyr::mutate(
-  TimeMax = Time + 1/pointsPerTimeUnit
-)
+if (length(unique(SpeciesPresence$SpeciesPresences$Environment)) > 2) {
+  presencesPlotDF <- presences %>% dplyr::filter(
+    is.na(InterventionNicheDistance) |
+      NicheDistance == InterventionNicheDistance
+  ) %>% dplyr::group_by(
+    Species, Size, SizeRank, Type, Affinity.Lower, Affinity.Upper,
+    Time,
+    PoolPatchAffinity, PoolPatchAffinitySeed,
+    Interactions, InteractionsSeed,
+    Events, EventsSeed, Dispersal, NicheDistance,
+    InterventionPatchType, InterventionPatchSeed,
+    InterventionTimeType, InterventionTimeSeed,
+    InterventionDispersal, InterventionNicheDistance,
+    Intervention
+  ) %>% dplyr::summarise(
+    Count = dplyr::n(),
+    EAf = toString(unique(EnvAffinity)),
+    # For checking: evidence that transitions are resulting in double counting.
+    .groups = "drop"
+  ) %>% dplyr::mutate(
+    TimeMax = Time + 1/pointsPerTimeUnit
+  )
+} else {
+  presencesPlotDF <- presences %>% dplyr::filter(
+    is.na(InterventionNicheDistance) |
+      NicheDistance == InterventionNicheDistance
+  ) %>% dplyr::group_by(
+    Species, Size, SizeRank, Type, Affinity.Lower, Affinity.Upper,
+    Time,
+    PoolPatchAffinity, PoolPatchAffinitySeed,
+    Interactions, InteractionsSeed,
+    Events, EventsSeed, Dispersal, NicheDistance,
+    InterventionPatchType, InterventionPatchSeed,
+    InterventionTimeType, InterventionTimeSeed,
+    InterventionDispersal, InterventionNicheDistance,
+    Intervention
+  ) %>% dplyr::summarise(
+    Count = toString(unique(Environment)),
+    EAf = toString(unique(EnvAffinity)),
+    # For checking: evidence that transitions are resulting in double counting.
+    .groups = "drop"
+  ) %>% dplyr::mutate(
+    TimeMax = Time + 1/pointsPerTimeUnit
+  )
+}
 
 # As with dispersal plots, this is the bare minimum to be functional.
 PLOT_T <- ggplot2::ggplot(
@@ -1079,12 +1104,12 @@ PLOT_T <- ggplot2::ggplot(
   ggplot2::aes(x = Time, xend = TimeMax, y = SizeRank, yend = SizeRank,
                color = Count,
                fill = Count
-               )
-# ) + ggplot2::geom_point(
-#   #shape = '.'
-# ) + ggplot2::geom_tile(
-#   width = 1/pointsPerTimeUnit,
-#   height = 2/100, alpha = 1
+  )
+  # ) + ggplot2::geom_point(
+  #   #shape = '.'
+  # ) + ggplot2::geom_tile(
+  #   width = 1/pointsPerTimeUnit,
+  #   height = 2/100, alpha = 1
 ) + ggplot2::geom_segment(
 ) + ggplot2::scale_color_viridis_c(
   direction = -1,
@@ -1092,10 +1117,10 @@ PLOT_T <- ggplot2::ggplot(
   aesthetics = c("colour", "fill")
 ) + ggplot2::facet_grid(
   Intervention ~ paste(Affinity.Lower, Affinity.Upper)
-# ) + ggplot2::geom_hline(
-#     yintercept = 0.1,
-#       #1/3 * (ncol(results[[1]]$Abundance) - 1) / results[[1]]$NumEnvironments,
-#       color = "red"
+  # ) + ggplot2::geom_hline(
+  #     yintercept = 0.1,
+  #       #1/3 * (ncol(results[[1]]$Abundance) - 1) / results[[1]]$NumEnvironments,
+  #       color = "red"
 ) + ggplot2::geom_hline(
   yintercept = min(presences$Species[presences$Type == "Consumer"]) - 0.5,
   color = "red"
@@ -1107,7 +1132,7 @@ PLOT_T <- ggplot2::ggplot(
 ) + ggplot2::theme(
   # axis.text.x = ggplot2::element_blank(),
   # plot.tag.position = c(0.02, 0.98)
-# ) + ggplot2::scale_y_log10(
+  # ) + ggplot2::scale_y_log10(
 )
 
 
