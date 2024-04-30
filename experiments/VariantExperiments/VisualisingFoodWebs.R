@@ -22,14 +22,20 @@
 # Problems with X11
 options(bitmapType = "cairo")
 
+systype <- match.arg(
+  "Simulation",
+  c("Simulation", "Intervention")
+)
+
 # Intervention specific version
 # LOAD POOLPATCHDYNAMICS
 # LOAD INTERVENTION
 
 set <- "18-1"
-tag <- paste0(set, "-2-25-3_6-6-6_40-1-15-3_1-1")
+tag <- paste0(set, "-2-25-3_6-6-6",
+              if (systype == "Intervention") "_40-1-15-3_1-1")
 dir <- "TSTS_Simulations_18-1_6-6_2024-03-08"
-load(file.path(dir, paste0("TSTS_Intervention_", tag, ".RData")))
+load(file.path(dir, paste0("TSTS_",systype, "_", tag, ".RData")))
 load(file.path(dir, paste0("TSTS_PoolPatchDynamics_", set, ".RData")))
 load(file.path(dir, paste0("TSTS_Diversity_", tag, ".RData")))
 load(file.path(dir, paste0("TSTS_DivAbund_", tag, ".RData")))
@@ -38,10 +44,15 @@ library(dplyr)
 
 threshold <- 0.00 # in [0, 1]
 
-afterIntervention <-
-  result$Abundance[, 1] > result$Ellipsis$Affinity$TimeIntervention
+if (systype == "Intervention") {
+  timesInUse <-
+    result$Abundance[, 1] >= result$Ellipsis$Affinity$TimeIntervention
 
-times <- result$Abundance[afterIntervention, 1]
+  times <- result$Abundance[timesInUse, 1]
+} else {
+  timesInUse <- rep(TRUE, nrow(result$Abundance))
+  times <- result$Abundance[, 1]
+}
 jaccard <- lapply(Diversity$Diversities$beta, as.data.frame)
 jaccard <- lapply(jaccard, function(x) {x$Jaccard <- as.numeric(x$Jaccard); x})
 jaccard <- jaccard %>% dplyr::bind_rows() %>% dplyr::filter(
@@ -69,10 +80,7 @@ environs <- lapply(
     indices <- 1 + 1:ns + (i - 1) * ns
 
     # Reduce to the appropriate submatrix.
-    temp <- result$Abundance[
-      result$Abundance[, 1] >= result$Ellipsis$Affinity$TimeIntervention,
-      indices
-      ]
+    temp <- result$Abundance[timesInUse, indices]
 
     # Keep only columns that have species present at some point in the sim.
     keep <- apply(temp, 2,
@@ -92,22 +100,29 @@ environs <- lapply(
     rownames(interactions) <- which(keep)
 
     ### Recreate Dispersal Matrix: ############################################
-    interventionDispersalDictionaryChoice <-
-      as.numeric(
-        ((strsplit(result$Ellipsis$ID, "_")[[1]][3]) %>% strsplit("-"))[[1]][3]
-      )
+    if (systype == "Intervention") {
+      dispersalDictionaryChoice <-
+        as.numeric((
+          (strsplit(result$Ellipsis$ID, "_")[[1]][3]) %>% strsplit("-")
+          )[[1]][3])
+    } else if (systype == "Simulation") {
+      dispersalDictionaryChoice <-
+        as.numeric((
+          (strsplit(result$Ellipsis$ID, "_")[[1]][1]) %>% strsplit("-")
+        )[[1]][4])
+    }
 
-    interventionDispersalDictionary <- rbind(
+    dispersalDictionary <- rbind(
       data.frame(Resistance = Inf, Configuration = "None"),
       expand.grid(
         Resistance = 10^c(0:9),
         Configuration = c("Ring", "Line", "Complete")
-      ))[ifelse(is.na(interventionDispersalDictionaryChoice),
-                1, interventionDispersalDictionaryChoice + 2), ]
+      ))[ifelse(is.na(dispersalDictionaryChoice),
+                1, dispersalDictionaryChoice + 2), ]
 
     DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
       EnvironmentDistances = with(c(
-        interventionDispersalDictionary,
+        dispersalDictionary,
         Environments = result$NumEnvironments
       ), {
         if (Configuration == "None") {
@@ -151,9 +166,13 @@ environs <- lapply(
       DispersalGain = In[indices[keep] - 1, ], # -1 since time not in Dispersal
       DispersalLoss = Out[indices[keep] - 1, ],
       Intrinsic =
+        if (systype == "Intervention") {
         result$Ellipsis$Affinity$EffectiveReproductionRateIntervention[
           indices[keep] - 1 # since time not in intrinsic rep rate.
           ]
+        } else if (systype == "Simulation") {
+          result$Ellipsis$Affinity$EffectiveReproductionRate[indices[keep] - 1]
+        }
     ))
   }, ns = (ncol(result$Abundance) - 1) / result$NumEnvironments)
 
@@ -290,7 +309,7 @@ animation::saveVideo(
             to = rownames(e[[i]]$Matrix),
             from = paste0(".", rownames(e[[i]]$Matrix)),
             weight = (e[[i]]$DispersalGain %*%
-                        result$Abundance[afterIntervention, ][timestep, -1])[, 1] /
+                        result$Abundance[timesInUse, ][timestep, -1])[, 1] /
               e[[i]]$Abundance[timestep, ],
             Type = "Dispersal"
           ) %>% dplyr::filter(!is.nan(weight),
@@ -303,7 +322,7 @@ animation::saveVideo(
             to = paste0(".", rownames(e[[i]]$Matrix)),
             from = rownames(e[[i]]$Matrix),
             weight = (e[[i]]$DispersalLoss %*%
-                        result$Abundance[afterIntervention, ][timestep, -1])[, 1] /
+                        result$Abundance[timesInUse, ][timestep, -1])[, 1] /
               e[[i]]$Abundance[timestep, ],
             Type = "Dispersal"
           ) %>% dplyr::filter(!is.nan(weight),
