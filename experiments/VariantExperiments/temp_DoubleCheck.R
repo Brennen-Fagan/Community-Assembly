@@ -41,7 +41,7 @@ interventionPatchDictionary <- expand.grid(
     # If numeric, it takes it as a fixed set of affinities.
     # If non-numeric, it attempts to treat the string as a function name.
     # In the latter case, it provides ONLY NumberEnvironments as an argument.
-    
+
     toString(rep(0, NumberOfEnvironments)), # Patches -> {0}
     toString(rep(0.5, NumberOfEnvironments)), # Patches -> {0.5}
     toString(rep(1, NumberOfEnvironments)), # Patches -> {1}
@@ -265,8 +265,12 @@ Dynamics <- function(t, y, parms) {
 
 timeSimulation <- times[timestep] * result$ReactionTime
 timestepResult <- which(result$Abundance[, 1] == timeSimulation)
+abundanceEliminated <- result$Abundance[timestepResult, -1]
+abundanceEliminated <- ifelse(
+  abundanceEliminated < result$Parameters$EliminationThreshold,
+  0, abundanceEliminated)
 
+expected <-
+  Dynamics(timeSimulation, abundanceEliminated, parms = list())[[1]] /
+  abundanceEliminated
 
-expected <- 
-  Dynamics(timeSimulation, result$Abundance[timestep,-1], parms = list())[[1]] / 
-  result$Abundance[timestep,-1]

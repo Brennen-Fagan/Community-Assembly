@@ -152,7 +152,7 @@ environs <- lapply(
       DispersalLoss = Out[indices[keep] - 1, ],
       Intrinsic =
         result$Ellipsis$Affinity$EffectiveReproductionRateIntervention[
-          indices[keep]
+          indices[keep] - 1 # since time not in intrinsic rep rate.
           ]
     ))
   }, ns = (ncol(result$Abundance) - 1) / result$NumEnvironments)
@@ -220,6 +220,10 @@ animation::saveVideo(
           #               Hence transpose t().
           #               Not doubled because tidygraph uses the opposite from-to
           #               convention from me.
+          #               colSums(...) returns the correct values.
+          #               (= (InteractionMatrices$Mats[[1]] %*%
+          #                  (result$Abundance[timestepResult, -1][1:200]))[
+          #                   as.numeric(colnames(environs[[1]]$Abundance))])
           t(e$Matrix) * e$Abundance[timestep, ]
         ) %>% tidygraph::mutate(
           Present = e$Abundance[timestep, ] > 0,
