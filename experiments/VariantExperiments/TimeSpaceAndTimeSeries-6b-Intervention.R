@@ -398,14 +398,7 @@ interventionSuccess <- foreach::foreach(
   })
 
   ##### Post-intervention adjusted intrinsic growth/decay rates: ##############
-  # TECH DEBT: Copied from 6a-Simulation.R.
-  rho <- retrieveFunction(data.frame(
-    rhofunction = c( # Take patch
-      "rho.2.0.1.euclidean",
-      "rho.2.1.2.euclidean",
-      "rho.10.1.2.euclidean"
-    )
-  )[as.numeric(strsplit(x_properties[[1]], "-", fixed = TRUE)[[3]][5]), ])
+  rho <- retrieveFunction(interventionDistanceDictionary)
 
   grid <- expand.grid(
     pool = 1:nrow(poolMats$Pool), # Fastest Varying
