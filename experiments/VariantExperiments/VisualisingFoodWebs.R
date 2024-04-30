@@ -517,7 +517,8 @@ animation::saveVideo(
       })
 
       candidateLargestTotalEffect <-
-        max(abs(unlist(lapply(graf, function(g) g %N>% pull(fill)))))
+        max(abs(unlist(lapply(graf, function(g) g %N>% pull(fill)))),
+            na.rm = TRUE)
       if (largestTotalEffect < candidateLargestTotalEffect) {
         largestTotalEffect <- candidateLargestTotalEffect
         print(largestTotalEffect)
@@ -636,7 +637,9 @@ animation::saveVideo(
                 if(i != 1) {paste(
                   c("R:", "Jac:", "BC:"),
                   unlist(lapply(c(corWith1, jacWith1, bcWith1), function(x) {
-                    if (x == 1) {
+                    if (is.na(x)) {
+                      " NA        "
+                    } else if (x == 1) {
                       " 1         "
                     } else if (x == 0) {
                       " 0         "
