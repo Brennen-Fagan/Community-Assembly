@@ -212,8 +212,235 @@ library(ggraph)
 library(ggpubr)
 library(animation)
 
+### Helper Functions: #########################################################
+# These need to be called multiple times do to have (nontrivial) layouts.
+createBaseGraph <- function(timestep, environs) {
+  lapply(
+    environs, function(e) {
+      g <- tidygraph::as_tbl_graph(
+        # Careful here: obvious way is to go from %*% to * to avoid addition
+        #               in the matrix-vector product.
+        #               R does its multiplications column wise though!
+        #               Hence transpose t().
+        #               Not doubled because tidygraph uses the opposite
+        #               from-to convention from me.
+        #               colSums(...) returns the correct values.
+        #               (= (InteractionMatrices$Mats[[1]] %*%
+        #                  (result$Abundance[timestepResult, -1][1:200]))[
+        #                   as.numeric(colnames(environs[[1]]$Abundance))])
+        t(e$Matrix) * e$Abundance[timestep, ]
+      ) %>% tidygraph::mutate(
+        Present = e$Abundance[timestep, ] > 0,
+        Abundance = e$Abundance[timestep, ],
+        Size = e$Size,
+        Type = e$Type,
+        Affinity = e$Affinity
+      )
+
+      if (sum(e$Abundance[timestep, ] > 0) > 1) {
+        g <- g %>% tidygraph::activate(edges) %>% tidygraph::mutate(
+          Type = ifelse(weight > 0, "Consumption", ifelse(
+            to == from, "Intraspecific", "Predation"
+          ))
+        ) %>% tidygraph::activate(nodes)
+      }
+
+      return(g)
+    }
+  )
+}
+
+addIntrinsicToGraph <- function(graph, timestep, environs) {
+  #KEY:
+  #   ON if ever PRESENT
+  #   PRESENT if currently have non-zero abundance
+  #   SPECIES if you represent a real species.
+  lapply(seq_along(environs), function(i, g, e) {
+    # Add missing nodes
+    temp <- tidygraph::bind_graphs(
+      g[[i]] %>% dplyr::mutate(On = TRUE, Species = TRUE),
+      tidygraph::tbl_graph(
+        data.frame(name = as.character(e[[i]]$Missing))
+      ) %>% dplyr::mutate(
+        On = FALSE, Species = TRUE, Present = FALSE, Abundance = 0,
+        Size = Pool$Size[e[[i]]$Missing],
+        Affinity = Pool$Affinity[e[[i]]$Missing]
+      )
+    ) %>% tidygraph::arrange(name)
+
+    # Add fake nodes
+    temp <- tidygraph::bind_graphs(
+      temp,
+      tidygraph::tbl_graph(
+        data.frame(name = paste0(".", temp %>% dplyr::pull(name)))
+      ) %>% dplyr::mutate(
+        On = FALSE, Species = FALSE, Present = FALSE, Abundance = 0,
+        Size = Pool$Size[temp %>% dplyr::pull(name) %>% as.numeric],
+        Affinity = NA
+      )
+    )
+
+    # Add intrinsic rates as edges to/from the fake nodes.
+    temp <- temp %>% tidygraph::bind_edges(
+      data.frame(
+        to = ifelse(e[[i]]$Intrinsic > 0,
+                    rownames(e[[i]]$Matrix),
+                    paste0(".", rownames(e[[i]]$Matrix))),
+        from = ifelse(e[[i]]$Intrinsic > 0,
+                      paste0(".", rownames(e[[i]]$Matrix)),
+                      rownames(e[[i]]$Matrix)),
+        weight = e[[i]]$Intrinsic,
+        Type = ifelse(e[[i]]$Intrinsic > 0, "Growth", "Decay")
+      ), node_key = "name"
+    )
+
+    # Add dispersal rates as edges to/from the fake nodes.
+    # Note units need to be per capita, so we calculate as:
+    #  (Dispersal %*% Abundance) / (Local Abundance)
+    temp <- temp %>% tidygraph::bind_edges(
+      data.frame(
+        to = rownames(e[[i]]$Matrix),
+        from = paste0(".", rownames(e[[i]]$Matrix)),
+        weight = (e[[i]]$DispersalGain %*%
+                    result$Abundance[timesInUse, ][timestep, -1])[, 1] /
+          e[[i]]$Abundance[timestep, ],
+        Type = "Dispersal"
+      ) %>% dplyr::filter(!is.nan(weight),
+                          weight != 0,
+                          !is.infinite(weight)), node_key = "name"
+    )
+
+    temp <- temp %>% tidygraph::bind_edges(
+      data.frame(
+        to = paste0(".", rownames(e[[i]]$Matrix)),
+        from = rownames(e[[i]]$Matrix),
+        weight = (e[[i]]$DispersalLoss %*%
+                    result$Abundance[timesInUse, ][timestep, -1])[, 1] /
+          e[[i]]$Abundance[timestep, ],
+        Type = "Dispersal"
+      ) %>% dplyr::filter(!is.nan(weight),
+                          weight != 0,
+                          !is.infinite(weight)), node_key = "name"
+    )
+
+    return(temp)
+  }, g = graph, e = environs)
+}
+
+thresholdGraphEdges <- function(graph, threshold) {
+  lapply(graph, function(g) {
+    g %>% tidygraph::activate(edges) %>% tidygraph::group_by(
+      to
+    ) %>% tidygraph::mutate(
+      PercentContribution = abs(weight) / sum(abs(weight)),
+      DestinationPresent = .N()$Present[to] | !.N()$Species[to], # Allow Decays
+      SourcePresent = .N()$Present[from] | !.N()$Species[from], # Allow Growths
+      Linetype = ifelse(weight > 0, "Positive", "Negative")
+    ) %>% tidygraph::filter(
+      PercentContribution > threshold,
+      DestinationPresent
+    ) %>% tidygraph::ungroup()
+  })
+}
+
+computeGraphLayout <- function(graph) {
+  grafNonEmpty <- graph[[which.max(
+    unlist(lapply(graph, function(g) {g %N>% filter(
+      Species
+    ) %E>% tidygraph::filter(
+      Type != "Predation",
+      Type != "Intraspecific",
+      Type != "Dispersal"
+    ) %E>% pull(to) %>% length}))
+  )]]
+  lay <- ggraph::create_layout(
+    tidygraph::to_undirected(
+      grafNonEmpty %N>% filter(
+        Species
+      ) %E>% tidygraph::filter(
+        Type != "Predation",
+        Type != "Intraspecific",
+        Type != "Dispersal"
+      )
+    ) ,
+    "backbone"
+    # "stress", y = log10(Size)
+  )
+  lay$y <- log10(lay$Size)
+  return(lay)
+
+  # # Create a complete graph between all real consumers,
+  # # Joined to all consumers and all basals,
+  # # Joined to all real nodes with their fake equivalents.
+  # nodesN <- grep(graf[[1]] %N>% dplyr::pull(name), pattern = ".",
+  #                fixed = TRUE, value = TRUE, invert = TRUE)
+  # nodeTypes <- Pool$Type[as.numeric(nodesN)]
+  # nodesTable <- table(nodeTypes)
+  #
+  # nodesConsumers <- create_complete(
+  #   nodesTable[2]
+  # ) %N>% mutate(
+  #   name = nodesN[nodeTypes == "Consumer"]
+  # )
+  #
+  # nodesBipartite <- create_bipartite(
+  #   nodesTable[1], nodesTable[2]
+  # ) %N>% mutate(
+  #   Type = ifelse(!type, "Basal", "Consumer")
+  # ) %>% group_by(
+  #   Type
+  # ) %>% mutate(
+  #   name = nodesN[nodeTypes == Type],
+  #   Size = Pool$Size[as.numeric(name)]
+  # ) %>% select(
+  #   -type
+  # )
+  #
+  # # nodesPairs <- lapply(1:length(nodesN), function(i) {
+  # #   create_complete(2) %N>% mutate(
+  # #     name = c(nodesN[i], paste0(".", nodesN[i])),
+  # #     Size = Pool$Size[as.numeric(nodesN[i])]
+  # #   )
+  # # }) %>% tidygraph::bind_graphs()
+  #
+  # nodesAll <- tidygraph::graph_join(
+  #   nodesConsumers, nodesBipartite, by = "name"
+  # # ) %>% tidygraph::graph_join(
+  # #   nodesPairs, by = c("name", "Size")
+  # ) %>% tidygraph::to_undirected()
+  #
+  # lay <- ggraph::create_layout(
+  #   nodesAll,
+  #   # "backbone"
+  #   # "stress", y = log10(Size),
+  #   # "auto", #y = log10(Size)
+  #   # "unrooted"
+  #   # "igraph", algorithm = "graphopt"
+  #   "linear"
+  # )
+  # lay$y <- log10(lay$Size)
+  # ggraph(
+  #   nodesAll, layout = data.frame(lay[, 1:2])
+  # ) + ggraph::geom_edge_diagonal(
+  #   alpha = 0.01
+  # ) + ggraph::geom_node_label(
+  #   mapping = aes(color = Type, label = name)
+  # )
+  # # Might need to do a linear layout of consumers,
+  # # tack on a stress layout with the basals,
+  # # then manually add all of the fake nodes to the side.
+}
+
 anyAbundanceSoFar <- FALSE
-layoutExists <- FALSE
+largestTotalEffect <- 0
+
+# Create a common layout.
+timestepLayout <- which.max(rowSums(result$Abundance[timesInUse, -1] > 0))
+graf4Layout <- createBaseGraph(timestepLayout, environs)
+graf4Layout <- addIntrinsicToGraph(graf4Layout, timestepLayout, environs)
+graf4Layout <- thresholdGraphEdges(graf4Layout, threshold)
+lay <- computeGraphLayout(graf4Layout)
+
 #
 #
 # # GIF
@@ -222,7 +449,7 @@ layoutExists <- FALSE
 # Video
 animation::saveVideo(
   # video.name = "test.mp4",
-  video.name = paste0("test", tag, ".mp4"),
+  video.name = paste0("test_", tag, ".mp4"),
   ani.height = 1024 * 2, ani.width = 1280 * 2, interval = 0.1,
   expr = {
     for (timestep in seq(from = 1, to = nrow(environs[[1]]$Abundance),
@@ -241,220 +468,10 @@ animation::saveVideo(
 
       timestep <- round(timestep)
 
-      # Convert to
-      graf <- lapply(
-        environs, function(e) {
-          g <- tidygraph::as_tbl_graph(
-            # Careful here: obvious way is to go from %*% to * to avoid addition
-            #               in the matrix-vector product.
-            #               R does its multiplications column wise though!
-            #               Hence transpose t().
-            #               Not doubled because tidygraph uses the opposite
-            #               from-to convention from me.
-            #               colSums(...) returns the correct values.
-            #               (= (InteractionMatrices$Mats[[1]] %*%
-            #                  (result$Abundance[timestepResult, -1][1:200]))[
-            #                   as.numeric(colnames(environs[[1]]$Abundance))])
-            t(e$Matrix) * e$Abundance[timestep, ]
-          ) %>% tidygraph::mutate(
-            Present = e$Abundance[timestep, ] > 0,
-            Abundance = e$Abundance[timestep, ],
-            Size = e$Size,
-            Type = e$Type,
-            Affinity = e$Affinity
-          )
+      graf <- createBaseGraph(timestep, environs)
+      graf <- addIntrinsicToGraph(graf, timestep, environs)
+      graf <- thresholdGraphEdges(graf, threshold)
 
-          if (sum(e$Abundance[timestep, ] > 0) > 1) {
-            g <- g %>% tidygraph::activate(edges) %>% tidygraph::mutate(
-              Type = ifelse(weight > 0, "Consumption", ifelse(
-                to == from, "Intraspecific", "Predation"
-              ))
-            ) %>% tidygraph::activate(nodes)
-          }
-
-          return(g)
-        }
-      )
-
-      #KEY:
-      #   ON if ever PRESENT
-      #   PRESENT if currently have non-zero abundance
-      #   SPECIES if you represent a real species.
-
-      graf <- lapply(seq_along(environs), function(i, g, e) {
-        # Add missing nodes
-        temp <- tidygraph::bind_graphs(
-          g[[i]] %>% dplyr::mutate(On = TRUE, Species = TRUE),
-          tidygraph::tbl_graph(
-            data.frame(name = as.character(e[[i]]$Missing))
-          ) %>% dplyr::mutate(
-            On = FALSE, Species = TRUE, Present = FALSE, Abundance = 0,
-            Size = Pool$Size[e[[i]]$Missing],
-            Affinity = Pool$Affinity[e[[i]]$Missing]
-          )
-        ) %>% tidygraph::arrange(name)
-
-        # Add fake nodes
-        temp <- tidygraph::bind_graphs(
-          temp,
-          tidygraph::tbl_graph(
-            data.frame(name = paste0(".", temp %>% dplyr::pull(name)))
-          ) %>% dplyr::mutate(
-            On = FALSE, Species = FALSE, Present = FALSE, Abundance = 0,
-            Size = Pool$Size[temp %>% dplyr::pull(name) %>% as.numeric],
-            Affinity = NA
-          )
-        )
-
-        # Add intrinsic rates as edges to/from the fake nodes.
-        temp <- temp %>% tidygraph::bind_edges(
-          data.frame(
-            to = ifelse(e[[i]]$Intrinsic > 0,
-                        rownames(e[[i]]$Matrix),
-                        paste0(".", rownames(e[[i]]$Matrix))),
-            from = ifelse(e[[i]]$Intrinsic > 0,
-                          paste0(".", rownames(e[[i]]$Matrix)),
-                          rownames(e[[i]]$Matrix)),
-            weight = e[[i]]$Intrinsic,
-            Type = ifelse(e[[i]]$Intrinsic > 0, "Growth", "Decay")
-          ), node_key = "name"
-        )
-
-        # Add dispersal rates as edges to/from the fake nodes.
-        # Note units need to be per capita, so we calculate as:
-        #  (Dispersal %*% Abundance) / (Local Abundance)
-        temp <- temp %>% tidygraph::bind_edges(
-          data.frame(
-            to = rownames(e[[i]]$Matrix),
-            from = paste0(".", rownames(e[[i]]$Matrix)),
-            weight = (e[[i]]$DispersalGain %*%
-                        result$Abundance[timesInUse, ][timestep, -1])[, 1] /
-              e[[i]]$Abundance[timestep, ],
-            Type = "Dispersal"
-          ) %>% dplyr::filter(!is.nan(weight),
-                              weight != 0,
-                              !is.infinite(weight)), node_key = "name"
-        )
-
-        temp <- temp %>% tidygraph::bind_edges(
-          data.frame(
-            to = paste0(".", rownames(e[[i]]$Matrix)),
-            from = rownames(e[[i]]$Matrix),
-            weight = (e[[i]]$DispersalLoss %*%
-                        result$Abundance[timesInUse, ][timestep, -1])[, 1] /
-              e[[i]]$Abundance[timestep, ],
-            Type = "Dispersal"
-          ) %>% dplyr::filter(!is.nan(weight),
-                              weight != 0,
-                              !is.infinite(weight)), node_key = "name"
-        )
-
-        return(temp)
-      }, g = graf, e = environs)
-
-      # Apply Thresholding
-      graf <- lapply(graf, function(g) {
-        g %>% tidygraph::activate(edges) %>% tidygraph::group_by(
-          to
-        ) %>% tidygraph::mutate(
-          PercentContribution = abs(weight) / sum(abs(weight)),
-          DestinationPresent = .N()$Present[to] | !.N()$Species[to], # Allow Decays
-          SourcePresent = .N()$Present[from] | !.N()$Species[from], # Allow Growths
-          Linetype = ifelse(weight > 0, "Positive", "Negative")
-        ) %>% tidygraph::filter(
-          PercentContribution > threshold,
-          DestinationPresent
-        ) %>% tidygraph::ungroup()
-      })
-
-      # Create a common layout.
-      if (!layoutExists) {
-        grafNonEmpty <- graf[[which.max(
-          unlist(lapply(graf, function(g) {g %N>% filter(
-            Species
-          ) %E>% tidygraph::filter(
-            Type != "Predation",
-            Type != "Intraspecific",
-            Type != "Dispersal"
-          ) %E>% pull(to) %>% length}))
-        )]]
-        lay <- ggraph::create_layout(
-          tidygraph::to_undirected(
-            graf[[1]] %N>% filter(
-              Species
-            ) %E>% tidygraph::filter(
-              Type != "Predation",
-              Type != "Intraspecific",
-              Type != "Dispersal"
-            )
-          ) ,
-          "backbone"
-          # "stress", y = log10(Size)
-        )
-        lay$y <- log10(lay$Size)
-
-        # # Create a complete graph between all real consumers,
-        # # Joined to all consumers and all basals,
-        # # Joined to all real nodes with their fake equivalents.
-        # nodesN <- grep(graf[[1]] %N>% dplyr::pull(name), pattern = ".",
-        #                fixed = TRUE, value = TRUE, invert = TRUE)
-        # nodeTypes <- Pool$Type[as.numeric(nodesN)]
-        # nodesTable <- table(nodeTypes)
-        #
-        # nodesConsumers <- create_complete(
-        #   nodesTable[2]
-        # ) %N>% mutate(
-        #   name = nodesN[nodeTypes == "Consumer"]
-        # )
-        #
-        # nodesBipartite <- create_bipartite(
-        #   nodesTable[1], nodesTable[2]
-        # ) %N>% mutate(
-        #   Type = ifelse(!type, "Basal", "Consumer")
-        # ) %>% group_by(
-        #   Type
-        # ) %>% mutate(
-        #   name = nodesN[nodeTypes == Type],
-        #   Size = Pool$Size[as.numeric(name)]
-        # ) %>% select(
-        #   -type
-        # )
-        #
-        # # nodesPairs <- lapply(1:length(nodesN), function(i) {
-        # #   create_complete(2) %N>% mutate(
-        # #     name = c(nodesN[i], paste0(".", nodesN[i])),
-        # #     Size = Pool$Size[as.numeric(nodesN[i])]
-        # #   )
-        # # }) %>% tidygraph::bind_graphs()
-        #
-        # nodesAll <- tidygraph::graph_join(
-        #   nodesConsumers, nodesBipartite, by = "name"
-        # # ) %>% tidygraph::graph_join(
-        # #   nodesPairs, by = c("name", "Size")
-        # ) %>% tidygraph::to_undirected()
-        #
-        # lay <- ggraph::create_layout(
-        #   nodesAll,
-        #   # "backbone"
-        #   # "stress", y = log10(Size),
-        #   # "auto", #y = log10(Size)
-        #   # "unrooted"
-        #   # "igraph", algorithm = "graphopt"
-        #   "linear"
-        # )
-        # lay$y <- log10(lay$Size)
-        # ggraph(
-        #   nodesAll, layout = data.frame(lay[, 1:2])
-        # ) + ggraph::geom_edge_diagonal(
-        #   alpha = 0.01
-        # ) + ggraph::geom_node_label(
-        #   mapping = aes(color = Type, label = name)
-        # )
-        # # Might need to do a linear layout of consumers,
-        # # tack on a stress layout with the basals,
-        # # then manually add all of the fake nodes to the side.
-        layoutExists <- TRUE
-      }
 
       edgecolors <- c(
         # to colorbrewer2.org!
@@ -499,7 +516,12 @@ animation::saveVideo(
 
       })
 
-      print(range(unlist(lapply(graf, function(g) g %N>% pull(fill))), na.rm = TRUE))
+      candidateLargestTotalEffect <-
+        max(abs(unlist(lapply(graf, function(g) g %N>% pull(fill)))))
+      if (largestTotalEffect < candidateLargestTotalEffect) {
+        largestTotalEffect <- candidateLargestTotalEffect
+        print(largestTotalEffect)
+      }
 
 
       plots <- lapply(seq_along(graf), function(i) {
