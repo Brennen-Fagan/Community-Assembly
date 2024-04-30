@@ -211,6 +211,9 @@ library(tidygraph)
 library(ggraph)
 library(ggpubr)
 library(animation)
+
+anyAbundanceSoFar <- FALSE
+layoutExists <- FALSE
 #
 #
 # # GIF
@@ -228,33 +231,49 @@ animation::saveVideo(
     )) {
       # ani.options(ani.height = 1280 * 2, ani.width = 1024 * 2, interval = 1)
 
+      if (!anyAbundanceSoFar) {
+        if (!any(result$Abundance[timesInUse,][timestep, -1] > 0)) {
+          next
+        } else {
+          anyAbundanceSoFar <- TRUE
+        }
+      }
+
       timestep <- round(timestep)
 
       # Convert to
       graf <- lapply(
-        environs, function(e) tidygraph::as_tbl_graph(
-          # Careful here: obvious way is to go from %*% to * to avoid the addition
-          #               of the matrix-vector product.
-          #               R does its multiplications column wise though!
-          #               Hence transpose t().
-          #               Not doubled because tidygraph uses the opposite from-to
-          #               convention from me.
-          #               colSums(...) returns the correct values.
-          #               (= (InteractionMatrices$Mats[[1]] %*%
-          #                  (result$Abundance[timestepResult, -1][1:200]))[
-          #                   as.numeric(colnames(environs[[1]]$Abundance))])
-          t(e$Matrix) * e$Abundance[timestep, ]
-        ) %>% tidygraph::mutate(
-          Present = e$Abundance[timestep, ] > 0,
-          Abundance = e$Abundance[timestep, ],
-          Size = e$Size,
-          Type = e$Type,
-          Affinity = e$Affinity
-        ) %>% tidygraph::activate(edges) %>% tidygraph::mutate(
-          Type = ifelse(weight > 0, "Consumption", ifelse(
-            to == from, "Intraspecific", "Predation"
-          ))
-        ) %>% tidygraph::activate(nodes)
+        environs, function(e) {
+          g <- tidygraph::as_tbl_graph(
+            # Careful here: obvious way is to go from %*% to * to avoid addition
+            #               in the matrix-vector product.
+            #               R does its multiplications column wise though!
+            #               Hence transpose t().
+            #               Not doubled because tidygraph uses the opposite
+            #               from-to convention from me.
+            #               colSums(...) returns the correct values.
+            #               (= (InteractionMatrices$Mats[[1]] %*%
+            #                  (result$Abundance[timestepResult, -1][1:200]))[
+            #                   as.numeric(colnames(environs[[1]]$Abundance))])
+            t(e$Matrix) * e$Abundance[timestep, ]
+          ) %>% tidygraph::mutate(
+            Present = e$Abundance[timestep, ] > 0,
+            Abundance = e$Abundance[timestep, ],
+            Size = e$Size,
+            Type = e$Type,
+            Affinity = e$Affinity
+          )
+
+          if (sum(e$Abundance[timestep, ] > 0) > 1) {
+            g <- g %>% tidygraph::activate(edges) %>% tidygraph::mutate(
+              Type = ifelse(weight > 0, "Consumption", ifelse(
+                to == from, "Intraspecific", "Predation"
+              ))
+            ) %>% tidygraph::activate(nodes)
+          }
+
+          return(g)
+        }
       )
 
       #KEY:
@@ -349,7 +368,16 @@ animation::saveVideo(
       })
 
       # Create a common layout.
-      if (timestep == 1) {
+      if (!layoutExists) {
+        grafNonEmpty <- graf[[which.max(
+          unlist(lapply(graf, function(g) {g %N>% filter(
+            Species
+          ) %E>% tidygraph::filter(
+            Type != "Predation",
+            Type != "Intraspecific",
+            Type != "Dispersal"
+          ) %E>% pull(to) %>% length}))
+        )]]
         lay <- ggraph::create_layout(
           tidygraph::to_undirected(
             graf[[1]] %N>% filter(
@@ -425,6 +453,7 @@ animation::saveVideo(
         # # Might need to do a linear layout of consumers,
         # # tack on a stress layout with the basals,
         # # then manually add all of the fake nodes to the side.
+        layoutExists <- TRUE
       }
 
       edgecolors <- c(
