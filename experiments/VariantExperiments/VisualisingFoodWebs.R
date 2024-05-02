@@ -23,7 +23,7 @@
 options(bitmapType = "cairo")
 
 systype <- match.arg(
-  "Simulation",
+  "Intervention",
   c("Simulation", "Intervention")
 )
 
@@ -32,10 +32,10 @@ systype <- match.arg(
 # LOAD INTERVENTION
 
 set <- "18-1"
-tag <- paste0(set, "-2-25-3_6-6-6",
-              if (systype == "Intervention") "_40-1-15-3_1-1")
+tag <- paste0(set, "-2-25-2_6-6-6",
+              if (systype == "Intervention") "_40-1-15-2_1-1")
 dir <- "TSTS_Simulations_18-1_6-6_2024-03-08"
-load(file.path(dir, paste0("TSTS_",systype, "_", tag, ".RData")))
+load(file.path(dir, paste0("TSTS_", systype, "_", tag, ".RData")))
 load(file.path(dir, paste0("TSTS_PoolPatchDynamics_", set, ".RData")))
 load(file.path(dir, paste0("TSTS_Diversity_", tag, ".RData")))
 load(file.path(dir, paste0("TSTS_DivAbund_", tag, ".RData")))
@@ -104,7 +104,7 @@ environs <- lapply(
       dispersalDictionaryChoice <-
         as.numeric((
           (strsplit(result$Ellipsis$ID, "_")[[1]][3]) %>% strsplit("-")
-          )[[1]][3])
+        )[[1]][3])
     } else if (systype == "Simulation") {
       dispersalDictionaryChoice <-
         as.numeric((
@@ -167,9 +167,9 @@ environs <- lapply(
       DispersalLoss = Out[indices[keep] - 1, ],
       Intrinsic =
         if (systype == "Intervention") {
-        result$Ellipsis$Affinity$EffectiveReproductionRateIntervention[
-          indices[keep] - 1 # since time not in intrinsic rep rate.
-          ]
+          result$Ellipsis$Affinity$EffectiveReproductionRateIntervention[
+            indices[keep] - 1 # since time not in intrinsic rep rate.
+            ]
         } else if (systype == "Simulation") {
           result$Ellipsis$Affinity$EffectiveReproductionRate[indices[keep] - 1]
         }
@@ -431,6 +431,50 @@ computeGraphLayout <- function(graph) {
   # # then manually add all of the fake nodes to the side.
 }
 
+patchBackgrounds <- c("#e66101", "#5e3c99")
+plotEventRug <- function(gplot) {
+  yrange <- ggplot2::layer_scales(gplot)$y$range$range
+  xrange <- ggplot2::layer_scales(gplot)$x$range$range
+  gplot + ggplot2::geom_rect(
+    data = result$Events %>% dplyr::filter(Success) %>% dplyr::mutate(
+      Environment = as.factor(Environment), Times = Times / result$ReactionTime,
+      NextEventTime = lead(Times)
+    ),
+    mapping = ggplot2::aes(
+      xmin = Times, xmax = NextEventTime, fill = Environment
+    ),
+    ymin = -Inf, ymax = Inf,
+    alpha = 0.15, inherit.aes = FALSE
+  ) + ggplot2::geom_rug(
+    data = result$Events %>% dplyr::filter(
+      Success, Type == "Extinct"
+    ) %>% dplyr::mutate(
+      Environment = as.factor(Environment), Times = Times / result$ReactionTime
+    ),
+    mapping = ggplot2::aes(
+      x = Times, color = Environment
+    ), inherit.aes = FALSE,
+    sides = "b"
+  ) + ggplot2::geom_rug(
+    data = result$Events %>% dplyr::filter(
+      Success, Type == "Arrival"
+    ) %>% dplyr::mutate(
+      Environment = as.factor(Environment), Times = Times / result$ReactionTime
+    ),
+    mapping = ggplot2::aes(
+      x = Times, color = Environment
+    ), inherit.aes = FALSE,
+    sides = "t"
+  ) + ggplot2::theme_bw() + ggplot2::annotate(
+    "text",
+    x = xrange[1] + diff(xrange)/20,
+    y = yrange + c(-0.02, 0.02) * diff(yrange),
+    label = c("Ext.", "Imm.")
+  ) + ggplot2::scale_color_manual(
+    values = patchBackgrounds, aesthetics = c("color", "fill")
+  )
+}
+
 anyAbundanceSoFar <- FALSE
 largestTotalEffect <- 0
 
@@ -576,9 +620,23 @@ animation::saveVideo(
 
         ggraph::ggraph(
           g, layout = data.frame(lay[, 1:2])
+        ) + ggplot2::geom_rect(
+          data = data.frame(1),
+          # type = "rect", # older version or ggplot, so geom_rect.
+          xmin = min(lay$x),
+          xmax = max(lay$x),
+          ymin = min(lay$y),
+          ymax = max(lay$y),
+          alpha = 0.15,
+          fill = if(i == 1) {
+            patchBackgrounds[1]
+          } else if (i == length(graf)) {
+            patchBackgrounds[2]
+          }
         ) + ggraph::geom_node_point(
           mapping = aes(
-            color = Type, alpha = interaction(Present, On),
+            #color = Type,
+            alpha = interaction(Present, On),
             stroke = log1p(Abundance), fill = fill, shape = factor(Affinity)
           ),
           #shape = 22,
@@ -592,14 +650,16 @@ animation::saveVideo(
           arrow = arrow(length = unit(2, 'mm')),
           start_cap = circle(5, 'mm'),
           end_cap = circle(5, 'mm')
+        ) + ggplot2::geom_hline(
+          yintercept = -1, linetype = "dashed", color = "black"
         ) + scale_shape_manual(
           values = c(22, 23), name = "b:"
         ) + scale_alpha_manual(
           values = c("FALSE.FALSE" = 0, "FALSE.TRUE" = 0.25, "TRUE.TRUE" = 1),
           guide = "none"
-        ) + scale_color_manual(
-          name = "Node",
-          values = c("Basal" = "darkgreen", "Consumer" = "yellow3")
+          # ) + scale_color_manual(
+          #   name = "Node",
+          #   values = c("Basal" = "darkgreen", "Consumer" = "yellow3")
         ) + scale_fill_gradient2(
           low = "#FF00FF", mid = "#FFFFFF", high = "#00FFFF",
           limits = c(-6, 6), breaks = c(-4,0,4),
@@ -733,13 +793,84 @@ animation::saveVideo(
       #   Reduce("+", barplotsAsAnnotations[[i]], plots[[i]])
       # })
 
+      dashboard <- lapply(
+        list(
+          # Alpha Richness
+          ggplot2::ggplot(
+            Diversity$Diversities$alpha %>% mutate(
+              Environment = as.factor(Environment)
+            ),
+            ggplot2::aes(x = Time, y = Richness,
+                         color = Environment, linetype = Environment)
+          ) + ggplot2::geom_line(
+          ),
+          # Gamma Richness
+          ggplot2::ggplot(
+            Diversity$Diversities$gamma %>% dplyr::filter(
+              Aggregation == "Gamma"
+            ),
+            ggplot2::aes(x = Time, y = Richness)
+          ) + ggplot2::geom_line(
+          ),
+          # Beta Jaccard
+          ggplot2::ggplot(
+            Diversity$Diversities$beta %>% dplyr::bind_rows() ,
+            ggplot2::aes(x = Time, y = Jaccard,
+                         group = interaction(Env1, Env2))
+          ) + ggplot2::geom_line(
+          ),
+          # Alpha exp(Evenness)
+          ggplot2::ggplot(
+            DivAbund$DivAbund$alpha %>% mutate(
+              Environment = as.factor(Environment)
+            ),
+            ggplot2::aes(x = Time, y = `1, All`,
+                         color = Environment, linetype = Environment)
+          ) + ggplot2::geom_line(
+          ) + ggplot2::ylab("Exp(Evenness)"),
+          # Gamma exp(Evenness)
+          ggplot2::ggplot(
+            DivAbund$DivAbund$gamma,
+            ggplot2::aes(x = Time, y = `1, All`)
+          ) + ggplot2::geom_line(
+          ) + ggplot2::ylab("Exp(Evenness)"),
+          # Beta Bray-Curtis
+          ggplot2::ggplot(
+            DivAbund$DivAbund$beta ,
+            ggplot2::aes(x = Time, y = BrayCurtis,
+                         group = interaction(Env1, Env2))
+          ) + ggplot2::geom_line(
+          )
+        ),
+        plotEventRug
+      )
+
+      dashboard <- lapply(dashboard, function(gplot) {
+        gplot + ggplot2::geom_vline(
+          color = "black", xintercept = times[timestep], linetype = "dashed"
+        )
+      })
+
       tempplot <- ggpubr::ggarrange(
         plotlist = plots, #combinedplots,
         ncol = 2, nrow = 1,
         common.legend = TRUE,
         legend = "bottom"
       )
-      plot(tempplot)
+
+      tempdashboard <- ggpubr::ggarrange(
+        plotlist = dashboard, #combinedplots,
+        ncol = 3, nrow = 2,
+        common.legend = TRUE,
+        legend = "bottom"
+      )
+
+      tempfull <- ggpubr::ggarrange(
+        plotlist = list(tempplot, tempdashboard), #combinedplots,
+        ncol = 1, nrow = 2, heights = c(3, 1)
+      )
+
+      plot(tempfull)
     }
   }
 )
