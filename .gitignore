@@ -23,3 +23,6 @@ inst/doc
 *.csv
 *.html
 *.RData
+
+**/Thumbs.db
+**/*.mp4
