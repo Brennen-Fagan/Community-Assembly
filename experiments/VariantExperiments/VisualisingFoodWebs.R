@@ -667,7 +667,8 @@ animation::saveVideo(
           name = "Per. Cap. Rate"
         ) + scale_edge_linetype_manual(
           name = "",
-          values = c("Positive" = "dashed", "Negative" = "longdash")
+          values = c("Positive" = "dashed", "Negative" = "longdash"),
+          guide = "none" # Legend entry not particularly clear.
         ) + scale_edge_color_manual(
           name = "Edge",
           values = edgecolors, drop = FALSE
