@@ -186,13 +186,13 @@ dynamicsSeed <- withRandom(
 )
 
 eventsDictionary <- expand.grid(
-  ImmigrationMultiplier = 1,
-  ImmigrationFunction = "RMTRCode2::ArrivalFUN_Example2",
-  ExtirpationMultiplier = 1,
-  ExtirpationFunction = "RMTRCode2::ExtinctFUN_Example2",
-  ExtirpationPercentage = 1,
   EventsFunction = "defaultEvents", # Takes Number of Environments and Species.
   EventsNumberMultiplier = c(1, 2),
+  ImmigrationMultiplier = 1,
+  ImmigrationFunction = "RMTRCode2::ArrivalFUN_Example2",
+  ExtirpationMultiplier = 1, # Frequency multiplier
+  ExtirpationFunction = "RMTRCode2::ExtinctFUN_Example2",
+  ExtirpationProportion = c(1, 0.9, 0), # Proportion of population removed.
   stringsAsFactors = FALSE
 )[eventsDictionaryChoice, ]
 eventsSeed <- withRandom(
@@ -535,7 +535,7 @@ result <- RMTRCode2::MultipleNumericalAssembly_Dispersal(
   DispersalMatrix = DispersalMatrix,
   EliminationThreshold = EliminationThreshold,
   ArrivalDensity = ArrivalDensity,
-  ExtinctionProportion = eventsDictionary$ExtirpationPercentage,
+  ExtinctionProportion = eventsDictionary$ExtirpationProportion,
   MaximumTimeStep = MaximumTimeStep,
   BetweenEventSteps = BetweenEventSteps,
   Verbose = TRUE,
