@@ -17,8 +17,9 @@ runDictionaryChoice <-
   # 7 # "TSTS_Simulations_11-1_4-4_2024-02-23"
   # 8 # "TSTS_Simulations_17-1_5-5_2024-03-08",
   # 9 # "TSTS_Simulations_18-1_6-6_2024-03-08",
-  10 # "TSTS_Simulations_19-1_7-7_2024-03-08",
+  # 10 # "TSTS_Simulations_19-1_7-7_2024-03-08",
   # 11 # "TSTS_Simulations_20-1_8-8_2024-03-08"
+  12 # "TSTS_Simulations_18-1_6-6_2024-05-23"
 
 # While this code can be run in parallel, I'm generally disinclined.
 # I've not written it to suggest mass production and would rather
@@ -27,7 +28,7 @@ runDictionaryChoice <-
 # Foreach is used instead in order to facilitate coding and consistency.
 cores <- 1
 
-overwriteOutput <- TRUE
+overwriteOutput <- FALSE
 
 # Parameters: #################################################################
 # Note that many of our options here vary between a deterministic mode
@@ -43,15 +44,15 @@ interventionPatchDictionaryChoice <-
   # 7 # Random 50% Patches -> {0, 0.5, 1} Unif @ Random
   # 8 # Random 50% Patches -> [0, 1] Gradient Ring
   # 9 # Random 50% Patches -> [0, 1] Unif @ Random
-  10 # Last 50% Patches -> {0} #TODO Did not work for two patch system?
+  # 10 # Last 50% Patches -> {0} #TODO Did not work for two patch system?
   # 11 # Last 50% Patches -> {0.5}
   # 12 # Last 50% Patches -> {1}
   # 13 # Last 50% Patches -> {0, 1} Gradient # <- Probably not desired.
   # 14 # Last 50% Patches -> {0, 1} Unif @ Random
   # 16 # Last 50% Patches -> {0, 0.5, 1} Unif @ Random
   # 18 # Last 50% Patches -> [0, 1] Unif @ Random
-  # 40 # All Patches -> {0, 1} Gradient
-  41 # All Patches -> {0, 1} Unif @ Random
+  40 # All Patches -> {0, 1} Gradient
+  # 41 # All Patches -> {0, 1} Unif @ Random
 interventionPatchSeedChoice <-
   1 # Used on 2024-03-01
 
@@ -74,18 +75,19 @@ interventionTimeSeedChoice <-
 
 # Probably shouldn't change.
 interventionDispersalDictionaryChoice <-
-  15 # c(NA, 5, 0)
+  "PREVIOUS" # 15 # c(NA, 5, 0)
 # Index: Ones place is resistance to Dispersal on a log scale.
 #      : Tens place is configuration: 0* = Ring, 1* = Line, 2* = Complete.
 #      : Special: NA corresponds to no dispersal.
+#      : Special: "PREVIOUS" corresponds to use the previous dispersal type.
 # Note : No randomness, so we don't need a seed.
 
 # Probably shouldn't change.
 # choose r' = r * rho ^ (sign(r)), but what rho?
 interventionDistanceDictionaryChoice <- # for m, n in [0, 1], rho(m, n) = ...
   # 1 # 2 ^ (- euclid(m, n)) => rho in [1/2, 1] for 1-D
-  # 2 # 2 ^ (1 - 2 euclid(m, n)) => rho in [1/2, 2] for 1-D
-  3 # 10 ^ (1 - 2 euclid(m, n)) => rho in [1/10, 10] for 1-D
+  2 # 2 ^ (1 - 2 euclid(m, n)) => rho in [1/2, 2] for 1-D
+  # 3 # 10 ^ (1 - 2 euclid(m, n)) => rho in [1/10, 10] for 1-D
 
 ## Other Parameters: ##########################################################
 # Most should be pulled from the data already.
@@ -138,7 +140,8 @@ runDictionary <- data.frame(
     "TSTS_Simulations_17-1_5-5_2024-03-08",
     "TSTS_Simulations_18-1_6-6_2024-03-08",
     "TSTS_Simulations_19-1_7-7_2024-03-08",
-    "TSTS_Simulations_20-1_8-8_2024-03-08"
+    "TSTS_Simulations_20-1_8-8_2024-03-08",
+    "TSTS_Simulations_18-1_6-6_2024-05-23"
   )
 )[runDictionaryChoice, ]
 
@@ -216,13 +219,20 @@ interventionTimeSeed <- withRandom(
 # many of my previous runs were the same pool-patches but different dispersals.
 # This implementation forces them to experience a new dispersal, and without a
 # proper transition (I don't think I have a dynamic dispersal function?).
-interventionDispersalDictionary <- rbind(
-  data.frame(Resistance = Inf, Configuration = "None"),
-  expand.grid(
-    Resistance = 10^c(0:9),
-    Configuration = c("Ring", "Line", "Complete")
-  ))[ifelse(is.na(interventionDispersalDictionaryChoice),
-            1, interventionDispersalDictionaryChoice + 2), ]
+if (!toupper(interventionDispersalDictionaryChoice) %in%
+    c("P", "PRE", "PREV", "PREVIOUS") # "PREVIOUS" is meaning. "p" for storage.
+) {
+  interventionDispersalDictionary <- rbind(
+    data.frame(Resistance = Inf, Configuration = "None"),
+    expand.grid(
+      Resistance = 10^c(0:9),
+      Configuration = c("Ring", "Line", "Complete")
+    ))[ifelse(is.na(interventionDispersalDictionaryChoice),
+              1, interventionDispersalDictionaryChoice + 2), ]
+} else {
+  # interventionDispersalDictionary <- "previous"
+  interventionDispersalDictionaryChoice <- "p"
+}
 
 interventionDistanceDictionary <- data.frame(
   rhofunction = c( # Take patch
@@ -257,36 +267,38 @@ datfiles <- dir(path = runDictionary,
 # Instantiate Dispersal Matrix: ###############################################
 # Copied from 6a-Simulations.R. Should the configuration "switch" be a function
 # in order to make it a common resource as well?
-DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
-  EnvironmentDistances = with(c(
-    interventionDispersalDictionary,
-    Environments = NumberOfEnvironments
-  ), {
-    if (Configuration == "None") {
-      DistanceMatrix <- Matrix::sparseMatrix(
-        i = Environments, j = Environments, x = 0)
+if (interventionDispersalDictionaryChoice != "p") {
+  DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
+    EnvironmentDistances = with(c(
+      interventionDispersalDictionary,
+      Environments = NumberOfEnvironments
+    ), {
+      if (Configuration == "None") {
+        DistanceMatrix <- Matrix::sparseMatrix(
+          i = Environments, j = Environments, x = 0)
+      }
+      if (Configuration == "Ring" || Configuration == "Line")
+        DistanceMatrix <- Matrix::bandSparse(
+          Environments, k = c(-1, 1),
+          diagonals = list(rep(Resistance, Environments - 1),
+                           rep(Resistance, Environments - 1))
+        )
+      if (Configuration == "Ring") {
+        DistanceMatrix[Environments, 1] <- Resistance
+        DistanceMatrix[1, Environments] <- Resistance
+      }
+      if (Configuration == "Complete") {
+        DistanceMatrix <- matrix(Resistance,
+                                 nrow = Environments,
+                                 ncol = Environments)
+        diag(DistanceMatrix) <- 0
+      }
+      DistanceMatrix
     }
-    if (Configuration == "Ring" || Configuration == "Line")
-      DistanceMatrix <- Matrix::bandSparse(
-        Environments, k = c(-1, 1),
-        diagonals = list(rep(Resistance, Environments - 1),
-                         rep(Resistance, Environments - 1))
-      )
-    if (Configuration == "Ring") {
-      DistanceMatrix[Environments, 1] <- Resistance
-      DistanceMatrix[1, Environments] <- Resistance
-    }
-    if (Configuration == "Complete") {
-      DistanceMatrix <- matrix(Resistance,
-                               nrow = Environments,
-                               ncol = Environments)
-      diag(DistanceMatrix) <- 0
-    }
-    DistanceMatrix
-  }
-  ),
-  SpeciesSpeeds = poolMats$Pool$Speed
-)
+    ),
+    SpeciesSpeeds = poolMats$Pool$Speed
+  )
+}
 
 # Interventions: ##############################################################
 interventionSuccess <- foreach::foreach(
@@ -324,6 +336,50 @@ interventionSuccess <- foreach::foreach(
   loaded <- load(x) # names
   stopifnot(length(loaded) == 1)
   loaded <- (get(loaded)) # objects
+
+  # Recalculate dispersal matrix if necessary.
+  if (interventionDispersalDictionaryChoice == "p") {
+    previousDispersalDictionaryChoice <- as.numeric(strsplit(
+      x_properties[[1]][3], split = '-'
+    )[[1]][4])
+    interventionDispersalDictionary <- rbind( #TECHDEBT!!!!!
+      data.frame(Resistance = Inf, Configuration = "None"),
+      expand.grid(
+        Resistance = 10^c(0:9),
+        Configuration = c("Ring", "Line", "Complete")
+      ))[ifelse(is.na(previousDispersalDictionaryChoice),
+                1, previousDispersalDictionaryChoice + 2), ]
+    DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
+      EnvironmentDistances = with(c(
+        interventionDispersalDictionary,
+        Environments = NumberOfEnvironments
+      ), {
+        if (Configuration == "None") {
+          DistanceMatrix <- Matrix::sparseMatrix(
+            i = Environments, j = Environments, x = 0)
+        }
+        if (Configuration == "Ring" || Configuration == "Line")
+          DistanceMatrix <- Matrix::bandSparse(
+            Environments, k = c(-1, 1),
+            diagonals = list(rep(Resistance, Environments - 1),
+                             rep(Resistance, Environments - 1))
+          )
+        if (Configuration == "Ring") {
+          DistanceMatrix[Environments, 1] <- Resistance
+          DistanceMatrix[1, Environments] <- Resistance
+        }
+        if (Configuration == "Complete") {
+          DistanceMatrix <- matrix(Resistance,
+                                   nrow = Environments,
+                                   ncol = Environments)
+          diag(DistanceMatrix) <- 0
+        }
+        DistanceMatrix
+      }
+      ),
+      SpeciesSpeeds = poolMats$Pool$Speed
+    )
+  }
 
   ### Determine Interventions: ################################################
   # Number:
