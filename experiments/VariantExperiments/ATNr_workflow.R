@@ -2,6 +2,12 @@
 # Note the below use random number generation, so need to be careful with seeds.
 # It doesn't look like ATNr implements errors or testing procedures
 # (e.g. checking if there is a binarized matrix provided when one is asked for).
+# Note also that I've occasionally had bad runs where nothing goes well.
+# (Plots that are just blocks, empty, or crashed early.)
+
+# ATNr also requires the data set "schneider" be findable, but it only loads
+# on attaching the package.
+library(ATNr)
 
 # 0. Parameters: ##############################################################
 species <- 200
@@ -36,7 +42,7 @@ foodwebLBinarized[foodwebLBinarized > 0] <- 1
 # ATNr uses 3 in their vignette.
 nutrients <- 3
 
-# What about "unscaled"? 
+# What about "unscaled"?
 # "Biological rates controlling the growth rate are [not] normalised by the
 #  growth rate of the smallest basal species."
 
@@ -50,8 +56,8 @@ modelLUnscaledNutrients <- ATNr::create_model_Unscaled_nuts(
 )
 
 # Note that the NicheUnscaledNutrients might be an abuse.
-# The vignette notes we need to initialise the models, and the 
-# unscaled nutrients version specifically requires the L matrix with a 
+# The vignette notes we need to initialise the models, and the
+# unscaled nutrients version specifically requires the L matrix with a
 # specific interpretation of what the matix means.
 # It isn't immediately clear if the niche version can accommodate that
 # interpretation as well, or if it should only be used for the next two models.
@@ -131,23 +137,23 @@ initialConditionsNutrients <- runif(nutrients, 1, 100)
 times <- c(seq(0, 100, 1), seq(101, 1000, 3), seq(1010, 5000, 10))
 
 # Note that for custom code, they "REQUIRE" initialisations be done.
-modelNicheUnscaledNutrients$initialisations() 
-modelLUnscaledNutrients$initialisations() 
-modelNicheScaled$initialisations() 
-modelLBinarizedScaled$initialisations() 
-modelLScaled$initialisations() 
-modelNicheUnscaled$initialisations() 
-modelLBinarizedUnscaled$initialisations() 
-modelLUnscaled$initialisations() 
+modelNicheUnscaledNutrients$initialisations()
+modelLUnscaledNutrients$initialisations()
+modelNicheScaled$initialisations()
+modelLBinarizedScaled$initialisations()
+modelLScaled$initialisations()
+modelNicheUnscaled$initialisations()
+modelLBinarizedUnscaled$initialisations()
+modelLUnscaled$initialisations()
 
 evalODE <- function(t, y, parms) {
-  # Basic: 
+  # Basic:
   # return(list(parms$ODE(y, t)))
-  
+
   # with loss of < 1 individual per unit area:
   population <- parms$ODE(y, t)
   # If biomass / (body mass) < 1, remove
-  popspecies <- population[1:species]  
+  popspecies <- population[1:species]
   popspecies[popspecies/masses < 1] <- 0
   population[1:species] <- popspecies
   return(list(population))
@@ -156,51 +162,51 @@ evalODE <- function(t, y, parms) {
 }
 
 solNUN <- deSolve::lsoda(
-  c(initialConditionsSpecies, initialConditionsNutrients), 
-  times, 
-  evalODE, 
+  c(initialConditionsSpecies, initialConditionsNutrients),
+  times,
+  evalODE,
   modelNicheUnscaledNutrients
 )
 solLUN <- deSolve::lsoda(
-  c(initialConditionsSpecies, initialConditionsNutrients), 
-  times, 
-  evalODE, 
+  c(initialConditionsSpecies, initialConditionsNutrients),
+  times,
+  evalODE,
   modelLUnscaledNutrients
 )
 solNS <- deSolve::lsoda(
-  c(initialConditionsSpecies), 
-  times, 
-  evalODE, 
+  c(initialConditionsSpecies),
+  times,
+  evalODE,
   modelNicheScaled
 )
 solBS <- deSolve::lsoda(
-  c(initialConditionsSpecies), 
-  times, 
-  evalODE, 
+  c(initialConditionsSpecies),
+  times,
+  evalODE,
   modelLBinarizedScaled
 )
 solLS <- deSolve::lsoda(
-  c(initialConditionsSpecies), 
-  times, 
-  evalODE, 
+  c(initialConditionsSpecies),
+  times,
+  evalODE,
   modelLScaled
 )
 solNU <- deSolve::lsoda(
-  c(initialConditionsSpecies), 
-  times, 
-  evalODE, 
+  c(initialConditionsSpecies),
+  times,
+  evalODE,
   modelNicheUnscaled
 )
 solBU <- deSolve::lsoda(
-  c(initialConditionsSpecies), 
-  times, 
-  evalODE, 
+  c(initialConditionsSpecies),
+  times,
+  evalODE,
   modelLBinarizedUnscaled
 )
 solLU <- deSolve::lsoda(
-  c(initialConditionsSpecies), 
-  times, 
-  evalODE, 
+  c(initialConditionsSpecies),
+  times,
+  evalODE,
   modelLUnscaled
 )
 
