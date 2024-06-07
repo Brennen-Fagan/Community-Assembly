@@ -4,6 +4,16 @@
 # (e.g. checking if there is a binarized matrix provided when one is asked for).
 # Note also that I've occasionally had bad runs where nothing goes well.
 # (Plots that are just blocks, empty, or crashed early.)
+# There are no clear warning signs, esp. from ATNr, about why/when this is the
+# case. Additionally, deSolve seems like it is doing excessive work.
+# (Specifically, deSolve is using a lot more cores than expected && is reporting
+#  that we are requesting excessive numerical precision.)
+# Checking on an example NUN and LUN suggests they blow-up to > 1E110.
+# This might be a blow-up specifically regarding the nutrients somehow...?
+# NS takes a long time to return. Not sure about BS, but it succeeded.
+# NU returned alright, as did BU and LU
+# I suspect that the problem is the lack of instruction regarding typical
+# parameters, e.g. for initial conditions for the nutrients.
 
 # ATNr also requires the data set "schneider" be findable, but it only loads
 # on attaching the package.
@@ -11,7 +21,7 @@ library(ATNr)
 
 # 0. Parameters: ##############################################################
 species <- 200
-connectance <- 0.1 # err, not sure of the reliability, but
+connectance <- 0.1 # not sure about value. Chosen from:
 # wiki.santafe.edu/images/f/f7/Dunne_-_Encyclopedia_of_Complex_Systems%2c_Food_Webs.pdf
 
 # 1. Create a Matrix: #########################################################
@@ -133,8 +143,9 @@ modelLUnscaled <- ATNr::initialise_default_Unscaled(
 # That will require modifying how the system runs.
 
 initialConditionsSpecies <- runif(species, 1, 10)
-initialConditionsNutrients <- runif(nutrients, 1, 100)
+initialConditionsNutrients <- runif(nutrients, 1, 100) # 10 * > species biomass.
 times <- c(seq(0, 100, 1), seq(101, 1000, 3), seq(1010, 5000, 10))
+rtol <- 1e-5; atol <- 1e-5
 
 # Note that for custom code, they "REQUIRE" initialisations be done.
 modelNicheUnscaledNutrients$initialisations()
@@ -162,52 +173,60 @@ evalODE <- function(t, y, parms) {
 }
 
 solNUN <- deSolve::lsoda(
-  c(initialConditionsSpecies, initialConditionsNutrients),
+  c(initialConditionsNutrients, initialConditionsSpecies), # Nutrients FIRST.
   times,
   evalODE,
-  modelNicheUnscaledNutrients
+  modelNicheUnscaledNutrients,
+  rtol = rtol, atol = atol
 )
 solLUN <- deSolve::lsoda(
-  c(initialConditionsSpecies, initialConditionsNutrients),
+  c(initialConditionsNutrients, initialConditionsSpecies), # Nutrients FIRST.
   times,
   evalODE,
-  modelLUnscaledNutrients
+  modelLUnscaledNutrients,
+  rtol = rtol, atol = atol
 )
 solNS <- deSolve::lsoda(
   c(initialConditionsSpecies),
   times,
   evalODE,
-  modelNicheScaled
+  modelNicheScaled,
+  rtol = rtol, atol = atol
 )
 solBS <- deSolve::lsoda(
   c(initialConditionsSpecies),
   times,
   evalODE,
-  modelLBinarizedScaled
+  modelLBinarizedScaled,
+  rtol = rtol, atol = atol
 )
 solLS <- deSolve::lsoda(
   c(initialConditionsSpecies),
   times,
   evalODE,
-  modelLScaled
+  modelLScaled,
+  rtol = rtol, atol = atol
 )
 solNU <- deSolve::lsoda(
   c(initialConditionsSpecies),
   times,
   evalODE,
-  modelNicheUnscaled
+  modelNicheUnscaled,
+  rtol = rtol, atol = atol
 )
 solBU <- deSolve::lsoda(
   c(initialConditionsSpecies),
   times,
   evalODE,
-  modelLBinarizedUnscaled
+  modelLBinarizedUnscaled,
+  rtol = rtol, atol = atol
 )
 solLU <- deSolve::lsoda(
   c(initialConditionsSpecies),
   times,
   evalODE,
-  modelLUnscaled
+  modelLUnscaled,
+  rtol = rtol, atol = atol
 )
 
 par(mfrow = c(3, 3))
