@@ -2,18 +2,7 @@
 # Note the below use random number generation, so need to be careful with seeds.
 # It doesn't look like ATNr implements errors or testing procedures
 # (e.g. checking if there is a binarized matrix provided when one is asked for).
-# Note also that I've occasionally had bad runs where nothing goes well.
-# (Plots that are just blocks, empty, or crashed early.)
-# There are no clear warning signs, esp. from ATNr, about why/when this is the
-# case. Additionally, deSolve seems like it is doing excessive work.
-# (Specifically, deSolve is using a lot more cores than expected && is reporting
-#  that we are requesting excessive numerical precision.)
-# Checking on an example NUN and LUN suggests they blow-up to > 1E110.
-# This might be a blow-up specifically regarding the nutrients somehow...?
-# NS takes a long time to return. Not sure about BS, but it succeeded.
-# NU returned alright, as did BU and LU
-# I suspect that the problem is the lack of instruction regarding typical
-# parameters, e.g. for initial conditions for the nutrients.
+# Some initial problems regarding misreading some things, but should be fixed.
 
 # ATNr also requires the data set "schneider" be findable, but it only loads
 # on attaching the package.
@@ -144,7 +133,7 @@ modelLUnscaled <- ATNr::initialise_default_Unscaled(
 
 initialConditionsSpecies <- runif(species, 1, 10)
 initialConditionsNutrients <- runif(nutrients, 1, 100) # 10 * > species biomass.
-times <- c(seq(0, 100, 1), seq(101, 1000, 3), seq(1010, 5000, 10))
+times <- c(seq(0, 1.0, .1), seq(1.1, 10.0, .3), seq(10.1, 50.0, 1.0))
 rtol <- 1e-5; atol <- 1e-5
 
 # Note that for custom code, they "REQUIRE" initialisations be done.
@@ -159,30 +148,34 @@ modelLUnscaled$initialisations()
 
 evalODE <- function(t, y, parms) {
   # Basic:
-  # return(list(parms$ODE(y, t)))
-
-  # with loss of < 1 individual per unit area:
-  population <- parms$ODE(y, t)
-  # If biomass / (body mass) < 1, remove
-  popspecies <- population[1:species]
-  popspecies[popspecies/masses < 1] <- 0
-  population[1:species] <- popspecies
-  return(list(population))
-  # Somewhat surprisingly the *unscaled* version doesn't have any losses
-  # under this rule.
+  return(list(parms$ODE(y, t)))
 }
+eventFunc <- list(
+  func = function(t, y, parms) {y[y < 1] <- 0;y},
+  time = times
+)
 
-solNUN <- deSolve::lsoda(
-  c(initialConditionsNutrients, initialConditionsSpecies), # Nutrients FIRST.
-  times,
-  evalODE,
+solNUNpre <- deSolve::lsoda(
+  y = c(initialConditionsNutrients, rep(0, species)), # Nutrients FIRST.
+  times = 1:100,
+  func = evalODE,
   modelNicheUnscaledNutrients,
   rtol = rtol, atol = atol
 )
-solLUN <- deSolve::lsoda(
+solNUN <- deSolve::lsoda( # Maybe no consumers???
+  y = c(solNUNpre[nrow(solNUNpre), 1+1:nutrients],
+    initialConditionsSpecies), # Nutrients FIRST.
+  times = times,
+  func = evalODE,
+  events = eventFunc,
+  modelNicheUnscaledNutrients,
+  rtol = rtol, atol = atol
+)
+solLUN <- deSolve::lsoda( # Single Basal? -> Double Basal?
   c(initialConditionsNutrients, initialConditionsSpecies), # Nutrients FIRST.
   times,
   evalODE,
+  events = eventFunc,
   modelLUnscaledNutrients,
   rtol = rtol, atol = atol
 )
@@ -190,27 +183,31 @@ solNS <- deSolve::lsoda(
   c(initialConditionsSpecies),
   times,
   evalODE,
+  events = eventFunc,
   modelNicheScaled,
   rtol = rtol, atol = atol
 )
-solBS <- deSolve::lsoda(
+solBS <- deSolve::lsoda( # Single Basal?
   c(initialConditionsSpecies),
   times,
   evalODE,
+  events = eventFunc,
   modelLBinarizedScaled,
   rtol = rtol, atol = atol
 )
-solLS <- deSolve::lsoda(
+solLS <- deSolve::lsoda( # FAILED x2
   c(initialConditionsSpecies),
   times,
   evalODE,
+  events = eventFunc,
   modelLScaled,
   rtol = rtol, atol = atol
 )
-solNU <- deSolve::lsoda(
+solNU <- deSolve::lsoda( # These 3 seem uninteresting? (Flat)
   c(initialConditionsSpecies),
   times,
   evalODE,
+  events = eventFunc,
   modelNicheUnscaled,
   rtol = rtol, atol = atol
 )
@@ -218,6 +215,7 @@ solBU <- deSolve::lsoda(
   c(initialConditionsSpecies),
   times,
   evalODE,
+  events = eventFunc,
   modelLBinarizedUnscaled,
   rtol = rtol, atol = atol
 )
@@ -225,6 +223,7 @@ solLU <- deSolve::lsoda(
   c(initialConditionsSpecies),
   times,
   evalODE,
+  events = eventFunc,
   modelLUnscaled,
   rtol = rtol, atol = atol
 )
@@ -239,7 +238,7 @@ ATNr::plot_odeweb(solNS, species)
 title(main = "NS")
 ATNr::plot_odeweb(solBS, species)
 title(main = "BS")
-ATNr::plot_odeweb(solLS, species)
+if(exists("solLS")) {ATNr::plot_odeweb(solLS, species)} else {plot(1,1)}
 title(main = "LS")
 ATNr::plot_odeweb(solNU, species)
 title(main = "NU")
