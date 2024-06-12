@@ -1,5 +1,5 @@
 # TimeSpaceAndTimeSeries-6e-Sampling.R
-# Returning now to the problem of how sampling methods/patterns change 
+# Returning now to the problem of how sampling methods/patterns change
 # perceptions of biodiversity.
 # See TSTS-4b-Sampling.R for the previous implementation.
 
@@ -140,40 +140,40 @@ samples <- foreach::foreach(
     warning(paste("File", filename, "exists."))
     return(NULL)
   }
-  
+
   # Load:
   results <- load(file)
   stopifnot(length(names) == 1)
   results <- get(results)
-  
+
   # Characteristic Time Scale
   if (results$Ellipsis$Timescale == "Simulation") {
     results$Ellipsis$Timescale <- "Characteristic"
     results$Abundance[, 1] <- results$Abundance[, 1] / results$ReactionTime
     results$Events$Times <- results$Events$Times / results$ReactionTime
     if ("TimeIntervention" %in% names(results$Ellipsis$Affinity)) {
-      results$Ellipsis$Affinity$TimeIntervention <- 
+      results$Ellipsis$Affinity$TimeIntervention <-
         results$Ellipsis$Affinity$TimeIntervention / results$ReactionTime
     }
   }
-  
+
   if ("TimeIntervention" %in% names(results$Ellipsis$Affinity)) {
-    interventionTimes <- 
+    interventionTimes <-
       c(interventionTimes, results$Ellipsis$Affinity$TimeIntervention)
   } else if (length(unique(interventionTimes) -> uIT) == 1) {
     results$Ellipsis$Affinity$TimeIntervention <- uIT
   } else {return(NULL)}
-  
+
   # Sampling Time Span
-  results$Ellipsis$TimeSpan <- 
+  results$Ellipsis$TimeSpan <-
     defaultTimeSpan(results$Ellipsis$TimeSpan)
-  
+
   # Make sure to remove spurious abundance if present.
   results$Abundance[, -1] <- ifelse(
     results$Abundance[, -1] > results$Parameters$EliminationThreshold,
     results$Abundance[, -1], 0
   )
-  
+
   # We want a row pre-intervention, but not too far away from it.
   # In the initial TSTS format, this could reliably be row 1, since the
   # format was to take an existing file, cut it before intervention and make
@@ -181,22 +181,22 @@ samples <- foreach::foreach(
   # In the data format from MNA-Image-ExampleOutcome-Create.R, it's a full
   # file, and so we need to be a bit more careful about how we look around.
   interventionRow <-
-    which.max(results$Abundance[, 1] >= 
+    which.max(results$Abundance[, 1] >=
                 results$Ellipsis$Affinity$TimeIntervention )
-  
+
   if (interventionRow - 10 < 0) {
     interventionRow <- 1
   } else {
     interventionRow <- interventionRow - 10
   }
-  
+
   samplingTimes <- unique(c(# Guard
     # r$Abundance[1, 1], # Pre-intervention, then moment of intervention forward.
     results$Abundance[interventionRow, 1],
     createSamplingTimes(results$Ellipsis$TimeSpan) +
-      results$Ellipsis$Affinity$TimeIntervention 
+      results$Ellipsis$Affinity$TimeIntervention
   ))
-  
+
   samplingDataFrame <- data.frame(expand.grid(
     Time = samplingTimes, # True time on characterstic scale.
     Patch = 1:results$NumEnvironments#,
@@ -205,28 +205,28 @@ samples <- foreach::foreach(
     PatchType = ifelse(Patch %in% r$Ellipsis$Affinity$PatchInterventions,
                        "Experiment", "Control"),
     # Time from intervention.
-    TimeBase = Time - results$Ellipsis$Affinity$TimeIntervention, 
+    TimeBase = Time - results$Ellipsis$Affinity$TimeIntervention,
     ParentRun = results$Ellipsis$ID,
     PatchAffinity = ifelse(
-      PatchType == "Experiment", 
+      PatchType == "Experiment",
       results$Ellipsis$Affinity$PatchAffinitiesIntervention,
       result$Ellipsis$Affinity$PatchAffinitiesOld)
   )
-  
-  samplingSeedsForRuns <- 
-    withRandom(runif(samplingRunsPerFile) * 1E8, 
+
+  samplingSeedsForRuns <-
+    withRandom(runif(samplingRunsPerFile) * 1E8,
                samplingSeedsForFiles)
-  
+
   samplingResults <- foreach::foreach(
     id = 1:samplingRunsPerFile,
     sd = iterators::iter(samplingSeedsForRuns),
     .packages = "dplyr"
   ) %dopar% {
-    sampleFromResults2(
+    withRandom(sampleFromResults2(
       resultAbundance = results$Abundance,
       sampling = samplingDataFrame %>% dplyr::mutate(SamplingRun = id),
       control = c(1:results$NumEnvironments)[
-        ! 1:results$NumEnvironments %in% 
+        ! 1:results$NumEnvironments %in%
           results$Ellipsis$Affinity$PatchInterventions
         ],
       intervention = results$Ellipsis$Affinity$TimeIntervention,
@@ -234,13 +234,17 @@ samples <- foreach::foreach(
       samplingPerAbundance = samplingPerAbundance,
       samplingFailureRate = samplingFailureRate,
       PoolTypes = table(pool$Affinity)
-    ) %>% dplyr::mutate(ParentRun = results$Ellipsis$ID)
+    ) %>% dplyr::mutate(
+      ParentRun = results$Ellipsis$ID,
+      Seed = sd
+      ),
+    sd)
   }
-  
+
   save(samplingResults, file = filename)
-  
+
   return(samplingResults)
-}  
+}
 
 # Cleanup: ####################################################################
 if (exists("clust")) {
