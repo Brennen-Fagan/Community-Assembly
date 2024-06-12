@@ -6,6 +6,7 @@
 # Parameters: #################################################################
 datfolder <-
     "TSTS_Simulations_18-1_6-6_2024-05-23"
+directory <- '.'
 
 ### Quantities: ###############################################################
 # When:
@@ -34,6 +35,18 @@ files <-  c(dir(datfolder, full.names = TRUE, pattern = "Intervention"),
 
 pool <- load(dir(datfolder, full.names = TRUE, pattern = "Pool"))
 pool <- get(pool)
+
+# Libraries: ##################################################################
+library(dplyr)
+
+library(parallel)
+library(iterators)
+library(doParallel)
+library(foreach)
+library(doRNG)
+
+source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
+source(file.path(directory, "TimeSpaceAndTimeSeries-0-Interventions.R"))
 
 ### Automatically load seed matched to each datfolder: ########################
 # > runif(1)*1E8
@@ -73,18 +86,6 @@ defaultTimeSpan <- function(iTS) {
     return(iTS)
   }
 }
-
-# Libraries: ##################################################################
-library(dplyr)
-
-library(parallel)
-library(iterators)
-library(doParallel)
-library(foreach)
-library(doRNG)
-
-source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
-source(file.path(directory, "TimeSpaceAndTimeSeries-0-Interventions.R"))
 
 # Parallelization: ############################################################
 if (cores > 1) {
@@ -133,9 +134,12 @@ samples <- foreach::foreach(
   file = iterators::iter(files),
   seed = iterators::iter(samplingSeedsForFiles)
 ) %do% {
-  fileproperties <- strsplit(file, split = "_", fixed = TRUE)
+  fileproperties <- strsplit(basename(file), split = "_", fixed = TRUE)
   fileproperties[[1]][[2]] <- "Sampling"
-  filename <- paste0(fileproperties[[1]], collapse = "_")
+  filename <- file.path(
+    dirname(file),
+    paste0(fileproperties[[1]], collapse = "_")
+  )
   if (file.exists(filename)) {
     warning(paste("File", filename, "exists."))
     return(NULL)
@@ -202,16 +206,24 @@ samples <- foreach::foreach(
     Patch = 1:results$NumEnvironments#,
     # SamplingRun = id
   )) %>% dplyr::arrange(Time) %>% dplyr::mutate(
-    PatchType = ifelse(Patch %in% r$Ellipsis$Affinity$PatchInterventions,
+    PatchType = ifelse(Patch %in% results$Ellipsis$Affinity$PatchInterventions,
                        "Experiment", "Control"),
     # Time from intervention.
     TimeBase = Time - results$Ellipsis$Affinity$TimeIntervention,
-    ParentRun = results$Ellipsis$ID,
-    PatchAffinity = ifelse(
-      PatchType == "Experiment",
-      results$Ellipsis$Affinity$PatchAffinitiesIntervention,
-      result$Ellipsis$Affinity$PatchAffinitiesOld)
+    ParentRun = results$Ellipsis$ID
   )
+  if ("PatchAffinitiesIntervention" %in% names(results$Ellipsis$Affinity)) {
+    samplingDataFrame <- samplingDataFrame %>% dplyr::mutate(
+      PatchAffinity = ifelse(
+        PatchType == "Experiment",
+        results$Ellipsis$Affinity$PatchAffinitiesIntervention[Patch,],
+        results$Ellipsis$Affinity$PatchAffinitiesOld[Patch,])
+    )
+  } else {
+    samplingDataFrame <- samplingDataFrame %>% dplyr::mutate(
+      PatchAffinity = results$Ellipsis$Affinity$PatchAffinities[Patch,]
+    )
+  }
 
   samplingSeedsForRuns <-
     withRandom(runif(samplingRunsPerFile) * 1E8,
