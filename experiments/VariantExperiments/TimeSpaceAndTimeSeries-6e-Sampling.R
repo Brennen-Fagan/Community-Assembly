@@ -138,6 +138,8 @@ samples <- foreach::foreach(
   file = iterators::iter(files),
   seed = iterators::iter(samplingSeedsForFiles)
 ) %do% {
+  print(file)
+
   fileproperties <- strsplit(basename(file), split = "_", fixed = TRUE)
   fileproperties[[1]][[2]] <- "Sampling"
   filename <- file.path(
@@ -244,7 +246,8 @@ samples <- foreach::foreach(
     sd = iterators::iter(samplingSeedsForRuns),
     .packages = "dplyr"
   ) %dopar% {
-    withRandom(sampleFromResults2(
+    out <- withRandom(
+      sampleFromResults2(
       resultAbundance = results$Abundance,
       sampling = samplingDataFrame %>% dplyr::mutate(SamplingRun = id),
       control = c(1:results$NumEnvironments)[
@@ -261,6 +264,8 @@ samples <- foreach::foreach(
       Seed = sd
       ),
     sd)
+    print(paste(id, sd))
+    return(out)
   }
 
   save(samplingResults, file = filename)

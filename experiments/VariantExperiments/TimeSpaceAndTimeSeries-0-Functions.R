@@ -382,7 +382,7 @@ sampleFromResults2 <- function(
                                             TypesAsFrame0$PoolTypes)
 
           x <- dplyr::bind_cols(x %>% dplyr::mutate(
-            SamplingTypes = toString(Types)
+            SamplingTypes = ""
           ), TypesAsFrame2)
         }
         return(x)
