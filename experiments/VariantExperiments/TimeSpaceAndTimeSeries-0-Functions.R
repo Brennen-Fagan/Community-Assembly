@@ -243,9 +243,10 @@ sampleFromResults2 <- function(
   nSpecies, # Number of species
   samplingPerAbundance, # Convert from Abundance to sample-able individuals.
   samplingFailureRate, # Pr(Researcher Doesn't See Sample)
-  PoolTypes # Number of species in each subtype. We assume id is a proxy.
+  PoolTypes # Vector of Species types, assume abundance colnumber is a proxy.
 ) {
-  if(!is.null(PoolTypes)) stopifnot(sum(PoolTypes) == nSpecies)
+  if(!is.null(PoolTypes)) stopifnot(sum(PoolTypes) == nSpecies ||
+                                      length(PoolTypes) == nSpecies)
 
   # sampling <-
   sampling %>% dplyr::mutate(
@@ -268,7 +269,8 @@ sampleFromResults2 <- function(
     .f = function(x, y) {
       temp <- resultAbundance[
         x$TimeActualRow, # First Col. = Time
-        1 + nSpecies * (y$Patch - 1) + 1:nSpecies]
+        1 + nSpecies * (y$Patch - 1) + 1:nSpecies
+        ]
 
       x %>% dplyr::mutate(
         # Abundances to know number of events:
@@ -298,45 +300,91 @@ sampleFromResults2 <- function(
 
         IDs <- strsplit(x$SamplingNonZeroSpecies, ", ", fixed = TRUE)[[1]]
 
-        if(!is.null(PoolTypes))
-          drawTypes <- cut(
-            as.numeric(IDs), # (ab)Using ID = Row Number.
-            c(0, cumsum(PoolTypes)),
-            labels = if(!is.null(names(PoolTypes))) names(PoolTypes)
-          )
+        if(!is.null(PoolTypes)) {
+          if(sum(PoolTypes) == nSpecies)
+            drawTypes <- cut(
+              as.numeric(IDs), # (ab)Using ID = Row Number.
+              c(0, cumsum(PoolTypes)),
+              labels = if(!is.null(names(PoolTypes))) names(PoolTypes)
+            )
           # Pool$Type[as.numeric(IDs)]
+          else if (length(PoolTypes) == nSpecies)
+            drawTypes <- PoolTypes[as.numeric(IDs)]
+        }
 
         IDs <- rep(IDs, times = draws)
 
-        if(!is.null(PoolTypes))
-          Types <- cut(
-            as.numeric(IDs), # (ab)Using ID = Row Number.
-            c(0, cumsum(PoolTypes)),
-            labels = if(!is.null(names(PoolTypes))) names(PoolTypes)
-          ) # different because of change in IDs from unique to freq. dependent.
+        if(!is.null(PoolTypes)) {
+          if(sum(PoolTypes) == nSpecies)
+            Types <- cut(
+              as.numeric(IDs), # (ab)Using ID = Row Number.
+              c(0, cumsum(PoolTypes)),
+              labels = if(!is.null(names(PoolTypes))) names(PoolTypes)
+            ) # different since change in IDs from unique to freq. dependent.
+          else if (length(PoolTypes) == nSpecies)
+            Types <- PoolTypes[as.numeric(IDs)]
+        }
 
         x <- x %>% dplyr::mutate(
           SamplingIDs = toString(IDs),
           SamplingAlpha = sum(draws > 0)
         )
-        if (!is.null(PoolTypes))
-          x <- x %>% dplyr::mutate(
-            SamplingTypes = toString(Types),
-            SamplingAlphaType1 = table(drawTypes[draws > 0])[1],
-            SamplingAlphaType2 = table(drawTypes[draws > 0])[2]
+        if (!is.null(PoolTypes)) {
+          # Need to make sure each type is presented, even if not in the pop.
+          if (!is.table(PoolTypes)) {
+            # All Types:
+            TypesAsFrame0 <- data.frame(table(PoolTypes))
+          } else {
+            TypesAsFrame0 <- data.frame(PoolTypes)
+            colnames(TypesAsFrame0)[1] <- "PoolTypes"
+          }
+          TypesAsFrame0 <- TypesAsFrame0 %>% dplyr::mutate(
+              PoolTypes = as.character(PoolTypes)
+            )
+          # Types in Sample:
+          TypesAsFrame1 <-
+            data.frame(table(drawTypes[draws > 0])) %>% dplyr::mutate(
+              Var1 = as.character(Var1)
+            )
+          TypesAsFrame0 <- dplyr::left_join(
+            TypesAsFrame0, TypesAsFrame1,
+            by = c("PoolTypes" = "Var1"), suffix = c("Orig", "")
           )
+          TypesAsFrame2 <- t(data.frame(TypesAsFrame0$Freq))
+          colnames(TypesAsFrame2) <- paste0("SamplingAlphaType",
+                                            TypesAsFrame0$PoolTypes)
+
+
+          x <- dplyr::bind_cols(x %>% dplyr::mutate(
+            SamplingTypes = toString(Types)
+          ), TypesAsFrame2)
+        }
         return(x)
       } else {
         x <- x %>% dplyr::mutate(
           SamplingIDs = "",
           SamplingAlpha = 0
         )
-        if (!is.null(PoolTypes))
-          x <- x %>% dplyr::mutate(
-            SamplingTypes = "",
-            SamplingAlphaType1 = 0,
-            SamplingAlphaType2 = 0
-          )
+        if (!is.null(PoolTypes)) {
+          if (!is.table(PoolTypes)) {
+            # All Types:
+            TypesAsFrame0 <- data.frame(table(PoolTypes))
+          } else {
+            TypesAsFrame0 <- data.frame(PoolTypes)
+            colnames(TypesAsFrame0)[1] <- "PoolTypes"
+          }
+          TypesAsFrame0 <- TypesAsFrame0 %>% dplyr::mutate(
+            PoolTypes = as.character(PoolTypes),
+              Freq = 0
+            )
+          TypesAsFrame2 <- t(data.frame(TypesAsFrame0$Freq))
+          colnames(TypesAsFrame2) <- paste0("SamplingAlphaType",
+                                            TypesAsFrame0$PoolTypes)
+
+          x <- dplyr::bind_cols(x %>% dplyr::mutate(
+            SamplingTypes = toString(Types)
+          ), TypesAsFrame2)
+        }
         return(x)
       }
     }

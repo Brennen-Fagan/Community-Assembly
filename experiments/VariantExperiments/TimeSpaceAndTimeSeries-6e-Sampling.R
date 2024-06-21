@@ -5,7 +5,9 @@
 
 # Parameters: #################################################################
 datfolder <-
-    "TSTS_Simulations_18-1_6-6_2024-05-23"
+    "TSTS_Simulations_18-1_6-6_2024-05-23" # Assumes all simulations and
+                                           # interventions should have the same
+                                           # root sampling time.
 directory <- '.'
 
 ### Quantities: ###############################################################
@@ -20,6 +22,8 @@ samplingPerAbundance <- 1/100 # Converts abundance to rate of encounter
 
 # Runs:
 samplingRunsPerFile <- 20 # A human readable number. Number of runs.
+
+samplingPreinterventionTimeGap <- 1
 
 # Parallelization
 cores <- 1
@@ -43,7 +47,7 @@ library(parallel)
 library(iterators)
 library(doParallel)
 library(foreach)
-library(doRNG)
+# library(doRNG)
 
 source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-0-Interventions.R"))
@@ -161,6 +165,8 @@ samples <- foreach::foreach(
     }
   }
 
+  # Record the set of intervention times in case they are needed for the
+  # no-intervention use cases.
   if ("TimeIntervention" %in% names(results$Ellipsis$Affinity)) {
     interventionTimes <-
       c(interventionTimes, results$Ellipsis$Affinity$TimeIntervention)
@@ -169,6 +175,7 @@ samples <- foreach::foreach(
   } else {return(NULL)}
 
   # Sampling Time Span
+  # Note that defaultTimeSpan has an if(!Null) bypass in it.
   results$Ellipsis$TimeSpan <-
     defaultTimeSpan(results$Ellipsis$TimeSpan)
 
@@ -177,6 +184,8 @@ samples <- foreach::foreach(
     results$Abundance[, -1] > results$Parameters$EliminationThreshold,
     results$Abundance[, -1], 0
   )
+  # i.e. any(results$Abundance[, -1] < results$Parameters$EliminationThreshold
+  #          & results$Abundance[, -1] != 0) == FALSE.
 
   # We want a row pre-intervention, but not too far away from it.
   # In the initial TSTS format, this could reliably be row 1, since the
@@ -186,13 +195,14 @@ samples <- foreach::foreach(
   # file, and so we need to be a bit more careful about how we look around.
   interventionRow <-
     which.max(results$Abundance[, 1] >=
-                results$Ellipsis$Affinity$TimeIntervention )
+                results$Ellipsis$Affinity$TimeIntervention
+                - samplingPreinterventionTimeGap)
 
-  if (interventionRow - 10 < 0) {
-    interventionRow <- 1
-  } else {
-    interventionRow <- interventionRow - 10
-  }
+  # if (interventionRow - 10 < 0) {
+  #   interventionRow <- 1
+  # } else {
+  #   interventionRow <- interventionRow - 10
+  # }
 
   samplingTimes <- unique(c(# Guard
     # r$Abundance[1, 1], # Pre-intervention, then moment of intervention forward.
@@ -245,7 +255,7 @@ samples <- foreach::foreach(
       nSpecies = (ncol(results$Abundance) - 1) / results$NumEnvironments,
       samplingPerAbundance = samplingPerAbundance,
       samplingFailureRate = samplingFailureRate,
-      PoolTypes = table(pool$Affinity)
+      PoolTypes = pool$Affinity
     ) %>% dplyr::mutate(
       ParentRun = results$Ellipsis$ID,
       Seed = sd
