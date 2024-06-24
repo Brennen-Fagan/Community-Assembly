@@ -12,7 +12,7 @@ directory <- '.'
 
 ### Quantities: ###############################################################
 # When:
-samplingQuantity <- 10 # 100 # Not guaranteed! Number of samples taken by a run
+samplingQuantity <- 100 # Not guaranteed! Number of samples taken by a run
 samplingTimeScaleLogarithmic <- TRUE # Logarithmically spread from intervention
 
 # How:
@@ -84,7 +84,7 @@ defaultTimeSpan <- function(iTS) {
       "TSTS_Simulations_3-1-7_2024-01-22" = 200,
       "TSTS_Simulations_3-2-7_2024-01-22" = 200,
       "TSTS_Simulations_3-3-7_2024-01-22" = 200,
-      10 # "Default"
+      100 # "Default"
     ))
   } else {
     return(iTS)
