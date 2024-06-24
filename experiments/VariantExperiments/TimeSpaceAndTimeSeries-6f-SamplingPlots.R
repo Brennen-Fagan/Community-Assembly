@@ -1,6 +1,7 @@
 # Plots used for ABC Presentation.
 options(bitmapType = "cairo")
 
+# Currently only set up for one at a time...
 datfolders <- c(
   "TSTS_Simulations_18-1_6-6_2024-05-23"
 )
@@ -48,7 +49,7 @@ presences <- lapply(
   })
 
 poolmats <- lapply(
-  dir(datfolders, full.names = TRUE, pattern = "PoolMats"), function(x) {
+  dir(datfolders, full.names = TRUE, pattern = "PoolPatchDynamics"), function(x) {
     names <- load(x)
     return(c(mget(names), "Dir" = x))
   })
@@ -279,7 +280,7 @@ ggplot2::ggsave(
 # The focal patch is targetpatches[1] and focal time is targettimes[2].
 # Hence the controls are at targetpatches[1] targettimes[1] or 2 and 2.
 # Parameters
-targettimes <- c(min(dplyr::bind_rows(samples)$TimeBase), # Pre-intervent
+targettimes <- c(0,
                  5) # 0 is intervention, 10 is timespan, 50% is symmetry.
 timeType <- "Time\nFor Time"
 spaceType <- "Space\nFor Time"
@@ -325,9 +326,9 @@ samplesByRun <- dplyr::bind_rows(samples) %>% dplyr::ungroup(
       )
 
     extirpation <-
-      ifelse(.yProperties[[1]][5] == "2", 1,
-             ifelse(.yProperties[[1]][5] == "4", 0.9,
-                    ifelse(.yProperties[[1]][5] == "6", 0,
+      ifelse(.yProperties[[1]][3] == "2", 1,
+             ifelse(.yProperties[[1]][3] == "4", 0.9,
+                    ifelse(.yProperties[[1]][3] == "6", 0,
                            NA)))
 
 
@@ -335,9 +336,9 @@ samplesByRun <- dplyr::bind_rows(samples) %>% dplyr::ungroup(
     controls <- .x %>% dplyr::filter(
       Patch %in% targetpatches,
       TimeBase %in% targettimes,
-      !(Patch == targetpatches[2] & # Not diff time and place.
+      !(Patch == targetpatches[2] & # Not [[diff time] and [diff place]].
           TimeBase == targettimes[1]),
-      !(Patch == targetpatches[1] & # Not same time and place.
+      !(Patch == targetpatches[1] & # Not [[same time] and [same place]].
           TimeBase == targettimes[2])
     ) %>% dplyr::mutate(
       Control = "Control",
@@ -432,22 +433,73 @@ samplesByRun <- dplyr::bind_rows(samples) %>% dplyr::ungroup(
 ##### But now we want to add on the counterfactual ############################
 ##### which requires comparing between files.
 
-#TODO I've stopped here for the weekend.
-
+# PREVIOUSLY:
 # We want the true niche1 species still present, the true niche2 species that
 # have appeared, and the overall change in the number of species in comparison
-# to the same patch at the same type but with the alternative treatment.
+# to the same patch at the same time but with the alternative treatment.
 # (These are what detected in control, not detected in control, and overall
 #  are attempting to approximate.)
 
-samplesTRUTH <- dplyr::bind_rows(samples[[1]]) %>% dplyr::ungroup(
+# BUT NOW:
+# We're NOT using niches in this way.
+# Instead, we're adopting the no intervention case as the counterfactual
+# baseline. Hence, there is 0 change overall, 0 change in species detected
+# in the control, and 0 species detected out of control when looking at the
+# no intervention case.
+# Instead, we want to know the effect of the intervention on each metric.
+# The sampling methods are then trying to capture this (previous sentence).
+
+# Make sure to associate each run with the correct no intervention run.
+samplesTRUTH <- dplyr::bind_rows(samples) %>% dplyr::ungroup(
 ) %>% dplyr::group_by(
   ParentRun
-  # samples[[1]][[1]] %>% dplyr::ungroup(
+  # samples[[1]][[1]] %>% dplyr::ungroup()%>% dplyr::group_by(ParentRun # debug
 ) %>% dplyr::group_modify(
   .f = function(.x, .y) {
 
-    .yProperties <- strsplit(basename(as.character(.y$ParentRun)), "-")[[1]]
+    .yProperties <- strsplit(basename(as.character(.y)), "_")
+
+    # ParentRun is a bit of a misnomer here, since it's actually the
+    # Intervention or Simulation run, but we strictly want the Simulations.
+    # This is stored in the first pair of .yProperties at this stage.
+    initialRun <- paste0(.yProperties[[1]][1:2], collapse = "_")
+
+    .yProperties <- strsplit(unlist(.yProperties), "-")
+
+    space <- if((length(.yProperties) > 2 && .yProperties[[3]][3] == "p")
+                || length(.yProperties) == 2) {
+      .yProperties[[1]][4]
+    } else {
+      .yProperties[[3]][3] # More accurately, this means a spatial intervention
+    }
+    space <- ifelse(
+      space == "10", 0,
+      ifelse(space == "15", 5,
+             ifelse(space == "NA", Inf,
+                    NA))
+    )
+
+    intervention <-
+      ifelse(length(.yProperties) == 2, "No Intervention",
+             ifelse(
+               (length(.yProperties) > 2 && .yProperties[[3]][1] == "40"),
+               "(0.5, 0.5) -> (0, 1)",
+               NA) # TECHDEBT (Being lazy...)
+      )
+
+    interventionIntensity <-
+      ifelse(length(.yProperties) == 2, "No Intervention",
+             ifelse(.yProperties[[3]][4] == "2", "2 ^ (1 - 2 euclid(m, n))",
+                    ifelse(.yProperties[[3]][4] == "3",  "10 ^ (1 - 2 euclid(m, n))",
+                           "NA"
+                    ))
+      )
+
+    extirpation <-
+      ifelse(.yProperties[[1]][3] == "2", 1,
+             ifelse(.yProperties[[1]][3] == "4", 0.9,
+                    ifelse(.yProperties[[1]][3] == "6", 0,
+                           NA)))
 
     truevalues <- .x %>% dplyr::filter(
       Patch == targetpatches[1] & # same time and place.
@@ -459,83 +511,126 @@ samplesTRUTH <- dplyr::bind_rows(samples[[1]]) %>% dplyr::ungroup(
       SamplingNonZeroSpecies, SamplingNonZeroAbundances
     )
 
-    truevalues$Space <- .yProperties[6]
-    truevalues$Intervention <- ifelse(
-      .yProperties[length(.yProperties)] == "Intervention.RData",
-      "Pool Swap", "No Intervention")
+    truevalues$Space <- space
+    truevalues$Intervention <- intervention
+    truevalues$InterventionIntensity <- interventionIntensity
+    truevalues$Extirpation <- extirpation
+    truevalues$InitialRun <- initialRun
 
     return(truevalues)
   }
 )
 
-# Evaluate the truth by breaking species up by niche.
-# Then rearrange by space, and evaluate differences between interventions.
+# Will be useful if we perform "niche" (trait, w/e) evaluation as well.
+# samplesTRUTH <- samplesTRUTH %>% dplyr::ungroup(
+# ) %>% dplyr::group_by(
+#   InitialRun
+# ) %>% dplyr::group_modify(
+#   .f = function(.x, .y) {
+#     speciesIDs <- strsplit(.x$SamplingNonZeroSpecies,
+#                            split = ", ", fixed = TRUE)
+#     speciesIDs <- lapply(speciesIDs, as.numeric)
+#
+#     # speciesAbundances <- strsplit(.x$SamplingNonZeroAbundances,
+#     #                               split = ", ", fixed = TRUE)
+#     # speciesAbundances <- lapply(speciesAbundances, as.numeric)
+#     #
+#     # speciesIDs <- lapply(seq_along(speciesIDs),
+#     #                      function(i, id, ab) id[[i]][ab[[i]] > 1e-4],
+#     #                      id = speciesIDs, # TODO TECHDEBT, USE RESULTS
+#     #                      ab = speciesAbundances)
+#
+#     # pool <- which(dirname(.y$InitialRun) ==
+#     #                 unlist(lapply(poolmats, function(p) dirname(p$Dir))))
+#     # pool <- poolmats[[pool]]$Pool
+#     pool <- poolmats[[1]]$Pool
+#
+#     # IN OUR SPECIFIC CASE: (The column especially, but also single row)
+#     # speciesIDsAll <- sort(unique(unlist(speciesIDs)))
+#     # niches <- pool$Affinity[match(speciesIDs, pool$ID)]
+#     niches <- lapply(lapply(speciesIDs, match, table = pool$ID), # get position
+#                      function(position) pool$Affinity[position]) # get affinity
+#     nichesPool <- sort(unique(pool$Affinity))
+#
+#     # Split the speciesIDs up into their types.
+#     niches_split <- lapply(seq_along(niches), function(nid) {
+#       splits <- lapply(nichesPool, function(niche) {
+#         toString(speciesIDs[[nid]][niches[[nid]] == niche])
+#       })
+#       splits <- data.frame(splits)
+#       colnames(splits) <- paste0("Niche", nichesPool)
+#       return(splits)
+#     }) %>% dplyr::bind_rows()
+#
+#     # .x$SamplingNonZeroSpecies <- toString(speciesIDs)
+#
+#     return(cbind(.x, niches_split))
+#   }
+# )
+
+# samplesTRUTH <- samplesTRUTH %>% dplyr::ungroup(
+# ) %>% dplyr::mutate(
+#   dplyr::across(
+#     .cols = c(SamplingNonZeroSpecies, tidyr::starts_with("Niche")),
+#     .fns = list(Richness = function(.x) {
+#       unlist(lapply(strsplit(.x, split = ", ", fixed = TRUE), length))
+#     })
+#   ),
+#   dplyr::across(
+#     .cols = dplyr::ends_with("Richness"),
+#     .fns = ~ ifelse(Intervention == "No Intervention", -.x, .x)
+#   )
+# ) %>% dplyr::group_by(
+#   Space, Patch, Time
+# ) %>% dplyr::summarise(
+#   `Overall` = sum(SamplingNonZeroSpecies_Richness),
+#   `Detected in Control` = sum(Niche1_Richness),
+#   `Not Detected in Control` = sum(Niche2_Richness),
+#   .groups = "drop"
+# )
+
 samplesTRUTH <- samplesTRUTH %>% dplyr::ungroup(
 ) %>% dplyr::group_by(
-  ParentRun
+  InitialRun
 ) %>% dplyr::group_modify(
   .f = function(.x, .y) {
     speciesIDs <- strsplit(.x$SamplingNonZeroSpecies,
                            split = ", ", fixed = TRUE)
     speciesIDs <- lapply(speciesIDs, as.numeric)
 
-    speciesAbundances <- strsplit(.x$SamplingNonZeroAbundances,
-                                  split = ", ", fixed = TRUE)
-    speciesAbundances <- lapply(speciesAbundances, as.numeric)
+    baseline <- which(.y$InitialRun == .x$ParentRun)
+    if(length(baseline) == 0) {
+      stop(paste0("Missing Baseline:", .y$InitialRun))
+    }
 
-    speciesIDs <- lapply(seq_along(speciesIDs),
-                         function(i, id, ab) id[[i]][ab[[i]] > 1e-4],
-                         id = speciesIDs, # TODO TECHDEBT, USE RESULTS
-                         ab = speciesAbundances)
-
-    pool <- which(dirname(.y$ParentRun) ==
-                    unlist(lapply(poolmats, function(p) dirname(p$Dir))))
-    pool <- poolmats[[pool]]$Pool
-
-    # IN OUR SPECIFIC CASE: (The column especially, but also single row)
-    speciesIDs <- speciesIDs[[1]]
-    niches <- pool$Niche_Cat[match(speciesIDs, pool$ID)]
-    nichesPool <- sort(unique(pool$Niche_Cat))
-
-    # Split the speciesIDs up into their types.
-    niches_split <- lapply(nichesPool, function(niche) {
-      toString(speciesIDs[niches == niche])
+    inControl <- lapply(speciesIDs, function(ids) {
+      length(ids[ids %in% speciesIDs[[baseline]]]) - length(speciesIDs[[baseline]])
     })
-    niches_split <- data.frame(niches_split)
-    names(niches_split) <- nichesPool
+    notInControl <- lapply(speciesIDs, function(ids) {
+      length(ids[!ids %in% speciesIDs[[baseline]]]) - 0
+    })
+    overallChange <- lapply(speciesIDs, function(ids) {
+      length(ids) - length(speciesIDs[[baseline]])
+    })
 
-    .x$SamplingNonZeroSpecies <- toString(speciesIDs)
+    differences <- data.frame(
+      `Overall` = unlist(overallChange),
+      `Detected in Control` = unlist(inControl),
+      `Not Detected in Control` = unlist(notInControl)
+    )
 
-    return(cbind(.x, niches_split))
-
+    return(cbind(.x, differences))
   }
-)
-
-samplesTRUTH <- samplesTRUTH %>% dplyr::ungroup(
-) %>% dplyr::mutate(
-  dplyr::across(
-    .cols = c(SamplingNonZeroSpecies, Niche1, Niche2),
-    .fns = list(Richness = function(.x) {
-      unlist(lapply(strsplit(.x, split = ", ", fixed = TRUE), length))
-    })
-  ),
-  dplyr::across(
-    .cols = dplyr::ends_with("Richness"),
-    .fns = ~ ifelse(Intervention == "No Intervention", -.x, .x)
-  )
-) %>% dplyr::group_by(
-  Space, Patch, Time
-) %>% dplyr::summarise(
-  `Overall` = sum(SamplingNonZeroSpecies_Richness),
-  `Detected in Control` = sum(Niche1_Richness),
-  `Not Detected in Control` = sum(Niche2_Richness),
-  .groups = "drop"
 )
 
 ##### Plotting: ###############################################################
 
-LSR_spacechoice <- "Inf"
-ylimits <- c(-8, 8)
+# LSR_spacechoice <- "Inf"
+ylimits <- max(unlist(lapply(samplesByRun, function(sbr) max(abs(sbr[, 4])))),
+               samplesTRUTH$Overall,
+               samplesTRUTH$Detected.in.Control,
+               samplesTRUTH$Not.Detected.in.Control)+1
+ylimits <- c(-ylimits, ylimits)
 # Patch so we don't have to re-run
 samplesByRun <- lapply(
   samplesByRun,
@@ -549,10 +644,14 @@ samplesByRun <- lapply(
     )
   }
 )
+samplesTRUTH <- samplesTRUTH %>% dplyr::rename(
+  `Detected in Control` = Detected.in.Control,
+  `Not Detected in Control` = Not.Detected.in.Control
+)
 
-###### Plot of Local Species Richness Gain Without True Values ################
-LSR_nointervent_notrue <- dplyr::bind_rows(samplesByRun)  %>% dplyr::filter(
-  Space == LSR_spacechoice, Intervention == "No Intervention", Sampled
+###### Master Plot: ###########################################################
+dplyr::bind_rows(samplesByRun)  %>% dplyr::filter(
+  Sampled
 ) %>% dplyr::group_by(
   `Local Species Richness Gain (vs. Control)`, Type, `Species Subset`
 ) %>% dplyr::mutate(
@@ -570,135 +669,194 @@ LSR_nointervent_notrue <- dplyr::bind_rows(samplesByRun)  %>% dplyr::filter(
 ) %>% ggplot2::ggplot(
   ggplot2::aes(x = Type,
                y = `Local Species Richness Gain (vs. Control)`,
-               fill = Type)
+               fill = factor(Space))
   # ) + ggplot2::geom_violin(
   #   draw_quantiles = c(
   #     #0.01, 0.05, # Only 20 samples!
   #     0.1, 0.25, 0.5, 0.75, 0.9#,
   #     #0.95, 0.99
   #   )
+) + ggplot2::geom_hline(
+  yintercept = 0
 ) + ggplot2::geom_dotplot(
   binaxis = "y", stackdir = "center", position = "dodge", binwidth = 1/5,
   dotsize = 1.,
   show.legend = FALSE
-) + ggplot2::facet_wrap(
-  . ~ factor(`Species Subset (Base)`, levels = c(
-    "Overall", "Detected in Control", "Not Detected in Control"),
-    ordered = TRUE)
 ) + ggplot2::coord_cartesian(
   ylim = ylimits, expand = FALSE
 ) + ggplot2::scale_y_continuous(
   breaks = ylimits[1]:ylimits[2]
 ) + ggplot2::theme(
   panel.grid.minor.y = ggplot2::element_blank()
-) + ggplot2::scale_fill_manual(
-  values = c("#7f6000", "#b6d7a8")
-)
-ggplot2::ggsave(LSR_nointervent_notrue,
-                filename = paste0("Image-ABC-LSR-",
-                                  LSR_spacechoice,
-                                  "-NoInt-WOTrue.png"),
-                width = 12, height = 10, units = "cm"
-)
-
-###### Plot of Local Species Richness Gain With True Values ###################
-LSR_nointervent_true <- LSR_nointervent_notrue + ggplot2::geom_point(
+) + ggplot2::facet_grid(
+  Extirpation ~ interaction(Intervention, InterventionIntensity) +
+    factor(`Species Subset (Base)`, levels = c(
+      "Overall", "Detected in Control", "Not Detected in Control"),
+      ordered = TRUE)
+) + ggplot2::geom_point(
   data = dplyr::bind_rows(samplesByRun) %>% dplyr::filter(
-    Space == LSR_spacechoice, Intervention == "No Intervention",
     Sampled == FALSE
-  ),
-  show.legend = FALSE
-)
-ggplot2::ggsave(LSR_nointervent_true,
-                filename = paste0("Image-ABC-LSR-",
-                                  LSR_spacechoice,
-                                  "-NoInt-WTrue.png"),
-                width = 12, height = 10, units = "cm"
-)
-
-###### Plot of Sampling for True Intervention. ################################
-
-###### Plot of Local Species Richness Gain Without True Values ################
-LSR_intervent_notrue <- dplyr::bind_rows(samplesByRun) %>% dplyr::filter(
-  Space == LSR_spacechoice, Intervention == "Pool Swap", Sampled
-) %>% dplyr::group_by(
-  `Local Species Richness Gain (vs. Control)`, Type, `Species Subset`
-) %>% dplyr::mutate(
-  `Local Species Richness Gain (vs. Control)` =
-    `Local Species Richness Gain (vs. Control)` +
-    if(length(`Local Species Richness Gain (vs. Control)`) > 1) {
-      rep(c(-1/6, 1/6), c(
-        floor(length(`Local Species Richness Gain (vs. Control)`)/2),
-        ceiling(length(`Local Species Richness Gain (vs. Control)`)/2)
-      ))
-    } else {
-      0
-    },
-  groupsize = dplyr::n()
-) %>% ggplot2::ggplot(
-  ggplot2::aes(x = Type,
-               y = `Local Species Richness Gain (vs. Control)`,
-               fill = Type)
-  # ) + ggplot2::geom_violin(
-  #   draw_quantiles = c(
-  #     #0.01, 0.05, # Only 20 samples!
-  #     0.1, 0.25, 0.5, 0.75, 0.9#,
-  #     #0.95, 0.99
-  #   )
-) + ggplot2::geom_dotplot(
-  binaxis = "y", stackdir = "center", position = "dodge", binwidth = 1/5,
-  dotsize = 1.,
-  show.legend = FALSE
-) + ggplot2::facet_wrap(
-  . ~ factor(`Species Subset (Base)`, levels = c(
-    "Overall", "Detected in Control", "Not Detected in Control"),
-    ordered = TRUE)
-) + ggplot2::coord_cartesian(
-  ylim = ylimits, expand = FALSE
-) + ggplot2::scale_y_continuous(
-  breaks = ylimits[1]:ylimits[2]
-) + ggplot2::theme(
-  panel.grid.minor.y = ggplot2::element_blank()
-) + ggplot2::scale_fill_manual(
-  values = c("#7f6000", "#b6d7a8")
-)
-ggplot2::ggsave(LSR_intervent_notrue,
-                filename = paste0("Image-ABC-LSR-",
-                                  LSR_spacechoice,
-                                  "-Int-WOTrue.png"),
-                width = 12, height = 10, units = "cm"
-)
-
-###### Plot of Local Species Richness Gain With True Values ###################
-LSR_intervent_true <- LSR_intervent_notrue + ggplot2::geom_point(
-  data = dplyr::bind_rows(samplesByRun) %>% dplyr::filter(
-    Space == LSR_spacechoice, Intervention == "Pool Swap", Sampled == FALSE
-  ),
-  show.legend = FALSE
-)
-ggplot2::ggsave(LSR_intervent_true,
-                filename = paste0("Image-ABC-LSR-",
-                                  LSR_spacechoice,
-                                  "-Int-WTrue.png"),
-                width = 12, height = 10, units = "cm"
-)
-
-##### Plot of Local Species Richness Gain With Counterfactual #################
-LSR_intervent_cf <- LSR_intervent_true + ggplot2::geom_point(
-  data = samplesTRUTH %>% dplyr::filter(
-    Space == LSR_spacechoice
-  ) %>% tidyr::pivot_longer(
+  ) %>% dplyr::select(-SamplingRun) %>% dplyr::distinct(),
+  show.legend = FALSE, position = position_dodge(width = 0.9)
+) + ggplot2::geom_point(
+  data = samplesTRUTH %>% tidyr::pivot_longer(
     cols = `Overall`:`Not Detected in Control`,
     names_to = "Species Subset (Base)",
     values_to = "Local Species Richness Gain (vs. Control)"
   ),
-  ggplot2::aes(x = 1.5),
-  show.legend = FALSE, color = "purple", fill = "black", shape = 7, size = 2
+  ggplot2::aes(x = 1.5, color = factor(Space)),
+  show.legend = FALSE, fill = "black", shape = 7, size = 2
 )
-ggplot2::ggsave(LSR_intervent_cf,
-                filename = paste0("Image-ABC-LSR-",
-                                  LSR_spacechoice,
-                                  "-Int-CF.png"),
-                width = 12, height = 10, units = "cm"
-)
+
+# ###### Plot of Local Species Richness Gain Without True Values ################
+# LSR_nointervent_notrue <- dplyr::bind_rows(samplesByRun)  %>% dplyr::filter(
+#   Intervention == "No Intervention", Sampled
+# ) %>% dplyr::group_by(
+#   `Local Species Richness Gain (vs. Control)`, Type, `Species Subset`
+# ) %>% dplyr::mutate(
+#   `Local Species Richness Gain (vs. Control)` =
+#     `Local Species Richness Gain (vs. Control)` +
+#     if(length(`Local Species Richness Gain (vs. Control)`) > 1) {
+#       rep(c(-1/6, 1/6), c(
+#         floor(length(`Local Species Richness Gain (vs. Control)`)/2),
+#         ceiling(length(`Local Species Richness Gain (vs. Control)`)/2)
+#       ))
+#     } else {
+#       0
+#     },
+#   groupsize = dplyr::n()
+# ) %>% ggplot2::ggplot(
+#   ggplot2::aes(x = Type,
+#                y = `Local Species Richness Gain (vs. Control)`,
+#                fill = Type)
+#   # ) + ggplot2::geom_violin(
+#   #   draw_quantiles = c(
+#   #     #0.01, 0.05, # Only 20 samples!
+#   #     0.1, 0.25, 0.5, 0.75, 0.9#,
+#   #     #0.95, 0.99
+#   #   )
+# ) + ggplot2::geom_dotplot(
+#   binaxis = "y", stackdir = "center", position = "dodge", binwidth = 1/5,
+#   dotsize = 1.,
+#   show.legend = FALSE
+# ) + ggplot2::facet_wrap(
+#   . ~ factor(`Species Subset (Base)`, levels = c(
+#     "Overall", "Detected in Control", "Not Detected in Control"),
+#     ordered = TRUE)
+# ) + ggplot2::coord_cartesian(
+#   ylim = ylimits, expand = FALSE
+# ) + ggplot2::scale_y_continuous(
+#   breaks = ylimits[1]:ylimits[2]
+# ) + ggplot2::theme(
+#   panel.grid.minor.y = ggplot2::element_blank()
+# ) + ggplot2::scale_fill_manual(
+#   values = c("#7f6000", "#b6d7a8")
+# )
+# ggplot2::ggsave(LSR_nointervent_notrue,
+#                 filename = paste0("Image-ABC-LSR-",
+#                                   LSR_spacechoice,
+#                                   "-NoInt-WOTrue.png"),
+#                 width = 12, height = 10, units = "cm"
+# )
+#
+# ###### Plot of Local Species Richness Gain With True Values ###################
+# LSR_nointervent_true <- LSR_nointervent_notrue + ggplot2::geom_point(
+#   data = dplyr::bind_rows(samplesByRun) %>% dplyr::filter(
+#     Space == LSR_spacechoice, Intervention == "No Intervention",
+#     Sampled == FALSE
+#   ),
+#   show.legend = FALSE
+# )
+# ggplot2::ggsave(LSR_nointervent_true,
+#                 filename = paste0("Image-ABC-LSR-",
+#                                   LSR_spacechoice,
+#                                   "-NoInt-WTrue.png"),
+#                 width = 12, height = 10, units = "cm"
+# )
+#
+# ###### Plot of Sampling for True Intervention. ################################
+#
+# ###### Plot of Local Species Richness Gain Without True Values ################
+# LSR_intervent_notrue <- dplyr::bind_rows(samplesByRun) %>% dplyr::filter(
+#   Space == LSR_spacechoice, Intervention == "Pool Swap", Sampled
+# ) %>% dplyr::group_by(
+#   `Local Species Richness Gain (vs. Control)`, Type, `Species Subset`
+# ) %>% dplyr::mutate(
+#   `Local Species Richness Gain (vs. Control)` =
+#     `Local Species Richness Gain (vs. Control)` +
+#     if(length(`Local Species Richness Gain (vs. Control)`) > 1) {
+#       rep(c(-1/6, 1/6), c(
+#         floor(length(`Local Species Richness Gain (vs. Control)`)/2),
+#         ceiling(length(`Local Species Richness Gain (vs. Control)`)/2)
+#       ))
+#     } else {
+#       0
+#     },
+#   groupsize = dplyr::n()
+# ) %>% ggplot2::ggplot(
+#   ggplot2::aes(x = Type,
+#                y = `Local Species Richness Gain (vs. Control)`,
+#                fill = Type)
+#   # ) + ggplot2::geom_violin(
+#   #   draw_quantiles = c(
+#   #     #0.01, 0.05, # Only 20 samples!
+#   #     0.1, 0.25, 0.5, 0.75, 0.9#,
+#   #     #0.95, 0.99
+#   #   )
+# ) + ggplot2::geom_dotplot(
+#   binaxis = "y", stackdir = "center", position = "dodge", binwidth = 1/5,
+#   dotsize = 1.,
+#   show.legend = FALSE
+# ) + ggplot2::facet_wrap(
+#   . ~ factor(`Species Subset (Base)`, levels = c(
+#     "Overall", "Detected in Control", "Not Detected in Control"),
+#     ordered = TRUE)
+# ) + ggplot2::coord_cartesian(
+#   ylim = ylimits, expand = FALSE
+# ) + ggplot2::scale_y_continuous(
+#   breaks = ylimits[1]:ylimits[2]
+# ) + ggplot2::theme(
+#   panel.grid.minor.y = ggplot2::element_blank()
+# ) + ggplot2::scale_fill_manual(
+#   values = c("#7f6000", "#b6d7a8")
+# )
+# ggplot2::ggsave(LSR_intervent_notrue,
+#                 filename = paste0("Image-ABC-LSR-",
+#                                   LSR_spacechoice,
+#                                   "-Int-WOTrue.png"),
+#                 width = 12, height = 10, units = "cm"
+# )
+#
+# ###### Plot of Local Species Richness Gain With True Values ###################
+# LSR_intervent_true <- LSR_intervent_notrue + ggplot2::geom_point(
+#   data = dplyr::bind_rows(samplesByRun) %>% dplyr::filter(
+#     Space == LSR_spacechoice, Intervention == "Pool Swap", Sampled == FALSE
+#   ),
+#   show.legend = FALSE
+# )
+# ggplot2::ggsave(LSR_intervent_true,
+#                 filename = paste0("Image-ABC-LSR-",
+#                                   LSR_spacechoice,
+#                                   "-Int-WTrue.png"),
+#                 width = 12, height = 10, units = "cm"
+# )
+#
+# ##### Plot of Local Species Richness Gain With Counterfactual #################
+# LSR_intervent_cf <- LSR_intervent_true + ggplot2::geom_point(
+#   data = samplesTRUTH %>% dplyr::filter(
+#     Space == LSR_spacechoice
+#   ) %>% tidyr::pivot_longer(
+#     cols = `Overall`:`Not Detected in Control`,
+#     names_to = "Species Subset (Base)",
+#     values_to = "Local Species Richness Gain (vs. Control)"
+#   ),
+#   ggplot2::aes(x = 1.5),
+#   show.legend = FALSE, color = "purple", fill = "black", shape = 7, size = 2
+# )
+# ggplot2::ggsave(LSR_intervent_cf,
+#                 filename = paste0("Image-ABC-LSR-",
+#                                   LSR_spacechoice,
+#                                   "-Int-CF.png"),
+#                 width = 12, height = 10, units = "cm"
+# )
 
