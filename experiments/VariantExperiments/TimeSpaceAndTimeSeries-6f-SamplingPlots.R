@@ -1,4 +1,4 @@
-# Plots used for ABC Presentation.
+# Modification of plots used for ABC Presentation.
 options(bitmapType = "cairo")
 
 # Currently only set up for one at a time...
@@ -29,6 +29,7 @@ results <- lapply(
 
 samples <- lapply(
   dir(datfolders, full.names = TRUE, pattern = "Sampling"), function(x) {
+    if (grepl("Sampling20", x) || grepl("SamplingBES", x)) return(NULL)
     names <- load(x)
     stopifnot(length(names) == 1)
     return(get(names))
@@ -60,7 +61,7 @@ poolmats <- lapply(
 
 # Plotting: ###################################################################
 # Parameters
-targetpatches <- c(1, 2) # Both experimental
+targetpatches <- c(2, 1) # first patch is focal, second patch is control
 
 ### Plot of maximally distant true diversities, not separated by niche. #######
 # We use the precomputed diversities. We expect experimental patch above,
@@ -95,7 +96,9 @@ diversitiesPlottable <- do.call(
 
     if(length(fileproperties) == 6) {
       filepropertiesIntervention <- strsplit(fileproperties[5], split = "-",
-                                             fixed = TRUE)[[1]][4]
+                                             fixed = TRUE)[[1]]
+      filepropertiesInterventionType <- filepropertiesIntervention[1]
+      filepropertiesIntervention <- filepropertiesIntervention[4]
       filepropertiesIntervention <- ifelse(
         filepropertiesIntervention == "2", "2 ^ (1 - 2 euclid(m, n))",
         ifelse(filepropertiesIntervention == "3", "10 ^ (1 - 2 euclid(m, n))",
@@ -103,17 +106,18 @@ diversitiesPlottable <- do.call(
       )
     } else {
       filepropertiesIntervention <- "NA"
+      filepropertiesInterventionType <- "NA"
     }
 
     # Need to unify Diversities Format
     d$Diversities$alpha <- d$Diversities$alpha %>% dplyr::select(
       -Species
-      ) %>% tidyr::pivot_longer(
-        cols = Richness:Richness_Consumer,
-        names_to = "Aggregation", values_to = "Measurement"
-      ) %>% dplyr::mutate(
-        Environment = as.character(Environment)
-      )
+    ) %>% tidyr::pivot_longer(
+      cols = Richness:Richness_Consumer,
+      names_to = "Aggregation", values_to = "Measurement"
+    ) %>% dplyr::mutate(
+      Environment = as.character(Environment)
+    )
 
     d$Diversities$beta <- dplyr::bind_rows(
       d$Diversities$beta
@@ -170,7 +174,10 @@ diversitiesPlottable <- do.call(
       ExtirpationProportion = filepropertiesExt,
       Intervention = ifelse(
         length(fileproperties) == 6,
-        "(0.5, 0.5) -> (0, 1)", "No Intervention"),
+        ifelse(filepropertiesInterventionType=="40", "(0.5, 0.5) -> (0, 1)",
+               ifelse(filepropertiesInterventionType=="12", "(0.5, 0.5) -> (0.5, 1)",
+                      "UNLISTED")),
+        "No Intervention"),
       InterventionIntensity = filepropertiesIntervention,
       ID = d$Dir
     )
@@ -178,14 +185,22 @@ diversitiesPlottable <- do.call(
 )
 
 Div_spacechoice <- "5"
+Div_interchoice <- c("No Intervention", "(0.5, 0.5) -> (0.5, 1)")
+Div_intenschoice <- c("NA",
+                      # "2 ^ (1 - 2 euclid(m, n))")
+                      "10 ^ (1 - 2 euclid(m, n))")
+Div_extprpchoice <- 0.9
 
 # Richness (local) and Space Specific plot in the first patch.
 # Assumes that all data are drawn from the same time/history/system.
-Div_experiment <- ggplot2::ggplot(
+Div_experiment_before <- ggplot2::ggplot(
   diversitiesPlottable %>% dplyr::filter(
     Space == Div_spacechoice,
     Environment %in% as.character(targetpatches[1]),
-    Measurement == "Richness"
+    Measurement == "Richness",
+    Intervention %in% Div_interchoice[1],
+    InterventionIntensity %in% Div_intenschoice[1],
+    ExtirpationProportion %in% Div_extprpchoice
   ),
   ggplot2::aes(
     x = Time,
@@ -196,16 +211,17 @@ Div_experiment <- ggplot2::ggplot(
       levels = rev(unique(interaction(Intervention, InterventionIntensity)))),
     group = ID
   )
-) + ggplot2::geom_vline(
-  xintercept = # SAFE ONLY IN OUR SPECIFIC CASE
-    (diversities[[1]]$Ellipsis$Affinity$TimeIntervention /
-       diversities[[1]]$Ellipsis$ReactionTime)
+  # ) + ggplot2::geom_vline(
+  #   xintercept = # SAFE ONLY IN OUR SPECIFIC CASE
+  #     (diversities[[1]]$Ellipsis$Affinity$TimeIntervention /
+  #        diversities[[1]]$Ellipsis$ReactionTime)
 ) + ggplot2::geom_line(
-  # show.legend = FALSE
+  show.legend = FALSE, linewidth = 2
 ) + ggplot2::scale_color_manual(
   values = c(
     "No Intervention" = "#44546a",
-    "(0.5, 0.5) -> (0, 1)" = "#ed7d31"
+    "(0.5, 0.5) -> (0, 1)" = "#ed7d31",
+    "(0.5, 0.5) -> (0.5, 1)" = "darkred"
   )
 ) + ggplot2::ylab(
   paste0("Richness\n(Patch", targetpatches[1], ")")
@@ -214,17 +230,20 @@ Div_experiment <- ggplot2::ggplot(
     Space == Div_spacechoice, Environment != "Gamma",
     Measurement == "Richness"
   ) %>% dplyr::pull(Value))
-) + ggplot2::facet_wrap(
-  . ~ ExtirpationProportion
+  # ) + ggplot2::facet_wrap(
+  #   . ~ ExtirpationProportion
 ) + ggplot2::scale_linetype(
   name = "Intervention+\nIntensity"
 )
 
-Div_control <- ggplot2::ggplot(
+Div_experiment <- ggplot2::ggplot(
   diversitiesPlottable %>% dplyr::filter(
     Space == Div_spacechoice,
-    Environment %in% as.character(targetpatches[2]),
-    Measurement == "Richness"
+    Environment %in% as.character(targetpatches[1]),
+    Measurement == "Richness",
+    Intervention %in% Div_interchoice,
+    InterventionIntensity %in% Div_intenschoice,
+    ExtirpationProportion %in% Div_extprpchoice
   ),
   ggplot2::aes(
     x = Time,
@@ -240,11 +259,55 @@ Div_control <- ggplot2::ggplot(
     (diversities[[1]]$Ellipsis$Affinity$TimeIntervention /
        diversities[[1]]$Ellipsis$ReactionTime)
 ) + ggplot2::geom_line(
-  # show.legend = FALSE
+  show.legend = FALSE, linewidth = 2
 ) + ggplot2::scale_color_manual(
   values = c(
     "No Intervention" = "#44546a",
-    "(0.5, 0.5) -> (0, 1)" = "#ed7d31"
+    "(0.5, 0.5) -> (0, 1)" = "#ed7d31",
+    "(0.5, 0.5) -> (0.5, 1)" = "darkred"
+  )
+) + ggplot2::ylab(
+  paste0("Richness\n(Patch", targetpatches[1], ")")
+) + ggplot2::coord_cartesian(
+  ylim = range(diversitiesPlottable %>% dplyr::filter(
+    Space == Div_spacechoice, Environment != "Gamma",
+    Measurement == "Richness"
+  ) %>% dplyr::pull(Value))
+  # ) + ggplot2::facet_wrap(
+  #   . ~ ExtirpationProportion
+) + ggplot2::scale_linetype(
+  name = "Intervention+\nIntensity"
+)
+
+Div_control_before <- ggplot2::ggplot(
+  diversitiesPlottable %>% dplyr::filter(
+    Space == Div_spacechoice,
+    Environment %in% as.character(targetpatches[2]),
+    Measurement == "Richness",
+    Intervention %in% Div_interchoice[1],
+    InterventionIntensity %in% Div_intenschoice[1],
+    ExtirpationProportion %in% Div_extprpchoice
+  ),
+  ggplot2::aes(
+    x = Time,
+    y = Value,
+    color = Intervention,
+    linetype = factor(
+      interaction(Intervention, InterventionIntensity),
+      levels = rev(unique(interaction(Intervention, InterventionIntensity)))),
+    group = ID
+  )
+  # ) + ggplot2::geom_vline(
+  #   xintercept = # SAFE ONLY IN OUR SPECIFIC CASE
+  #     (diversities[[1]]$Ellipsis$Affinity$TimeIntervention /
+  #        diversities[[1]]$Ellipsis$ReactionTime)
+) + ggplot2::geom_line(
+  show.legend = FALSE, linewidth = 2
+) + ggplot2::scale_color_manual(
+  values = c(
+    "No Intervention" = "#44546a",
+    "(0.5, 0.5) -> (0, 1)" = "#ed7d31",
+    "(0.5, 0.5) -> (0.5, 1)" = "darkred"
   )
 ) + ggplot2::ylab(
   paste0("Richness\n(Patch", targetpatches[2], ")")
@@ -253,20 +316,176 @@ Div_control <- ggplot2::ggplot(
     Space == Div_spacechoice, Environment != "Gamma",
     Measurement == "Richness"
   ) %>% dplyr::pull(Value))
-) + ggplot2::facet_wrap(
-  . ~ ExtirpationProportion
+  # ) + ggplot2::facet_wrap(
+  #   . ~ ExtirpationProportion
+) + ggplot2::scale_linetype(
+  name = "Intervention+\nIntensity"
+)
+
+Div_control <- ggplot2::ggplot(
+  diversitiesPlottable %>% dplyr::filter(
+    Space == Div_spacechoice,
+    Environment %in% as.character(targetpatches[2]),
+    Measurement == "Richness",
+    Intervention %in% Div_interchoice,
+    InterventionIntensity %in% Div_intenschoice,
+    ExtirpationProportion %in% Div_extprpchoice
+  ),
+  ggplot2::aes(
+    x = Time,
+    y = Value,
+    color = Intervention,
+    linetype = factor(
+      interaction(Intervention, InterventionIntensity),
+      levels = rev(unique(interaction(Intervention, InterventionIntensity)))),
+    group = ID
+  )
+) + ggplot2::geom_vline(
+  xintercept = # SAFE ONLY IN OUR SPECIFIC CASE
+    (diversities[[1]]$Ellipsis$Affinity$TimeIntervention /
+       diversities[[1]]$Ellipsis$ReactionTime)
+) + ggplot2::geom_line(
+  show.legend = FALSE, linewidth = 2
+) + ggplot2::scale_color_manual(
+  values = c(
+    "No Intervention" = "#44546a",
+    "(0.5, 0.5) -> (0, 1)" = "#ed7d31",
+    "(0.5, 0.5) -> (0.5, 1)" = "darkred"
+  )
+) + ggplot2::ylab(
+  paste0("Richness\n(Patch", targetpatches[2], ")")
+) + ggplot2::coord_cartesian(
+  ylim = range(diversitiesPlottable %>% dplyr::filter(
+    Space == Div_spacechoice, Environment != "Gamma",
+    Measurement == "Richness"
+  ) %>% dplyr::pull(Value))
+  # ) + ggplot2::facet_wrap(
+  #   . ~ ExtirpationProportion
 ) + ggplot2::scale_linetype(
   name = "Intervention+\nIntensity"
 )
 
 ggplot2::ggsave(
-  ggpubr::ggarrange(Div_experiment, Div_control,
-                    common.legend = TRUE, nrow = 2, legend = "right"),
-  filename = paste0("Image-ABC-Div-",
+  ggpubr::ggarrange(
+    Div_experiment_before + ggplot2::theme_bw(
+    ) + ggplot2::theme(text = ggplot2::element_text(size = 30)),
+    Div_control_before + ggplot2::theme_bw(
+    ) + ggplot2::theme(text = ggplot2::element_text(size = 30)),
+    common.legend = TRUE, ncol = 2, legend = "right"),
+  filename = paste0("Image-BESMacro-Div-",
+                    Div_spacechoice,
+                    "_Before.png"),
+  width = 16, height = 4, units = "in"
+)
+ggplot2::ggsave(
+  ggpubr::ggarrange(
+    Div_experiment + ggplot2::theme_bw(
+    ) + ggplot2::theme(text = ggplot2::element_text(size = 30)),
+    Div_control + ggplot2::theme_bw(
+    ) + ggplot2::theme(text = ggplot2::element_text(size = 30)),
+    common.legend = TRUE, ncol = 2, legend = "right"),
+  filename = paste0("Image-BESMacro-Div-",
                     Div_spacechoice,
                     ".png"),
-  width = 12, height = 8, units = "in"
+  width = 16, height = 4, units = "in"
 )
+
+for (space in c("0", "5", "Inf")) {
+  Div_experiment_full <- ggplot2::ggplot(
+    diversitiesPlottable %>% dplyr::filter(
+      Space == space,
+      Environment %in% as.character(targetpatches[1]),
+      Measurement == "Richness",
+      Intervention %in% Div_interchoice#,
+      # InterventionIntensity %in% Div_intenschoice,
+      # ExtirpationProportion %in% Div_extprpchoice
+    ),
+    ggplot2::aes(
+      x = Time,
+      y = Value,
+      color = Intervention,
+      linetype = factor(
+        interaction(Intervention, InterventionIntensity),
+        levels = rev(unique(interaction(Intervention, InterventionIntensity)))),
+      group = ID
+    )
+  ) + ggplot2::geom_vline(
+    xintercept = # SAFE ONLY IN OUR SPECIFIC CASE
+      (diversities[[1]]$Ellipsis$Affinity$TimeIntervention /
+         diversities[[1]]$Ellipsis$ReactionTime)
+  ) + ggplot2::geom_line(
+    # show.legend = FALSE, linewidth = 2
+  ) + ggplot2::scale_color_manual(
+    values = c(
+      "No Intervention" = "#44546a",
+      "(0.5, 0.5) -> (0, 1)" = "#ed7d31",
+      "(0.5, 0.5) -> (0.5, 1)" = "darkred"
+    )
+  ) + ggplot2::ylab(
+    paste0("Richness\n(Patch", targetpatches[1], ")")
+  ) + ggplot2::coord_cartesian(
+    ylim = range(diversitiesPlottable %>% dplyr::filter(
+      Space == space, Environment != "Gamma",
+      Measurement == "Richness"
+    ) %>% dplyr::pull(Value))
+  ) + ggplot2::facet_wrap(
+    . ~ ExtirpationProportion
+  ) + ggplot2::scale_linetype(
+    name = "Intervention+\nIntensity"
+  )
+
+  Div_control_full <- ggplot2::ggplot(
+    diversitiesPlottable %>% dplyr::filter(
+      Space == space,
+      Environment %in% as.character(targetpatches[2]),
+      Measurement == "Richness",
+      Intervention %in% Div_interchoice#,
+      # InterventionIntensity %in% Div_intenschoice,
+      # ExtirpationProportion %in% Div_extprpchoice
+    ),
+    ggplot2::aes(
+      x = Time,
+      y = Value,
+      color = Intervention,
+      linetype = factor(
+        interaction(Intervention, InterventionIntensity),
+        levels = rev(unique(interaction(Intervention, InterventionIntensity)))),
+      group = ID
+    )
+  ) + ggplot2::geom_vline(
+    xintercept = # SAFE ONLY IN OUR SPECIFIC CASE
+      (diversities[[1]]$Ellipsis$Affinity$TimeIntervention /
+         diversities[[1]]$Ellipsis$ReactionTime)
+  ) + ggplot2::geom_line(
+    # show.legend = FALSE, linewidth = 2
+  ) + ggplot2::scale_color_manual(
+    values = c(
+      "No Intervention" = "#44546a",
+      "(0.5, 0.5) -> (0, 1)" = "#ed7d31",
+      "(0.5, 0.5) -> (0.5, 1)" = "darkred"
+    )
+  ) + ggplot2::ylab(
+    paste0("Richness\n(Patch", targetpatches[2], ")")
+  ) + ggplot2::coord_cartesian(
+    ylim = range(diversitiesPlottable %>% dplyr::filter(
+      Space == space, Environment != "Gamma",
+      Measurement == "Richness"
+    ) %>% dplyr::pull(Value))
+  ) + ggplot2::facet_wrap(
+    . ~ ExtirpationProportion
+  ) + ggplot2::scale_linetype(
+    name = "Intervention+\nIntensity"
+  )
+
+  ggplot2::ggsave(
+    ggpubr::ggarrange(Div_experiment_full, Div_control_full,
+                      common.legend = TRUE, nrow = 2, legend = "right"),
+    filename = paste0("Image-all-Div-",
+                      space,
+                      ".png"),
+    width = 12, height = 8, units = "in"
+  )
+}
 
 
 ### Plot of maximally distant true diversities, separated by species type. ####
@@ -281,11 +500,61 @@ ggplot2::ggsave(
 # Hence the controls are at targetpatches[1] targettimes[1] or 2 and 2.
 # Parameters
 targettimes <- c(0,
-                 5) # 0 is intervention, 10 is timespan, 50% is symmetry.
-timeType <- "Time\nFor Time"
+                 50) # 0 is intervention, ... is timespan, 50% is symmetry.
+parentchoice <- c(
+  "18-1-4-15-2_6-6-6", "18-1-4-15-2_6-6-6_12-1-p-3_1-1"
+)
+interventchoice <- c("No Intervention", "(0.5, 0.5) -> (0.5, 1)")
+intensitychoice <- c("No Intervention",
+                     # "2 ^ (1 - 2 euclid(m, n))")
+                    "10 ^ (1 - 2 euclid(m, n))")
+timeType <- "Time Series" # "Time\nFor Time"
 spaceType <- "Space\nFor Time"
 
-samplesByRun <- dplyr::bind_rows(samples) %>% dplyr::ungroup(
+temp <- dplyr::bind_rows(samples) %>% dplyr::filter(
+  ParentRun %in% parentchoice[1]
+) %>% dplyr::ungroup(
+) %>% dplyr::group_by(
+  ParentRun
+  # samples[[1]][[1]] %>% dplyr::ungroup()%>% dplyr::group_by(ParentRun # debug
+)
+samplingsummaryplot <- ggplot2::ggplot(
+  temp %>% dplyr::group_by(
+    Patch, Time
+  ) %>% dplyr::mutate(
+    P05 = quantile(SamplingAlpha, p = 0.05),
+    P25 = quantile(SamplingAlpha, p = 0.25),
+    P50 = quantile(SamplingAlpha, p = 0.5),
+    P75 = quantile(SamplingAlpha, p = 0.75),
+    P95 = quantile(SamplingAlpha, p = 0.95)
+  ),
+  ggplot2::aes(x = Time)
+) + ggplot2::geom_ribbon(
+  ggplot2::aes(ymin = P05, ymax = P95), alpha = 0.2
+) + ggplot2::geom_ribbon(
+  ggplot2::aes(ymin = P25, ymax = P75), alpha = 0.2
+) + ggplot2::geom_line(
+  ggplot2::aes(y = P50)
+) + ggplot2::facet_wrap(
+  . ~ rev(Patch)
+) + ggplot2::ylab(
+  "Detected\nRichness"
+) + ggplot2::theme_bw(
+) + ggplot2::theme(
+  text = ggplot2::element_text(size = 30),
+  strip.background = ggplot2::element_blank(),
+  strip.text.x = ggplot2::element_blank()
+)
+
+ggplot2::ggsave(
+  samplingsummaryplot,
+  filename = paste0("SamplingOverLongTime_",parentchoice[1],".png"),
+  width = 16, height = 4, units = "in"
+)
+
+samplesByRun <- dplyr::bind_rows(samples) %>% dplyr::filter(
+  ParentRun %in% parentchoice
+) %>% dplyr::ungroup(
 ) %>% dplyr::group_by(
   ParentRun
   # samples[[1]][[1]] %>% dplyr::ungroup()%>% dplyr::group_by(ParentRun # debug
@@ -314,15 +583,17 @@ samplesByRun <- dplyr::bind_rows(samples) %>% dplyr::ungroup(
              ifelse(
                (length(.yProperties) > 2 && .yProperties[[3]][1] == "40"),
                "(0.5, 0.5) -> (0, 1)",
-               NA) # TECHDEBT (Being lazy...)
+               ifelse(length(.yProperties) > 2 && .yProperties[[3]][1] == "12",
+                      "(0.5, 0.5) -> (0.5, 1)",
+                      NA)) # TECHDEBT (Being lazy...)
       )
 
     interventionIntensity <-
       ifelse(length(.yProperties) == 2, "No Intervention",
              ifelse(.yProperties[[3]][4] == "2", "2 ^ (1 - 2 euclid(m, n))",
-               ifelse(.yProperties[[3]][4] == "3",  "10 ^ (1 - 2 euclid(m, n))",
-                      "NA"
-               ))
+                    ifelse(.yProperties[[3]][4] == "3",  "10 ^ (1 - 2 euclid(m, n))",
+                           "NA"
+                    ))
       )
 
     extirpation <-
@@ -364,14 +635,14 @@ samplesByRun <- dplyr::bind_rows(samples) %>% dplyr::ungroup(
     )
 
     combined <- rbind(experiments, controls) %>% dplyr::rowwise(
-    # ) %>% dplyr::mutate( # Shouldn't be necessary, 6e lines 185 -- 187
-    #   SamplingNonZeroSpecies =
-    #     paste0(
-    #       strsplit(SamplingNonZeroSpecies, ", ", fixed = TRUE)[[1]][
-    #         as.numeric(strsplit(SamplingNonZeroAbundances, ", ",
-    #                             fixed = TRUE)[[1]]) > 1e-4 # TODO TECHDEBT
-    #         ], collapse = ", "
-    #     )
+      # ) %>% dplyr::mutate( # Shouldn't be necessary, 6e lines 185 -- 187
+      #   SamplingNonZeroSpecies =
+      #     paste0(
+      #       strsplit(SamplingNonZeroSpecies, ", ", fixed = TRUE)[[1]][
+      #         as.numeric(strsplit(SamplingNonZeroAbundances, ", ",
+      #                             fixed = TRUE)[[1]]) > 1e-4 # TODO TECHDEBT
+      #         ], collapse = ", "
+      #     )
     ) %>% dplyr::ungroup(
     ) %>% dplyr::group_by(
       Type, SamplingRun
@@ -385,6 +656,7 @@ samplesByRun <- dplyr::bind_rows(samples) %>% dplyr::ungroup(
     ) %>% dplyr::group_by(
       Type, SamplingRun
     ) %>% dplyr::mutate(
+      nControl = sum(Control == "Control"),
       TrueAlpha = TrueAlphaNative + TrueAlphaInvasive,
       dplyr::across(
         .cols = c(SamplingAlpha, SamplingAlphaNative, SamplingAlphaInvasive,
@@ -410,7 +682,7 @@ samplesByRun <- dplyr::bind_rows(samples) %>% dplyr::ungroup(
       cols = c(`Overall`, `Detected in Control`, `Not Detected in Control`,
                `Overall (T)`, `Detected in Control (T)`, `Not Detected in Control (T)`),
       names_to = "Species Subset",
-      values_to = "Local Species Richness Gain (vs. Control)"
+      values_to = "Local Species Richness Gain (vs. Baseline)"
     ) %>% dplyr::mutate(
       Sampled = !grepl(pattern = "(T)", fixed = TRUE, x = `Species Subset`),
       `Species Subset (Base)` = gsub(pattern = " (T)", replacement = "",
@@ -425,6 +697,16 @@ samplesByRun <- dplyr::bind_rows(samples) %>% dplyr::ungroup(
     return(combined)
   }
 )
+# samplesByRun <- lapply(
+#   samplesByRun_All,
+#   function(sample) sample %>% dplyr::filter(
+#     # ParentRun %in% parentchoice
+#     Intervention %in% interventchoice,
+#     InterventionIntensity %in% intensitychoice
+#
+#   )
+# )
+
 # Ok, this gives me per file:
 #   Space - For - Time, With Sampling Error
 #   Space - For - Time, Without Sampling Error
@@ -450,7 +732,9 @@ samplesByRun <- dplyr::bind_rows(samples) %>% dplyr::ungroup(
 # The sampling methods are then trying to capture this (previous sentence).
 
 # Make sure to associate each run with the correct no intervention run.
-samplesTRUTH <- dplyr::bind_rows(samples) %>% dplyr::ungroup(
+samplesTRUTH <- dplyr::bind_rows(samples) %>% dplyr::filter(
+  ParentRun %in% parentchoice
+) %>% dplyr::ungroup(
 ) %>% dplyr::group_by(
   ParentRun
   # samples[[1]][[1]] %>% dplyr::ungroup()%>% dplyr::group_by(ParentRun # debug
@@ -484,7 +768,9 @@ samplesTRUTH <- dplyr::bind_rows(samples) %>% dplyr::ungroup(
              ifelse(
                (length(.yProperties) > 2 && .yProperties[[3]][1] == "40"),
                "(0.5, 0.5) -> (0, 1)",
-               NA) # TECHDEBT (Being lazy...)
+               ifelse(length(.yProperties) > 2 && .yProperties[[3]][1] == "12",
+                      "(0.5, 0.5) -> (0.5, 1)",
+                      NA)) # TECHDEBT (Being lazy...)
       )
 
     interventionIntensity <-
@@ -637,8 +923,8 @@ samplesByRun <- lapply(
   function(x) {
     x %>% dplyr::mutate(
       Type = dplyr::case_when(
-        Type == "Space-For-Time" ~ "Space\nFor Time",
-        Type == "Time-For-Time" ~ "Time\nFor Time",
+        Type == "Space-For-Time" ~ spaceType, #"Space\nFor Time",
+        Type == "Time-For-Time" ~ timeType, #"Time\nFor Time",
         TRUE ~ Type
       )
     )
@@ -650,38 +936,40 @@ samplesTRUTH <- samplesTRUTH %>% dplyr::rename(
 )
 
 ###### Master Plot: ###########################################################
+spacechoices <- 5 #c(0, 5, Inf)
+extchoices <- 0.9 #c(0, 0.9, 1)
 dplyr::bind_rows(samplesByRun)  %>% dplyr::filter(
-  Sampled
+  Sampled, Space %in% spacechoices, Extirpation %in% extchoices
 ) %>% dplyr::group_by(
-  `Local Species Richness Gain (vs. Control)`, Type, `Species Subset`
-) %>% dplyr::mutate(
-  `Local Species Richness Gain (vs. Control)` =
-    `Local Species Richness Gain (vs. Control)` +
-    if(length(`Local Species Richness Gain (vs. Control)`) > 1) {
-      rep(c(-1/6, 1/6), c(
-        floor(length(`Local Species Richness Gain (vs. Control)`)/2),
-        ceiling(length(`Local Species Richness Gain (vs. Control)`)/2)
-      ))
-    } else {
-      0
-    },
-  groupsize = dplyr::n()
+  `Local Species Richness Gain (vs. Baseline)`, Type, `Species Subset`
+  # ) %>% dplyr::mutate(
+  #   `Local Species Richness Gain (vs. Baseline)` =
+  #     `Local Species Richness Gain (vs. Baseline)` +
+  #     if(length(`Local Species Richness Gain (vs. Baseline)`) > 1) {
+  #       rep(c(-1/6, 1/6), c(
+  #         floor(length(`Local Species Richness Gain (vs. Baseline)`)/2),
+  #         ceiling(length(`Local Species Richness Gain (vs. Baseline)`)/2)
+  #       ))
+  #     } else {
+  #       0
+  #     },
+  #   groupsize = dplyr::n()
 ) %>% ggplot2::ggplot(
   ggplot2::aes(x = Type,
-               y = `Local Species Richness Gain (vs. Control)`,
+               y = `Local Species Richness Gain (vs. Baseline)`,
                fill = factor(Space))
+) + ggplot2::geom_hline(
+  yintercept = 0
   # ) + ggplot2::geom_violin(
   #   draw_quantiles = c(
   #     #0.01, 0.05, # Only 20 samples!
   #     0.1, 0.25, 0.5, 0.75, 0.9#,
   #     #0.95, 0.99
   #   )
-) + ggplot2::geom_hline(
-  yintercept = 0
 ) + ggplot2::geom_dotplot(
   binaxis = "y", stackdir = "center", position = "dodge", binwidth = 1/5,
-  dotsize = 1.,
-  show.legend = FALSE
+  dotsize = 3#,
+  # show.legend = FALSE
 ) + ggplot2::coord_cartesian(
   ylim = ylimits, expand = FALSE
 ) + ggplot2::scale_y_continuous(
@@ -689,23 +977,184 @@ dplyr::bind_rows(samplesByRun)  %>% dplyr::filter(
 ) + ggplot2::theme(
   panel.grid.minor.y = ggplot2::element_blank()
 ) + ggplot2::facet_grid(
-  Extirpation ~ interaction(Intervention, InterventionIntensity) +
+  interaction(Intervention, InterventionIntensity) + Extirpation ~
     factor(`Species Subset (Base)`, levels = c(
       "Overall", "Detected in Control", "Not Detected in Control"),
       ordered = TRUE)
 ) + ggplot2::geom_point(
   data = dplyr::bind_rows(samplesByRun) %>% dplyr::filter(
-    Sampled == FALSE
+    Sampled == FALSE, Space %in% spacechoices, Extirpation %in% extchoices
   ) %>% dplyr::select(-SamplingRun) %>% dplyr::distinct(),
   show.legend = FALSE, position = position_dodge(width = 0.9)
 ) + ggplot2::geom_point(
-  data = samplesTRUTH %>% tidyr::pivot_longer(
+  data = samplesTRUTH %>% dplyr::filter(
+    Space %in% spacechoices, Extirpation %in% extchoices
+  ) %>% tidyr::pivot_longer(
     cols = `Overall`:`Not Detected in Control`,
     names_to = "Species Subset (Base)",
-    values_to = "Local Species Richness Gain (vs. Control)"
+    values_to = "Local Species Richness Gain (vs. Baseline)"
   ),
   ggplot2::aes(x = 1.5, color = factor(Space)),
   show.legend = FALSE, fill = "black", shape = 7, size = 2
+)
+
+histogramData <- dplyr::bind_rows(samplesByRun)  %>% dplyr::filter(
+  Sampled, Space %in% spacechoices, Extirpation %in% extchoices,
+  `Species Subset (Base)` %in% c("Overall"),
+  !InterventionIntensity %in% c("2 ^ (1 - 2 euclid(m, n))")
+  # "No Intervention" "2 ^ (1 - 2 euclid(m, n))" "10 ^ (1 - 2 euclid(m, n))"
+) %>% dplyr::group_by(
+  `Local Species Richness Gain (vs. Baseline)`,
+  Space, Extirpation, Type, `Species Subset (Base)`,
+  Intervention, InterventionIntensity
+) %>% dplyr::summarise(
+  Count = dplyr::n(),
+  .groups = "drop"
+)
+
+factualData <- dplyr::bind_rows(samplesByRun) %>% dplyr::filter(
+  SamplingRun > 20, # Temporary patch to deal with my duplicating things.
+  # 1st 20 samples are duplicated only and only in some cases...
+  Sampled == FALSE, Space %in% spacechoices, Extirpation %in% extchoices,
+  `Species Subset (Base)` %in% c("Overall"),
+  !InterventionIntensity %in% c("2 ^ (1 - 2 euclid(m, n))")
+) %>% dplyr::select(-SamplingRun) %>% dplyr::distinct()
+
+counterData <- samplesTRUTH %>% dplyr::filter(
+  Space %in% spacechoices, Extirpation %in% extchoices
+) %>% tidyr::pivot_longer(
+  cols = `Overall`:`Not Detected in Control`,
+  names_to = "Species Subset (Base)",
+  values_to = "Local Species Richness Gain (vs. Baseline)"
+) %>% dplyr::filter(
+  `Species Subset (Base)` %in% c("Overall"),
+  !InterventionIntensity %in% c("2 ^ (1 - 2 euclid(m, n))")
+)
+
+limitsX <- range(
+  c(histogramData$`Local Species Richness Gain (vs. Baseline)`,
+    factualData$`Local Species Richness Gain (vs. Baseline)`,
+    counterData$`Local Species Richness Gain (vs. Baseline)`)
+)
+limitsY <- range(histogramData$Count)
+
+baseplot <- ggplot2::ggplot(
+  histogramData %>% dplyr::filter(
+    InterventionIntensity %in% "No Intervention"
+  ),
+  ggplot2::aes(x = `Local Species Richness Gain (vs. Baseline)`,
+               group = `Local Species Richness Gain (vs. Baseline)`,
+               y = Count)
+) + ggplot2::geom_vline(
+  xintercept = 0
+) + ggplot2::coord_flip(
+  xlim = limitsX, ylim = limitsY
+) + ggplot2::facet_grid(
+  # interaction(Intervention, InterventionIntensity) + Extirpation ~
+    # factor(`Species Subset (Base)`, levels = c(
+    #   "Overall", "Detected in Control", "Not Detected in Control"),
+    #   ordered = TRUE) #+ Type
+  .
+  ~ Type, switch = "x"
+) + ggplot2::theme_bw(
+) + ggplot2::scale_x_continuous(
+  breaks = limitsX[1]:limitsX[2]
+)
+
+baseplot_factual <- baseplot + ggplot2::geom_vline(
+  data = factualData %>% dplyr::filter(
+    InterventionIntensity %in% "No Intervention"
+  ),
+  ggplot2::aes(xintercept = `Local Species Richness Gain (vs. Baseline)`),
+  color = "red")
+
+baseplot_sampled <- baseplot_factual + ggplot2::geom_bar(
+  stat = "identity", position = "dodge"
+)
+
+ggplot2::ggsave(
+  baseplot,
+  filename = paste0("histogram_base_TSTS_",parentchoice[1],".png"),
+  units = "cm", height = 11, width = 23
+)
+ggplot2::ggsave(
+  baseplot_factual,
+  filename = paste0("histogram_factual_TSTS_",parentchoice[1],".png"),
+  units = "cm", height = 11, width = 23
+)
+ggplot2::ggsave(
+  baseplot_sampled,
+  filename = paste0("histogram_sampled_TSTS_",parentchoice[1],".png"),
+  units = "cm", height = 11, width = 23
+)
+
+# baseplot_counter <- baseplot_sampled + ggplot2::geom_vline(
+#   data = counterData %>% dplyr::filter(
+#     InterventionIntensity %in% "No Intervention"
+#   ),
+#   ggplot2::aes(xintercept = `Local Species Richness Gain (vs. Baseline)`),
+#   linetype = "dashed", color = "orange"
+# )
+
+interventionplot <- ggplot2::ggplot(
+  histogramData %>% dplyr::filter(
+    !InterventionIntensity %in% "No Intervention"
+  ),
+  ggplot2::aes(x = `Local Species Richness Gain (vs. Baseline)`,
+               group = `Local Species Richness Gain (vs. Baseline)`,
+               y = Count)
+) + ggplot2::geom_vline(
+  xintercept = 0
+) + ggplot2::coord_flip(
+  xlim = limitsX, ylim = limitsY
+) + ggplot2::facet_grid(
+  # interaction(Intervention, InterventionIntensity) + Extirpation ~
+    # factor(`Species Subset (Base)`, levels = c(
+    #   "Overall", "Detected in Control", "Not Detected in Control"),
+    #   ordered = TRUE) #+ Type
+  .
+  ~ Type, switch = "x"
+) + ggplot2::theme_bw(
+) + ggplot2::scale_x_continuous(breaks = limitsX[1]:limitsX[2])
+
+interventionplot_factual <- interventionplot + ggplot2::geom_vline(
+  data = factualData %>% dplyr::filter(
+    !InterventionIntensity %in% "No Intervention"
+  ),
+  ggplot2::aes(xintercept = `Local Species Richness Gain (vs. Baseline)`),
+  color = "red")
+
+interventionplot_sampled <- interventionplot_factual + ggplot2::geom_bar(
+  stat = "identity", position = "dodge"
+)
+
+interventionplot_counter <- interventionplot_sampled + ggplot2::geom_vline(
+  data = counterData %>% dplyr::filter(
+    !InterventionIntensity %in% "No Intervention"
+  ),
+  ggplot2::aes(xintercept = `Local Species Richness Gain (vs. Baseline)`),
+  linetype = "dashed", color = "orange"
+)
+
+ggplot2::ggsave(
+  interventionplot,
+  filename = paste0("histogram_base_TSTS_", parentchoice[2], ".png"),
+  units = "cm", height = 11, width = 23
+)
+ggplot2::ggsave(
+  interventionplot_factual,
+  filename = paste0("histogram_factual_TSTS_", parentchoice[2], ".png"),
+  units = "cm", height = 11, width = 23
+)
+ggplot2::ggsave(
+  interventionplot_sampled,
+  filename = paste0("histogram_sampled_TSTS_", parentchoice[2], ".png"),
+  units = "cm", height = 11, width = 23
+)
+ggplot2::ggsave(
+  interventionplot_counter,
+  filename = paste0("histogram_counter_TSTS_", parentchoice[2], ".png"),
+  units = "cm", height = 11, width = 23
 )
 
 # ###### Plot of Local Species Richness Gain Without True Values ################
