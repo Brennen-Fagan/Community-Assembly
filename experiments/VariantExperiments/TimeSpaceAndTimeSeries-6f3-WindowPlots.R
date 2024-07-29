@@ -1,0 +1,270 @@
+# Plots used for BES Macro Presentation.
+options(bitmapType = "cairo")
+
+# Currently only set up for one at a time...
+datfolders <- c(
+  "TSTS_Simulations_18-1_6-6_2024-05-23"
+)
+
+targetFiles <- c(
+  "18-1-4-15-2_6-6-6.RData", "18-1-4-15-2_6-6-6_12-1-p-3_1-1.RData"
+)
+
+targettimes <- c(0,
+                 200) # 0 is intervention, ... is timespan, 50% is symmetry.
+
+Div_rounding <- 1
+
+timeType <- " Time Series " # "Time\nFor Time"
+spaceType <- "Space\nFor Time"
+
+histFillColor <- "#70ad47" # green
+lineNullColor <- "#5b9bd5" # blue
+linePertColor <-  "#ed7d31" # orange
+
+# Libraries: ##################################################################
+library(dplyr)
+library(tidyr)
+
+library(ggplot2)
+library(RColorBrewer) # Shading: stackoverflow.com/a/24436825
+library(ggpubr) # replace patchwork with ggarrange.
+
+library(RMTRCode2)
+
+source("TimeSpaceAndTimeSeries-0-Functions.R")
+
+# Load Data: ##################################################################
+
+samples <- unlist(lapply(targetFiles, function(tf)
+  dir(datfolders, full.names = TRUE,
+      pattern = paste0("Sampling_", tf))
+))
+samples <- lapply(
+  samples, function(x) {
+    names <- load(x)
+    stopifnot(length(names) == 1)
+    return(get(names))
+  })
+
+diversities <- unlist(lapply(targetFiles, function(tf)
+  dir(datfolders, full.names = TRUE,
+      pattern = paste0("Diversity_", tf))
+))
+diversities <- lapply(
+  diversities, function(x) {
+    names <- load(x)
+    stopifnot(length(names) == 1)
+    return(c(get(names), "Dir" = x))
+  })
+
+# Plotting: ###################################################################
+# Parameters
+targetpatches <- c(2, 1) # first patch is focal, second patch is control
+
+### Plot of maximally distant true diversities, not separated by niche. #######
+# We use the precomputed diversities. We expect experimental patch above,
+# control patch below. Each panel should have two lines, one for the no
+# intervention case and one for the pool swap case. We make three plots in
+# total, one for each distance.
+
+diversitiesPlottable <- do.call(
+  rbind,
+  diversities %>% lapply(function(d) {
+    fileproperties <- strsplit(basename(d$Dir), split = "_", fixed = TRUE)[[1]]
+    
+    filepropertiesInit <- strsplit(fileproperties[3], split = "-",
+                                   fixed = TRUE)[[1]]
+    
+    filepropertiesExt <- filepropertiesInit[3]
+    filepropertiesExt <- ifelse(
+      filepropertiesExt == "2", 1,
+      ifelse(filepropertiesExt == "4", 0.9,
+             ifelse(filepropertiesExt == "6", 0,
+                    NA))
+    )
+    
+    filepropertiesSpace <- filepropertiesInit[4]
+    filepropertiesSpace <- ifelse(
+      filepropertiesSpace == "10", 0,
+      ifelse(filepropertiesSpace == "15", 5,
+             ifelse(filepropertiesSpace == "NA", "Inf", NA))
+    )
+    
+    if(length(fileproperties) == 6) {
+      filepropertiesIntervention <- strsplit(fileproperties[5], split = "-",
+                                             fixed = TRUE)[[1]]
+      filepropertiesInterventionType <- filepropertiesIntervention[1]
+      filepropertiesIntervention <- filepropertiesIntervention[4]
+      filepropertiesIntervention <- ifelse(
+        filepropertiesIntervention == "2", "2 ^ (1 - 2 euclid(m, n))",
+        ifelse(filepropertiesIntervention == "3", "10 ^ (1 - 2 euclid(m, n))",
+               "NA")
+      )
+    } else {
+      filepropertiesIntervention <- "NA"
+      filepropertiesInterventionType <- "NA"
+    }
+    
+    # Need to unify Diversities Format
+    d$Diversities$alpha <- d$Diversities$alpha %>% dplyr::select(
+      -Species
+    ) %>% tidyr::pivot_longer(
+      cols = Richness:Richness_Consumer,
+      names_to = "Aggregation", values_to = "Measurement"
+    ) %>% dplyr::mutate(
+      Environment = as.character(Environment)
+    )
+    
+    d$Diversities$beta <- dplyr::bind_rows(
+      d$Diversities$beta
+    ) %>% dplyr::mutate(
+      Environment = paste(Env1, Env2),
+      Aggregation = "Jaccard",
+      Jaccard = as.double(Jaccard)
+    ) %>% dplyr::rename(
+      Measurement = Jaccard
+    ) %>% dplyr::select(
+      -Env1, -Env2
+    )
+    
+    d$Diversities$gamma <- d$Diversities$gamma %>% dplyr::mutate(
+      Aggregation = ifelse(Aggregation == "Gamma", "Richness", Aggregation)
+    ) %>% dplyr::rename(
+      Agg = Aggregation,
+      `_Gamma` = Richness,
+      `_Gamma_Basal` = Basals,
+      `_Gamma_Consumer` = Consumers
+    ) %>% tidyr::pivot_longer(
+      cols = `_Gamma`:`_Gamma_Consumer`,
+      names_to = "Agg2", values_to = "Measurement"
+    ) %>% dplyr::mutate(
+      Environment = NA,
+      Aggregation = paste0(Agg, Agg2)
+    ) %>% dplyr::select(
+      -Agg, -Agg2
+    )
+    
+    d$Diversities <- dplyr::bind_rows(
+      d$Diversities
+    ) %>% dplyr::rename(
+      Value = Measurement,
+      Measurement = Aggregation
+    )
+    
+    if (d$Ellipsis$Timescale == "Simulation") {
+      d$Diversities$Time <- d$Diversities$Time / d$Ellipsis$ReactionTime
+    }
+    
+    d$Diversities %>% dplyr::mutate(
+      Time = round(Time / Div_rounding) * Div_rounding
+    ) %>% dplyr::group_by(
+      Time, Environment, Measurement
+    ) %>% dplyr::summarise(
+      Value = median(Value),
+      Frequency = dplyr::n(),
+      .groups = "drop"
+    ) %>% dplyr::mutate(
+      Space = filepropertiesSpace,
+      ExtirpationProportion = filepropertiesExt,
+      Intervention = ifelse(
+        length(fileproperties) == 6,
+        ifelse(filepropertiesInterventionType=="40",
+               "(0.5, 0.5) -> (0, 1)",
+               ifelse(filepropertiesInterventionType=="12",
+                      "(0.5, 0.5) -> (0.5, 1)",
+                      "UNLISTED")),
+        "No Intervention"),
+      InterventionIntensity = filepropertiesIntervention,
+      ID = d$Dir
+    )
+  })
+)
+
+# Need to duplicate data from the non-intervention case to the intervention.
+postInterventionStart <- diversitiesPlottable %>% dplyr::group_by(
+  Space, ExtirpationProportion, 
+  Intervention, InterventionIntensity, ID
+) %>% dplyr::filter(
+  Intervention != "No Intervention"
+) %>% dplyr::summarise(
+  Time = min(Time), .groups = "drop"
+)
+
+preInterventionData <- postInterventionStart %>% dplyr::rowwise(
+) %>% dplyr::group_modify(
+  .f = function(x, y) {
+    diversitiesPlottable %>% dplyr::filter(
+      Time < x$Time,
+      Space == x$Space,
+      ExtirpationProportion == x$ExtirpationProportion
+    ) %>% dplyr::mutate(
+      Intervention = x$Intervention,
+      InterventionIntensity = x$InterventionIntensity,
+      ID = x$ID
+    )
+  }
+)
+
+windowSizes <- 2^c(1:10)
+temp <- dplyr::bind_rows(lapply(
+  windowSizes, function(windowSize, dat) {
+    # dat %>% runner::run_by(
+    #   k = windowSize, na_pad = TRUE
+    # )
+    dat %>% dplyr::mutate(
+      WindowAverage = runner::runner(
+        x = Value, f = mean, k = windowSize, na_pad = TRUE
+      ),
+      WindowChange = runner::runner(
+        x = Value, f = function(y) {y[length(y)] - y[1]},
+        k = windowSize, na_pad = TRUE
+      ),
+      WindowSlope = runner::runner(
+        x = ., f = function(y) coefficients(lm(Value ~ Time, data = y))[2],
+        k = windowSize, na_pad = TRUE
+      ),
+      WindowSize = windowSize
+    ) %>% dplyr::mutate(
+      dplyr::across(WindowAverage:WindowSlope, 
+                    .fns = function(x) ifelse(abs(x) < 0.01, 0, x))
+    ) %>% dplyr::filter(
+      !is.na(WindowSlope)
+    )
+  }, dat = dplyr::bind_rows(
+    preInterventionData,
+    diversitiesPlottable
+  ) %>% dplyr::arrange(
+    Time
+  ) %>% dplyr::group_by(
+    Environment, Space, ExtirpationProportion, 
+    Intervention, InterventionIntensity, ID
+  ) %>% dplyr::filter(
+    Measurement == "Richness"
+  )
+))
+
+ggplot2::ggplot(
+  temp %>% tidyr::pivot_longer(
+    WindowAverage:WindowSlope, 
+    names_to = "Window Function", 
+    values_to = "Window Value" 
+  ),
+  ggplot2::aes(x = Time,
+               y = `Window Value`,
+               color = factor(WindowSize, levels = windowSizes, ordered = TRUE),
+               group = WindowSize)
+) + ggplot2::geom_vline(
+  xintercept = postInterventionStart$Time,
+  linetype = "dotted"
+# ) + ggplot2::geom_point(
+#   shape = '.'
+) + ggplot2::geom_line(
+) + ggplot2::facet_grid(
+  `Window Function` ~ Intervention + Environment  ,
+  scales = "free_y"
+) + ggplot2::labs(
+  color = "Window Size"
+# ) + ggplot2::scale_y_continuous(
+#   transform = scales::pseudo_log_trans(sigma = 0.1)
+)
