@@ -705,7 +705,7 @@ baseplot <- ggplot2::ggplot(
   .
   ~ Type, switch = "x"
 ) + ggplot2::theme_bw(
-  base_size = 17
+  base_size = 16.9
 ) + ggplot2::scale_x_continuous(
   breaks = limitsX[1]:limitsX[2]
 ) + ggplot2::labs(
@@ -761,7 +761,7 @@ interventionplot <- ggplot2::ggplot(
   .
   ~ Type, switch = "x"
 ) + ggplot2::theme_bw(
-  base_size = 17
+  base_size = 16.9
 ) + ggplot2::scale_x_continuous(
   breaks = limitsX[1]:limitsX[2]
 ) + ggplot2::labs(
