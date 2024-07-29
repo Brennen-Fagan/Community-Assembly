@@ -214,15 +214,15 @@ temp <- dplyr::bind_rows(lapply(
     # )
     dat %>% dplyr::mutate(
       WindowAverage = runner::runner(
-        x = Value, f = mean, k = windowSize, na_pad = TRUE
+        x = Value, f = mean, idx = Time, k = windowSize, na_pad = TRUE
       ),
       WindowChange = runner::runner(
         x = Value, f = function(y) {y[length(y)] - y[1]},
-        k = windowSize, na_pad = TRUE
+        idx = Time, k = windowSize, na_pad = TRUE
       ),
       WindowSlope = runner::runner(
         x = ., f = function(y) coefficients(lm(Value ~ Time, data = y))[2],
-        k = windowSize, na_pad = TRUE
+        idx = Time, k = windowSize, na_pad = TRUE
       ),
       WindowSize = windowSize
     ) %>% dplyr::mutate(
@@ -268,3 +268,27 @@ ggplot2::ggplot(
 # ) + ggplot2::scale_y_continuous(
 #   transform = scales::pseudo_log_trans(sigma = 0.1)
 )
+
+# Examine more closely the Change and Slope for sensitivity ~ WindowSize.
+ggplot2::ggplot(
+  temp %>% tidyr::pivot_longer(
+    WindowChange:WindowSlope, 
+    names_to = "Window Function", 
+    values_to = "Window Value" 
+  ),
+  ggplot2::aes(x = Time,
+               y = `Window Value` * WindowSize,
+               color = factor(WindowSize, levels = windowSizes, ordered = TRUE),
+               group = WindowSize)
+) + ggplot2::geom_vline(
+  xintercept = postInterventionStart$Time,
+  linetype = "dotted"
+) + ggplot2::geom_line(
+) + ggplot2::facet_grid(
+  `Window Function` ~ Intervention + Environment  ,
+  scales = "free_y"
+) + ggplot2::labs(
+  color = "Window Size"
+)
+# Slope magnitude maximised when even on either side it looks like.
+# This indicates it's more of a late warning signal.
