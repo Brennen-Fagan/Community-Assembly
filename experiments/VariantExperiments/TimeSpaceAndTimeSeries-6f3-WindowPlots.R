@@ -13,7 +13,7 @@ targetFiles <- c(
 targettimes <- c(0,
                  200) # 0 is intervention, ... is timespan, 50% is symmetry.
 
-Div_rounding <- 1
+Div_rounding <- .5
 
 timeType <- " Time Series " # "Time\nFor Time"
 spaceType <- "Space\nFor Time"
@@ -224,7 +224,7 @@ temp <- dplyr::bind_rows(lapply(
         x = ., f = function(y) coefficients(lm(Value ~ Time, data = y))[2],
         idx = Time, k = windowSize, na_pad = TRUE
       ),
-      WindowSize = windowSize
+      WindowSize = windowSize * Div_rounding
     ) %>% dplyr::mutate(
       dplyr::across(WindowAverage:WindowSlope, 
                     .fns = function(x) ifelse(abs(x) < 0.01, 0, x))
@@ -252,7 +252,9 @@ ggplot2::ggplot(
   ),
   ggplot2::aes(x = Time,
                y = `Window Value`,
-               color = factor(WindowSize, levels = windowSizes, ordered = TRUE),
+               color = factor(WindowSize, 
+                              levels = windowSizes* Div_rounding, 
+                              ordered = TRUE),
                group = WindowSize)
 ) + ggplot2::geom_vline(
   xintercept = postInterventionStart$Time,
@@ -278,7 +280,9 @@ ggplot2::ggplot(
   ),
   ggplot2::aes(x = Time,
                y = `Window Value` * WindowSize,
-               color = factor(WindowSize, levels = windowSizes, ordered = TRUE),
+               color = factor(WindowSize, 
+                              levels = windowSizes* Div_rounding, 
+                              ordered = TRUE),
                group = WindowSize)
 ) + ggplot2::geom_vline(
   xintercept = postInterventionStart$Time,
