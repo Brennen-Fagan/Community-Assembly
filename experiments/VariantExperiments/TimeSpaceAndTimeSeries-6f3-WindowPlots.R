@@ -13,7 +13,7 @@ targetFiles <- c(
 targettimes <- c(0,
                  200) # 0 is intervention, ... is timespan, 50% is symmetry.
 
-Div_rounding <- .5
+Div_rounding <- .25
 
 timeType <- " Time Series " # "Time\nFor Time"
 spaceType <- "Space\nFor Time"
@@ -25,6 +25,7 @@ linePertColor <-  "#ed7d31" # orange
 # Libraries: ##################################################################
 library(dplyr)
 library(tidyr)
+library(slider) # rolling windows. tried runner, but seemed buggy on a test.
 
 library(ggplot2)
 library(RColorBrewer) # Shading: stackoverflow.com/a/24436825
@@ -181,6 +182,25 @@ diversitiesPlottable <- do.call(
   })
 )
 
+# checkGelmanRubin <- function(x) {
+#   x %>% tidyr::pivot_wider(
+#     id_cols = c(Time, Space, ExtirpationProportion, 
+#                 Intervention, InterventionIntensity, ID),
+#     names_from = c(Environment, Measurement),
+#     values_from = Value
+#   ) %>% dplyr::group_by(
+#     Space, ExtirpationProportion, 
+#     Intervention, InterventionIntensity, ID
+#   ) %>% dplyr::group_map(
+#     .f = function(x, y) {
+#       coda::mcmc(data = x %>% dplyr::select(-Time))
+#       # Thin doesn't show up in gelman.diag documentation
+#     }
+#     # ) %>% coda::mcmc.list(
+#     # ) %>% coda::gelman.diag(
+#   )
+# }
+
 # Need to duplicate data from the non-intervention case to the intervention.
 postInterventionStart <- diversitiesPlottable %>% dplyr::group_by(
   Space, ExtirpationProportion, 
@@ -206,12 +226,140 @@ preInterventionData <- postInterventionStart %>% dplyr::rowwise(
   }
 )
 
-windowSizes <- 2^c(1:10)
-temp <- dplyr::bind_rows(lapply(
+windowSizes <- 2^c(1,3,5,7,9)
+timeSeriesWindows <- dplyr::bind_rows(lapply(
   windowSizes, function(windowSize, dat) {
     # dat %>% runner::run_by(
     #   k = windowSize, na_pad = TRUE
     # )
+    dat %>% dplyr::mutate(
+      WindowSize = windowSize * Div_rounding,
+      WindowAverage = slider::slide_index2(
+        .x = Value, .y = Time, .f = function(value, time) {
+          widths <- diff(c(time, time + WindowSize))
+          heights <- value
+          return(widths * heights / WindowSize)
+          }, 
+        .i = Time, .after = windowSize * Div_rounding, .complete = TRUE
+      ),
+      WindowChange = slider::slide_index(
+        .x = Value, .f = function(y) {y[length(y)] - y[1]},
+        .i = Time, .after = windowSize * Div_rounding, .complete = TRUE
+      ),
+      WindowSlope = slider::slide_index2(
+        .x = Value, .y = Time, .f = 
+          function(value, time) {coefficients(lm(value ~ time))[2]},
+        .i = Time, .after = windowSize * Div_rounding, .complete = TRUE
+      ),
+      WindowTime = Time + WindowSize # Location to plot as at.
+    ) %>% dplyr::mutate(
+      dplyr::across(WindowAverage:WindowSlope, 
+                    .fns = function(x) ifelse(abs(x) < 0.01, 0, x))
+    ) %>% dplyr::filter(
+      !is.na(WindowSlope)
+    )
+  }, dat = dplyr::bind_rows(
+    preInterventionData,
+    diversitiesPlottable
+  ) %>% dplyr::arrange(
+    Time
+  ) %>% dplyr::group_by(
+    Environment, Space, ExtirpationProportion, 
+    Intervention, InterventionIntensity, ID
+  ) %>% dplyr::filter(
+    Measurement == "Richness",
+    Environment %in% targetpatches
+  )
+))
+
+spaceForTimeWindows <- dplyr::bind_rows(lapply(
+  windowSizes, function(windowSize, dat) {
+    # In reality, we are trying to investigate the differences, 
+    # so windowed average of differences makes the most sense.
+    # But in practice, we'd receive a window of data which could then be either
+    #   paired, then differenced, then averaged/sloped or
+    #   averaged/sloped, then paired, then differenced.
+    
+    # Pair -> Difference -> Window -> Average/Slope
+    v1 <- dat %>% dplyr::group_by(
+      .add = TRUE, Time
+    ) %>% dplyr::summarise(
+      Value = sum(ifelse(Environment == targetpatches[2], -Value, Value)),
+      .groups = "drop_last"
+    ) %>% dplyr::mutate(
+      WindowSize = windowSize * Div_rounding,
+      DifferencesWindowAverages = slider::slide_index2(
+        .x = Value, .y = Time, .f = function(value, time) {
+          widths <- diff(c(time, time + WindowSize))
+          heights <- value
+          return(widths * heights / WindowSize)
+        }, 
+        .i = Time, .after = windowSize * Div_rounding, .complete = TRUE
+      ),
+      DifferencesWindowSlopes = slider::slide_index2(
+        .x = Value, .y = Time, .f = 
+          function(value, time) {coefficients(lm(value ~ time))[2]},
+        .i = Time, .after = windowSize * Div_rounding, .complete = TRUE
+      ),
+      WindowTime = Time + WindowSize # Location to plot as at.
+    )
+    
+    # Window -> Pair -> Difference -> Average/Slope
+    # More "realistic", should match v1
+    v2 <- dat %>% tidyr::pivot_wider(
+      names_from = Environment,
+      names_prefix = "Env",
+      names_sep = "_",
+      values_from = Value
+    )
+    colnames(v2)[colnames(v2) == paste0("Env_", targetpatches[1])] <- "Env_1"
+    colnames(v2)[colnames(v2) == paste0("Env_", targetpatches[2])] <- "Env_2"
+    
+    v2 <- v2 %>% dplyr::mutate(
+      WindowSize = windowSize * Div_rounding,
+      WindowDifferencesAverages = slider::slide_index2(
+        .x = Env_1, .y = Env_2, .f = function(x, y) {
+          # Focal - Control
+          heights <- Env_1 - Env_2
+          widths <- diff(c(time, time + WindowSize))
+          return(widths * heights / WindowSize)
+        }
+        .i = Time, .after = windowSize * Div_rounding, .complete = TRUE
+      ),
+      WindowDifferencesSlopes = slider::pslide_index(
+        .l = list(Env_1, Env_2, Time), .f = function(x, y, Time) {
+          # Focal - Control
+          Value <- Env_1 - Env_2
+          return(coefficients(lm(Value ~ Time))[2])
+        }
+        .i = Time, .after = windowSize * Div_rounding, .complete = TRUE
+      ),
+      WindowTime = Time + WindowSize # Location to plot as at.
+    )
+    
+    # Window -> Average/Slope -> Pair -> Difference 
+    v3 <- dat %>% dplyr::mutate(
+      Value = ifelse(Environment == targetpatches[2], -Value, Value),
+      WindowSize = windowSize * Div_rounding,
+      WindowAveragesDifferences = runner::runner(
+        x = ., f = function(y) {
+          averages <- with(y, by(Value, Environment, mean))
+          sum(averages)
+        }, idx = Time, k = windowSize, na_pad = TRUE
+      ),
+      WindowSlopesDifferences = runner::runner(
+        x = ., f = function(y) {
+          slopes <- with(y, by(y, Environment, 
+                               function(z) {
+                                 coefficients(lm(Value ~ Time, data = z))[2]
+                               } ))
+          sum(slopes)
+        },
+        idx = Time, k = windowSize, na_pad = TRUE
+      ),
+      WindowTime = Time + WindowSize # Location to plot as at.
+    )
+    
     dat %>% dplyr::mutate(
       WindowAverage = runner::runner(
         x = Value, f = mean, idx = Time, k = windowSize, na_pad = TRUE
@@ -237,20 +385,28 @@ temp <- dplyr::bind_rows(lapply(
   ) %>% dplyr::arrange(
     Time
   ) %>% dplyr::group_by(
-    Environment, Space, ExtirpationProportion, 
+    Space, ExtirpationProportion, 
     Intervention, InterventionIntensity, ID
   ) %>% dplyr::filter(
-    Measurement == "Richness"
+    Measurement == "Richness",
+    Environment %in% targetpatches
   )
 ))
 
+
 ggplot2::ggplot(
-  temp %>% tidyr::pivot_longer(
+  timeSeriesWindows %>% tidyr::pivot_longer(
     WindowAverage:WindowSlope, 
     names_to = "Window Function", 
     values_to = "Window Value" 
+  ) %>% dplyr::group_by(
+    WindowSize, `Window Function`, Intervention, Environment
+  ) %>% dplyr::mutate(
+    Alpha = 
+      (abs(`Window Value`) > quantile(
+        p = 0.99, x = abs(`Window Value`))) * 0.2 + 0.01
   ),
-  ggplot2::aes(x = Time,
+  ggplot2::aes(x = WindowTime,
                y = `Window Value`,
                color = factor(WindowSize, 
                               levels = windowSizes* Div_rounding, 
@@ -259,26 +415,66 @@ ggplot2::ggplot(
 ) + ggplot2::geom_vline(
   xintercept = postInterventionStart$Time,
   linetype = "dotted"
-# ) + ggplot2::geom_point(
-#   shape = '.'
+  # ) + ggplot2::geom_point(
+  # ggplot2::aes(alpha = Alpha)
+  #   shape = '.'
 ) + ggplot2::geom_line(
 ) + ggplot2::facet_grid(
   `Window Function` ~ Intervention + Environment  ,
   scales = "free_y"
 ) + ggplot2::labs(
   color = "Window Size"
-# ) + ggplot2::scale_y_continuous(
-#   transform = scales::pseudo_log_trans(sigma = 0.1)
+  # ) + ggplot2::scale_y_continuous(
+  #   transform = scales::pseudo_log_trans(sigma = 0.1)
+) + ggplot2::guides(
+  color = ggplot2::guide_legend(override.aes = list(alpha = 1))
+)
+
+ggplot2::ggplot(
+  timeSeriesWindows %>% tidyr::pivot_longer(
+    WindowAverage:WindowSlope, 
+    names_to = "Window Function", 
+    values_to = "Window Value" 
+  ) %>% dplyr::group_by(
+    WindowSize, `Window Function`, Intervention, Environment
+  ) %>% dplyr::mutate(
+    Alpha = 
+      (abs(`Window Value`) > quantile(
+        p = 0.99, x = abs(`Window Value`))) * 0.2 + 0.01,
+    `Window Value` = `Window Value` / max(abs(`Window Value`))
+  ),
+  ggplot2::aes(x = WindowTime,
+               y = `Window Value`,
+               color = factor(WindowSize, 
+                              levels = windowSizes* Div_rounding, 
+                              ordered = TRUE),
+               group = WindowSize)
+) + ggplot2::geom_vline(
+  xintercept = postInterventionStart$Time,
+  linetype = "dotted"
+) + ggplot2::geom_point(
+  ggplot2::aes(alpha = Alpha)
+  #   shape = '.'
+  # ) + ggplot2::geom_line(
+) + ggplot2::facet_grid(
+  `Window Function` ~ Intervention + Environment  ,
+  scales = "free_y"
+) + ggplot2::labs(
+  color = "Window Size"
+  # ) + ggplot2::scale_y_continuous(
+  #   transform = scales::pseudo_log_trans(sigma = 0.1)
+) + ggplot2::guides(
+  color = ggplot2::guide_legend(override.aes = list(alpha = 1))
 )
 
 # Examine more closely the Change and Slope for sensitivity ~ WindowSize.
 ggplot2::ggplot(
-  temp %>% tidyr::pivot_longer(
+  timeSeriesWindows %>% tidyr::pivot_longer(
     WindowChange:WindowSlope, 
     names_to = "Window Function", 
     values_to = "Window Value" 
   ),
-  ggplot2::aes(x = Time,
+  ggplot2::aes(x = WindowTime,
                y = `Window Value` * WindowSize,
                color = factor(WindowSize, 
                               levels = windowSizes* Div_rounding, 
