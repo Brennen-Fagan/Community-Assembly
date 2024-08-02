@@ -236,10 +236,10 @@ timeSeriesWindows <- dplyr::bind_rows(lapply(
       WindowSize = windowSize * Div_rounding,
       WindowAverage = slider::slide_index2(
         .x = Value, .y = Time, .f = function(value, time) {
-          widths <- diff(c(time, time + WindowSize))
+          widths <- diff(c(time, time[1] + windowSize * Div_rounding))
           heights <- value
-          return(widths * heights / WindowSize)
-          }, 
+          return(sum(widths * heights) / (windowSize * Div_rounding))
+        }, 
         .i = Time, .after = windowSize * Div_rounding, .complete = TRUE
       ),
       WindowChange = slider::slide_index(
@@ -253,10 +253,17 @@ timeSeriesWindows <- dplyr::bind_rows(lapply(
       ),
       WindowTime = Time + WindowSize # Location to plot as at.
     ) %>% dplyr::mutate(
-      dplyr::across(WindowAverage:WindowSlope, 
-                    .fns = function(x) ifelse(abs(x) < 0.01, 0, x))
+      dplyr::across(
+        WindowAverage:WindowSlope, 
+        .fns = function(x) {
+          unlist(lapply(x, function(y) ifelse(is.null(y), NA, y)))
+        }
+      )
     ) %>% dplyr::filter(
-      !is.na(WindowSlope)
+      !is.na(WindowAverage)
+    ) %>% dplyr::mutate(
+      dplyr::across(WindowAverage:WindowSlope, 
+                    .fns = function(x) ifelse(abs(x) < 1e-10, 0, x))
     )
   }, dat = dplyr::bind_rows(
     preInterventionData,
@@ -292,7 +299,7 @@ spaceForTimeWindows <- dplyr::bind_rows(lapply(
         .x = Value, .y = Time, .f = function(value, time) {
           widths <- diff(c(time, time + WindowSize))
           heights <- value
-          return(widths * heights / WindowSize)
+          return(sum(widths * heights) / WindowSize)
         }, 
         .i = Time, .after = windowSize * Div_rounding, .complete = TRUE
       ),
@@ -322,7 +329,7 @@ spaceForTimeWindows <- dplyr::bind_rows(lapply(
           # Focal - Control
           heights <- Env_1 - Env_2
           widths <- diff(c(time, time + WindowSize))
-          return(widths * heights / WindowSize)
+          return(sum(widths * heights) / WindowSize)
         }
         .i = Time, .after = windowSize * Div_rounding, .complete = TRUE
       ),
