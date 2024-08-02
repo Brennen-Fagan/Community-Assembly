@@ -297,95 +297,129 @@ spaceForTimeWindows <- dplyr::bind_rows(lapply(
       WindowSize = windowSize * Div_rounding,
       DifferencesWindowAverages = slider::slide_index2(
         .x = Value, .y = Time, .f = function(value, time) {
-          widths <- diff(c(time, time + WindowSize))
+          widths <- diff(c(time, time[1] + windowSize * Div_rounding))
           heights <- value
-          return(sum(widths * heights) / WindowSize)
+          return(sum(widths * heights) / (windowSize * Div_rounding))
         }, 
         .i = Time, .after = windowSize * Div_rounding, .complete = TRUE
       ),
       DifferencesWindowSlopes = slider::slide_index2(
         .x = Value, .y = Time, .f = 
-          function(value, time) {coefficients(lm(value ~ time))[2]},
+          function(value, time) {
+            if (length(value) == 1) {
+              return(0)
+            } else {
+              coefficients(lm(value ~ time))[2]
+            }
+          },
         .i = Time, .after = windowSize * Div_rounding, .complete = TRUE
       ),
       WindowTime = Time + WindowSize # Location to plot as at.
-    )
+    ) %>% dplyr::mutate(
+      dplyr::across(
+        DifferencesWindowAverages:DifferencesWindowSlopes, 
+        .fns = function(x) {
+          unlist(lapply(x, function(y) ifelse(is.null(y), NA, y)))
+        }
+      )
+    ) %>% dplyr::filter(
+      !is.na(DifferencesWindowAverages)
+    ) %>% dplyr::select(-Value)
     
     # Window -> Pair -> Difference -> Average/Slope
     # More "realistic", should match v1
     v2 <- dat %>% tidyr::pivot_wider(
       names_from = Environment,
       names_prefix = "Env",
-      names_sep = "_",
       values_from = Value
     )
-    colnames(v2)[colnames(v2) == paste0("Env_", targetpatches[1])] <- "Env_1"
-    colnames(v2)[colnames(v2) == paste0("Env_", targetpatches[2])] <- "Env_2"
+    colnames(v2)[colnames(v2) == paste0("Env", targetpatches[1])] <- "Env_1"
+    colnames(v2)[colnames(v2) == paste0("Env", targetpatches[2])] <- "Env_2"
     
     v2 <- v2 %>% dplyr::mutate(
       WindowSize = windowSize * Div_rounding,
-      WindowDifferencesAverages = slider::slide_index2(
-        .x = Env_1, .y = Env_2, .f = function(x, y) {
+      WindowDifferencesAverages = slider::pslide_index(
+        .l = list(Env_1, Env_2, Time), .f = function(x, y, time) {
           # Focal - Control
-          heights <- Env_1 - Env_2
-          widths <- diff(c(time, time + WindowSize))
-          return(sum(widths * heights) / WindowSize)
-        }
+          heights <- x - y
+          widths <- diff(c(time, time[1] + windowSize * Div_rounding))
+          return(sum(widths * heights) / (windowSize * Div_rounding))
+        },
         .i = Time, .after = windowSize * Div_rounding, .complete = TRUE
       ),
       WindowDifferencesSlopes = slider::pslide_index(
         .l = list(Env_1, Env_2, Time), .f = function(x, y, Time) {
-          # Focal - Control
-          Value <- Env_1 - Env_2
-          return(coefficients(lm(Value ~ Time))[2])
-        }
+          if (length(x) == 1) {
+            return(0)
+          } else {
+            # Focal - Control
+            Value <- x - y
+            return(coefficients(lm(Value ~ Time))[2])
+          }
+        },
         .i = Time, .after = windowSize * Div_rounding, .complete = TRUE
       ),
       WindowTime = Time + WindowSize # Location to plot as at.
-    )
+    ) %>% dplyr::mutate(
+      dplyr::across(
+        WindowDifferencesAverages:WindowDifferencesSlopes, 
+        .fns = function(x) {
+          unlist(lapply(x, function(y) ifelse(is.null(y), NA, y)))
+        }
+      )
+    ) %>% dplyr::filter(
+      !is.na(WindowDifferencesAverages)
+    ) 
     
     # Window -> Average/Slope -> Pair -> Difference 
-    v3 <- dat %>% dplyr::mutate(
-      Value = ifelse(Environment == targetpatches[2], -Value, Value),
-      WindowSize = windowSize * Div_rounding,
-      WindowAveragesDifferences = runner::runner(
-        x = ., f = function(y) {
-          averages <- with(y, by(Value, Environment, mean))
-          sum(averages)
-        }, idx = Time, k = windowSize, na_pad = TRUE
+    v3 <- dat %>% dplyr::group_by(
+      .add = TRUE, Environment
+    ) %>% dplyr::summarize(
+      WindowAverage = slider::slide_index(
+        .x = Value, .f = mean, 
+        .i = Time, .after = windowSize * Div_rounding, .complete = TRUE
       ),
-      WindowSlopesDifferences = runner::runner(
-        x = ., f = function(y) {
-          slopes <- with(y, by(y, Environment, 
-                               function(z) {
-                                 coefficients(lm(Value ~ Time, data = z))[2]
-                               } ))
-          sum(slopes)
+      WindowSlope = slider::pslide_index(
+        .l = list(Value, Time), .f = function(x, time) {
+          if (length(x) == 1) {
+            return(0)
+          } else {
+            coefficients(lm(x ~ time))[2]
+          }
         },
-        idx = Time, k = windowSize, na_pad = TRUE
+        .i = Time, .after = windowSize * Div_rounding, .complete = TRUE
       ),
-      WindowTime = Time + WindowSize # Location to plot as at.
+      Time = slider::slide_index(
+        .x = Time, .f = function(x) x[1], 
+        .i = Time, .after = windowSize * Div_rounding, .complete = TRUE
+      ),
+      .groups = "drop_last"
+    ) %>% dplyr::mutate(
+      dplyr::across(
+        WindowAverage:Time, 
+        .fns = function(x) {
+          unlist(lapply(x, function(y) ifelse(is.null(y), NA, y)))
+        }
+      )
+    ) %>% dplyr::filter(
+      !is.na(WindowAverage)
+    ) %>% dplyr::group_by(
+      .add = TRUE, Time
+    ) %>% dplyr::summarise(
+      WindowSize = windowSize * Div_rounding,
+      WindowTime = unique(Time) + WindowSize, # Location to plot as at.
+      WindowAveragesDifferences = sum(
+        ifelse(Environment == targetpatches[2], -WindowAverage, WindowAverage)
+      ),
+      WindowSlopesDifferences = sum(
+        ifelse(Environment == targetpatches[2], -WindowSlope, WindowSlope)
+      ), .groups = "drop_last"
     )
     
-    dat %>% dplyr::mutate(
-      WindowAverage = runner::runner(
-        x = Value, f = mean, idx = Time, k = windowSize, na_pad = TRUE
-      ),
-      WindowChange = runner::runner(
-        x = Value, f = function(y) {y[length(y)] - y[1]},
-        idx = Time, k = windowSize, na_pad = TRUE
-      ),
-      WindowSlope = runner::runner(
-        x = ., f = function(y) coefficients(lm(Value ~ Time, data = y))[2],
-        idx = Time, k = windowSize, na_pad = TRUE
-      ),
-      WindowSize = windowSize * Div_rounding
-    ) %>% dplyr::mutate(
-      dplyr::across(WindowAverage:WindowSlope, 
-                    .fns = function(x) ifelse(abs(x) < 0.01, 0, x))
-    ) %>% dplyr::filter(
-      !is.na(WindowSlope)
-    )
+    bys <- c("Space", "ExtirpationProportion", 
+             "Intervention", "InterventionIntensity", "ID", 
+             "Time", "WindowSize", "WindowTime")
+    dplyr::full_join(v1, v2, by = bys) %>% dplyr::full_join(v3, by = bys)
   }, dat = dplyr::bind_rows(
     preInterventionData,
     diversitiesPlottable
