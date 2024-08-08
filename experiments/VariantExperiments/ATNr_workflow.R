@@ -133,7 +133,7 @@ modelLUnscaled <- ATNr::initialise_default_Unscaled(
 
 initialConditionsSpecies <- runif(species, 1, 10)
 initialConditionsNutrients <- runif(nutrients, 1, 100) # 10 * > species biomass.
-times <- c(seq(0, 1.0, .1), seq(1.1, 10.0, .3), seq(10.1, 50.0, 1.0))
+times <- c(seq(0, 1.0, .1), seq(1.1, 10.0, .3), seq(10.1, 200.0, 1.0))
 rtol <- 1e-5; atol <- 1e-5
 
 # Note that for custom code, they "REQUIRE" initialisations be done.
@@ -151,11 +151,11 @@ evalODE <- function(t, y, parms) {
   return(list(parms$ODE(y, t)))
 }
 eventFunc <- list(
-  func = function(t, y, parms) {y[y < 1] <- 0;y},
+  func = function(t, y, parms) {y[y < 1e-6] <- 0;y},
   time = times
 )
 
-solNUNpre <- deSolve::lsoda(
+solNUNpre <- deSolve::lsoda( # Trying to get closer to steady state for nutr.
   y = c(initialConditionsNutrients, rep(0, species)), # Nutrients FIRST.
   times = 1:100,
   func = evalODE,
@@ -163,46 +163,47 @@ solNUNpre <- deSolve::lsoda(
   rtol = rtol, atol = atol
 )
 solNUN <- deSolve::lsoda( # Maybe no consumers???
-  y = c(solNUNpre[nrow(solNUNpre), 1+1:nutrients],
-    initialConditionsSpecies), # Nutrients FIRST.
+  y = c(solNUNpre[nrow(solNUNpre), 1+1:nutrients],# Nutrients FIRST.
+    initialConditionsSpecies),
   times = times,
   func = evalODE,
   events = eventFunc,
   modelNicheUnscaledNutrients,
   rtol = rtol, atol = atol
 )
-solLUN <- deSolve::lsoda( # Single Basal? -> Double Basal?
-  c(initialConditionsNutrients, initialConditionsSpecies), # Nutrients FIRST.
-  times,
-  evalODE,
+solLUN <- deSolve::lsoda(       # Single Basal? -> Double Basal?
+  c(initialConditionsNutrients, # Nutrients FIRST.
+    initialConditionsSpecies),  # Despite large number of inputs, almost all
+  times,                        # die out before the end of the time, leaving
+  evalODE,                      # essentially only basals.
   events = eventFunc,
   modelLUnscaledNutrients,
   rtol = rtol, atol = atol
 )
-solNS <- deSolve::lsoda(
-  c(initialConditionsSpecies),
-  times,
-  evalODE,
+solNS <- deSolve::lsoda(       # Less exciting than solBS, but seems to give
+  c(initialConditionsSpecies), # more consistent results? Consumers still seem
+  times,                       # to be far more common than the basal species.
+  evalODE,                     # (Curves are generally flatter, slower.)
   events = eventFunc,
   modelNicheScaled,
   rtol = rtol, atol = atol
 )
-solBS <- deSolve::lsoda( # Single Basal?
-  c(initialConditionsSpecies),
-  times,
-  evalODE,
-  events = eventFunc,
-  modelLBinarizedScaled,
-  rtol = rtol, atol = atol
+solBS <- deSolve::lsoda(       # Sometimes Single Basal? Seems the best
+  c(initialConditionsSpecies), # performer. Non-obvious what to do with the
+  times,                       # scaling though. As well, basal species seem
+  evalODE,                     # to have substantially less biomass than the
+  events = eventFunc,          # consumer species, but labelling is unclear.
+  modelLBinarizedScaled,       # Also need to be careful with the elimination
+  rtol = rtol, atol = atol     # threshold.
 )
-solLS <- deSolve::lsoda( # FAILED x2
+try(solLS <- deSolve::lsoda( # FAILED x2
   c(initialConditionsSpecies),
   times,
   evalODE,
   events = eventFunc,
   modelLScaled,
   rtol = rtol, atol = atol
-)
+))
 solNU <- deSolve::lsoda( # These 3 seem uninteresting? (Flat)
   c(initialConditionsSpecies),
   times,
@@ -246,3 +247,4 @@ ATNr::plot_odeweb(solBU, species)
 title(main = "BU")
 ATNr::plot_odeweb(solLU, species)
 title(main = "LU")
+
