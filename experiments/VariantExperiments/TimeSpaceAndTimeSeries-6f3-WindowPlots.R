@@ -477,42 +477,42 @@ ggplot2::ggplot(
   color = ggplot2::guide_legend(override.aes = list(alpha = 1))
 )
 
-ggplot2::ggplot(
-  timeSeriesWindows %>% tidyr::pivot_longer(
-    WindowAverage:WindowSlope,
-    names_to = "Window Function",
-    values_to = "Window Value"
-  ) %>% dplyr::group_by(
-    WindowSize, `Window Function`, Intervention, Environment
-  ) %>% dplyr::mutate(
-    Alpha =
-      (abs(`Window Value`) > quantile(
-        p = 0.99, x = abs(`Window Value`))) * 0.2 + 0.01,
-    `Window Value` = `Window Value` / max(abs(`Window Value`))
-  ),
-  ggplot2::aes(x = WindowTime,
-               y = `Window Value`,
-               color = factor(WindowSize,
-                              levels = windowSizes* Div_rounding,
-                              ordered = TRUE),
-               group = WindowSize)
-) + ggplot2::geom_vline(
-  xintercept = postInterventionStart$Time,
-  linetype = "dotted"
-) + ggplot2::geom_point(
-  ggplot2::aes(alpha = Alpha)
-  #   shape = '.'
-  # ) + ggplot2::geom_line(
-) + ggplot2::facet_grid(
-  `Window Function` ~ Intervention + Environment  ,
-  scales = "free_y"
-) + ggplot2::labs(
-  color = "Window Size"
-  # ) + ggplot2::scale_y_continuous(
-  #   transform = scales::pseudo_log_trans(sigma = 0.1)
-) + ggplot2::guides(
-  color = ggplot2::guide_legend(override.aes = list(alpha = 1))
-)
+# ggplot2::ggplot(
+#   timeSeriesWindows %>% tidyr::pivot_longer(
+#     WindowAverage:WindowSlope,
+#     names_to = "Window Function",
+#     values_to = "Window Value"
+#   ) %>% dplyr::group_by(
+#     WindowSize, `Window Function`, Intervention, Environment
+#   ) %>% dplyr::mutate(
+#     Alpha =
+#       (abs(`Window Value`) > quantile(
+#         p = 0.99, x = abs(`Window Value`))) * 0.2 + 0.01,
+#     `Window Value` = `Window Value` / max(abs(`Window Value`))
+#   ),
+#   ggplot2::aes(x = WindowTime,
+#                y = `Window Value`,
+#                color = factor(WindowSize,
+#                               levels = windowSizes* Div_rounding,
+#                               ordered = TRUE),
+#                group = WindowSize)
+# ) + ggplot2::geom_vline(
+#   xintercept = postInterventionStart$Time,
+#   linetype = "dotted"
+# ) + ggplot2::geom_point(
+#   ggplot2::aes(alpha = Alpha)
+#   #   shape = '.'
+#   # ) + ggplot2::geom_line(
+# ) + ggplot2::facet_grid(
+#   `Window Function` ~ Intervention + Environment  ,
+#   scales = "free_y"
+# ) + ggplot2::labs(
+#   color = "Window Size"
+#   # ) + ggplot2::scale_y_continuous(
+#   #   transform = scales::pseudo_log_trans(sigma = 0.1)
+# ) + ggplot2::guides(
+#   color = ggplot2::guide_legend(override.aes = list(alpha = 1))
+# )
 
 # Examine more closely the Change and Slope for sensitivity ~ WindowSize.
 ggplot2::ggplot(
@@ -520,9 +520,14 @@ ggplot2::ggplot(
     WindowChange:WindowSlope,
     names_to = "Window Function",
     values_to = "Window Value"
+  ) %>% dplyr::group_by(
+    WindowSize, `Window Function`, Intervention, Environment
+  ) %>% dplyr::mutate(
+    `Window Value` = `Window Value` * WindowSize,
+    `Relative Scaled Window Value` = `Window Value` / max(abs(`Window Value`))
   ),
   ggplot2::aes(x = WindowTime,
-               y = `Window Value` * WindowSize,
+               y = `Relative Scaled Window Value`,
                color = factor(WindowSize,
                               levels = windowSizes* Div_rounding,
                               ordered = TRUE),
