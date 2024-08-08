@@ -19,7 +19,8 @@ runDictionaryChoice <-
   # 9 # "TSTS_Simulations_18-1_6-6_2024-03-08",
   # 10 # "TSTS_Simulations_19-1_7-7_2024-03-08",
   # 11 # "TSTS_Simulations_20-1_8-8_2024-03-08"
-  12 # "TSTS_Simulations_18-1_6-6_2024-05-23"
+  # 12 # "TSTS_Simulations_18-1_6-6_2024-05-23"
+  13 # "TSTS_Simulations_18-1_6-6_2024-05-23"
 
 # While this code can be run in parallel, I'm generally disinclined.
 # I've not written it to suggest mass production and would rather
@@ -46,12 +47,12 @@ interventionPatchDictionaryChoice <-
   # 9 # Random 50% Patches -> [0, 1] Unif @ Random
   # 10 # Last 50% Patches -> {0} #TODO Did not work for two patch system?
   # 11 # Last 50% Patches -> {0.5}
-  # 12 # Last 50% Patches -> {1}
+  12 # Last 50% Patches -> {1}
   # 13 # Last 50% Patches -> {0, 1} Gradient # <- Probably not desired.
   # 14 # Last 50% Patches -> {0, 1} Unif @ Random
   # 16 # Last 50% Patches -> {0, 0.5, 1} Unif @ Random
   # 18 # Last 50% Patches -> [0, 1] Unif @ Random
-  40 # All Patches -> {0, 1} Gradient
+  # 40 # All Patches -> {0, 1} Gradient
   # 41 # All Patches -> {0, 1} Unif @ Random
 interventionPatchSeedChoice <-
   1 # Used on 2024-03-01
@@ -86,8 +87,8 @@ interventionDispersalDictionaryChoice <-
 # choose r' = r * rho ^ (sign(r)), but what rho?
 interventionDistanceDictionaryChoice <- # for m, n in [0, 1], rho(m, n) = ...
   # 1 # 2 ^ (- euclid(m, n)) => rho in [1/2, 1] for 1-D
-  2 # 2 ^ (1 - 2 euclid(m, n)) => rho in [1/2, 2] for 1-D
-  # 3 # 10 ^ (1 - 2 euclid(m, n)) => rho in [1/10, 10] for 1-D
+  # 2 # 2 ^ (1 - 2 euclid(m, n)) => rho in [1/2, 2] for 1-D
+  3 # 10 ^ (1 - 2 euclid(m, n)) => rho in [1/10, 10] for 1-D
 
 ## Other Parameters: ##########################################################
 # Most should be pulled from the data already.
@@ -141,7 +142,8 @@ runDictionary <- data.frame(
     "TSTS_Simulations_18-1_6-6_2024-03-08",
     "TSTS_Simulations_19-1_7-7_2024-03-08",
     "TSTS_Simulations_20-1_8-8_2024-03-08",
-    "TSTS_Simulations_18-1_6-6_2024-05-23"
+    "TSTS_Simulations_18-1_6-6_2024-05-23",
+    "TSTS_Simulations_18-1_9-9_2024-08-06"
   )
 )[runDictionaryChoice, ]
 
@@ -642,3 +644,7 @@ interventionSuccess <- foreach::foreach(
   return(0)
 }
 
+if (cores > 1) {
+  parallel::stopCluster(clust)
+} else {
+}
