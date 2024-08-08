@@ -18,8 +18,8 @@
 
 poolpatchDictionaryChoice <-
   # 17 # 100 Species, 2 Patches, Species {0, 1} Alternating, Patches {0.5}.
-  # 18 # 200 Species, 2 Patches, Species {0, 1} Alternating, Patches {0.5}.
-  19 # 100 Species, 10 Patches, Species {0, 1} Alternating, Patches {0.5}.
+  18 # 200 Species, 2 Patches, Species {0, 1} Alternating, Patches {0.5}.
+  # 19 # 100 Species, 10 Patches, Species {0, 1} Alternating, Patches {0.5}.
   # 20 # 200 Species, 10 Patches, Species {0, 1} Alternating, Patches {0.5}.
 
 poolpatchSeedChoice <-
@@ -29,8 +29,9 @@ poolpatchSeedChoice <-
   # 4 # Used on 2024-02-23 for the 2 patch system
   # 5 # Used on 2024-03-08 for choice 17 above.
   # 6 # Used on 2024-03-08 for choice 18 above.
-  7 # Used on 2024-03-08 for choice 19 above.
+  # 7 # Used on 2024-03-08 for choice 19 above.
   # 8 # Used on 2024-03-08 for choice 20 above.
+  9 # Used on 2024-08-06 for choice 18 above. Replication Experiments.
 
 dynamicsDictionaryChoice <-
   1 # Law and Morton 1996, Size-Structured Lotka-Volterra, Default Parameters
@@ -42,13 +43,16 @@ dynamicsSeedChoice <-
   # 4 # Used on 2024-02-23 for the 2 patch system
   # 5 # Used on 2024-03-08 for choice 17 above.
   # 6 # Used on 2024-03-08 for choice 18 above.
-  7 # Used on 2024-03-08 for choice 19 above.
+  # 7 # Used on 2024-03-08 for choice 19 above.
   # 8 # Used on 2024-03-08 for choice 20 above.
+  9 # Used on 2024-08-06 for ppD 18, ppS 9.  Replication Experiments.
 
 eventsDictionaryChoice <-
   #   Multipliers:
   # 1 # Immigration: 1, Extirpation: 1, NumberOfEvents: 1 # Default
   2 # Immigration: 1, Extirpation: 1, NumberOfEvents: 2 # For Interventions.
+  # 4 # Immigration: 1, Extirpation 1 (90% Effect), NumEvents: 2
+  # 6 # Immigration: 1, Extirpation 1 (No Effect), NumEvents: 2
 eventsSeedChoice <-
   # 1 # Used on 2024-02-13
   # 2 # Used on 2024-02-14 for both 1-1 and 2-1.
@@ -56,8 +60,12 @@ eventsSeedChoice <-
   # 4 # Used on 2024-02-23 for the 2 patch system
   # 5 # Used on 2024-03-08 for ppDChoice 17 above.
   # 6 # Used on 2024-03-08 for ppDChoice 18 above.
-  7 # Used on 2024-03-08 for ppDChoice 19 above.
+  # 7 # Used on 2024-03-08 for ppDChoice 19 above.
   # 8 # Used on 2024-03-08 for ppDChoice 20 above.
+  # 9 # Used on 2024-08-02 for ppD 18, ppS 9 above. Replication Experiments.
+  # 10 # Used on 2024-08-06 for ppD 18, ppS 9 above. Replication Experiments.
+  # 11 # Used on 2024-08-06 for ppD 18, ppS 9 above. Replication Experiments.
+  12 # Used on 2024-08-06 for ppD 18, ppS 9 above. Replication Experiments.
 
 dispersalDictionaryChoice <-
   15 # c(NA, 5, 0)
