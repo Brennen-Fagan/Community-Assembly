@@ -18,7 +18,7 @@ results <- lapply(seq_along(results), function(i, r, n) {
 names(results) <- dir(datfolder, "Simulation", full.names = T) 
 names(interventions) <- dir(datfolder, "Intervention", full.names = T) 
 
-numberAttempts <- 100#0
+numberAttempts <- 10000 # 30,000 simulation scale time units (simts) TS~8 simts 
 # For non-"suitability", this is the number of equispaced chronological points
 # used for determining how the relationship develops through time.
 # For "suitability", this is the number of random samples we take to determine
@@ -133,9 +133,12 @@ interventionDetails <- data.frame(
 # Comparing 2 after / to 3 after /  -> Spatial Suitability.
 # Comparing 1 before / to 1 after / -> Temporal Control.
 # Comparing 2 after / to 1 after /  -> Spatial Control.
-comparisonTypes <- c("True Focal", "True Nonfocal", 
-                     "Temporal Suitability", "Spatial Suitability",
-                     "Temporal Control", "Spatial Control")
+comparisonTypes <- c("True Focal", 
+                     "True Nonfocal", 
+                     "Temporal Suitability", 
+                     "Spatial Suitability",
+                     "Temporal Control", 
+                     "Spatial Control")
 
 abundances <- lapply(c(results, interventions), function(r) {
   extractAbund(
@@ -262,3 +265,19 @@ attempts <- attempts %>% dplyr::group_by(# Rowwise
     ))
   }
 ) %>% dplyr::ungroup()
+
+ggplot2::ggplot(
+  attempts, 
+  ggplot2::aes(x = Env1Time, y = Env2Time, color = Jaccard)
+) + ggplot2::geom_point(
+) + ggplot2::facet_wrap(
+  .~ComparisonType
+) + ggplot2::scale_color_viridis_b(breaks = (0:7)/7) 
+
+ggplot2::ggplot(
+  attempts, 
+  ggplot2::aes(x = Env1Time, y = Env2Time, color = Bray)
+) + ggplot2::geom_point(
+) + ggplot2::facet_wrap(
+  .~ComparisonType
+) + ggplot2::scale_color_viridis_b(breaks = (0:7)/7) 
