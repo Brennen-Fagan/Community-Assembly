@@ -1,6 +1,9 @@
-# source("standardizeGapSize.R") # maybe? Thinking I might try splinefun.
+# Preparation: ################################################################
+
+### Libraries: ################################################################
 library(dplyr)
 
+### Files: ####################################################################
 datfolder <-
   "TSTS_Simulations_18-1_9-9_2024-08-06"
 results <-
@@ -10,6 +13,7 @@ interventions <-
   lapply(dir(datfolder, "Intervention", full.names = T),
          function(x) {nm <- load(x); return(get(nm))})
 
+### Adjust for connections: ###################################################
 # interventions store the ParentRun, which we need to assign to each result.
 results <- lapply(seq_along(results), function(i, r, n) {
   r[[i]]$RunName <- n[i]
@@ -53,7 +57,7 @@ perturbedRange <-
     }))))
 # REMINDER: MAKE SURE TO CONSIDER TEMPORAL PROXIMITY TO PERTURBATION.
 
-# Schema:
+# Schema: #####################################################################
 # 1 aaaaaaaaaaaaaaaaaaaaaaaaaa/bbbbbbbbbbbbbbbbbbbbbbb Perturbation
 # 2 cccccccccccccccccccccccccc/ccccccccccccccccccccccc Spatial Control (Theory)
 # 3 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa Unperturbed
@@ -65,7 +69,7 @@ perturbedRange <-
 # Comparing 1 before / to 1 after / -> Temporal Control.
 # Comparing 2 after / to 1 after /  -> Spatial Control.
 
-# Tool:
+# Tools: ######################################################################
 extractAbund <- function(abundance, nEnv, epsilon = NULL) {
   nSpec <- (ncol(abundance) - 1)/nEnv
   stopifnot(nSpec == floor(nSpec))
@@ -111,6 +115,8 @@ extractBrayDissimilarity <- function(ab1, ab2) {
 
 # extractJaccDissimilarity(unperturbed1(1, 10000), unperturbed3(1, 10000))
 
+# Comparisons: ################################################################
+### Final Setup: ##############################################################
 # TODO CHANGE FOR OTHER CONFIGURATIONS.
 interventionDetails <- data.frame(
   InterventionRun = names(interventions),
@@ -150,6 +156,26 @@ abundances <- lapply(c(results, interventions), function(r) {
     epsilon = r$Parameters$EliminationThreshold)
 })
 
+# Expectations (developed after having seen some (corrupted) data mind you!):
+# Temporal variations are 2-D due to varying start times.
+# Other variations are 1-D due to paired nature.
+# The Controls should aim to replicate the True Focal.
+# The temporal control should not matter what comparison time is used.
+#   (I.e., moving along x-axis should have about the same beta diversity.)
+#   Hence the action should be in the vertical movement.
+# Stripes should correspond to community configurations.
+# In 1-D a sudden spike corresponds to a change in either comparator.
+# In the bottom right of the plots, the differences should be decreased.
+# After looking at the data more, a vertical stripe in temporal indicates an
+#   insufficient burn-in.
+# If suitability is good, the corresponding control should match the True Focal
+#   well.
+# One "nuisance" (that's a big problem in principle I guess?) is that the
+#   non-perturbed focal patch could change configuration, and the controls
+#   cannot pick up on that I think.
+#
+
+### Configuration of Comparisons: #############################################
 attempts <- expand.grid(
   Replicate = 1:numberAttempts,
   ParentRun = names(results),
@@ -262,6 +288,7 @@ attempts <- expand.grid(
   # Bray = NA
 )
 
+### Evaluate Comparisons: #####################################################
 attempts <- attempts %>% dplyr::group_by(# Rowwise
   Replicate, ParentRun, InterventionType, ComparisonType
 ) %>% dplyr::group_modify(
@@ -276,10 +303,11 @@ attempts <- attempts %>% dplyr::group_by(# Rowwise
   }
 ) %>% dplyr::ungroup()
 
+### Plot Comparisons: #########################################################
 ggplot2::ggplot(
   attempts,
   ggplot2::aes(x = Env1Time, y = Env2Time, color = Jaccard)
-) + ggplot2::geom_point(
+) + ggplot2::geom_point(alpha = 0.1
 ) + ggplot2::facet_grid(
   ComparisonType ~ ParentRun + InterventionType
 ) + ggplot2::scale_color_viridis_c()
@@ -287,7 +315,23 @@ ggplot2::ggplot(
 ggplot2::ggplot(
   attempts,
   ggplot2::aes(x = Env1Time, y = Env2Time, color = Bray)
-) + ggplot2::geom_point(
+) + ggplot2::geom_point(alpha = 0.1
 ) + ggplot2::facet_grid(
   ComparisonType ~ ParentRun + InterventionType
 ) + ggplot2::scale_color_viridis_c()
+
+### Temporal: Distance Decay?: ################################################
+
+### Mismatch with True Focal: #################################################
+# Quite a few things we want to compare around this.
+#   Difference between beta calculated from control and from unperturbed.
+#     Time1, Time2, Color = True Focal(Time2) - Control
+#   Predictability from the suitability calculation.
+#     Suitability, True Focal(Time2) - Control, Color = Time2
+#   Systemic deviations between control and unperturbed.
+#     Control, True Focal, Color = Time2
+# Be careful with temporals to keep any pairs.
+attemptsTRUE <- attempts %>% dplyr::filter(
+  ComparisonType == comparisonTypes[1]
+)
+

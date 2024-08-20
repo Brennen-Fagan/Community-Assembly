@@ -1,3 +1,9 @@
+# By discretising in this way, there seems to be a risk that we are deflating
+# the GR statistic. Trying to discretise it other ways seems to rely on time
+# sampling at regular intervals anyways, which isn't necessarily appropriate
+# for our situation, but I'm not sure I have a more direct/robust alternative.
+# (Could spend a few weeks trying to build cross-disciplines to do so?)
+
 datfolder <-
   "TSTS_Simulations_18-1_9-9_2024-08-06"
 results <-
