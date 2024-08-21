@@ -580,7 +580,34 @@ ggplot2::ggplot(
 ) + ggplot2::labs(
   x = "J(Pert. Focal, Pert. Control) - J(Pert. Focal, Unpert. Focal)",
   color = "Time Since\nPerturbation"
+) + ggplot2::facet_grid(
+  . ~ basename(ParentRun) + InterventionType
 )
+# But notice!
+ggplot2::ggplot(
+  attemptsSpace %>% dplyr::filter(
+    abs(Env1Time - `Env1Time_Spatial Control`) / Env1Time < 0.05
+  ),
+  ggplot2::aes(x = `Jaccard_Spatial Control` - Jaccard)
+  # ) + ggplot2::geom_freqpoly(
+  #   bins = 10000,
+  #   ggplot2::aes(group = round(Env2TimeEval/10)*10,
+  #                color = round(Env2TimeEval/10)*10),
+  #   alpha = 0.1
+) + ggplot2::geom_vline(
+  xintercept = 0, linetype = "dashed"
+) + ggplot2::geom_density(
+) + ggplot2::geom_rug(
+  ggplot2::aes(color = Env2TimeEval),
+  alpha = 0.01
+) + ggplot2::scale_color_viridis_c(
+) + ggplot2::labs(
+  x = "J(Pert. Focal, Pert. Control) - J(Pert. Focal, Unpert. Focal)",
+  color = "Time Since\nPerturbation"
+) + ggplot2::facet_grid(
+  . ~ basename(ParentRun) + InterventionType
+)
+
 ggplot2::ggplot(
   attemptsSpace,
   ggplot2::aes(x = `Bray_Spatial Control` - Bray)
@@ -599,6 +626,8 @@ ggplot2::ggplot(
 ) + ggplot2::labs(
   x = "B(Pert. Focal, Pert. Control) - B(Pert. Focal, Unpert. Focal)",
   color = "Time Since\nPerturbation"
+) + ggplot2::facet_grid(
+  . ~ basename(ParentRun) + InterventionType
 )
 
 ##### Temporal: ###############################################################
@@ -779,6 +808,8 @@ ggplot2::ggplot(
 ) + ggplot2::labs(
   x = "J(Pert. Focal, Hist. Focal) - J(Pert. Focal, Unpert. Focal)",
   color = "Time Since\nPerturbation"
+) + ggplot2::facet_grid(
+  . ~ basename(ParentRun) + InterventionType
 )
 ggplot2::ggplot(
   attemptsTime,
@@ -798,4 +829,6 @@ ggplot2::ggplot(
 ) + ggplot2::labs(
   x = "B(Pert. Focal, Hist. Focal) - B(Pert. Focal, Unpert. Focal)",
   color = "Time Since\nPerturbation"
+) + ggplot2::facet_grid(
+  . ~ basename(ParentRun) + InterventionType
 )
