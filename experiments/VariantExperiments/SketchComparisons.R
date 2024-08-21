@@ -32,7 +32,7 @@ numberAttempts <- 10000 # 30,000 simulation scale time units (simts) TS~8 simts
 stopifnot(
   all(results[[1]]$ReactionTime ==
         unlist(lapply(c(results, interventions), function(r) r$ReactionTime)))
-  )
+)
 # So it doesn't matter which timescale we use, but it does matter start and end
 # times.
 # We have unperturbed-before, unperturbed-after, and perturbed-after.
@@ -53,7 +53,7 @@ perturbedRange <-
     interventions,
     function(r) {
       (r$Events$Times[length(r$Events$Times)]
-        - r$Ellipsis$Affinity$TimeIntervention)
+       - r$Ellipsis$Affinity$TimeIntervention)
     }))))
 # REMINDER: MAKE SURE TO CONSIDER TEMPORAL PROXIMITY TO PERTURBATION.
 
@@ -125,7 +125,7 @@ interventionDetails <- data.frame(
   )),
   EnvIntervention = unlist(lapply(
     interventions, function(r) r$Ellipsis$Affinity$PatchInterventions
-    )),
+  )),
   EnvControl = unlist(lapply(
     interventions,
     function(r) setdiff(1:r$NumEnvironments,
@@ -254,8 +254,8 @@ attempts <- expand.grid(
                                      min = unperturbedRange[1],
                                      max = unperturbedRange[2]),
     Env1Timespan == "After" ~ runif(n = length(Env1Timespan),
-                                     min = perturbedRange[1],
-                                     max = perturbedRange[2]),
+                                    min = perturbedRange[1],
+                                    max = perturbedRange[2]),
     TRUE ~ NA_real_
   ),
   Env2Time = dplyr::case_when(
@@ -309,7 +309,7 @@ ggplot2::ggplot(
   ggplot2::aes(x = Env1Time, y = Env2Time, color = Jaccard)
 ) + ggplot2::geom_point(alpha = 0.1
 ) + ggplot2::facet_grid(
-  ComparisonType ~ ParentRun + InterventionType
+  ComparisonType ~ basename(ParentRun) + InterventionType
 ) + ggplot2::scale_color_viridis_c()
 
 ggplot2::ggplot(
@@ -317,10 +317,54 @@ ggplot2::ggplot(
   ggplot2::aes(x = Env1Time, y = Env2Time, color = Bray)
 ) + ggplot2::geom_point(alpha = 0.1
 ) + ggplot2::facet_grid(
-  ComparisonType ~ ParentRun + InterventionType
+  ComparisonType ~ basename(ParentRun) + InterventionType
 ) + ggplot2::scale_color_viridis_c()
 
 ### Temporal: Distance Decay?: ################################################
+
+attemptsTime <- attempts %>% dplyr::filter(
+  ComparisonType %in% comparisonTypes[c(3, 5)]
+)
+
+# Generally, the temporal metrics become more dissimilar if the temporal
+# control is further away (temporally!) from the comparison time, but the story
+# appears to be somewhat complicated by varying intervention strengths.
+attemptsTime %>% dplyr::mutate(
+  TimeDistance =
+    abs(
+      (Env1TimeEval + ifelse(Env1File == InterventionRun,
+                             InterventionTime,
+                             0)) -
+        (Env2TimeEval + ifelse(Env2File == InterventionRun,
+                               InterventionTime,
+                               0))
+    )
+) %>% ggplot2::ggplot(
+  ggplot2::aes(x = TimeDistance, y = Jaccard, color = Env1Time)
+) + ggplot2::geom_point(alpha = 0.1
+) + ggplot2::geom_smooth(color = "red"
+) + ggplot2::facet_grid(
+  ComparisonType ~ basename(ParentRun) + InterventionType
+) + ggplot2::scale_color_viridis_c()
+
+attemptsTime %>% dplyr::mutate(
+  TimeDistance =
+    abs(
+      (Env1TimeEval + ifelse(Env1File == InterventionRun,
+                             InterventionTime,
+                             0)) -
+        (Env2TimeEval + ifelse(Env2File == InterventionRun,
+                               InterventionTime,
+                               0))
+    )
+) %>% ggplot2::ggplot(
+  ggplot2::aes(x = TimeDistance, y = Bray, color = Env1Time)
+) + ggplot2::geom_point(alpha = 0.1
+) + ggplot2::geom_smooth(color = "red"
+) + ggplot2::facet_grid(
+  ComparisonType ~ basename(ParentRun) + InterventionType
+) + ggplot2::scale_color_viridis_c()
+
 
 ### Mismatch with True Focal: #################################################
 # Quite a few things we want to compare around this.
@@ -331,7 +375,147 @@ ggplot2::ggplot(
 #   Systemic deviations between control and unperturbed.
 #     Control, True Focal, Color = Time2
 # Be careful with temporals to keep any pairs.
+
+##### Spatial: ################################################################
 attemptsTRUE <- attempts %>% dplyr::filter(
   ComparisonType == comparisonTypes[1]
 )
+
+# Pivot Suitability to be in the same rows as Control. This keeps pairs.
+attemptsSpace <- attempts %>% dplyr::filter(
+  ComparisonType %in% comparisonTypes[c(4, 6)]
+) %>% tidyr::pivot_wider(
+  id_cols = c(# Shared Observation Columns (differs from Time version!)
+    Replicate, ParentRun, InterventionRun, InterventionType, InterventionTime,
+    EnvIntervention, EnvControl
+  ),
+  names_from = ComparisonType,
+  values_from = c(Env1:Bray)
+)
+
+attemptsSpaceControlTime2Col <- attemptsSpace$`Env2Time_Spatial Control`
+
+# Remove Duplicated Columns. Note that this is aggressive!
+attemptsSpace <- attemptsSpace[!duplicated(as.list(attemptsSpace))]
+
+# Need to match Env1Time of True Focal to Env2Time of Control.
+# Retrieve the new index.
+attemptsSpaceControlTime2ColIndex <-
+  which(unlist(lapply(as.list(attemptsSpace),
+                      function(x) all(x == attemptsSpaceControlTime2Col))))
+
+attemptsSpace <- dplyr::right_join(
+  attemptsTRUE, attemptsSpace,
+  by = c(# Shared Observation Columns (differs from Time version!)
+    "Replicate", "ParentRun", "InterventionRun",
+    "InterventionType", "InterventionTime",
+    "EnvIntervention", "EnvControl",
+    "Env1Time" = colnames(attemptsSpace)[attemptsSpaceControlTime2ColIndex]
+  ),
+  suffix = c("True", "")
+)
+
+attemptsSpace <- attemptsSpace[!duplicated(as.list(attemptsSpace))]
+
+#   Difference between beta calculated from control and from unperturbed.
+ggplot2::ggplot(
+  attemptsSpace, ggplot2::aes(
+    x = Env2TimeEval, y = Env1Time, color = `Jaccard_Spatial Control` - Jaccard
+  )
+) + ggplot2::geom_point(alpha = 0.1
+) + ggplot2::facet_grid(
+  ComparisonType ~ ParentRun + InterventionType
+) + ggplot2::scale_color_gradient2(
+) + ggplot2::labs(
+  color = "J(Pert. Focal, Pert. Control)\n-J(Pert. Focal, Unpert. Focal)"
+)
+ggplot2::ggplot(
+  attemptsSpace, ggplot2::aes(
+    x = Env2TimeEval, y = Env1Time, color = `Bray_Spatial Control` - Bray
+  )
+) + ggplot2::geom_point(alpha = 0.1
+) + ggplot2::facet_grid(
+  ComparisonType ~ basename(ParentRun) + InterventionType
+) + ggplot2::scale_color_gradient2(
+) + ggplot2::labs(
+  color = "B(Pert. Focal, Pert. Control)\n-B(Pert. Focal, Unpert. Focal)"
+)
+
+#   Predictability from the suitability calculation.
+ggplot2::ggplot(
+  attemptsSpace, ggplot2::aes(
+    x = `Jaccard_Spatial Suitability`,
+    y = `Jaccard_Spatial Control` - Jaccard,
+    color = Env2TimeEval
+  )
+) + ggplot2::geom_hline(yintercept = 0, linetype = "dashed"
+) + ggplot2::geom_point(alpha = 0.1
+) + ggplot2::facet_grid(
+  ComparisonType ~ basename(ParentRun) + InterventionType
+) + ggplot2::scale_color_viridis_c(
+) + ggplot2::labs(
+  x = "J(Unpert. Focal, Pert. Control) Dissimilarity",
+  y = "J(Pert. Focal, Pert. Control) - J(Pert. Focal, Unpert. Focal)"
+)
+
+ggplot2::ggplot(
+  attemptsSpace, ggplot2::aes(
+    x = `Bray_Spatial Suitability`,
+    y = `Bray_Spatial Control` - Bray,
+    color = Env2TimeEval
+  )
+) + ggplot2::geom_hline(yintercept = 0, linetype = "dashed"
+) + ggplot2::geom_point(alpha = 0.1
+) + ggplot2::facet_grid(
+  ComparisonType ~ basename(ParentRun) + InterventionType
+) + ggplot2::scale_color_viridis_c(
+) + ggplot2::labs(
+  x = "B(Unpert. Focal, Pert. Control) Dissimilarity",
+  y = "B(Pert. Focal, Pert. Control) - B(Pert. Focal, Unpert. Focal)"
+)
+
+#   Systemic deviations between control and unperturbed.
+ggplot2::ggplot(
+  attemptsSpace, ggplot2::aes(
+    x = `Jaccard_Spatial Control`,
+    y =  Jaccard,
+    color = Env2TimeEval
+  )
+) + ggplot2::geom_abline(slope = 1, intercept = 0, linetype = "dashed"
+) + ggplot2::geom_point(alpha = 0.1
+) + ggplot2::facet_grid(
+  ComparisonType ~ basename(ParentRun) + InterventionType
+) + ggplot2::scale_color_viridis_c(
+) + ggplot2::labs(
+  x = "J(Pert. Focal, Pert. Control) Dissimilarity",
+  y = "J(Pert. Focal, Unpert. Focal)"
+)
+ggplot2::ggplot(
+  attemptsSpace, ggplot2::aes(
+    x = `Bray_Spatial Control`,
+    y =  Bray,
+    color = Env2TimeEval
+  )
+) + ggplot2::geom_abline(slope = 1, intercept = 0, linetype = "dashed"
+) + ggplot2::geom_point(alpha = 0.1
+) + ggplot2::facet_grid(
+  ComparisonType ~ basename(ParentRun) + InterventionType
+) + ggplot2::scale_color_viridis_c(
+) + ggplot2::labs(
+  x = "B(Pert. Focal, Pert. Control) Dissimilarity",
+  y = "B(Pert. Focal, Unpert. Focal)"
+)
+
+##### Temporal: ###############################################################
+# Reminder:
+# Quite a few things we want to compare around this.
+#   Difference between beta calculated from control and from unperturbed.
+#     Time1, Time2, Color = True Focal(Time2) - Control
+#   Predictability from the suitability calculation.
+#     Suitability, True Focal(Time2) - Control, Color = Time2
+#   Systemic deviations between control and unperturbed.
+#     Control, True Focal, Color = Time2
+# Be careful with temporals to keep any pairs.
+
+
 
