@@ -5,7 +5,8 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 
-imageWidth <- 1200; imageHeight <- 1000
+imageWidth <- 3600; imageHeight <- 3000; imageUnit <- "px"
+options(bitmapType = "cairo")
 
 ### Files: ####################################################################
 datfolder <-
@@ -376,11 +377,11 @@ plot1B <- ggplot2::ggplot(
 
 ggplot2::ggsave(
   plot1J, filename = "Image-Comparisons-Jaccard-All.png",
-  width = imageWidth, height = imageHeight
+  width = imageWidth, height = imageHeight, units = imageUnit
   )
 ggplot2::ggsave(
   plot1B, filename = "Image-Comparisons-Bray-All.png",
-  width = imageWidth, height = imageHeight
+  width = imageWidth, height = imageHeight, units = imageUnit
 )
 
 ### Temporal: Distance Decay?: ################################################
@@ -431,11 +432,11 @@ plot2_DecayTimeBray <- attemptsTime %>% dplyr::mutate(
 
 ggplot2::ggsave(
   plot2_DecayTimeJaccard, filename = "Image-Comparisons-Jaccard-Decay.png",
-  width = imageWidth, height = imageHeight
+  width = imageWidth, height = imageHeight, units = imageUnit
 )
 ggplot2::ggsave(
   plot2_DecayTimeBray, filename = "Image-Comparisons-Bray-Decay.png",
-  width = imageWidth, height = imageHeight
+  width = imageWidth, height = imageHeight, units = imageUnit
 )
 
 ### Mismatch with True Focal: #################################################
@@ -544,12 +545,14 @@ plot3_SpaceBray_Error <- ggplot2::ggplot(
 ) + ggplot2::theme_bw()
 
 ggplot2::ggsave(
-  plot3_SpaceJaccard_Error, filename = "Image-Comparisons-Jaccard-SpaceAgreement.png",
-  width = imageWidth, height = imageHeight
+  plot3_SpaceJaccard_Error,
+  filename = "Image-Comparisons-Jaccard-SpaceAgreement.png",
+  width = imageWidth, height = imageHeight, units = imageUnit
 )
 ggplot2::ggsave(
-  plot3_SpaceBray_Error, filename = "Image-Comparisons-Bray-SpaceAgreement.png",
-  width = imageWidth, height = imageHeight
+  plot3_SpaceBray_Error,
+  filename = "Image-Comparisons-Bray-SpaceAgreement.png",
+  width = imageWidth, height = imageHeight, units = imageUnit
 )
 
 ####### Plot 4: ###############################################################
@@ -590,12 +593,12 @@ plot4_SpaceBray_SuitabilityDependence <- ggplot2::ggplot(
 ggplot2::ggsave(
   plot4_SpaceJaccard_SuitabilityDependence,
   filename = "Image-Comparisons-Jaccard-SpaceSuitability.png",
-  width = imageWidth, height = imageHeight
+  width = imageWidth, height = imageHeight, units = imageUnit
 )
 ggplot2::ggsave(
   plot4_SpaceBray_SuitabilityDependence,
   filename = "Image-Comparisons-Bray-SpaceSuitability.png",
-  width = imageWidth, height = imageHeight
+  width = imageWidth, height = imageHeight, units = imageUnit
 )
 
 
@@ -637,12 +640,12 @@ plot5_SpaceBray_DissimilarityDifferences <- ggplot2::ggplot(
 ggplot2::ggsave(
   plot5_SpaceJaccard_DissimilarityDifferences,
   filename = "Image-Comparisons-Jaccard-SpaceDifferences.png",
-  width = imageWidth, height = imageHeight
+  width = imageWidth, height = imageHeight, units = imageUnit
 )
 ggplot2::ggsave(
   plot5_SpaceBray_DissimilarityDifferences,
   filename = "Image-Comparisons-Bray-SpaceDifferences.png",
-  width = imageWidth, height = imageHeight
+  width = imageWidth, height = imageHeight, units = imageUnit
 )
 
 ####### Plot 6: ###############################################################
@@ -718,17 +721,17 @@ plot6_SpaceBray_DensityDifferences <- ggplot2::ggplot(
 ggplot2::ggsave(
   plot6_SpaceJaccard_DensityDifferences,
   filename = "Image-Comparisons-Jaccard-SpaceDensities.png",
-  width = imageWidth, height = imageHeight
+  width = imageWidth, height = imageHeight, units = imageUnit
 )
 ggplot2::ggsave(
   plot6_SpaceJaccard_DensityDifferencesSmall,
   filename = "Image-Comparisons-Jaccard-SpaceDensitiesNearEqualTimes.png",
-  width = imageWidth, height = imageHeight
+  width = imageWidth, height = imageHeight, units = imageUnit
 )
 ggplot2::ggsave(
   plot6_SpaceBray_DensityDifferences,
   filename = "Image-Comparisons-Bray-SpaceDensities.png",
-  width = imageWidth, height = imageHeight
+  width = imageWidth, height = imageHeight, units = imageUnit
 )
 
 ####### Plot 7: ###############################################################
@@ -875,12 +878,12 @@ plot3_TimeBray_Error <- ggplot2::ggplot(
 ggplot2::ggsave(
   plot3_TimeJaccard_Error,
   filename = "Image-Comparisons-Jaccard-TimeAgreement.png",
-  width = imageWidth, height = imageHeight
+  width = imageWidth, height = imageHeight, units = imageUnit
 )
 ggplot2::ggsave(
   plot3_TimeBray_Error,
   filename = "Image-Comparisons-Bray-TimeAgreement.png",
-  width = imageWidth, height = imageHeight
+  width = imageWidth, height = imageHeight, units = imageUnit
 )
 
 ####### Plot 4: ###############################################################
@@ -920,12 +923,12 @@ plot4_TimeBray_SuitabilityDependence <- ggplot2::ggplot(
 ggplot2::ggsave(
   plot4_TimeJaccard_SuitabilityDependence,
   filename = "Image-Comparisons-Jaccard-TimeSuitability.png",
-  width = imageWidth, height = imageHeight
+  width = imageWidth, height = imageHeight, units = imageUnit
 )
 ggplot2::ggsave(
   plot4_TimeBray_SuitabilityDependence,
   filename = "Image-Comparisons-Bray-TimeSuitability.png",
-  width = imageWidth, height = imageHeight
+  width = imageWidth, height = imageHeight, units = imageUnit
 )
 
 ####### Plot 5: ###############################################################
@@ -965,12 +968,12 @@ plot5_TimeBray_DissimilarityDifferences <- ggplot2::ggplot(
 ggplot2::ggsave(
   plot5_TimeJaccard_DissimilarityDifferences,
   filename = "Image-Comparisons-Jaccard-TimeDifferences.png",
-  width = imageWidth, height = imageHeight
+  width = imageWidth, height = imageHeight, units = imageUnit
 )
 ggplot2::ggsave(
   plot5_TimeBray_DissimilarityDifferences,
   filename = "Image-Comparisons-Bray-TimeDifferences.png",
-  width = imageWidth, height = imageHeight
+  width = imageWidth, height = imageHeight, units = imageUnit
 )
 
 ####### Plot 6: ###############################################################
@@ -1021,12 +1024,12 @@ plot6_TimeBray_DensityDifferences <- ggplot2::ggplot(
 ggplot2::ggsave(
   plot6_TimeJaccard_DensityDifferences,
   filename = "Image-Comparisons-Jaccard-TimeDensities.png",
-  width = imageWidth, height = imageHeight
+  width = imageWidth, height = imageHeight, units = imageUnit
 )
 ggplot2::ggsave(
   plot6_TimeBray_DensityDifferences,
   filename = "Image-Comparisons-Bray-TimeDensities.png",
-  width = imageWidth, height = imageHeight
+  width = imageWidth, height = imageHeight, units = imageUnit
 )
 
 ####### Plot 7: ###############################################################

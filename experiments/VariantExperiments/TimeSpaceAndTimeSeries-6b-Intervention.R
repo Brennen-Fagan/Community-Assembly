@@ -25,7 +25,7 @@ runDictionaryChoice <-
 
 # While this code can be run in parallel, I'm generally disinclined.
 # I've not written it to suggest mass production and would rather
-# embarassingly parallel approached be used before proper foreach.
+# an embarassingly parallel approach be used before proper foreach.
 # Concerns include memory and time commitment.
 # Foreach is used instead in order to facilitate coding and consistency.
 cores <- 1

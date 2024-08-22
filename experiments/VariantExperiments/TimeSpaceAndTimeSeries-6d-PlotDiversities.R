@@ -15,7 +15,8 @@ datfolders <- c(
   # "TSTS_Simulations_11-1_3-3_2024-02-23"
   # "TSTS_Simulations_17-1_5-5_2024-03-08"
   # "TSTS_Simulations_18-1_6-6_2024-03-08"
-  "TSTS_Simulations_19-1_7-7_2024-03-08"
+  # "TSTS_Simulations_19-1_7-7_2024-03-08"
+  "TSTS_Simulations_138-1_10-10_2024-08-22"
 )
 
 savedir <- file.path(datfolders, "Images")

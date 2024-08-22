@@ -21,7 +21,8 @@ poolpatchDictionaryChoice <-
   # 18 # 200 Species, 2 Patches, Species {0, 1} Alternating, Patches {0.5}.
   # 19 # 100 Species, 10 Patches, Species {0, 1} Alternating, Patches {0.5}.
   # 20 # 200 Species, 10 Patches, Species {0, 1} Alternating, Patches {0.5}.
-  138 # 200 Species, 2 Patches, Species {0, 1} Alternating, Patches {0}.
+  # 138 # 200 Species, 2 Patches, Species {0, 1} Alternating, Patches {0}.
+  158 # 200 Species, 2 Patches, Species {0, 1} Alternating, Patches {0.5, 1}.
 
 poolpatchSeedChoice <-
   # 1 # Used on 2024-02-13
@@ -33,7 +34,8 @@ poolpatchSeedChoice <-
   # 7 # Used on 2024-03-08 for choice 19 above.
   # 8 # Used on 2024-03-08 for choice 20 above.
   # 9 # Used on 2024-08-06 for choice 18 above. Replication Experiments.
-  10 # Used on 2024-08-22 for choice 138 above.
+  # 10 # Used on 2024-08-22 for choice 138 above.
+  9 # Used on 2024-08-22 for choice 158 above. Reverse Pert. Experiments.
 
 dynamicsDictionaryChoice <-
   1 # Law and Morton 1996, Size-Structured Lotka-Volterra, Default Parameters
@@ -48,7 +50,8 @@ dynamicsSeedChoice <-
   # 7 # Used on 2024-03-08 for choice 19 above.
   # 8 # Used on 2024-03-08 for choice 20 above.
   # 9 # Used on 2024-08-06 for ppD 18, ppS 9.  Replication Experiments.
-  10 # Used on 2024-08-22 for ppD 138, ppS 10.  Replication Experiments.
+  # 10 # Used on 2024-08-22 for ppD 138, ppS 10.
+  9 # Used on 2024-08-22 for ppD 158, ppS 9.  Reverse Pert. Experiments.
 
 eventsDictionaryChoice <-
   #   Multipliers:
@@ -69,7 +72,8 @@ eventsSeedChoice <-
   # 10 # Used on 2024-08-06 for ppD 18, ppS 9 above. Replication Experiments.
   # 11 # Used on 2024-08-06 for ppD 18, ppS 9 above. Replication Experiments.
   # 12 # Used on 2024-08-06 for ppD 18, ppS 9 above. Replication Experiments.
-  13 # Used on 2024-08-22 for ppD 138, ppS 10 above.
+  # 13 # Used on 2024-08-22 for ppD 138, ppS 10 above.
+  9 # Used on 2024-08-22 for ppD 158, ppS 9 above. Reverse Pert. Experiments.
 
 dispersalDictionaryChoice <-
   15 # c(NA, 5, 0)
@@ -124,6 +128,7 @@ evensplit <- function(values = c(0, 1)) {
   }
 }
 evensplit_01 <- evensplit()
+evensplit_051 <- evensplit(c(0.5, 1))
 
 gradientline_01 <- function(n) {
   c(rep(0, ceiling(n/2)), rep(1, floor(n/2)))
@@ -175,7 +180,8 @@ poolpatchDictionary <- expand.grid(
     "gradientline_0half1", # Patch {0, 0.5, 1} affinities. Gradient Line.
     "patchTypes.0.Half.1", # Patch {0, 0.5, 1} affinities. Gradient Ring.
     "runifRing", #           Patch [0, 1] affinities. Gradient Ring at Random.
-    "rep_0" #                Patch {0} affinities.
+    "rep_0", #               Patch {0} affinities.
+    "evensplit_051" #        Patch {0.5, 1} affinities. Alternating.
   ),
   stringsAsFactors = FALSE
 )[poolpatchDictionaryChoice, ] %>% dplyr::mutate(
