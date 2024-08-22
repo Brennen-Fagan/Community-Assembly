@@ -21,7 +21,8 @@ runDictionaryChoice <-
   # 11 # "TSTS_Simulations_20-1_8-8_2024-03-08"
   # 12 # "TSTS_Simulations_18-1_6-6_2024-05-23"
   # 13 # "TSTS_Simulations_18-1_9-9_2024-08-06"
-  14 # "TSTS_Simulations_138-1_10-10_2024-08-22"
+  # 14 # "TSTS_Simulations_138-1_10-10_2024-08-22"
+  15 # "TSTS_Simulations_158-1_9-9_2024-08-22"
 
 # While this code can be run in parallel, I'm generally disinclined.
 # I've not written it to suggest mass production and would rather
@@ -47,8 +48,8 @@ interventionPatchDictionaryChoice <-
   # 8 # Random 50% Patches -> [0, 1] Gradient Ring
   # 9 # Random 50% Patches -> [0, 1] Unif @ Random
   # 10 # Last 50% Patches -> {0} #TODO Did not work for two patch system?
-  # 11 # Last 50% Patches -> {0.5}
-  12 # Last 50% Patches -> {1}
+  11 # Last 50% Patches -> {0.5}
+  # 12 # Last 50% Patches -> {1}
   # 13 # Last 50% Patches -> {0, 1} Gradient # <- Probably not desired.
   # 14 # Last 50% Patches -> {0, 1} Unif @ Random
   # 16 # Last 50% Patches -> {0, 0.5, 1} Unif @ Random
@@ -145,7 +146,8 @@ runDictionary <- data.frame(
     "TSTS_Simulations_20-1_8-8_2024-03-08",
     "TSTS_Simulations_18-1_6-6_2024-05-23",
     "TSTS_Simulations_18-1_9-9_2024-08-06",
-    "TSTS_Simulations_138-1_10-10_2024-08-22"
+    "TSTS_Simulations_138-1_10-10_2024-08-22",
+    "TSTS_Simulations_158-1_9-9_2024-08-22"
   )
 )[runDictionaryChoice, ]
 

@@ -15,11 +15,16 @@ datfolders <- c(
   # "TSTS_Simulations_6-1_2-2_2024-02-15"
   # "TSTS_Simulations_11-1_3-3_2024-02-23",
   # "TSTS_Simulations_11-1_4-4_2024-02-23"
-  "TSTS_Simulations_17-1_5-5_2024-03-08",
-  "TSTS_Simulations_18-1_6-6_2024-03-08"
+  # "TSTS_Simulations_17-1_5-5_2024-03-08",
+  # "TSTS_Simulations_18-1_6-6_2024-03-08"
+  # "TSTS_Simulations_19-1_7-7_2024-03-08",
+  # "TSTS_Simulations_20-1_8-8_2024-03-08"
+  #"TSTS_Simulations_18-1_6-6_2024-05-23"
+  # "TSTS_Simulations_138-1_10-10_2024-08-22"
+  "TSTS_Simulations_158-1_9-9_2024-08-22"
 )
 
-cores <- 4
+cores <- 1
 
 rows_per_event <- 1
 
