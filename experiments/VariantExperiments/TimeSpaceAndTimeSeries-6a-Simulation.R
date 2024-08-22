@@ -18,9 +18,10 @@
 
 poolpatchDictionaryChoice <-
   # 17 # 100 Species, 2 Patches, Species {0, 1} Alternating, Patches {0.5}.
-  18 # 200 Species, 2 Patches, Species {0, 1} Alternating, Patches {0.5}.
+  # 18 # 200 Species, 2 Patches, Species {0, 1} Alternating, Patches {0.5}.
   # 19 # 100 Species, 10 Patches, Species {0, 1} Alternating, Patches {0.5}.
   # 20 # 200 Species, 10 Patches, Species {0, 1} Alternating, Patches {0.5}.
+  138 # 200 Species, 2 Patches, Species {0, 1} Alternating, Patches {0}.
 
 poolpatchSeedChoice <-
   # 1 # Used on 2024-02-13
@@ -31,7 +32,8 @@ poolpatchSeedChoice <-
   # 6 # Used on 2024-03-08 for choice 18 above.
   # 7 # Used on 2024-03-08 for choice 19 above.
   # 8 # Used on 2024-03-08 for choice 20 above.
-  9 # Used on 2024-08-06 for choice 18 above. Replication Experiments.
+  # 9 # Used on 2024-08-06 for choice 18 above. Replication Experiments.
+  10 # Used on 2024-08-22 for choice 138 above.
 
 dynamicsDictionaryChoice <-
   1 # Law and Morton 1996, Size-Structured Lotka-Volterra, Default Parameters
@@ -45,7 +47,8 @@ dynamicsSeedChoice <-
   # 6 # Used on 2024-03-08 for choice 18 above.
   # 7 # Used on 2024-03-08 for choice 19 above.
   # 8 # Used on 2024-03-08 for choice 20 above.
-  9 # Used on 2024-08-06 for ppD 18, ppS 9.  Replication Experiments.
+  # 9 # Used on 2024-08-06 for ppD 18, ppS 9.  Replication Experiments.
+  10 # Used on 2024-08-22 for ppD 138, ppS 10.  Replication Experiments.
 
 eventsDictionaryChoice <-
   #   Multipliers:
@@ -65,7 +68,8 @@ eventsSeedChoice <-
   # 9 # Used on 2024-08-02 for ppD 18, ppS 9 above. Replication Experiments.
   # 10 # Used on 2024-08-06 for ppD 18, ppS 9 above. Replication Experiments.
   # 11 # Used on 2024-08-06 for ppD 18, ppS 9 above. Replication Experiments.
-  12 # Used on 2024-08-06 for ppD 18, ppS 9 above. Replication Experiments.
+  # 12 # Used on 2024-08-06 for ppD 18, ppS 9 above. Replication Experiments.
+  13 # Used on 2024-08-22 for ppD 138, ppS 10 above.
 
 dispersalDictionaryChoice <-
   15 # c(NA, 5, 0)
@@ -170,7 +174,8 @@ poolpatchDictionary <- expand.grid(
     "evensplit_01", #        Patch {0, 1} affinities. Alternating.
     "gradientline_0half1", # Patch {0, 0.5, 1} affinities. Gradient Line.
     "patchTypes.0.Half.1", # Patch {0, 0.5, 1} affinities. Gradient Ring.
-    "runifRing" #            Patch [0, 1] affinities. Gradient Ring at Random.
+    "runifRing", #           Patch [0, 1] affinities. Gradient Ring at Random.
+    "rep_0" #                Patch {0} affinities.
   ),
   stringsAsFactors = FALSE
 )[poolpatchDictionaryChoice, ] %>% dplyr::mutate(

@@ -20,7 +20,8 @@ runDictionaryChoice <-
   # 10 # "TSTS_Simulations_19-1_7-7_2024-03-08",
   # 11 # "TSTS_Simulations_20-1_8-8_2024-03-08"
   # 12 # "TSTS_Simulations_18-1_6-6_2024-05-23"
-  13 # "TSTS_Simulations_18-1_6-6_2024-05-23"
+  # 13 # "TSTS_Simulations_18-1_9-9_2024-08-06"
+  14 # "TSTS_Simulations_138-1_10-10_2024-08-22"
 
 # While this code can be run in parallel, I'm generally disinclined.
 # I've not written it to suggest mass production and would rather
@@ -87,8 +88,8 @@ interventionDispersalDictionaryChoice <-
 # choose r' = r * rho ^ (sign(r)), but what rho?
 interventionDistanceDictionaryChoice <- # for m, n in [0, 1], rho(m, n) = ...
   # 1 # 2 ^ (- euclid(m, n)) => rho in [1/2, 1] for 1-D
-  # 2 # 2 ^ (1 - 2 euclid(m, n)) => rho in [1/2, 2] for 1-D
-  3 # 10 ^ (1 - 2 euclid(m, n)) => rho in [1/10, 10] for 1-D
+  2 # 2 ^ (1 - 2 euclid(m, n)) => rho in [1/2, 2] for 1-D
+  # 3 # 10 ^ (1 - 2 euclid(m, n)) => rho in [1/10, 10] for 1-D
 
 ## Other Parameters: ##########################################################
 # Most should be pulled from the data already.
@@ -143,7 +144,8 @@ runDictionary <- data.frame(
     "TSTS_Simulations_19-1_7-7_2024-03-08",
     "TSTS_Simulations_20-1_8-8_2024-03-08",
     "TSTS_Simulations_18-1_6-6_2024-05-23",
-    "TSTS_Simulations_18-1_9-9_2024-08-06"
+    "TSTS_Simulations_18-1_9-9_2024-08-06",
+    "TSTS_Simulations_138-1_10-10_2024-08-22"
   )
 )[runDictionaryChoice, ]
 
