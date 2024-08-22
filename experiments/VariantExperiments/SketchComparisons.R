@@ -196,7 +196,7 @@ temporalpairs <- matrix(c(
   runif(n = numberAttempts,
         min = perturbedRange[1],
         max = perturbedRange[2])# col2: after
-  ), ncol = 2)
+), ncol = 2)
 spatialpairs <- matrix(c(
   runif(n = numberAttempts,
         min = perturbedRange[1],
@@ -378,7 +378,7 @@ plot1B <- ggplot2::ggplot(
 ggplot2::ggsave(
   plot1J, filename = "Image-Comparisons-Jaccard-All.png",
   width = imageWidth, height = imageHeight, units = imageUnit
-  )
+)
 ggplot2::ggsave(
   plot1B, filename = "Image-Comparisons-Bray-All.png",
   width = imageWidth, height = imageHeight, units = imageUnit
@@ -699,11 +699,11 @@ plot6_SpaceJaccard_DensityDifferencesSmall <- ggplot2::ggplot(
 plot6_SpaceBray_DensityDifferences <- ggplot2::ggplot(
   attemptsSpace,
   ggplot2::aes(x = `Bray_Spatial Control` - Bray)
-# ) + ggplot2::geom_freqpoly(
-#   bins = 10000,
-#   ggplot2::aes(group = round(Env2TimeEval/100)*100,
-#                color = round(Env2TimeEval/100)*100),
-#   alpha = 0.1
+  # ) + ggplot2::geom_freqpoly(
+  #   bins = 10000,
+  #   ggplot2::aes(group = round(Env2TimeEval/100)*100,
+  #                color = round(Env2TimeEval/100)*100),
+  #   alpha = 0.1
 ) + ggplot2::geom_vline(
   xintercept = 0, linetype = "dashed"
 ) + ggplot2::geom_density(
@@ -1072,4 +1072,204 @@ ggplot2::ggplot(
   color = "Time of Control"
 ) + ggplot2::facet_grid(
   basename(ParentRun) + InterventionType ~ .
+) # Need to remove or switch the panels, then add to the right
+# ggplot2::ggplot(
+#   attemptsTime,
+#   ggplot2::aes(
+#     y = `Bray_Temporal Control` - Bray
+#   )
+# ) + ggplot2::geom_density(
+# ) + ggplot2::geom_hline(
+#   yintercept = 0, linetype = "dashed"
+# ) + ggplot2::facet_grid(
+#   basename(ParentRun) + InterventionType ~ .
+# ) + ggplot2::theme_void() + ggplot2::theme(
+#   strip.text = ggplot2::element_blank()
+# )
+# Might need to do each panel individually and then stich them together.
+# Best otherwise seems to be:
+ggpubr::ggarrange(
+  ggplot2::ggplot(
+    attemptsSpace,
+    ggplot2::aes(
+      x = Env2TimeEval,
+      y = `Jaccard_Spatial Control` - Jaccard
+    )
+  ) + ggplot2::geom_hline(
+    yintercept = 0, linetype = "dashed"
+  ) + ggplot2::geom_point(
+    mapping = ggplot2::aes(
+      color = `Env1Time_Spatial Control` + InterventionTime
+      ),
+    alpha = 0.1
+  ) + ggplot2::geom_smooth(
+  ) + ggplot2::scale_color_viridis_c(
+  ) + ggplot2::labs(
+    x = "Time of Focal",
+    y = "J(Pert. Focal, Pert. Control) - J(Pert. Focal, Unpert. Focal)",
+    color = "Time of Control"
+  ) + ggplot2::facet_grid(
+    basename(ParentRun) + InterventionType ~ .
+  ), ggplot2::ggplot(
+    attemptsSpace,
+    ggplot2::aes(
+      y = `Jaccard_Spatial Control` - Jaccard
+    )
+  ) + ggplot2::geom_density(
+  ) + ggplot2::geom_hline(
+    yintercept = 0, linetype = "dashed"
+  ) + ggplot2::facet_grid(
+    basename(ParentRun) + InterventionType ~ ., switch = "y"
+  ) + ggplot2::theme_void() + ggplot2::theme(
+    strip.text = ggplot2::element_blank()
+  ), ncol = 2, widths = c(5, 1),
+  align = "h", legend = "right", common.legend = TRUE
+)
+ggpubr::ggarrange(
+  ggplot2::ggplot(
+    attemptsSpace %>% dplyr::filter(
+      abs(Env1Time - `Env1Time_Spatial Control`) / Env1Time < 0.05
+    ),
+    ggplot2::aes(
+      x = Env2TimeEval,
+      y = `Jaccard_Spatial Control` - Jaccard
+    )
+  ) + ggplot2::geom_hline(
+    yintercept = 0, linetype = "dashed"
+  ) + ggplot2::geom_point(
+    mapping = ggplot2::aes(
+      color = `Env1Time_Spatial Control` + InterventionTime
+    ),
+    alpha = 0.1
+  ) + ggplot2::geom_smooth(
+  ) + ggplot2::scale_color_viridis_c(
+  ) + ggplot2::labs(
+    x = "Time of Focal",
+    y = "J(Pert. Focal, Pert. Control) - J(Pert. Focal, Unpert. Focal)",
+    color = "Time of Control"
+  ) + ggplot2::facet_grid(
+    basename(ParentRun) + InterventionType ~ .
+  ), ggplot2::ggplot(
+    attemptsSpace %>% dplyr::filter(
+      abs(Env1Time - `Env1Time_Spatial Control`) / Env1Time < 0.05
+    ),
+    ggplot2::aes(
+      y = `Jaccard_Spatial Control` - Jaccard
+    )
+  ) + ggplot2::geom_density(
+  ) + ggplot2::geom_hline(
+    yintercept = 0, linetype = "dashed"
+  ) + ggplot2::facet_grid(
+    basename(ParentRun) + InterventionType ~ ., switch = "y"
+  ) + ggplot2::theme_void() + ggplot2::theme(
+    strip.text = ggplot2::element_blank()
+  ), ncol = 2, widths = c(5, 1),
+  align = "h", legend = "right", common.legend = TRUE
+)
+ggpubr::ggarrange(
+  ggplot2::ggplot(
+    attemptsSpace,
+    ggplot2::aes(
+      x = Env2TimeEval,
+      y = `Bray_Spatial Control` - Bray
+    )
+  ) + ggplot2::geom_hline(
+    yintercept = 0, linetype = "dashed"
+  ) + ggplot2::geom_point(
+    mapping = ggplot2::aes(
+      color = `Env1Time_Spatial Control` + InterventionTime
+    ),
+    alpha = 0.1
+  ) + ggplot2::geom_smooth(
+  ) + ggplot2::scale_color_viridis_c(
+  ) + ggplot2::labs(
+    x = "Time of Focal",
+    y = "B(Pert. Focal, Pert. Control) - B(Pert. Focal, Unpert. Focal)",
+    color = "Time of Control"
+  ) + ggplot2::facet_grid(
+    basename(ParentRun) + InterventionType ~ .
+  ), ggplot2::ggplot(
+    attemptsSpace,
+    ggplot2::aes(
+      y = `Bray_Spatial Control` - Bray
+    )
+  ) + ggplot2::geom_density(
+  ) + ggplot2::geom_hline(
+    yintercept = 0, linetype = "dashed"
+  ) + ggplot2::facet_grid(
+    basename(ParentRun) + InterventionType ~ ., switch = "y"
+  ) + ggplot2::theme_void() + ggplot2::theme(
+    strip.text = ggplot2::element_blank()
+  ), ncol = 2, widths = c(5, 1),
+  align = "h", legend = "right", common.legend = TRUE
+)
+ggpubr::ggarrange(
+  ggplot2::ggplot(
+    attemptsTime,
+    ggplot2::aes(
+      x = Env2TimeEval,
+      y = `Jaccard_Temporal Control` - Jaccard
+    )
+  ) + ggplot2::geom_hline(
+    yintercept = 0, linetype = "dashed"
+  ) + ggplot2::geom_point(
+    mapping = ggplot2::aes(color = `Env1Time_Temporal Control`),
+    alpha = 0.1
+  ) + ggplot2::geom_smooth(
+  ) + ggplot2::scale_color_viridis_c(
+  ) + ggplot2::labs(
+    x = "Time of Focal",
+    y = "J(Pert. Focal, Hist. Focal) - J(Pert. Focal, Unpert. Focal)",
+    color = "Time of Control"
+  ) + ggplot2::facet_grid(
+    basename(ParentRun) + InterventionType ~ .
+  ), ggplot2::ggplot(
+    attemptsTime,
+    ggplot2::aes(
+      y = `Jaccard_Temporal Control` - Jaccard
+    )
+  ) + ggplot2::geom_density(
+  ) + ggplot2::geom_hline(
+    yintercept = 0, linetype = "dashed"
+  ) + ggplot2::facet_grid(
+    basename(ParentRun) + InterventionType ~ ., switch = "y"
+  ) + ggplot2::theme_void() + ggplot2::theme(
+    strip.text = ggplot2::element_blank()
+  ), ncol = 2, widths = c(5, 1),
+  align = "h", legend = "right", common.legend = TRUE
+)
+ggpubr::ggarrange(
+  ggplot2::ggplot(
+    attemptsTime,
+    ggplot2::aes(
+      x = Env2TimeEval,
+      y = `Bray_Temporal Control` - Bray
+    )
+  ) + ggplot2::geom_hline(
+    yintercept = 0, linetype = "dashed"
+  ) + ggplot2::geom_point(
+    mapping = ggplot2::aes(color = `Env1Time_Temporal Control`),
+    alpha = 0.1
+  ) + ggplot2::geom_smooth(
+  ) + ggplot2::scale_color_viridis_c(
+  ) + ggplot2::labs(
+    x = "Time of Focal",
+    y = "B(Pert. Focal, Hist. Focal) - B(Pert. Focal, Unpert. Focal)",
+    color = "Time of Control"
+  ) + ggplot2::facet_grid(
+    basename(ParentRun) + InterventionType ~ .
+  ), ggplot2::ggplot(
+    attemptsTime,
+    ggplot2::aes(
+      y = `Bray_Temporal Control` - Bray
+    )
+  ) + ggplot2::geom_density(
+  ) + ggplot2::geom_hline(
+    yintercept = 0, linetype = "dashed"
+  ) + ggplot2::facet_grid(
+    basename(ParentRun) + InterventionType ~ ., switch = "y"
+  ) + ggplot2::theme_void() + ggplot2::theme(
+    strip.text = ggplot2::element_blank()
+  ), ncol = 2, widths = c(5, 1),
+  align = "h", legend = "right", common.legend = TRUE
 )
