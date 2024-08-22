@@ -5,6 +5,8 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 
+imageWidth <- 1200; imageHeight <- 1000
+
 ### Files: ####################################################################
 datfolder <-
   "TSTS_Simulations_18-1_9-9_2024-08-06"
@@ -70,6 +72,8 @@ perturbedRange <-
 # Comparing 2 after / to 3 after /  -> Spatial Control Suitability.
 # Comparing 1 before / to 1 after / -> Temporal Control.
 # Comparing 2 after / to 1 after /  -> Spatial Control.
+# Comparing 3 before / to 3 after / -> No Perturbation Temporal Effect
+# Comparing 4 after / to 3 after /  -> No Perturbation Spatial Effect
 
 # Tools: ######################################################################
 extractAbund <- function(abundance, nEnv, epsilon = NULL) {
@@ -144,12 +148,16 @@ interventionDetails <- data.frame(
 # Comparing 2 after / to 3 after /  -> Spatial Suitability.
 # Comparing 1 before / to 1 after / -> Temporal Control.
 # Comparing 2 after / to 1 after /  -> Spatial Control.
+# Comparing 3 before / to 3 after / -> Temporal Null
+# Comparing 4 after / to 3 after /  -> Spatial Null
 comparisonTypes <- c("True Focal",
                      "True Nonfocal",
                      "Temporal Suitability",
                      "Spatial Suitability",
                      "Temporal Control",
-                     "Spatial Control")
+                     "Spatial Control",
+                     "Temporal Null",
+                     "Spatial Null")
 
 abundances <- lapply(c(results, interventions), function(r) {
   extractAbund(
@@ -219,6 +227,8 @@ attempts <- expand.grid(
     ComparisonType == comparisonTypes[4] ~ EnvControl,
     ComparisonType == comparisonTypes[5] ~ EnvIntervention,
     ComparisonType == comparisonTypes[6] ~ EnvControl,
+    ComparisonType == comparisonTypes[7] ~ EnvIntervention,
+    ComparisonType == comparisonTypes[8] ~ EnvControl,
     TRUE ~ NA_integer_),
   Env2 = dplyr::case_when(
     ComparisonType == comparisonTypes[1] ~ EnvIntervention,
@@ -227,6 +237,8 @@ attempts <- expand.grid(
     ComparisonType == comparisonTypes[4] ~ EnvIntervention,
     ComparisonType == comparisonTypes[5] ~ EnvIntervention,
     ComparisonType == comparisonTypes[6] ~ EnvIntervention,
+    ComparisonType == comparisonTypes[7] ~ EnvIntervention,
+    ComparisonType == comparisonTypes[8] ~ EnvIntervention,
     TRUE ~ NA_integer_),
   Env1File = dplyr::case_when(
     ComparisonType == comparisonTypes[1] ~ InterventionRun,
@@ -235,6 +247,8 @@ attempts <- expand.grid(
     ComparisonType == comparisonTypes[4] ~ InterventionRun,
     ComparisonType == comparisonTypes[5] ~ ParentRun,
     ComparisonType == comparisonTypes[6] ~ InterventionRun,
+    ComparisonType == comparisonTypes[7] ~ ParentRun,
+    ComparisonType == comparisonTypes[8] ~ ParentRun,
     TRUE ~ NA_character_),
   Env2File = dplyr::case_when(
     ComparisonType == comparisonTypes[1] ~ ParentRun,
@@ -243,6 +257,8 @@ attempts <- expand.grid(
     ComparisonType == comparisonTypes[4] ~ ParentRun,
     ComparisonType == comparisonTypes[5] ~ InterventionRun,
     ComparisonType == comparisonTypes[6] ~ InterventionRun,
+    ComparisonType == comparisonTypes[7] ~ ParentRun,
+    ComparisonType == comparisonTypes[8] ~ ParentRun,
     TRUE ~ NA_character_),
   Env1Abundance = unlist(lapply(Env1File,
                                 function(f) which(f == names(abundances)))),
@@ -255,6 +271,8 @@ attempts <- expand.grid(
     ComparisonType == comparisonTypes[4] ~ "After",
     ComparisonType == comparisonTypes[5] ~ "Before",
     ComparisonType == comparisonTypes[6] ~ "After",
+    ComparisonType == comparisonTypes[7] ~ "Before",
+    ComparisonType == comparisonTypes[8] ~ "After",
     TRUE ~ NA_character_),
   Env2Timespan = dplyr::case_when(
     ComparisonType == comparisonTypes[1] ~ "After",
@@ -263,11 +281,13 @@ attempts <- expand.grid(
     ComparisonType == comparisonTypes[4] ~ "After",
     ComparisonType == comparisonTypes[5] ~ "After",
     ComparisonType == comparisonTypes[6] ~ "After",
+    ComparisonType == comparisonTypes[7] ~ "After",
+    ComparisonType == comparisonTypes[8] ~ "After",
     TRUE ~ NA_character_),
   Env1Time = dplyr::case_when(
-    ComparisonType %in% comparisonTypes[c(3, 5)] &
+    ComparisonType %in% comparisonTypes[c(3, 5, 7)] &
       Env1Timespan == "Before" ~ temporalpairs[Replicate, 1],
-    ComparisonType %in% comparisonTypes[c(4, 6)] &
+    ComparisonType %in% comparisonTypes[c(4, 6, 8)] &
       Env1Timespan == "After" ~ spatialpairs[Replicate, 1],
 
     Env1Timespan == Env2Timespan & Env1Timespan == "Before" ~
@@ -286,9 +306,9 @@ attempts <- expand.grid(
     TRUE ~ NA_real_
   ),
   Env2Time = dplyr::case_when(
-    ComparisonType %in% comparisonTypes[c(3, 5)] &
+    ComparisonType %in% comparisonTypes[c(3, 5, 7)] &
       Env2Timespan == "After" ~ temporalpairs[Replicate, 2],
-    ComparisonType %in% comparisonTypes[c(4, 6)] &
+    ComparisonType %in% comparisonTypes[c(4, 6, 8)] &
       Env2Timespan == "After" ~ spatialpairs[Replicate, 2],
 
     Env1Timespan == Env2Timespan & Env2Timespan == "Before" ~
@@ -337,7 +357,8 @@ attempts <- attempts %>% dplyr::group_by(# Rowwise
 ) %>% dplyr::ungroup()
 
 ### Plot Comparisons: #########################################################
-ggplot2::ggplot(
+##### Plot 1: #################################################################
+plot1J <- ggplot2::ggplot(
   attempts,
   ggplot2::aes(x = Env1Time, y = Env2Time, color = Jaccard)
 ) + ggplot2::geom_point(alpha = 0.1
@@ -345,7 +366,7 @@ ggplot2::ggplot(
   ComparisonType ~ basename(ParentRun) + InterventionType
 ) + ggplot2::scale_color_viridis_c()
 
-ggplot2::ggplot(
+plot1B <- ggplot2::ggplot(
   attempts,
   ggplot2::aes(x = Env1Time, y = Env2Time, color = Bray)
 ) + ggplot2::geom_point(alpha = 0.1
@@ -353,16 +374,26 @@ ggplot2::ggplot(
   ComparisonType ~ basename(ParentRun) + InterventionType
 ) + ggplot2::scale_color_viridis_c()
 
+ggplot2::ggsave(
+  plot1J, filename = "Image-Comparisons-Jaccard-All.png",
+  width = imageWidth, height = imageHeight
+  )
+ggplot2::ggsave(
+  plot1B, filename = "Image-Comparisons-Bray-All.png",
+  width = imageWidth, height = imageHeight
+)
+
 ### Temporal: Distance Decay?: ################################################
 
 attemptsTime <- attempts %>% dplyr::filter(
-  ComparisonType %in% comparisonTypes[c(3, 5)]
+  ComparisonType %in% comparisonTypes[3:8]
 )
 
+##### Plot 2: #################################################################
 # Generally, the temporal metrics become more dissimilar if the temporal
 # control is further away (temporally!) from the comparison time, but the story
 # appears to be somewhat complicated by varying intervention strengths.
-attemptsTime %>% dplyr::mutate(
+plot2_DecayTimeJaccard <- attemptsTime %>% dplyr::mutate(
   TimeDistance =
     abs(
       (Env1TimeEval + ifelse(Env1File == InterventionRun,
@@ -380,7 +411,7 @@ attemptsTime %>% dplyr::mutate(
   ComparisonType ~ basename(ParentRun) + InterventionType
 ) + ggplot2::scale_color_viridis_c()
 
-attemptsTime %>% dplyr::mutate(
+plot2_DecayTimeBray <- attemptsTime %>% dplyr::mutate(
   TimeDistance =
     abs(
       (Env1TimeEval + ifelse(Env1File == InterventionRun,
@@ -398,6 +429,14 @@ attemptsTime %>% dplyr::mutate(
   ComparisonType ~ basename(ParentRun) + InterventionType
 ) + ggplot2::scale_color_viridis_c()
 
+ggplot2::ggsave(
+  plot2_DecayTimeJaccard, filename = "Image-Comparisons-Jaccard-Decay.png",
+  width = imageWidth, height = imageHeight
+)
+ggplot2::ggsave(
+  plot2_DecayTimeBray, filename = "Image-Comparisons-Bray-Decay.png",
+  width = imageWidth, height = imageHeight
+)
 
 ### Mismatch with True Focal: #################################################
 # Quite a few things we want to compare around this.
@@ -416,7 +455,7 @@ attemptsTRUE <- attempts %>% dplyr::filter(
 
 # Pivot Suitability to be in the same rows as Control. This keeps pairs.
 attemptsSpace <- attempts %>% dplyr::filter(
-  ComparisonType %in% comparisonTypes[c(4, 6)]
+  ComparisonType %in% comparisonTypes[c(4, 6, 8)]
 ) %>% tidyr::pivot_wider(
   id_cols = c(# Shared Observation Columns (differs from Time version!)
     Replicate, ParentRun, InterventionRun, InterventionType, InterventionTime,
@@ -471,32 +510,51 @@ attemptsSpace <- dplyr::right_join(
 
 attemptsSpace <- attemptsSpace[!duplicated(as.list(attemptsSpace))]
 
+####### Plot 3: ###############################################################
 #   Difference between beta calculated from control and from unperturbed.
-ggplot2::ggplot(
+plot3_SpaceJaccard_Error <- ggplot2::ggplot(
   attemptsSpace, ggplot2::aes(
-    x = Env2TimeEval, y = Env1Time, color = `Jaccard_Spatial Control` - Jaccard
+    x = Env2TimeEval, y = `Env1Time_Spatial Control` + InterventionTime,
+    color = `Jaccard_Spatial Control` - Jaccard
   )
 ) + ggplot2::geom_point(alpha = 0.1
 ) + ggplot2::facet_grid(
   ComparisonType ~ ParentRun + InterventionType
 ) + ggplot2::scale_color_gradient2(
+  mid = "grey"
 ) + ggplot2::labs(
-  color = "J(Pert. Focal, Pert. Control)\n-J(Pert. Focal, Unpert. Focal)"
-)
-ggplot2::ggplot(
+  color = "J(Pert. Focal, Pert. Control)\n-J(Pert. Focal, Unpert. Focal)",
+  x = "Time of Focal",
+  y = "Time of Control"
+) + ggplot2::theme_bw()
+plot3_SpaceBray_Error <- ggplot2::ggplot(
   attemptsSpace, ggplot2::aes(
-    x = Env2TimeEval, y = Env1Time, color = `Bray_Spatial Control` - Bray
+    x = Env2TimeEval, y = `Env1Time_Spatial Control` + InterventionTime,
+    color = `Bray_Spatial Control` - Bray
   )
 ) + ggplot2::geom_point(alpha = 0.1
 ) + ggplot2::facet_grid(
   ComparisonType ~ basename(ParentRun) + InterventionType
 ) + ggplot2::scale_color_gradient2(
+  mid = "grey"
 ) + ggplot2::labs(
-  color = "B(Pert. Focal, Pert. Control)\n-B(Pert. Focal, Unpert. Focal)"
+  color = "B(Pert. Focal, Pert. Control)\n-B(Pert. Focal, Unpert. Focal)",
+  x = "Time of Focal",
+  y = "Time of Control"
+) + ggplot2::theme_bw()
+
+ggplot2::ggsave(
+  plot3_SpaceJaccard_Error, filename = "Image-Comparisons-Jaccard-SpaceAgreement.png",
+  width = imageWidth, height = imageHeight
+)
+ggplot2::ggsave(
+  plot3_SpaceBray_Error, filename = "Image-Comparisons-Bray-SpaceAgreement.png",
+  width = imageWidth, height = imageHeight
 )
 
+####### Plot 4: ###############################################################
 #   Predictability from the suitability calculation.
-ggplot2::ggplot(
+plot4_SpaceJaccard_SuitabilityDependence <- ggplot2::ggplot(
   attemptsSpace, ggplot2::aes(
     x = `Jaccard_Spatial Suitability`,
     y = `Jaccard_Spatial Control` - Jaccard,
@@ -509,10 +567,10 @@ ggplot2::ggplot(
 ) + ggplot2::scale_color_viridis_c(
 ) + ggplot2::labs(
   x = "J(Unpert. Focal, Pert. Control) Dissimilarity",
-  y = "J(Pert. Focal, Pert. Control) - J(Pert. Focal, Unpert. Focal)"
+  y = "J(Pert. Focal, Pert. Control) - J(Pert. Focal, Unpert. Focal)",
+  color = "Time of Focal"
 )
-
-ggplot2::ggplot(
+plot4_SpaceBray_SuitabilityDependence <- ggplot2::ggplot(
   attemptsSpace, ggplot2::aes(
     x = `Bray_Spatial Suitability`,
     y = `Bray_Spatial Control` - Bray,
@@ -525,11 +583,25 @@ ggplot2::ggplot(
 ) + ggplot2::scale_color_viridis_c(
 ) + ggplot2::labs(
   x = "B(Unpert. Focal, Pert. Control) Dissimilarity",
-  y = "B(Pert. Focal, Pert. Control) - B(Pert. Focal, Unpert. Focal)"
+  y = "B(Pert. Focal, Pert. Control) - B(Pert. Focal, Unpert. Focal)",
+  color = "Time of Focal"
 )
 
+ggplot2::ggsave(
+  plot4_SpaceJaccard_SuitabilityDependence,
+  filename = "Image-Comparisons-Jaccard-SpaceSuitability.png",
+  width = imageWidth, height = imageHeight
+)
+ggplot2::ggsave(
+  plot4_SpaceBray_SuitabilityDependence,
+  filename = "Image-Comparisons-Bray-SpaceSuitability.png",
+  width = imageWidth, height = imageHeight
+)
+
+
+####### Plot 5: ###############################################################
 #   Systemic deviations between control and unperturbed.
-ggplot2::ggplot(
+plot5_SpaceJaccard_DissimilarityDifferences <- ggplot2::ggplot(
   attemptsSpace, ggplot2::aes(
     x = `Jaccard_Spatial Control`,
     y =  Jaccard,
@@ -542,9 +614,10 @@ ggplot2::ggplot(
 ) + ggplot2::scale_color_viridis_c(
 ) + ggplot2::labs(
   x = "J(Pert. Focal, Pert. Control) Dissimilarity",
-  y = "J(Pert. Focal, Unpert. Focal)"
+  y = "J(Pert. Focal, Unpert. Focal)",
+  color = "Time of Focal"
 )
-ggplot2::ggplot(
+plot5_SpaceBray_DissimilarityDifferences <- ggplot2::ggplot(
   attemptsSpace, ggplot2::aes(
     x = `Bray_Spatial Control`,
     y =  Bray,
@@ -558,11 +631,23 @@ ggplot2::ggplot(
 ) + ggplot2::labs(
   x = "B(Pert. Focal, Pert. Control) Dissimilarity",
   y = "B(Pert. Focal, Unpert. Focal)",
-  color = "Time Since\nPerturbation"
+  color = "Time of Focal"
 )
 
+ggplot2::ggsave(
+  plot5_SpaceJaccard_DissimilarityDifferences,
+  filename = "Image-Comparisons-Jaccard-SpaceDifferences.png",
+  width = imageWidth, height = imageHeight
+)
+ggplot2::ggsave(
+  plot5_SpaceBray_DissimilarityDifferences,
+  filename = "Image-Comparisons-Bray-SpaceDifferences.png",
+  width = imageWidth, height = imageHeight
+)
+
+####### Plot 6: ###############################################################
 # Density of differences
-ggplot2::ggplot(
+plot6_SpaceJaccard_DensityDifferences <- ggplot2::ggplot(
   attemptsSpace,
   ggplot2::aes(x = `Jaccard_Spatial Control` - Jaccard)
   # ) + ggplot2::geom_freqpoly(
@@ -584,7 +669,7 @@ ggplot2::ggplot(
   . ~ basename(ParentRun) + InterventionType
 )
 # But notice!
-ggplot2::ggplot(
+plot6_SpaceJaccard_DensityDifferencesSmall <- ggplot2::ggplot(
   attemptsSpace %>% dplyr::filter(
     abs(Env1Time - `Env1Time_Spatial Control`) / Env1Time < 0.05
   ),
@@ -608,7 +693,7 @@ ggplot2::ggplot(
   . ~ basename(ParentRun) + InterventionType
 )
 
-ggplot2::ggplot(
+plot6_SpaceBray_DensityDifferences <- ggplot2::ggplot(
   attemptsSpace,
   ggplot2::aes(x = `Bray_Spatial Control` - Bray)
 # ) + ggplot2::geom_freqpoly(
@@ -629,6 +714,65 @@ ggplot2::ggplot(
 ) + ggplot2::facet_grid(
   . ~ basename(ParentRun) + InterventionType
 )
+
+ggplot2::ggsave(
+  plot6_SpaceJaccard_DensityDifferences,
+  filename = "Image-Comparisons-Jaccard-SpaceDensities.png",
+  width = imageWidth, height = imageHeight
+)
+ggplot2::ggsave(
+  plot6_SpaceJaccard_DensityDifferencesSmall,
+  filename = "Image-Comparisons-Jaccard-SpaceDensitiesNearEqualTimes.png",
+  width = imageWidth, height = imageHeight
+)
+ggplot2::ggsave(
+  plot6_SpaceBray_DensityDifferences,
+  filename = "Image-Comparisons-Bray-SpaceDensities.png",
+  width = imageWidth, height = imageHeight
+)
+
+####### Plot 7: ###############################################################
+ggplot2::ggplot(
+  attemptsSpace,
+  ggplot2::aes(
+    x = Env2TimeEval,
+    y = `Jaccard_Spatial Control` - Jaccard
+  )
+) + ggplot2::geom_hline(
+  yintercept = 0, linetype = "dashed"
+) + ggplot2::geom_point(
+  mapping = ggplot2::aes(color = `Env1Time_Spatial Control`),
+  alpha = 0.1
+) + ggplot2::geom_smooth(
+) + ggplot2::scale_color_viridis_c(
+) + ggplot2::labs(
+  x = "Time of Focal",
+  y = "J(Pert. Focal, Hist. Focal) - J(Pert. Focal, Unpert. Focal)",
+  color = "Time of Control"
+) + ggplot2::facet_grid(
+  . ~ basename(ParentRun) + InterventionType
+)
+ggplot2::ggplot(
+  attemptsSpace,
+  ggplot2::aes(
+    x = Env2TimeEval,
+    y = `Bray_Spatial Control` - Bray
+  )
+) + ggplot2::geom_hline(
+  yintercept = 0, linetype = "dashed"
+) + ggplot2::geom_point(
+  mapping = ggplot2::aes(color = `Env1Time_Spatial Control`),
+  alpha = 0.1
+) + ggplot2::geom_smooth(
+) + ggplot2::scale_color_viridis_c(
+) + ggplot2::labs(
+  x = "Time of Focal",
+  y = "B(Pert. Focal, Hist. Focal) - B(Pert. Focal, Unpert. Focal)",
+  color = "Time of Control"
+) + ggplot2::facet_grid(
+  basename(ParentRun) + InterventionType ~ .
+)
+
 
 ##### Temporal: ###############################################################
 # Reminder:
@@ -699,32 +843,49 @@ attemptsTime <- dplyr::right_join(
 
 attemptsTime <- attemptsTime[!duplicated(as.list(attemptsTime))]
 
+####### Plot 3: ###############################################################
 #   Difference between beta calculated from control and from unperturbed.
-ggplot2::ggplot(
+plot3_TimeJaccard_Error <- ggplot2::ggplot(
   attemptsTime, ggplot2::aes(
-    x = Env2TimeEval, y = Env1Time, color = `Jaccard_Temporal Control` - Jaccard
+    x = Env2TimeEval, y = `Env1Time_Temporal Control`,
+    color = `Jaccard_Temporal Control` - Jaccard
   )
 ) + ggplot2::geom_point(alpha = 0.1
 ) + ggplot2::facet_grid(
   ComparisonType ~ ParentRun + InterventionType
 ) + ggplot2::scale_color_gradient2(
+  mid = "grey"
 ) + ggplot2::labs(
   color = "J(Pert. Focal, Hist. Focal)\n-J(Pert. Focal, Unpert. Focal)"
-)
-ggplot2::ggplot(
+) + ggplot2::theme_bw()
+plot3_TimeBray_Error <- ggplot2::ggplot(
   attemptsTime, ggplot2::aes(
-    x = Env2TimeEval, y = Env1Time, color = `Bray_Temporal Control` - Bray
+    x = Env2TimeEval, y = `Env1Time_Temporal Control`,
+    color = `Bray_Temporal Control` - Bray
   )
 ) + ggplot2::geom_point(alpha = 0.1
 ) + ggplot2::facet_grid(
   ComparisonType ~ basename(ParentRun) + InterventionType
 ) + ggplot2::scale_color_gradient2(
+  mid = "grey"
 ) + ggplot2::labs(
   color = "B(Pert. Focal, Hist. Focal)\n-B(Pert. Focal, Unpert. Focal)"
+) + ggplot2::theme_bw()
+
+ggplot2::ggsave(
+  plot3_TimeJaccard_Error,
+  filename = "Image-Comparisons-Jaccard-TimeAgreement.png",
+  width = imageWidth, height = imageHeight
+)
+ggplot2::ggsave(
+  plot3_TimeBray_Error,
+  filename = "Image-Comparisons-Bray-TimeAgreement.png",
+  width = imageWidth, height = imageHeight
 )
 
+####### Plot 4: ###############################################################
 #   Predictability from the suitability calculation.
-ggplot2::ggplot(
+plot4_TimeJaccard_SuitabilityDependence <- ggplot2::ggplot(
   attemptsTime, ggplot2::aes(
     x = `Jaccard_Temporal Suitability`,
     y = `Jaccard_Temporal Control` - Jaccard,
@@ -740,7 +901,7 @@ ggplot2::ggplot(
   y = "J(Pert. Focal, Hist. Focal) - J(Pert. Focal, Unpert. Focal)"
 )
 
-ggplot2::ggplot(
+plot4_TimeBray_SuitabilityDependence <- ggplot2::ggplot(
   attemptsTime, ggplot2::aes(
     x = `Bray_Temporal Suitability`,
     y = `Bray_Temporal Control` - Bray,
@@ -756,8 +917,20 @@ ggplot2::ggplot(
   y = "B(Pert. Focal, Hist. Focal) - B(Pert. Focal, Unpert. Focal)"
 )
 
+ggplot2::ggsave(
+  plot4_TimeJaccard_SuitabilityDependence,
+  filename = "Image-Comparisons-Jaccard-TimeSuitability.png",
+  width = imageWidth, height = imageHeight
+)
+ggplot2::ggsave(
+  plot4_TimeBray_SuitabilityDependence,
+  filename = "Image-Comparisons-Bray-TimeSuitability.png",
+  width = imageWidth, height = imageHeight
+)
+
+####### Plot 5: ###############################################################
 #   Systemic deviations between control and unperturbed.
-ggplot2::ggplot(
+plot5_TimeJaccard_DissimilarityDifferences <- ggplot2::ggplot(
   attemptsTime, ggplot2::aes(
     x = `Jaccard_Temporal Control`,
     y =  Jaccard,
@@ -772,7 +945,7 @@ ggplot2::ggplot(
   x = "J(Pert. Focal, Hist. Focal) Dissimilarity",
   y = "J(Pert. Focal, Unpert. Focal)"
 )
-ggplot2::ggplot(
+plot5_TimeBray_DissimilarityDifferences <- ggplot2::ggplot(
   attemptsTime, ggplot2::aes(
     x = `Bray_Temporal Control`,
     y =  Bray,
@@ -789,8 +962,20 @@ ggplot2::ggplot(
   color = "Time Since\nPerturbation"
 )
 
+ggplot2::ggsave(
+  plot5_TimeJaccard_DissimilarityDifferences,
+  filename = "Image-Comparisons-Jaccard-TimeDifferences.png",
+  width = imageWidth, height = imageHeight
+)
+ggplot2::ggsave(
+  plot5_TimeBray_DissimilarityDifferences,
+  filename = "Image-Comparisons-Bray-TimeDifferences.png",
+  width = imageWidth, height = imageHeight
+)
+
+####### Plot 6: ###############################################################
 # Density of differences
-ggplot2::ggplot(
+plot6_TimeJaccard_DensityDifferences <- ggplot2::ggplot(
   attemptsTime,
   ggplot2::aes(x = `Jaccard_Temporal Control` - Jaccard)
   # ) + ggplot2::geom_freqpoly(
@@ -811,7 +996,7 @@ ggplot2::ggplot(
 ) + ggplot2::facet_grid(
   . ~ basename(ParentRun) + InterventionType
 )
-ggplot2::ggplot(
+plot6_TimeBray_DensityDifferences <- ggplot2::ggplot(
   attemptsTime,
   ggplot2::aes(x = `Bray_Temporal Control` - Bray)
   # ) + ggplot2::geom_freqpoly(
@@ -831,4 +1016,57 @@ ggplot2::ggplot(
   color = "Time Since\nPerturbation"
 ) + ggplot2::facet_grid(
   . ~ basename(ParentRun) + InterventionType
+)
+
+ggplot2::ggsave(
+  plot6_TimeJaccard_DensityDifferences,
+  filename = "Image-Comparisons-Jaccard-TimeDensities.png",
+  width = imageWidth, height = imageHeight
+)
+ggplot2::ggsave(
+  plot6_TimeBray_DensityDifferences,
+  filename = "Image-Comparisons-Bray-TimeDensities.png",
+  width = imageWidth, height = imageHeight
+)
+
+####### Plot 7: ###############################################################
+ggplot2::ggplot(
+  attemptsTime,
+  ggplot2::aes(
+    x = Env2TimeEval,
+    y = `Jaccard_Temporal Control` - Jaccard
+  )
+) + ggplot2::geom_hline(
+  yintercept = 0, linetype = "dashed"
+) + ggplot2::geom_point(
+  mapping = ggplot2::aes(color = `Env1Time_Temporal Control`),
+  alpha = 0.1
+) + ggplot2::geom_smooth(
+) + ggplot2::scale_color_viridis_c(
+) + ggplot2::labs(
+  x = "Time of Focal",
+  y = "J(Pert. Focal, Hist. Focal) - J(Pert. Focal, Unpert. Focal)",
+  color = "Time of Control"
+) + ggplot2::facet_grid(
+  . ~ basename(ParentRun) + InterventionType
+)
+ggplot2::ggplot(
+  attemptsTime,
+  ggplot2::aes(
+    x = Env2TimeEval,
+    y = `Bray_Temporal Control` - Bray
+  )
+) + ggplot2::geom_hline(
+  yintercept = 0, linetype = "dashed"
+) + ggplot2::geom_point(
+  mapping = ggplot2::aes(color = `Env1Time_Temporal Control`),
+  alpha = 0.1
+) + ggplot2::geom_smooth(
+) + ggplot2::scale_color_viridis_c(
+) + ggplot2::labs(
+  x = "Time of Focal",
+  y = "B(Pert. Focal, Hist. Focal) - B(Pert. Focal, Unpert. Focal)",
+  color = "Time of Control"
+) + ggplot2::facet_grid(
+  basename(ParentRun) + InterventionType ~ .
 )
