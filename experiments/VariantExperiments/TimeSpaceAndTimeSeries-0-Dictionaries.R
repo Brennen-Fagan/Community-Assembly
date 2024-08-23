@@ -1,3 +1,5 @@
+library(dplyr)
+
 # Pool-Patch: #################################################################
 poolpatchDictionaryOrigin <- expand.grid(
   BasalConsumerRatio = 1/2,
@@ -39,7 +41,7 @@ poolpatchDictionaryOrigin <- expand.grid(
     "evensplit_0.51" #        Patch {0.5, 1} affinities. Alternating.
   ),
   stringsAsFactors = FALSE
-)
+) %>% dplyr::mutate(ID = dplyr::row_number())
 
 # Dynamics: ###################################################################
 dynamicsDictionaryOrigin <- data.frame(
@@ -47,7 +49,7 @@ dynamicsDictionaryOrigin <- data.frame(
   InteractionParameters = "Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1)",
   DynamicsFunction = "RMTRCode2::PerCapitaDynamics_Type1",
   stringsAsFactors = FALSE
-)
+) %>% dplyr::mutate(ID = dplyr::row_number())
 
 # Events: #####################################################################
 eventsDictionaryOrigin <- expand.grid(
@@ -59,7 +61,7 @@ eventsDictionaryOrigin <- expand.grid(
   ExtirpationFunction = "RMTRCode2::ExtinctFUN_Example2",
   ExtirpationProportion = c(1, 0.9, 0), # Proportion of population removed.
   stringsAsFactors = FALSE
-)
+) %>% dplyr::mutate(ID = dplyr::row_number())
 
 # Dispersal: ##################################################################
 dispersalDictionaryOrigin <- rbind(
@@ -68,7 +70,7 @@ dispersalDictionaryOrigin <- rbind(
     Resistance = 10^c(0:9),
     Configuration = c("Ring", "Line", "Complete"),
     stringsAsFactors = FALSE
-  ))
+  )) %>% dplyr::mutate(ID = dplyr::row_number())
 
 # Distance/Intensity/Affinity: ################################################
 distanceDictionaryOrigin <- data.frame(
@@ -78,7 +80,7 @@ distanceDictionaryOrigin <- data.frame(
     "rho.10.1.2.euclidean",
     stringsAsFactors = FALSE
   )
-)
+) %>% dplyr::mutate(ID = dplyr::row_number())
 
 # Intervention Patch Affinities: ##############################################
 interventionPatchDictionaryOrigin <- expand.grid(
@@ -112,7 +114,7 @@ interventionPatchDictionaryOrigin <- expand.grid(
     1
   ),
   stringsAsFactors = FALSE
-)
+) %>% dplyr::mutate(ID = dplyr::row_number())
 
 # InterventionTime: ###########################################################
 interventionTimeDictionaryOrigin <- data.frame(
@@ -134,4 +136,4 @@ interventionTimeDictionaryOrigin <- data.frame(
     0 # Instantaneous => Switch
     # Else: Should be numeric > 0, determines timespan for interpolation.
   )
-)
+) %>% dplyr::mutate(ID = dplyr::row_number())

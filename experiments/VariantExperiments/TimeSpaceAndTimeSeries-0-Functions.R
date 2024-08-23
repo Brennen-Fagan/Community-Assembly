@@ -114,7 +114,7 @@ gradientline_0half1 <- function(n) {
 # I think this is probably higher accuracy than the previous version.
 defaultEvents <- function(
   NumberOfEnvironments, NumberOfSpecies, constant = 3
-  ) {
+) {
   ceiling(
     NumberOfEnvironments * NumberOfSpecies * (
       log(NumberOfEnvironments * NumberOfSpecies) + constant
@@ -180,6 +180,37 @@ retrieveFunction <- function(funcstring) {
     stop("No parts found for function.")
   }
   return(funcstring)
+}
+
+### Conversion: ###############################################################
+convertDispersalDictToDistMatrix <- function(dispersalDictionary, nEnv) {
+  with(c(
+    dispersalDictionary,
+    Environments = nEnv
+  ), {
+    if (Configuration == "None") {
+      DistanceMatrix <- Matrix::sparseMatrix(
+        i = Environments, j = Environments, x = 0)
+    }
+    if (Configuration == "Ring" || Configuration == "Line")
+      DistanceMatrix <- Matrix::bandSparse(
+        Environments, k = c(-1, 1),
+        diagonals = list(rep(Resistance, Environments - 1),
+                         rep(Resistance, Environments - 1))
+      )
+    if (Configuration == "Ring") {
+      DistanceMatrix[Environments, 1] <- Resistance
+      DistanceMatrix[1, Environments] <- Resistance
+    }
+    if (Configuration == "Complete") {
+      DistanceMatrix <- matrix(Resistance,
+                               nrow = Environments,
+                               ncol = Environments)
+      diag(DistanceMatrix) <- 0
+    }
+    return(DistanceMatrix)
+  }
+  )
 }
 
 ### Sampling: #################################################################
@@ -370,8 +401,8 @@ sampleFromResults2 <- function(
             colnames(TypesAsFrame0)[1] <- "PoolTypes"
           }
           TypesAsFrame0 <- TypesAsFrame0 %>% dplyr::mutate(
-              PoolTypes = as.character(PoolTypes)
-            )
+            PoolTypes = as.character(PoolTypes)
+          )
           # Types in Sample:
           TypesAsFrame1 <-
             data.frame(table(drawTypes[draws > 0])) %>% dplyr::mutate(
@@ -406,8 +437,8 @@ sampleFromResults2 <- function(
           }
           TypesAsFrame0 <- TypesAsFrame0 %>% dplyr::mutate(
             PoolTypes = as.character(PoolTypes),
-              Freq = 0
-            )
+            Freq = 0
+          )
           TypesAsFrame2 <- t(data.frame(TypesAsFrame0$Freq))
           colnames(TypesAsFrame2) <- paste0("SamplingAlphaType",
                                             TypesAsFrame0$PoolTypes)
@@ -831,9 +862,9 @@ calculateAbundanceMetrics <- function(abundance, nspecies, nenvironments) {
   names(metrics_basal) <- paste0(names(metrics_basal), ", Basal")
   names(metrics_consumer) <- paste0(names(metrics_consumer), ", Consumer")
   diversity_gamma <- cbind(Time = time,
-        metrics, metrics_basal, metrics_consumer,
-        Environment = NA,
-        stringsAsFactors = FALSE)
+                           metrics, metrics_basal, metrics_consumer,
+                           Environment = NA,
+                           stringsAsFactors = FALSE)
 
   print("gamma")
   ### Beta Diversity (Jaccard, Space): ##################################
