@@ -91,6 +91,7 @@ interventionDistanceDictionaryChoice <- # for m, n in [0, 1], rho(m, n) = ...
   # 1 # 2 ^ (- euclid(m, n)) => rho in [1/2, 1] for 1-D
   2 # 2 ^ (1 - 2 euclid(m, n)) => rho in [1/2, 2] for 1-D
   # 3 # 10 ^ (1 - 2 euclid(m, n)) => rho in [1/10, 10] for 1-D
+  # "PREVIOUS" # Special: "PREVIOUS" -> use the previous affinity intensity.
 
 ## Other Parameters: ##########################################################
 # Most should be pulled from the data already.
@@ -168,7 +169,9 @@ interventionPatchDictionary <- expand.grid(
     # In the latter case, it provides ONLY NumberEnvironments as an argument.
 
     toString(rep(0, NumberOfEnvironments)), # Patches -> {0}
+    toString(rep(0.25, NumberOfEnvironments)), # Patches -> {0.25}
     toString(rep(0.5, NumberOfEnvironments)), # Patches -> {0.5}
+    toString(rep(0.75, NumberOfEnvironments)), # Patches -> {0.75}
     toString(rep(1, NumberOfEnvironments)), # Patches -> {1}
     toString(c(rep(0, NumberOfEnvironments/2),
                rep(1, NumberOfEnvironments/2))), # Patches -> {0, 1} Gradient
@@ -240,14 +243,21 @@ if (!toupper(interventionDispersalDictionaryChoice) %in%
   interventionDispersalDictionaryChoice <- "p"
 }
 
-interventionDistanceDictionary <- data.frame(
-  rhofunction = c( # Take patch
-    "rho.2.0.1.euclidean",
-    "rho.2.1.2.euclidean",
-    "rho.10.1.2.euclidean",
-    stringsAsFactors = FALSE
-  )
-)[interventionDistanceDictionaryChoice, ]
+if (!toupper(interventionDistanceDictionaryChoice) %in%
+    c("P", "PRE", "PREV", "PREVIOUS") # "PREVIOUS" is meaning. "p" for storage.
+) {
+  interventionDistanceDictionary <- data.frame(
+    rhofunction = c( # Take patch
+      "rho.2.0.1.euclidean",
+      "rho.2.1.2.euclidean",
+      "rho.10.1.2.euclidean",
+      stringsAsFactors = FALSE
+    )
+  )[interventionDistanceDictionaryChoice, ]
+} else {
+  interventionDistanceDictionaryChoice <- "p"
+}
+
 
 # Files: ######################################################################
 
@@ -460,6 +470,20 @@ interventionSuccess <- foreach::foreach(
   })
 
   ##### Post-intervention adjusted intrinsic growth/decay rates: ##############
+
+  if (interventionDistanceDictionaryChoice == "p") {
+    previousInterventionDistanceDictionaryChoice <- as.numeric(strsplit(
+      x_properties[[1]][3], split = '-'
+    )[[1]][5])
+    interventionDistanceDictionary <- data.frame(
+      rhofunction = c( # Take patch
+        "rho.2.0.1.euclidean",
+        "rho.2.1.2.euclidean",
+        "rho.10.1.2.euclidean",
+        stringsAsFactors = FALSE
+      )
+    )[previousInterventionDistanceDictionaryChoice, ]
+  }
   rho <- retrieveFunction(interventionDistanceDictionary)
 
   grid <- expand.grid(

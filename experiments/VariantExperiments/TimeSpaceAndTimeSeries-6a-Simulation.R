@@ -9,6 +9,8 @@
 # As always, please see the previous files for some design choices,
 # although we aim to improve design at each stage.
 
+# Updated 2024-08-23 with significant changes to poolpatchDictionary numbering.
+
 # Parameters: #################################################################
 # We're going to group our simulation parameters, as in 4a, but for the purpose
 # of replicating the behaviour of MNA-...-Create.R.
@@ -29,13 +31,13 @@ poolpatchSeedChoice <-
   # 2 # Used on 2024-02-14, 2024-02-15
   # 3 # Used on 2024-02-23
   # 4 # Used on 2024-02-23 for the 2 patch system
-  # 5 # Used on 2024-03-08 for choice 17 above.
-  # 6 # Used on 2024-03-08 for choice 18 above.
-  # 7 # Used on 2024-03-08 for choice 19 above.
-  # 8 # Used on 2024-03-08 for choice 20 above.
-  # 9 # Used on 2024-08-06 for choice 18 above. Replication Experiments.
-  # 10 # Used on 2024-08-22 for choice 138 above.
-  9 # Used on 2024-08-22 for choice 158 above. Reverse Pert. Experiments.
+  # 5 # Used on 2024-03-08 # for choice 17 above.
+  # 6 # Used on 2024-03-08 # for choice 18 above.
+  # 7 # Used on 2024-03-08 # for choice 19 above.
+  # 8 # Used on 2024-03-08 # for choice 20 above.
+  # 9 # Used on 2024-08-06 # for choice 18 above. Replication Experiments.
+  # 10 # Used on 2024-08-22 # for choice 138 above.
+  9 # Used on 2024-08-22 # for choice 158 above. Reverse Pert. Experiments.
 
 dynamicsDictionaryChoice <-
   1 # Law and Morton 1996, Size-Structured Lotka-Volterra, Default Parameters
@@ -45,13 +47,13 @@ dynamicsSeedChoice <-
   # 2 # Used on 2024-02-14
   # 3 # Used on 2024-02-23
   # 4 # Used on 2024-02-23 for the 2 patch system
-  # 5 # Used on 2024-03-08 for choice 17 above.
-  # 6 # Used on 2024-03-08 for choice 18 above.
-  # 7 # Used on 2024-03-08 for choice 19 above.
-  # 8 # Used on 2024-03-08 for choice 20 above.
-  # 9 # Used on 2024-08-06 for ppD 18, ppS 9.  Replication Experiments.
-  # 10 # Used on 2024-08-22 for ppD 138, ppS 10.
-  9 # Used on 2024-08-22 for ppD 158, ppS 9.  Reverse Pert. Experiments.
+  # 5 # Used on 2024-03-08 # for choice 17 above.
+  # 6 # Used on 2024-03-08 # for choice 18 above.
+  # 7 # Used on 2024-03-08 # for choice 19 above.
+  # 8 # Used on 2024-03-08 # for choice 20 above.
+  # 9 # Used on 2024-08-06 # for ppD 18, ppS 9.  Replication Experiments.
+  # 10 # Used on 2024-08-22 # for ppD 138, ppS 10.
+  9 # Used on 2024-08-22 # for ppD 158, ppS 9.  Reverse Pert. Experiments.
 
 eventsDictionaryChoice <-
   #   Multipliers:
@@ -64,16 +66,16 @@ eventsSeedChoice <-
   # 2 # Used on 2024-02-14 for both 1-1 and 2-1.
   # 3 # Used on 2024-02-23
   # 4 # Used on 2024-02-23 for the 2 patch system
-  # 5 # Used on 2024-03-08 for ppDChoice 17 above.
-  # 6 # Used on 2024-03-08 for ppDChoice 18 above.
-  # 7 # Used on 2024-03-08 for ppDChoice 19 above.
-  # 8 # Used on 2024-03-08 for ppDChoice 20 above.
-  # 9 # Used on 2024-08-02 for ppD 18, ppS 9 above. Replication Experiments.
-  # 10 # Used on 2024-08-06 for ppD 18, ppS 9 above. Replication Experiments.
-  # 11 # Used on 2024-08-06 for ppD 18, ppS 9 above. Replication Experiments.
-  # 12 # Used on 2024-08-06 for ppD 18, ppS 9 above. Replication Experiments.
-  # 13 # Used on 2024-08-22 for ppD 138, ppS 10 above.
-  9 # Used on 2024-08-22 for ppD 158, ppS 9 above. Reverse Pert. Experiments.
+  # 5 # Used on 2024-03-08 # for ppDChoice 17 above.
+  # 6 # Used on 2024-03-08 # for ppDChoice 18 above.
+  # 7 # Used on 2024-03-08 # for ppDChoice 19 above.
+  # 8 # Used on 2024-03-08 # for ppDChoice 20 above.
+  # 9 # Used on 2024-08-02 # for ppD 18, ppS 9 above. Replication Experiments.
+  # 10 # Used on 2024-08-06 # for ppD 18, ppS 9 above. Replication Experiments.
+  # 11 # Used on 2024-08-06 # for ppD 18, ppS 9 above. Replication Experiments.
+  # 12 # Used on 2024-08-06 # for ppD 18, ppS 9 above. Replication Experiments.
+  # 13 # Used on 2024-08-22 # for ppD 138, ppS 10 above.
+  9 # Used on 2024-08-22 # for ppD 158, ppS 9 above. Reverse Pert. Experiments.
 
 dispersalDictionaryChoice <-
   15 # c(NA, 5, 0)
@@ -115,7 +117,9 @@ repFixed <- function(value = 0.5) {
   function(n) {rep(value, n)}
 }
 rep_0 <- repFixed(0)
+rep_0.25 <- repFixed(0.25)
 rep_0.5 <- repFixed()
+rep_0.75 <- repFixed(0.75)
 rep_1 <- repFixed(1)
 
 evensplit <- function(values = c(0, 1)) {
@@ -128,7 +132,7 @@ evensplit <- function(values = c(0, 1)) {
   }
 }
 evensplit_01 <- evensplit()
-evensplit_051 <- evensplit(c(0.5, 1))
+evensplit_0.51 <- evensplit(c(0.5, 1))
 
 gradientline_01 <- function(n) {
   c(rep(0, ceiling(n/2)), rep(1, floor(n/2)))
@@ -156,7 +160,7 @@ poolpatchDictionary <- expand.grid(
           "LogBodySize = c(-2, -1, -1, 0)", sep = "; ")
   ),
   PoolDispersalSpeed = 1, # Value divided by DispersalResistance to get current.
-  NumberEnvironments = c(2, 10),
+  NumberEnvironments = c(1, 2, 10),
   SpeciesAffinities = c(
     # Pool with {0.5} affinities.
     "rep_0.5",
@@ -175,13 +179,16 @@ poolpatchDictionary <- expand.grid(
     # If non-numeric, it attempts to treat the string as a function name.
     # In the latter case, it provides ONLY NumberEnvironments as an argument.
     "rep_0.5", #             Patch {0.5} affinities.
+    "rep_0", #               Patch {0} affinities.
+    "rep_0.25", #            Patch {0.25} affinities.
+    "rep_0.75", #            Patch {0.75} affinities.
+    "rep_1", #               Patch {1} affinities.
     "gradientline_01", #     Patch {0, 1} affinities. Gradient Line.
     "evensplit_01", #        Patch {0, 1} affinities. Alternating.
     "gradientline_0half1", # Patch {0, 0.5, 1} affinities. Gradient Line.
     "patchTypes.0.Half.1", # Patch {0, 0.5, 1} affinities. Gradient Ring.
     "runifRing", #           Patch [0, 1] affinities. Gradient Ring at Random.
-    "rep_0", #               Patch {0} affinities.
-    "evensplit_051" #        Patch {0.5, 1} affinities. Alternating.
+    "evensplit_0.51" #        Patch {0.5, 1} affinities. Alternating.
   ),
   stringsAsFactors = FALSE
 )[poolpatchDictionaryChoice, ] %>% dplyr::mutate(
