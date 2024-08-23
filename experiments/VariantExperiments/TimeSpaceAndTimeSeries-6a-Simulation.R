@@ -109,40 +109,11 @@ library(Matrix)
 # Functions: ##################################################################
 
 source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
-# Defines: retrieveFunction.
-
-# Why? so we can have single argument functions with partials.
-repFixed <- function(value = 0.5) {
-  force(value)
-  function(n) {rep(value, n)}
-}
-rep_0 <- repFixed(0)
-rep_0.25 <- repFixed(0.25)
-rep_0.5 <- repFixed()
-rep_0.75 <- repFixed(0.75)
-rep_1 <- repFixed(1)
-
-evensplit <- function(values = c(0, 1)) {
-  force(values)
-  function(n) {
-    c(rep(values, times = floor(n / length(values))),
-      if (n %% length(values) != 0) {
-        values[1:(n %% length(values))]
-      })
-  }
-}
-evensplit_01 <- evensplit()
-evensplit_0.51 <- evensplit(c(0.5, 1))
-
-gradientline_01 <- function(n) {
-  c(rep(0, ceiling(n/2)), rep(1, floor(n/2)))
-}
-gradientline_0half1 <- function(n) {
-  left <- rep(0, floor(n / 3)); right <- rep(1, floor(n/3))
-  return(c(left, rep(0.5, n - length(left) - length(right)), right))
-}
+# Defines: retrieveFunction and parameter functions.
 
 # Dictionaries: ###############################################################
+source(file.path(directory, "TimeSpaceAndTimeSeries-0-Dictionaries.R"))
+
 # > runif(3)*1e8
 # [1] 21622193 73825470 83066253
 seedsMain <- data.frame(
@@ -151,47 +122,8 @@ seedsMain <- data.frame(
   "dynamics" = 83066253
 )
 
-poolpatchDictionary <- expand.grid(
-  BasalConsumerRatio = 1/2,
-  NSpecies = c(100, 200),
-  PoolFunction = "RMTRCode2::LawMorton1996_species",
-  PoolParameters = c(
-    paste("Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1)",
-          "LogBodySize = c(-2, -1, -1, 0)", sep = "; ")
-  ),
-  PoolDispersalSpeed = 1, # Value divided by DispersalResistance to get current.
-  NumberEnvironments = c(1, 2, 10),
-  SpeciesAffinities = c(
-    # Pool with {0.5} affinities.
-    "rep_0.5",
-    # 2  # Pool {0, 1} patch affinities at random.
-    "sample.int.normalized",
-    # 3  # Pool {0, 0.5, 1} patch affinities at random.
-    "sample.int.3",
-    # 4  # Pool [0, 1] patch affinities at random.
-    "runif",
-    # 5  # Pool {0, 1} alternating affinities.
-    "evensplit_01"
-  ),
-  PatchAffinities = c(
-    # Detection via if string begins with a numeric or a non-numeric.
-    # If numeric, it takes it as a fixed set of affinities.
-    # If non-numeric, it attempts to treat the string as a function name.
-    # In the latter case, it provides ONLY NumberEnvironments as an argument.
-    "rep_0.5", #             Patch {0.5} affinities.
-    "rep_0", #               Patch {0} affinities.
-    "rep_0.25", #            Patch {0.25} affinities.
-    "rep_0.75", #            Patch {0.75} affinities.
-    "rep_1", #               Patch {1} affinities.
-    "gradientline_01", #     Patch {0, 1} affinities. Gradient Line.
-    "evensplit_01", #        Patch {0, 1} affinities. Alternating.
-    "gradientline_0half1", # Patch {0, 0.5, 1} affinities. Gradient Line.
-    "patchTypes.0.Half.1", # Patch {0, 0.5, 1} affinities. Gradient Ring.
-    "runifRing", #           Patch [0, 1] affinities. Gradient Ring at Random.
-    "evensplit_0.51" #        Patch {0.5, 1} affinities. Alternating.
-  ),
-  stringsAsFactors = FALSE
-)[poolpatchDictionaryChoice, ] %>% dplyr::mutate(
+poolpatchDictionary <-
+  poolpatchDictionaryOrigin[poolpatchDictionaryChoice, ] %>% dplyr::mutate(
   Basals = ceiling((1 - (1 + BasalConsumerRatio)^(-1)) * NSpecies),
   Consumers = NSpecies - Basals
 )
@@ -200,49 +132,26 @@ poolpatchSeed <- withRandom(
   seed = seedsMain$pools
   )
 
-dynamicsDictionary <- data.frame(
-  InteractionFunction = "RMTRCode2::LawMorton1996_CommunityMat",
-  InteractionParameters = "Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1)",
-  DynamicsFunction = "RMTRCode2::PerCapitaDynamics_Type1",
-  stringsAsFactors = FALSE
-)[dynamicsDictionaryChoice, ]
+dynamicsDictionary <-
+  dynamicsDictionaryOrigin[dynamicsDictionaryChoice, ]
 dynamicsSeed <- withRandom(
   runif(dynamicsSeedChoice)[dynamicsSeedChoice] * 1e8,
   seed = seedsMain$dynamics
 )
 
-eventsDictionary <- expand.grid(
-  EventsFunction = "defaultEvents", # Takes Number of Environments and Species.
-  EventsNumberMultiplier = c(1, 2),
-  ImmigrationMultiplier = 1,
-  ImmigrationFunction = "RMTRCode2::ArrivalFUN_Example2",
-  ExtirpationMultiplier = 1, # Frequency multiplier
-  ExtirpationFunction = "RMTRCode2::ExtinctFUN_Example2",
-  ExtirpationProportion = c(1, 0.9, 0), # Proportion of population removed.
-  stringsAsFactors = FALSE
-)[eventsDictionaryChoice, ]
+eventsDictionary <-
+  eventsDictionaryOrigin[eventsDictionaryChoice, ]
 eventsSeed <- withRandom(
   runif(eventsSeedChoice)[eventsSeedChoice] * 1e8,
   seed = seedsMain$events
 )
 
-dispersalDictionary <- rbind(
-  data.frame(Resistance = Inf, Configuration = "None"),
-  expand.grid(
-    Resistance = 10^c(0:9),
-    Configuration = c("Ring", "Line", "Complete"),
-    stringsAsFactors = FALSE
-  ))[ifelse(is.na(dispersalDictionaryChoice),
-            1, dispersalDictionaryChoice + 2), ]
+dispersalDictionary <-
+  dispersalDictionaryOrigin[ifelse(is.na(dispersalDictionaryChoice),
+                                   1, dispersalDictionaryChoice + 2), ]
 
-distanceDictionary <- data.frame(
-  rhofunction = c( # Take patch
-    "rho.2.0.1.euclidean",
-    "rho.2.1.2.euclidean",
-    "rho.10.1.2.euclidean",
-    stringsAsFactors = FALSE
-  )
-)[distanceDictionaryChoice, ]
+distanceDictionary <-
+  distanceDictionaryOrigin[distanceDictionaryChoice, ]
 
 # Files: ######################################################################
 partialID <- paste0(

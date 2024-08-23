@@ -79,6 +79,37 @@ patchTypes.0.Half.1 <- function(n) {
   )
 }
 
+# Why? so we can have single argument functions with partials.
+repFixed <- function(value = 0.5) {
+  force(value)
+  function(n) {rep(value, n)}
+}
+rep_0 <- repFixed(0)
+rep_0.25 <- repFixed(0.25)
+rep_0.5 <- repFixed()
+rep_0.75 <- repFixed(0.75)
+rep_1 <- repFixed(1)
+
+evensplit <- function(values = c(0, 1)) {
+  force(values)
+  function(n) {
+    c(rep(values, times = floor(n / length(values))),
+      if (n %% length(values) != 0) {
+        values[1:(n %% length(values))]
+      })
+  }
+}
+evensplit_01 <- evensplit()
+evensplit_0.51 <- evensplit(c(0.5, 1))
+
+gradientline_01 <- function(n) {
+  c(rep(0, ceiling(n/2)), rep(1, floor(n/2)))
+}
+gradientline_0half1 <- function(n) {
+  left <- rep(0, floor(n / 3)); right <- rep(1, floor(n/3))
+  return(c(left, rep(0.5, n - length(left) - length(right)), right))
+}
+
 # Coupon Collector's Problem
 # I think this is probably higher accuracy than the previous version.
 defaultEvents <- function(

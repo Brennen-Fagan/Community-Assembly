@@ -124,6 +124,8 @@ if (cores > 1) {
 }
 
 # Dictionaries: ###############################################################
+source(file.path(directory, "TimeSpaceAndTimeSeries-0-Dictionaries.R"))
+
 # > runif(3)*1e8
 # [1] 10515098 55871737 11522135
 seedsMain <- data.frame(
@@ -161,63 +163,18 @@ poolMats <- new.env()
 load(datPoolMats, envir = poolMats)
 NumberOfEnvironments <- length(poolMats$InteractionMatrices$Mats)
 
-interventionPatchDictionary <- expand.grid(
-  PatchAffinities = c(
-    # Detection via if string begins with a numeric or a non-numeric.
-    # If numeric, it takes it as a fixed set of affinities.
-    # If non-numeric, it attempts to treat the string as a function name.
-    # In the latter case, it provides ONLY NumberEnvironments as an argument.
-
-    toString(rep(0, NumberOfEnvironments)), # Patches -> {0}
-    toString(rep(0.25, NumberOfEnvironments)), # Patches -> {0.25}
-    toString(rep(0.5, NumberOfEnvironments)), # Patches -> {0.5}
-    toString(rep(0.75, NumberOfEnvironments)), # Patches -> {0.75}
-    toString(rep(1, NumberOfEnvironments)), # Patches -> {1}
-    toString(c(rep(0, NumberOfEnvironments/2),
-               rep(1, NumberOfEnvironments/2))), # Patches -> {0, 1} Gradient
-    "sample.int.normalized", # Patches -> {0, 1} Unif @ Random
-    "patchTypes.0.Half.1", # Patches -> {0, 0.5, 1} Gradient Ring
-    "sample.int.3", # Patches -> {0, 0.5, 1} Unif @ Random
-    "runifRing", # Patches -> [0, 1] Gradient Ring
-    "runif" # Patches -> [0, 1] Unif @ Random
-  ),
-  InterventionLocation = c(
-    # Percentage seems easiest
-    NA, # == Random
-    1, # Last
-    0 # First
-  ),
-  InterventionPercentage = c(
-    0.5,
-    1
-  ),
-  stringsAsFactors = FALSE
-)[interventionPatchDictionaryChoice, , drop = FALSE]
+interventionPatchDictionary <-
+  interventionPatchDictionaryOrigin[
+    interventionPatchDictionaryChoice, , drop = FALSE
+    ]
 interventionPatchSeed <- withRandom(
   runif(interventionPatchSeedChoice)[interventionPatchSeedChoice] * 1e8,
   seed = seedsMain$patches
 )
 
-interventionTimeDictionary <- data.frame(
-  # Time1, Time2; called by eval(str2lang(X)) where X is the string below
-  #               and "loaded" is the file that is loaded.
-  Time1 = c(
-    "median(loaded$Events$Times)",
-    "quantile(loaded$Events$Times, p = 0.25)"
-  ),
-  Time2 = c(
-    "1/2 * max(loaded$Events$Times)",
-    "quantile(loaded$Events$Times, p = 0.75)"
-  ),
-  Method = c(# each needs a custom implementation unfortunately!
-    "mean",
-    "runif"
-  ),
-  InterventionTimespan = c(
-    0 # Instantaneous => Switch
-    # Else: Should be numeric > 0, determines timespan for interpolation.
-  )
-)[interventionTimeDictionaryChoice, ]
+interventionTimeDictionary <- interventionTimeDictionaryOrigin[
+  interventionTimeDictionaryChoice,
+  ]
 interventionTimeSeed <- withRandom(
   runif(interventionTimeSeedChoice)[interventionTimeSeedChoice] * 1e8,
   seed = seedsMain$times
@@ -231,13 +188,10 @@ interventionTimeSeed <- withRandom(
 if (!toupper(interventionDispersalDictionaryChoice) %in%
     c("P", "PRE", "PREV", "PREVIOUS") # "PREVIOUS" is meaning. "p" for storage.
 ) {
-  interventionDispersalDictionary <- rbind(
-    data.frame(Resistance = Inf, Configuration = "None"),
-    expand.grid(
-      Resistance = 10^c(0:9),
-      Configuration = c("Ring", "Line", "Complete")
-    ))[ifelse(is.na(interventionDispersalDictionaryChoice),
-              1, interventionDispersalDictionaryChoice + 2), ]
+  interventionDispersalDictionary <- dispersalDictionaryOrigin[
+    ifelse(is.na(interventionDispersalDictionaryChoice),
+              1, interventionDispersalDictionaryChoice + 2),
+    ]
 } else {
   # interventionDispersalDictionary <- "previous"
   interventionDispersalDictionaryChoice <- "p"
@@ -246,14 +200,8 @@ if (!toupper(interventionDispersalDictionaryChoice) %in%
 if (!toupper(interventionDistanceDictionaryChoice) %in%
     c("P", "PRE", "PREV", "PREVIOUS") # "PREVIOUS" is meaning. "p" for storage.
 ) {
-  interventionDistanceDictionary <- data.frame(
-    rhofunction = c( # Take patch
-      "rho.2.0.1.euclidean",
-      "rho.2.1.2.euclidean",
-      "rho.10.1.2.euclidean",
-      stringsAsFactors = FALSE
-    )
-  )[interventionDistanceDictionaryChoice, ]
+  interventionDistanceDictionary <-
+    distanceDictionaryOrigin[interventionDistanceDictionaryChoice, ]
 } else {
   interventionDistanceDictionaryChoice <- "p"
 }
@@ -358,13 +306,11 @@ interventionSuccess <- foreach::foreach(
     previousDispersalDictionaryChoice <- as.numeric(strsplit(
       x_properties[[1]][3], split = '-'
     )[[1]][4])
-    interventionDispersalDictionary <- rbind( #TECHDEBT!!!!!
-      data.frame(Resistance = Inf, Configuration = "None"),
-      expand.grid(
-        Resistance = 10^c(0:9),
-        Configuration = c("Ring", "Line", "Complete")
-      ))[ifelse(is.na(previousDispersalDictionaryChoice),
-                1, previousDispersalDictionaryChoice + 2), ]
+    interventionDispersalDictionary <-
+      dispersalDictionaryOrigin[
+        ifelse(is.na(previousDispersalDictionaryChoice),
+               1, previousDispersalDictionaryChoice + 2), ]
+
     DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
       EnvironmentDistances = with(c(
         interventionDispersalDictionary,
@@ -475,14 +421,8 @@ interventionSuccess <- foreach::foreach(
     previousInterventionDistanceDictionaryChoice <- as.numeric(strsplit(
       x_properties[[1]][3], split = '-'
     )[[1]][5])
-    interventionDistanceDictionary <- data.frame(
-      rhofunction = c( # Take patch
-        "rho.2.0.1.euclidean",
-        "rho.2.1.2.euclidean",
-        "rho.10.1.2.euclidean",
-        stringsAsFactors = FALSE
-      )
-    )[previousInterventionDistanceDictionaryChoice, ]
+    interventionDistanceDictionary <-
+      distanceDictionaryOrigin[previousInterventionDistanceDictionaryChoice, ]
   }
   rho <- retrieveFunction(interventionDistanceDictionary)
 
