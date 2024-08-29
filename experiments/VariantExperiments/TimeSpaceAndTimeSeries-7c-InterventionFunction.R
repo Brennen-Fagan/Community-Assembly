@@ -9,28 +9,11 @@ source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-0-Dictionaries.R"))
 
 # Function Definition: ########################################################
-interventionWrapper <- function(
-  ID, # list containing: Tag (optional) + 
+handlerID <- function(
+  ID # list containing: Tag (optional) + 
   # poolpatchDictionaryChoice, poolpatchSeedChoice, dynamicsDictionaryChoice,
   # dynamicsSeedChoice, eventsDictionaryChoice, eventsSeedChoice,
   # dispersalDictionaryChoice, distanceDictionaryChoice, Date (YYYY-MM-DD)
-  interventionPatchDictionaryChoice,
-  interventionPatchSeedChoice,
-  interventionTimeDictionaryChoice,
-  interventionTimeSeedChoice,
-  interventionDispersalDictionaryChoice,
-  interventionDistanceDictionaryChoice,
-  parameters = list(), # Borrowing from stats::optim's control template
-  loadPoolPatchDynamicsIfAble = TRUE,
-  seedsMain = data.frame(
-    "patches"  = 10515098,
-    "times"    = 55871737,
-    "dynamics" = 11522135
-  ),
-  returnResults = FALSE,
-  saveResults = TRUE,
-  skipIfSaveExists = TRUE, # Precedence over the next argument.
-  errorIfSaveExists = FALSE
 ) {
   # ID Handling: ##############################################################
   stopmsg <- "ID not interpreted correctly. Try providing explicit names."
@@ -64,18 +47,22 @@ interventionWrapper <- function(
     
   } else if (length(ID) == 1) {# The file.path(dirname, basename) itself.
     if (is.list(ID)) {
-      runDictionary <- dirname(unlist(ID))
-      datfile <- unlist(ID)
-    } else {
-      runDictionary <- dirname(ID)
-      datfile <- ID
-    }
+      ID <- unlist(ID)
+    } 
+    runDictionary <- dirname(ID)
+    datfile <- basename(ID)
     
   } else if (length(ID) <= 10 && length(ID) >= 8) { # Unnamed list of components
+    runDictionary0 <- 0
+    runDictionaryDate <- NULL
     if (length(ID) > 8) {
       # Maybe Date
       runDictionaryDateTest <- tryCatch(
-        {as.Date(ID[[length(ID)]], tryFormats = c("%Y-%m-%d")); TRUE},
+        {
+          runDictionaryDate <- as.Date(ID[[length(ID)]], 
+                                       tryFormats = c("%Y-%m-%d")); 
+          TRUE
+        },
         error = function(e) return(FALSE))
       if(length(ID) == 10 && !runDictionaryDateTest) {
         stop("ID has 10 entries, but last not parsed as %Y-%m-%d date.")
@@ -83,23 +70,87 @@ interventionWrapper <- function(
       if (length(ID) == 10 || !runDictionaryDateTest) {
         # == 9 entries and last is not a date (X)or have 10 entries.
         runDictionaryTag <- ID[[1]]
+        runDictionary0 <- 1
       } else {
         runDictionaryTag <- "TSTS_Simulations"
       }
     }
     
-    runDictionary <- tryCatch({
-      file.path(
-        paste0()
+    tryCatch({
+      runDictionary <- # Note awkward order.
+        paste0(runDictionaryTag, "_", 
+               # PARAMETERS:
+               # poolpatchDictionaryChoice, "-", dynamicsDictionaryChoice, "_",
+               ID[[runDictionary0 + 1]], "-", ID[[runDictionary0 + 3]], "_",
+               # SEEDS:
+               # poolpatchSeedChoice, "-", dynamicsSeedChoice, "_", 
+               ID[[runDictionary0 + 2]], "-", ID[[runDictionary0 + 4]], "_",
+               runDictionaryDate)
+      
+      if (is.null(runDictionaryDate)) {
+        if (!exists("directory")) directory <- "."
+        candidates <- grep(dir(directory), pattern = runDictionary, 
+                           value = TRUE)
+        if (length(candidates) != 1) {
+          stop("Provided ID ambiguous. Try providing explicit names.")
+        }
+        runDictionary <- candidates
+      }
+      
+      datfile <- with(
+        ID, paste0(
+          runDictionaryTag, "_", 
+          # PARAMETERS:
+          # poolpatchDictionaryChoice, "-", dynamicsDictionaryChoice, "-",
+          ID[[runDictionary0 + 1]], "-", ID[[runDictionary0 + 3]], "_",
+          # eventsDictionaryChoice, "-", dispersalDictionaryChoice, "-", 
+          ID[[runDictionary0 + 5]], "-", ID[[runDictionary0 + 7]], "_",
+          # distanceDictionaryChoice, "_",
+          ID[[runDictionary0 + 8]], "_",
+          # SEEDS:
+          # poolpatchSeedChoice, "-", dynamicsSeedChoice, "-", eventsSeedChoice,
+          ID[[runDictionary0 + 2]], "-", ID[[runDictionary0 + 4]], "-",
+          ID[[runDictionary0 + 6]],
+          ".RData")
       )
+      
     }, error = function(e) {
       stop(stopmsg)
-      }
+    }
     )
   } else {
     stop(stopmsg)
   }
   
+  return(list(
+    runDictionary = runDictionary, # dirname
+    datfile = file.path(runDictionary, datfile) # file.path(dirname, basename)
+  ))
+}
+
+interventionWrapper <- function(
+  ID, # See handlerID.
+  interventionPatchDictionaryChoice,
+  interventionPatchSeedChoice,
+  interventionTimeDictionaryChoice,
+  interventionTimeSeedChoice,
+  interventionDispersalDictionaryChoice,
+  interventionDistanceDictionaryChoice,
+  parameters = list(), # Borrowing from stats::optim's control template
+  loadPoolPatchDynamicsIfAble = TRUE,
+  seedsMain = data.frame(
+    "patches"  = 10515098,
+    "times"    = 55871737,
+    "dynamics" = 11522135
+  ),
+  returnResults = FALSE,
+  saveResults = TRUE,
+  skipIfSaveExists = TRUE, # Precedence over the next argument.
+  errorIfSaveExists = FALSE
+) {
+  files <- handlerID(ID)
+  runDictionary <- files$runDictionary
+  datfile <- files$datfile
   
   # Source Files: #############################################################
   
