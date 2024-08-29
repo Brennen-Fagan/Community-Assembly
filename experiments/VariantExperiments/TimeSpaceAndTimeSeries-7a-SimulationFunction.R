@@ -304,7 +304,7 @@ simulationWrapper <- function(
       grid$pool,
       grid$patch,
       FUN = function(i, j) {
-        retrieveFunction(distanceDictionary)(
+        retrieveFunction(distanceDictionary$rhofunction)(
           Pool[i, grepl("Affinity", colnames(Pool), fixed = TRUE)],
           PatchAffinities[j, ] # Forced to be a matrix.
         )[1]
@@ -358,14 +358,20 @@ simulationWrapper <- function(
   }
 
   # Instantiate Dispersal Matrix: ###############################################
-
-  DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
-    EnvironmentDistances = convertDispersalDictToDistMatrix(
-      dispersalDictionary,
-      nEnv = poolpatchDictionary$NumberEnvironments
-    ),
-    SpeciesSpeeds = Pool$Speed
-  )
+  if (poolpatchDictionary$NumberEnvironments > 1) {
+    DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
+      EnvironmentDistances = convertDispersalDictToDistMatrix(
+        dispersalDictionary,
+        nEnv = poolpatchDictionary$NumberEnvironments
+      ),
+      SpeciesSpeeds = Pool$Speed
+    )
+  } else {
+    DispersalMatrix <- Matrix::sparseMatrix(
+      i = {}, j = {}, # From documentation
+      dims = c(nrow(Pool), nrow(Pool))
+      )
+  }
 
   # Run Simulation: ###########################################################
   result <- RMTRCode2::MultipleNumericalAssembly_Dispersal(
@@ -375,11 +381,11 @@ simulationWrapper <- function(
     Events = Events,
     PerCapitaDynamics = PerCapitaDynamics,
     DispersalMatrix = DispersalMatrix,
-    EliminationThreshold = EliminationThreshold,
-    ArrivalDensity = ArrivalDensity,
+    EliminationThreshold = params$EliminationThreshold,
+    ArrivalDensity = params$ArrivalDensity,
     ExtinctionProportion = eventsDictionary$ExtirpationProportion,
-    MaximumTimeStep = MaximumTimeStep,
-    BetweenEventSteps = BetweenEventSteps,
+    MaximumTimeStep = params$MaximumTimeStep,
+    BetweenEventSteps = params$BetweenEventSteps,
     Verbose = TRUE,
     # Using the ellipsis pass through feature:
     Timescale = "Simulation",

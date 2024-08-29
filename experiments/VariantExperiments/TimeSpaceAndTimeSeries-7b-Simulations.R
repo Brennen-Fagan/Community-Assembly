@@ -1,11 +1,17 @@
-directory <- '.'
-source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
-source(file.path(directory, "TimeSpaceAndTimeSeries-7a-SimulationFunction.R"))
+# runSimulations <- TRUE
+runSimulationsFlag <- # Default to TRUE if runSimulations does not exist.
+  (!exists("runSimulations") || get("runSimulations") == TRUE)
 
-library(parallel)
-library(doParallel)
-library(foreach)
-library(iterators)
+if (runSimulationsFlag) {
+  directory <- '.'
+  source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
+  source(file.path(directory, "TimeSpaceAndTimeSeries-7a-SimulationFunction.R"))
+
+  library(parallel)
+  library(doParallel)
+  library(foreach)
+  library(iterators)
+}
 
 # Setup Notes: ################################################################
 # Seeds already used from 6a:
@@ -84,44 +90,47 @@ parameterChoices <- dplyr::bind_rows(
 )
 
 # Run across each row of parameterChoices: ####################################
-clust <- parallel::makeCluster(4)
-doParallel::registerDoParallel(clust)
-toExport <- unlist(lapply(
-  1:5, # Non-seed columns of parameterChoices
-  function(id, pcs, dicts) {
-    indices <- unique(unlist(pcs[, id]))
-    dictChoices <- dicts[[id]][indices, ]
-    stringCols <- unlist(lapply(dictChoices, function(x) all(is.character(x))))
-    dictChoices[, stringCols] %>% unlist()
-  },
-  pcs = parameterChoices %>% dplyr::select(-dplyr::ends_with("Seed")),
-  dicts = list(poolpatchDictionaryOrigin, dynamicsDictionaryOrigin,
-               eventsDictionaryOrigin, dispersalDictionaryOrigin,
-               distanceDictionaryOrigin)
-)) %>% unique()
-toExport <- toExport[!grepl("=", toExport, fixed = TRUE) &
-                       !grepl("::", toExport, fixed = TRUE) &
-                       !is.na(toExport) ]
-toExport <- toExport[toExport %in% ls()]
+if (runSimulationsFlag) {
+  clust <- parallel::makeCluster(4)
+  doParallel::registerDoParallel(clust)
+  toExport <- unlist(lapply(
+    1:5, # Non-seed columns of parameterChoices
+    function(id, pcs, dicts) {
+      indices <- unique(unlist(pcs[, id]))
+      dictChoices <- dicts[[id]][indices, ]
+      stringCols <- unlist(lapply(dictChoices,
+                                  function(x) all(is.character(x))))
+      dictChoices[, stringCols] %>% unlist()
+    },
+    pcs = parameterChoices %>% dplyr::select(-dplyr::ends_with("Seed")),
+    dicts = list(poolpatchDictionaryOrigin, dynamicsDictionaryOrigin,
+                 eventsDictionaryOrigin, dispersalDictionaryOrigin,
+                 distanceDictionaryOrigin)
+  )) %>% unique()
+  toExport <- toExport[!grepl("=", toExport, fixed = TRUE) &
+                         !grepl("::", toExport, fixed = TRUE) &
+                         !is.na(toExport) ]
+  toExport <- toExport[toExport %in% ls()]
 
-success <- foreach::foreach(
-  pc = iterators::iter(parameterChoices, by = "row"),
-  .packages = c("RMTRCode2", "dplyr"), .export = toExport
-) %dopar% {
-  pc <- unlist(pc) # untibble so we are passing numerics.
-  simulationWrapper(
-    poolpatchDictionaryChoice = pc[1],
-    poolpatchSeedChoice = pc[2],
-    dynamicsDictionaryChoice = pc[3],
-    dynamicsSeedChoice = pc[4],
-    eventsDictionaryChoice = pc[5],
-    eventsSeedChoice = pc[6],
-    dispersalDictionaryChoice = pc[7],
-    distanceDictionaryChoice = pc[8],
-    returnResults = FALSE,
-    saveResults = TRUE,
-    skipIfSaveExists = TRUE
-  )
+  success <- foreach::foreach(
+    pc = iterators::iter(parameterChoices, by = "row"),
+    .packages = c("RMTRCode2", "dplyr"), .export = toExport
+  ) %dopar% {
+    pc <- unlist(pc) # untibble so we are passing numerics.
+    simulationWrapper(
+      poolpatchDictionaryChoice = pc[1],
+      poolpatchSeedChoice = pc[2],
+      dynamicsDictionaryChoice = pc[3],
+      dynamicsSeedChoice = pc[4],
+      eventsDictionaryChoice = pc[5],
+      eventsSeedChoice = pc[6],
+      dispersalDictionaryChoice = pc[7],
+      distanceDictionaryChoice = pc[8],
+      returnResults = FALSE,
+      saveResults = TRUE,
+      skipIfSaveExists = TRUE
+    )
+  }
+
+  parallel::stopCluster(clust)
 }
-
-parallel::stopCluster(clust)
