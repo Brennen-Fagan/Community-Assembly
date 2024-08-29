@@ -26,7 +26,9 @@ simulationWrapper <- function(
     "dynamics" = 83066253
   ),
   returnResults = FALSE,
-  saveResults = TRUE
+  saveResults = TRUE,
+  skipIfSaveExists = TRUE, # Precedence over the next argument.
+  errorIfSaveExists = FALSE
 ) {
   #  Parameters: ##############################################################
   params <- list(
@@ -42,7 +44,7 @@ simulationWrapper <- function(
       "Unknown names in parameters: ", paste(namespNotFound, collapse = ", ")
     )
   }
-  
+
   # Dictionaries: #############################################################
   poolpatchDictionary <-
     poolpatchDictionaryOrigin[poolpatchDictionaryChoice, ] %>% dplyr::mutate(
@@ -53,28 +55,28 @@ simulationWrapper <- function(
     runif(poolpatchSeedChoice)[poolpatchSeedChoice] * 1e8,
     seed = seedsMain$pools
   )
-  
+
   dynamicsDictionary <-
     dynamicsDictionaryOrigin[dynamicsDictionaryChoice, ]
   dynamicsSeed <- withRandom(
     runif(dynamicsSeedChoice)[dynamicsSeedChoice] * 1e8,
     seed = seedsMain$dynamics
   )
-  
+
   eventsDictionary <-
     eventsDictionaryOrigin[eventsDictionaryChoice, ]
   eventsSeed <- withRandom(
     runif(eventsSeedChoice)[eventsSeedChoice] * 1e8,
     seed = seedsMain$events
   )
-  
+
   dispersalDictionary <-
     dispersalDictionaryOrigin[ifelse(is.na(dispersalDictionaryChoice),
                                      1, dispersalDictionaryChoice + 2), ]
-  
+
   distanceDictionary <-
     distanceDictionaryOrigin[distanceDictionaryChoice, ]
-  
+
   # Files: ######################################################################
   partialID <- paste0(
     # PARAMETERS:
@@ -95,7 +97,7 @@ simulationWrapper <- function(
   if (!dir.exists(datfolder)) {
     dir.create(datfolder)
   }
-  
+
   fullID <- paste0(
     # PARAMETERS:
     poolpatchDictionaryChoice, "-", # Bundle Inter-Simulation Constants.
@@ -108,18 +110,25 @@ simulationWrapper <- function(
     dynamicsSeedChoice, "-",
     eventsSeedChoice
   )
-  
-  
+
+
   if(saveResults) {
     datfile <- file.path(
       datfolder,
       paste0("TSTS_Simulation_", fullID, ".RData")
     )
     if (file.exists(datfile)) {
-      warning(paste(datfile, "already exists and will be overwritten."))
+      if (skipIfSaveExists) {
+        warning(paste(datfile, "already exists. Returning NULL."))
+        return(NULL)
+      } else if (errorIfSaveExists) {
+        stop(paste(datfile, "already exists. Throwing error."))
+      } else {
+        warning(paste(datfile, "already exists and will be overwritten."))
+      }
     }
   }
-  
+
   datfile_ppd <- file.path(
     datfolder,
     paste0(
@@ -136,7 +145,7 @@ simulationWrapper <- function(
       datfile_ppd_write <- TRUE
     }
   }
-  
+
   # Pools and Interaction Matrices: ###########################################
   if (exists("datfile_ppd_envir")) {
     # Pool, InteractionMatrices, DynamicsFunction, CharacteristicRate,
@@ -157,7 +166,7 @@ simulationWrapper <- function(
               )
       )
     })
-    
+
     Affinities <- with(poolpatchDictionary, {
       if(!is.na(as.numeric(substr(SpeciesAffinities, 1, 1)))) {
         # Treat as numbers
@@ -170,7 +179,7 @@ simulationWrapper <- function(
         )
       }
     })
-    
+
     Speeds <- with(poolpatchDictionary, {
       if(is.numeric(PoolDispersalSpeed)) {
         rep(PoolDispersalSpeed, Basals + Consumers)
@@ -185,13 +194,13 @@ simulationWrapper <- function(
         )
       }
     })
-    
+
     Pool <- cbind(
       Pool,
       Speed = Speeds,
       Affinity = Affinities
     )
-    
+
     PatchAffinities <- matrix(with(poolpatchDictionary, {
       if(is.numeric(PatchAffinities)) {
         rep(PatchAffinities, Basals + Consumers)
@@ -206,7 +215,7 @@ simulationWrapper <- function(
         )
       }
     }), nrow = poolpatchDictionary$NumberEnvironments)
-    
+
     # NOT THE FINAL PERCAPITADYNAMICS FUNCTION.
     DynamicsFunction <- with(dynamicsDictionary, {
       withRandom(
@@ -214,7 +223,7 @@ simulationWrapper <- function(
         seed = withRandom(runif(1)[1] * 1e8, seed = dynamicsSeed)
       )}
     )
-    
+
     IntMatFunc <- with(dynamicsDictionary, {
       withRandom(
         purrr::partial(
@@ -228,18 +237,18 @@ simulationWrapper <- function(
         seed = withRandom(runif(2)[2] * 1e8, seed = dynamicsSeed)
       )}
     )
-    
+
     InteractionMatrices <- RMTRCode2::CreateEnvironmentInteractions(
       Pool = Pool,
       NumEnvironments = poolpatchDictionary$NumberEnvironments,
       ComputeInteractionMatrix = IntMatFunc,
       EnvironmentSeeds = withRandom(runif(3)[3] * 1e8, seed = dynamicsSeed)
     )
-    
+
     CharacteristicRate <- max(unlist(lapply(
       InteractionMatrices$Mats, function(m) {abs(eigen(m)$values)}
     )))
-    
+
     if (exists("datfile_ppd_write") && datfile_ppd_write) {
       save(Pool, PatchAffinities,
            InteractionMatrices, DynamicsFunction, CharacteristicRate,
@@ -247,14 +256,14 @@ simulationWrapper <- function(
            file = datfile_ppd)
     }
   }
-  
+
   # Events: #####################################################################
   EventsEach <- with(poolpatchDictionary, {
     retrieveFunction(eventsDictionary$EventsFunction)(
       NumberEnvironments, Basals + Consumers
     )
   })
-  
+
   Events <- with(eventsDictionary, {
     RMTRCode2::CreateAssemblySequence(
       Species = with(poolpatchDictionary, Basals + Consumers),
@@ -268,7 +277,7 @@ simulationWrapper <- function(
       HistorySeed = eventsSeed
     )}
   )
-  
+
   print(combinations <-
           table(Events$Events$Species,
                 Events$Events$Environment,
@@ -276,11 +285,11 @@ simulationWrapper <- function(
   if(any(combinations == 0)) {warning(
     "Exists a species which doesn't immigrate to/extirpate from an environment."
   )}
-  
+
   # Instantiate PerCapitaDynamics: ##############################################
   # We've already built the "functional" interactions matrix, but we now need
   # to apply the transformation r' = r rho^(sign(r)) and then combine.
-  
+
   #TODO Be careful here. If we add columns to distanceDictionary, we need to
   # adjust the call here (since a 1x1 dataframe is returned as just the entry).
   # Not a function, so we don't need to on the fly.
@@ -301,7 +310,7 @@ simulationWrapper <- function(
         )[1]
       }
     ) ^ sign(rep(Pool$ReproductionRate, poolpatchDictionary$NumberEnvironments))
-  
+
   if (is.function(rprime)) {
     # Calculate rprime using Parms$Patch
     if (is.function(InteractionMatrices$Mats[[1]])) {
@@ -347,9 +356,9 @@ simulationWrapper <- function(
       )
     }
   }
-  
+
   # Instantiate Dispersal Matrix: ###############################################
-  
+
   DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
     EnvironmentDistances = convertDispersalDictToDistMatrix(
       dispersalDictionary,
@@ -357,7 +366,7 @@ simulationWrapper <- function(
     ),
     SpeciesSpeeds = Pool$Speed
   )
-  
+
   # Run Simulation: ###########################################################
   result <- RMTRCode2::MultipleNumericalAssembly_Dispersal(
     Pool = Pool,
@@ -380,11 +389,11 @@ simulationWrapper <- function(
       EffectiveReproductionRate = rprime
     )
   )
-  
+
   # Save Simulation: ##########################################################
   if(saveResults)
     save(result, file = datfile)
-  
+
   if(returnResults) {
     return(results)
   } else {

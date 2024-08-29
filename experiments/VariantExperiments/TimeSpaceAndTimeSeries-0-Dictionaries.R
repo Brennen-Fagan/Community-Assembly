@@ -89,14 +89,21 @@ interventionPatchDictionaryOrigin <- expand.grid(
     # If numeric, it takes it as a fixed set of affinities.
     # If non-numeric, it attempts to treat the string as a function name.
     # In the latter case, it provides ONLY NumberEnvironments as an argument.
-    
-    toString(rep(0, NumberOfEnvironments)), # Patches -> {0}
-    toString(rep(0.25, NumberOfEnvironments)), # Patches -> {0.25}
-    toString(rep(0.5, NumberOfEnvironments)), # Patches -> {0.5}
-    toString(rep(0.75, NumberOfEnvironments)), # Patches -> {0.75}
-    toString(rep(1, NumberOfEnvironments)), # Patches -> {1}
-    toString(c(rep(0, NumberOfEnvironments/2),
-               rep(1, NumberOfEnvironments/2))), # Patches -> {0, 1} Gradient
+
+
+    "rep_0.5", #             Patch {0.5} affinities.
+    "rep_0", #               Patch {0} affinities.
+    "rep_0.25", #            Patch {0.25} affinities.
+    "rep_0.75", #            Patch {0.75} affinities.
+    "rep_1", #               Patch {1} affinities.
+    "gradientline_01", #     Patch {0, 1} affinities. Gradient Line.
+    # toString(rep(0, NumberOfEnvironments)), # Patches -> {0}
+    # toString(rep(0.25, NumberOfEnvironments)), # Patches -> {0.25}
+    # toString(rep(0.5, NumberOfEnvironments)), # Patches -> {0.5}
+    # toString(rep(0.75, NumberOfEnvironments)), # Patches -> {0.75}
+    # toString(rep(1, NumberOfEnvironments)), # Patches -> {1}
+    # toString(c(rep(0, NumberOfEnvironments/2),
+    #            rep(1, NumberOfEnvironments/2))), # Patches -> {0, 1} Gradient
     "sample.int.normalized", # Patches -> {0, 1} Unif @ Random
     "patchTypes.0.Half.1", # Patches -> {0, 0.5, 1} Gradient Ring
     "sample.int.3", # Patches -> {0, 0.5, 1} Unif @ Random
