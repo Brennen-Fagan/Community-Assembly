@@ -1,4 +1,3 @@
-
 # Libraries: ##################################################################
 library(RMTRCode2)
 library(dplyr)
@@ -9,6 +8,7 @@ directory <- "." # Should be "VariantExperiments"
 source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-0-Dictionaries.R"))
 
+# Function Definition: ########################################################
 simulationWrapper <- function(
   poolpatchDictionaryChoice,
   poolpatchSeedChoice,
