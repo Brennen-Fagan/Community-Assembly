@@ -290,9 +290,7 @@ simulationWrapper <- function(
   # We've already built the "functional" interactions matrix, but we now need
   # to apply the transformation r' = r rho^(sign(r)) and then combine.
 
-  #TODO Be careful here. If we add columns to distanceDictionary, we need to
-  # adjust the call here (since a 1x1 dataframe is returned as just the entry).
-  # Not a function, so we don't need to on the fly.
+    # Not a function, so we don't need to on the fly.
   # We'll be a bit lazy here, but hopefully readable and clear.
   grid <- expand.grid(
     pool = 1:nrow(Pool), # Fastest Varying
