@@ -1,7 +1,14 @@
-source("TimeSpaceAndTimeSeries-7a-SimulationFunction.R")
+directory <- '.'
+source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
+source(file.path(directory, "TimeSpaceAndTimeSeries-7a-SimulationFunction.R"))
+
+library(parallel)
+library(doParallel)
+library(foreach)
+library(iterators)
 
 # Setup Notes: ################################################################
-# Seeds already used from 6a: 
+# Seeds already used from 6a:
 #   1:10 (poolpatch), 1:10 (dynamics), 1:13 (events)
 
 # Requested Combinations:
@@ -35,10 +42,10 @@ source("TimeSpaceAndTimeSeries-7a-SimulationFunction.R")
 # Parameters: #################################################################
 parameterChoices <- dplyr::bind_rows(
   # 1 Patch Systems first.
-  expand.grid(pp = c(26, 56, 86, 116, 146), dyn = 1, 
+  expand.grid(pp = c(26, 56, 86, 116, 146), dyn = 1,
               events = 2, dispersal = NA, distance = c(2, 3)),
   # 2 Patch Systems with varying dispersal.
-  expand.grid(pp = c(28, 58, 88, 118, 148), dyn = 1, 
+  expand.grid(pp = c(28, 58, 88, 118, 148), dyn = 1,
               events = 2, dispersal = c(NA, 15, 10), distance = c(2, 3))
 )
 # Each sim type should have 2 pools with associated matrices, and each pool
@@ -76,3 +83,45 @@ parameterChoices <- dplyr::bind_rows(
   dplyr::across(dplyr::everything())
 )
 
+# Run across each row of parameterChoices: ####################################
+clust <- parallel::makeCluster(4)
+doParallel::registerDoParallel(clust)
+toExport <- unlist(lapply(
+  1:5, # Non-seed columns of parameterChoices
+  function(id, pcs, dicts) {
+    indices <- unique(unlist(pcs[, id]))
+    dictChoices <- dicts[[id]][indices, ]
+    stringCols <- unlist(lapply(dictChoices, function(x) all(is.character(x))))
+    dictChoices[, stringCols] %>% unlist()
+  },
+  pcs = parameterChoices %>% dplyr::select(-dplyr::ends_with("Seed")),
+  dicts = list(poolpatchDictionaryOrigin, dynamicsDictionaryOrigin,
+               eventsDictionaryOrigin, dispersalDictionaryOrigin,
+               distanceDictionaryOrigin)
+)) %>% unique()
+toExport <- toExport[!grepl("=", toExport, fixed = TRUE) &
+                       !grepl("::", toExport, fixed = TRUE) &
+                       !is.na(toExport) ]
+toExport <- toExport[toExport %in% ls()]
+
+success <- foreach::foreach(
+  pc = iterators::iter(parameterChoices, by = "row"),
+  .packages = c("RMTRCode2", "dplyr"), .export = toExport
+) %dopar% {
+  pc <- unlist(pc) # untibble so we are passing numerics.
+  simulationWrapper(
+    poolpatchDictionaryChoice = pc[1],
+    poolpatchSeedChoice = pc[2],
+    dynamicsDictionaryChoice = pc[3],
+    dynamicsSeedChoice = pc[4],
+    eventsDictionaryChoice = pc[5],
+    eventsSeedChoice = pc[6],
+    dispersalDictionaryChoice = pc[7],
+    distanceDictionaryChoice = pc[8],
+    returnResults = FALSE,
+    saveResults = TRUE,
+    skipIfSaveExists = TRUE
+  )
+}
+
+parallel::stopCluster(clust)

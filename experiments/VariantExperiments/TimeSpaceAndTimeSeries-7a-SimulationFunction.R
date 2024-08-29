@@ -120,7 +120,7 @@ simulationWrapper <- function(
     if (file.exists(datfile)) {
       if (skipIfSaveExists) {
         warning(paste(datfile, "already exists. Returning NULL."))
-        return(NULL)
+        return(-1)
       } else if (errorIfSaveExists) {
         stop(paste(datfile, "already exists. Throwing error."))
       } else {
