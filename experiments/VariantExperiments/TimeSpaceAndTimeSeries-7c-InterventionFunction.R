@@ -160,21 +160,21 @@ interventionWrapper <- function(
   
   # Put failure point before loads.
   if(saveResults) {
-      # Reformulate file name.
-      filename <- file.path(
-        dirname(datfile),
-        paste0(datfile_properties[[1]][1],
-               "_Intervention_",
-               datfile_properties[[1]][3],"_", datfile_properties[[1]][4],
-               "_", appendID,
-               if (length(datfile_properties[[1]]) > 4)
-                 paste0("_", datfile_properties[[1]][
-                   4:length(datfile_properties[[1]])
-                   ],
-                   collapse = ""),
-               ".RData")
-      )
-      
+    # Reformulate file name.
+    filename <- file.path(
+      dirname(datfile),
+      paste0(datfile_properties[[1]][1],
+             "_Intervention_",
+             datfile_properties[[1]][3],"_", datfile_properties[[1]][4],
+             "_", appendID,
+             if (length(datfile_properties[[1]]) > 4)
+               paste0("_", datfile_properties[[1]][
+                 4:length(datfile_properties[[1]])
+                 ],
+                 collapse = ""),
+             ".RData")
+    )
+    
     if (file.exists(filename)) {
       if (skipIfSaveExists) {
         warning(paste(filename, "already exists. Returning NULL."))
