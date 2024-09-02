@@ -343,7 +343,7 @@ interventionWrapper <- function(
   })
 
   ##### Post-intervention adjusted intrinsic growth/decay rates: ##############
-  rho <- retrieveFunction(interventionDistanceDictionary)
+  rho <- retrieveFunction(interventionDistanceDictionary$rhofunction)
 
   grid <- expand.grid(
     pool = 1:nrow(poolMats$Pool), # Fastest Varying

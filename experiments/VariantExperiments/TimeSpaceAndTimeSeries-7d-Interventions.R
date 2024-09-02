@@ -6,6 +6,7 @@ library(iterators)
 
 directory <- '.'
 source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
+source(file.path(directory, "TimeSpaceAndTimeSeries-0-Interventions.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-7a-SimulationFunction.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-7c-InterventionFunction.R"))
 
@@ -51,8 +52,8 @@ parameterChoices <- dplyr::bind_rows(
 )
 
 # Run across each row of parameterChoices: ####################################
-# clust <- parallel::makeCluster(4)
-# doParallel::registerDoParallel(clust)
+clust <- parallel::makeCluster(4)
+doParallel::registerDoParallel(clust)
 
 toExport <- unlist(lapply(
   1:7, # Non-seed columns of parameterChoices
@@ -77,9 +78,9 @@ toExport <- toExport[toExport %in% ls()]
 success <- foreach::foreach(
   pc = iterators::iter(parameterChoices, by = "row"),
   .packages = c("RMTRCode2", "dplyr"), .export = toExport
-# ) %dopar% {
-) %do% {
-  pc <- unlist(pc) # untibble so we are passing numerics.
+) %dopar% {
+# ) %do% {
+  pc <- as.list(pc) # untibble so we are passing numerics and strings.
   interventionWrapper(
     # ID = list(
     #   Tag = fileTags,
@@ -95,19 +96,21 @@ success <- foreach::foreach(
     # ),
     ID = file.path(
       paste0(
-        dirTag, "_", pc[1], "-", pc[3], "_", pc[2], "-", pc[4], "_", dirDate
+        dirTag, "_", pc[[1]], "-", pc[[3]],
+        "_", pc[[2]], "-", pc[[4]], "_", dirDate
       ),
       paste0(
-        baseTag, "_", pc[1], "-", pc[3], "-", pc[5], "-", pc[7], "-", pc[8],
-        "_", pc[2], "-", pc[4], "-", pc[6], ".RData"
+        baseTag,
+        "_", pc[[1]], "-", pc[[3]], "-", pc[[5]], "-", pc[[7]], "-", pc[[8]],
+        "_", pc[[2]], "-", pc[[4]], "-", pc[[6]], ".RData"
       )
     ),
-    interventionPatchDictionaryChoice = pc[9],
-    interventionPatchSeedChoice = pc[10],
-    interventionTimeDictionaryChoice = pc[11],
-    interventionTimeSeedChoice = pc[12],
-    interventionDispersalDictionaryChoice = pc[13],
-    interventionDistanceDictionaryChoice = pc[14],
+    interventionPatchDictionaryChoice = pc[[9]],
+    interventionPatchSeedChoice = pc[[10]],
+    interventionTimeDictionaryChoice = pc[[11]],
+    interventionTimeSeedChoice = pc[[12]],
+    interventionDispersalDictionaryChoice = pc[[13]],
+    interventionDistanceDictionaryChoice = pc[[14]],
     returnResults = FALSE,
     saveResults = TRUE,
     skipIfSaveExists = TRUE
