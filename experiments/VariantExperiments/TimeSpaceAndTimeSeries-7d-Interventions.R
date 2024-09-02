@@ -9,8 +9,9 @@ source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-7a-SimulationFunction.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-7c-InterventionFunction.R"))
 
-fileTags <- "TSTS_Simulations"
-fileDates <- "2024-08-29"
+dirTag <- "TSTS_Simulations"
+dirDate <- "2024-08-29"
+baseTag <-  "TSTS_Simulation" # Note the distinction
 
 runSimulations <- FALSE
 source(file.path(directory, "TimeSpaceAndTimeSeries-7b-Simulations.R"))
@@ -43,15 +44,15 @@ parameterChoices <- dplyr::bind_rows(
   ipSeed = 1, # No random components
   it = 1, # Dead middle
   itSeed = 1, # No random components
-  itDisp = "PREVIOUS", # Use previous values.
-  itDist = "PREVIOUS" # Use previous values.
+  itDisp = "p", # Use previous values.
+  itDist = "p" # Use previous values.
 ) %>% dplyr::arrange(
   dplyr::across(dplyr::everything())
 )
 
 # Run across each row of parameterChoices: ####################################
-clust <- parallel::makeCluster(4)
-doParallel::registerDoParallel(clust)
+# clust <- parallel::makeCluster(4)
+# doParallel::registerDoParallel(clust)
 
 toExport <- unlist(lapply(
   1:7, # Non-seed columns of parameterChoices
@@ -76,20 +77,30 @@ toExport <- toExport[toExport %in% ls()]
 success <- foreach::foreach(
   pc = iterators::iter(parameterChoices, by = "row"),
   .packages = c("RMTRCode2", "dplyr"), .export = toExport
-) %dopar% {
+# ) %dopar% {
+) %do% {
   pc <- unlist(pc) # untibble so we are passing numerics.
   interventionWrapper(
-    ID = list(
-      Tag = fileTags,
-      poolpatchDictionaryChoice = pc[1],
-      poolpatchSeedChoice = pc[2],
-      dynamicsDictionaryChoice = pc[3],
-      dynamicsSeedChoice = pc[4],
-      eventsDictionaryChoice = pc[5],
-      eventsSeedChoice = pc[6],
-      dispersalDictionaryChoice = pc[7],
-      distanceDictionaryChoice = pc[8],
-      Date = fileDates
+    # ID = list(
+    #   Tag = fileTags,
+    #   poolpatchDictionaryChoice = pc[1],
+    #   poolpatchSeedChoice = pc[2],
+    #   dynamicsDictionaryChoice = pc[3],
+    #   dynamicsSeedChoice = pc[4],
+    #   eventsDictionaryChoice = pc[5],
+    #   eventsSeedChoice = pc[6],
+    #   dispersalDictionaryChoice = pc[7],
+    #   distanceDictionaryChoice = pc[8],
+    #   Date = fileDates
+    # ),
+    ID = file.path(
+      paste0(
+        dirTag, "_", pc[1], "-", pc[3], "_", pc[2], "-", pc[4], "_", dirDate
+      ),
+      paste0(
+        baseTag, "_", pc[1], "-", pc[3], "-", pc[5], "-", pc[7], "-", pc[8],
+        "_", pc[2], "-", pc[4], "-", pc[6], ".RData"
+      )
     ),
     interventionPatchDictionaryChoice = pc[9],
     interventionPatchSeedChoice = pc[10],
