@@ -261,12 +261,12 @@ interventionWrapper <- function(
         interventionDispersalDictionary,
         nEnv = NumberOfEnvironments
       ),
-      SpeciesSpeeds = Pool$Speed
+      SpeciesSpeeds = poolMats$Pool$Speed
     )
   } else {
     DispersalMatrix <- Matrix::sparseMatrix(
       i = {}, j = {}, # From documentation
-      dims = c(nrow(Pool), nrow(Pool))
+      dims = c(nrow(poolMats$Pool), nrow(poolMats$Pool))
     )
   }
 
