@@ -191,7 +191,7 @@ interventionWrapper <- function(
 
     if (file.exists(filename)) {
       if (skipIfSaveExists) {
-        warning(paste(filename, "already exists. Returning NULL."))
+        warning(paste(filename, "already exists. Returning -1."))
         return(-1)
       } else if (errorIfSaveExists) {
         stop(paste(filename, "already exists. Throwing error."))
@@ -511,7 +511,7 @@ interventionWrapper <- function(
     Verbose = TRUE,
     # Using the ellipsis pass through feature:
     Timescale = "Simulation",
-    ParentRun = x,
+    ParentRun = datfile,
     ID = paste0(loaded$Ellipsis$ID, "_", appendID),
     Affinity = list(
       PatchAffinitiesOld = loaded$Ellipsis$Affinity$PatchAffinities,
