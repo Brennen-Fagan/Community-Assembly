@@ -3,24 +3,22 @@ options(bitmapType = "cairo")
 
 # Currently only set up for one at a time...
 datfolders <- c(
-  "TSTS_Simulations_18-1_6-6_2024-05-23"
+  "TSTS_Simulations_28-1_12-12_2024-08-29"
 )
 
 targetFiles <- c(
-  "18-1-4-15-2_6-6-6.RData", "18-1-4-15-2_6-6-6_12-1-p-3_1-1.RData"
+  # "28-1-2-15-3_12-12-17.RData", "28-1-2-15-3_12-12-17_13-1-p-p_1-1.RData"
+  "28-1-2-15-3_12-12-18.RData", "28-1-2-15-3_12-12-18_13-1-p-p_1-1.RData"
 )
-
-targettimes <- c(0,
-                 200) # 0 is intervention, ... is timespan, 50% is symmetry.
 
 Div_rounding <- .25
 
 timeType <- " Time Series " # "Time\nFor Time"
 spaceType <- "Space\nFor Time"
 
-histFillColor <- "#70ad47" # green
-lineNullColor <- "#5b9bd5" # blue
-linePertColor <-  "#ed7d31" # orange
+# histFillColor <- "#70ad47" # green
+# lineNullColor <- "#5b9bd5" # blue
+# linePertColor <-  "#ed7d31" # orange
 
 # Libraries: ##################################################################
 library(dplyr)
@@ -37,16 +35,16 @@ source("TimeSpaceAndTimeSeries-0-Functions.R")
 
 # Load Data: ##################################################################
 
-samples <- unlist(lapply(targetFiles, function(tf)
-  dir(datfolders, full.names = TRUE,
-      pattern = paste0("Sampling_", tf))
-))
-samples <- lapply(
-  samples, function(x) {
-    names <- load(x)
-    stopifnot(length(names) == 1)
-    return(get(names))
-  })
+# samples <- unlist(lapply(targetFiles, function(tf)
+#   dir(datfolders, full.names = TRUE,
+#       pattern = paste0("Sampling_", tf))
+# ))
+# samples <- lapply(
+#   samples, function(x) {
+#     names <- load(x)
+#     stopifnot(length(names) == 1)
+#     return(get(names))
+#   })
 
 diversities <- unlist(lapply(targetFiles, function(tf)
   dir(datfolders, full.names = TRUE,
@@ -226,7 +224,7 @@ preInterventionData <- postInterventionStart %>% dplyr::rowwise(
   }
 )
 
-windowSizes <- 2^c(1,3,5,7,9)
+windowSizes <- 2^c(1, 5, 9, 11, 13)
 timeSeriesWindows <- dplyr::bind_rows(lapply(
   windowSizes, function(windowSize, dat) {
     # dat %>% runner::run_by(
@@ -525,7 +523,7 @@ ggplot2::ggplot(
   ) %>% dplyr::mutate(
     `Window Value` = `Window Value` * WindowSize,
     `Relative Scaled Window Value` = `Window Value` / max(abs(`Window Value`))
-  ),
+  ) %>% dplyr::filter(`Window Function` == "WindowChange"),
   ggplot2::aes(x = WindowTime,
                y = `Relative Scaled Window Value`,
                color = factor(WindowSize,
@@ -537,7 +535,40 @@ ggplot2::ggplot(
   linetype = "dotted"
 ) + ggplot2::geom_line(
 ) + ggplot2::facet_grid(
-  `Window Function` ~ Intervention + Environment  ,
+  # `Window Function`
+  factor(WindowSize,
+         levels = windowSizes* Div_rounding,
+         ordered = TRUE) ~ Intervention + Environment  ,
+  scales = "free_y"
+) + ggplot2::labs(
+  color = "Window Size"
+)
+ggplot2::ggplot(
+  timeSeriesWindows %>% tidyr::pivot_longer(
+    WindowChange:WindowSlope,
+    names_to = "Window Function",
+    values_to = "Window Value"
+  ) %>% dplyr::group_by(
+    WindowSize, `Window Function`, Intervention, Environment
+  ) %>% dplyr::mutate(
+    `Window Value` = `Window Value` * WindowSize,
+    `Relative Scaled Window Value` = `Window Value` / max(abs(`Window Value`))
+  ) %>% dplyr::filter(`Window Function` == "WindowSlope"),
+  ggplot2::aes(x = WindowTime,
+               y = `Relative Scaled Window Value`,
+               color = factor(WindowSize,
+                              levels = windowSizes* Div_rounding,
+                              ordered = TRUE),
+               group = WindowSize)
+) + ggplot2::geom_vline(
+  xintercept = postInterventionStart$Time,
+  linetype = "dotted"
+) + ggplot2::geom_line(
+) + ggplot2::facet_grid(
+  # `Window Function`
+  factor(WindowSize,
+         levels = windowSizes* Div_rounding,
+         ordered = TRUE) ~ Intervention + Environment  ,
   scales = "free_y"
 ) + ggplot2::labs(
   color = "Window Size"
@@ -582,67 +613,67 @@ ggplot2::ggplot(
 #   ggplot2::aes(x = WindowTime, y = Averages, color = Method, group = ID)
 #   ) + ggplot2::geom_line() + ggplot2::facet_wrap(Method ~ WindowSize)
 #
-ggplot2::ggplot(
-  spaceForTimeWindows %>% dplyr::select(
-    !dplyr::contains(".") | dplyr::starts_with("Differences")
-  ) %>% tidyr::pivot_longer(
-    dplyr::contains("."),
-    names_to = "Window Function",
-    values_to = "Window Value"
-  ),
-  ggplot2::aes(x = WindowTime,
-               y = `Window Value`,
-               color = factor(WindowSize,
-                              levels = windowSizes* Div_rounding,
-                              ordered = TRUE),
-               group = WindowSize)
-) + ggplot2::geom_vline(
-  xintercept = postInterventionStart$Time,
-  linetype = "dotted"
-  # ) + ggplot2::geom_point(
-  # ggplot2::aes(alpha = Alpha)
-  #   shape = '.'
-) + ggplot2::geom_line(
-) + ggplot2::facet_grid(
-  `Window Function` ~ Intervention,
-  scales = "free_y"
-) + ggplot2::labs(
-  color = "Window Size"
-  # ) + ggplot2::scale_y_continuous(
-  #   transform = scales::pseudo_log_trans(sigma = 0.1)
-) + ggplot2::guides(
-  color = ggplot2::guide_legend(override.aes = list(alpha = 1))
-)
-
-
-ggplot2::ggplot(
-  spaceForTimeWindows %>% dplyr::select(
-    !dplyr::contains(".") | dplyr::starts_with("Differences.Window.Slopes")
-  ) %>% tidyr::pivot_longer(
-    dplyr::contains("."),
-    names_to = "Window Function",
-    values_to = "Window Value"
-  ),
-  ggplot2::aes(x = WindowTime,
-               y = `Window Value` * WindowSize,
-               color = factor(WindowSize,
-                              levels = windowSizes* Div_rounding,
-                              ordered = TRUE),
-               group = WindowSize)
-) + ggplot2::geom_vline(
-  xintercept = postInterventionStart$Time,
-  linetype = "dotted"
-  # ) + ggplot2::geom_point(
-  # ggplot2::aes(alpha = Alpha)
-  #   shape = '.'
-) + ggplot2::geom_line(
-) + ggplot2::facet_grid(
-  `Window Function` ~ Intervention,
-  scales = "free_y"
-) + ggplot2::labs(
-  color = "Window Size"
-  # ) + ggplot2::scale_y_continuous(
-  #   transform = scales::pseudo_log_trans(sigma = 0.1)
-) + ggplot2::guides(
-  color = ggplot2::guide_legend(override.aes = list(alpha = 1))
-)
+# ggplot2::ggplot(
+#   spaceForTimeWindows %>% dplyr::select(
+#     !dplyr::contains(".") | dplyr::starts_with("Differences")
+#   ) %>% tidyr::pivot_longer(
+#     dplyr::contains("."),
+#     names_to = "Window Function",
+#     values_to = "Window Value"
+#   ),
+#   ggplot2::aes(x = WindowTime,
+#                y = `Window Value`,
+#                color = factor(WindowSize,
+#                               levels = windowSizes* Div_rounding,
+#                               ordered = TRUE),
+#                group = WindowSize)
+# ) + ggplot2::geom_vline(
+#   xintercept = postInterventionStart$Time,
+#   linetype = "dotted"
+#   # ) + ggplot2::geom_point(
+#   # ggplot2::aes(alpha = Alpha)
+#   #   shape = '.'
+# ) + ggplot2::geom_line(
+# ) + ggplot2::facet_grid(
+#   `Window Function` ~ Intervention,
+#   scales = "free_y"
+# ) + ggplot2::labs(
+#   color = "Window Size"
+#   # ) + ggplot2::scale_y_continuous(
+#   #   transform = scales::pseudo_log_trans(sigma = 0.1)
+# ) + ggplot2::guides(
+#   color = ggplot2::guide_legend(override.aes = list(alpha = 1))
+# )
+#
+#
+# ggplot2::ggplot(
+#   spaceForTimeWindows %>% dplyr::select(
+#     !dplyr::contains(".") | dplyr::starts_with("Differences.Window.Slopes")
+#   ) %>% tidyr::pivot_longer(
+#     dplyr::contains("."),
+#     names_to = "Window Function",
+#     values_to = "Window Value"
+#   ),
+#   ggplot2::aes(x = WindowTime,
+#                y = `Window Value` * WindowSize,
+#                color = factor(WindowSize,
+#                               levels = windowSizes* Div_rounding,
+#                               ordered = TRUE),
+#                group = WindowSize)
+# ) + ggplot2::geom_vline(
+#   xintercept = postInterventionStart$Time,
+#   linetype = "dotted"
+#   # ) + ggplot2::geom_point(
+#   # ggplot2::aes(alpha = Alpha)
+#   #   shape = '.'
+# ) + ggplot2::geom_line(
+# ) + ggplot2::facet_grid(
+#   `Window Function` ~ Intervention,
+#   scales = "free_y"
+# ) + ggplot2::labs(
+#   color = "Window Size"
+#   # ) + ggplot2::scale_y_continuous(
+#   #   transform = scales::pseudo_log_trans(sigma = 0.1)
+# ) + ggplot2::guides(
+#   color = ggplot2::guide_legend(override.aes = list(alpha = 1))
+# )
