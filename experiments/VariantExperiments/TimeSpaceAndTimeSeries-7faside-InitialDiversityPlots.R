@@ -224,7 +224,7 @@ diversitiesRounded <- diversitiesRounded %>% dplyr::filter(
         paste0(ppDO$PatchAffinities, "(", ppDO$NumberEnvironments, ")")
     }
     
-    if(is.na(ipt)) {return(initstate)}
+    if(is.na(ipt)) {return(initState)}
     
     ipDO <- interventionPatchDictionaryOrigin[ipt, ]
     
@@ -280,7 +280,8 @@ plotDiversityOverview <- function(dRounded) {
     ggplot2::aes(
       x = Time,
       y = Value,
-      color = interaction(Intervention)
+      color = interaction(Intervention),
+      alpha = Alpha
     )
   ) + ggplot2::geom_line(
     # alpha = 0.4,
@@ -292,10 +293,10 @@ plotDiversityOverview <- function(dRounded) {
                     InterventionPatchType, InterventionPatchSeed,
                     InterventionTimeType, InterventionTimeSeed,
                     InterventionDispersal, InterventionNicheDistance),
-      alpha = ifelse(Measurement2 == "Regional Rich.", 1, 0.4)#,
+      # alpha = ifelse(Measurement2 == "Regional Rich.", 1, 0.4)#,
       # size = ifelse(Measurement2 == "Regional Rich.", 1.2, 1)
     ),
-    alpha = 0.6
+    # alpha = 0.6
   ) + ggplot2::geom_line(
     data = dRounded %>% dplyr::filter(
       Measurement2 %in% c("Spatial Diss.", "Local Rich.", "Regional Rich."),
@@ -320,16 +321,16 @@ plotDiversityOverview <- function(dRounded) {
     # ) + ggplot2::scale_fill_manual(
     #   name = legend_bl_name,
     #   values = c("darkorange4", "plum4", "cyan4")
-  ) + ggplot2::facet_grid(
-    factor(
-      Measurement2, ordered = T,
-      levels = c("Local Rich.", "Regional Rich.", "Spatial Diss.")
-    ) ~ #PoolPatchAffinity +
-      #Affinity ,# ncol = 3,
-      Alignment,
-    scales = "free_y"
-  ) + ggplot2::scale_alpha(
-    guide = "none"
+  # ) + ggplot2::facet_grid(
+  #   factor(
+  #     Measurement2, ordered = T,
+  #     levels = c("Local Rich.", "Regional Rich.", "Spatial Diss.")
+  #   ) ~ #PoolPatchAffinity +
+  #     #Affinity ,# ncol = 3,
+  #     Alignment,
+  #   scales = "free_y"
+  # ) + ggplot2::scale_alpha(
+  #   guide = "none"
   ) + ggplot2::scale_size(
     guide = "none"
   ) + ggplot2::coord_cartesian(
