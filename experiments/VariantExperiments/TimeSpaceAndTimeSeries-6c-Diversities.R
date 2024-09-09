@@ -7,24 +7,25 @@
 # although we aim to improve design at each stage.
 
 # Parameters: #################################################################
-datfolders <- c(
-  # "TSTS_Simulations_1-1_1-1_2024-02-13",
-  # "TSTS_Simulations_1-1_2-2_2024-02-14",
-  # "TSTS_Simulations_2-1_2-2_2024-02-14",
-  # "TSTS_Simulations_10-1_2-2_2024-02-15",
-  # "TSTS_Simulations_6-1_2-2_2024-02-15"
-  # "TSTS_Simulations_11-1_3-3_2024-02-23",
-  # "TSTS_Simulations_11-1_4-4_2024-02-23"
-  # "TSTS_Simulations_17-1_5-5_2024-03-08",
-  # "TSTS_Simulations_18-1_6-6_2024-03-08"
-  # "TSTS_Simulations_19-1_7-7_2024-03-08",
-  # "TSTS_Simulations_20-1_8-8_2024-03-08"
-  #"TSTS_Simulations_18-1_6-6_2024-05-23"
-  # "TSTS_Simulations_138-1_10-10_2024-08-22"
-  "TSTS_Simulations_158-1_9-9_2024-08-22"
-)
+# datfolders <- c(
+#   # "TSTS_Simulations_1-1_1-1_2024-02-13",
+#   # "TSTS_Simulations_1-1_2-2_2024-02-14",
+#   # "TSTS_Simulations_2-1_2-2_2024-02-14",
+#   # "TSTS_Simulations_10-1_2-2_2024-02-15",
+#   # "TSTS_Simulations_6-1_2-2_2024-02-15"
+#   # "TSTS_Simulations_11-1_3-3_2024-02-23",
+#   # "TSTS_Simulations_11-1_4-4_2024-02-23"
+#   # "TSTS_Simulations_17-1_5-5_2024-03-08",
+#   # "TSTS_Simulations_18-1_6-6_2024-03-08"
+#   # "TSTS_Simulations_19-1_7-7_2024-03-08",
+#   # "TSTS_Simulations_20-1_8-8_2024-03-08"
+#   #"TSTS_Simulations_18-1_6-6_2024-05-23"
+#   # "TSTS_Simulations_138-1_10-10_2024-08-22"
+#   "TSTS_Simulations_158-1_9-9_2024-08-22"
+# )
+datfolders <- dir(pattern = "TSTS_Simulations_")
 
-cores <- 1
+cores <- 4
 
 rows_per_event <- 1
 
@@ -150,7 +151,7 @@ Diversity <- foreach::foreach(
             # These paths are of length n / 2 + 1 = 6. If we had 11, then the
             # extra patch would be on adjacent to one of the extremes (w.l.o.g.)
             # but then either one could be the extreme. So 11 also => 6.
-            cut(.x, breaks = ceiling((loaded$NumEnvironments + 1)/2))
+            cut(.x, breaks = max(ceiling((loaded$NumEnvironments + 1)/2), 2))
           } else {
             .x
           }
@@ -196,7 +197,7 @@ Diversity <- foreach::foreach(
       Diversity$Diversities <-
         RMTRCode2::thinAndCalculateDiversities(#Calculate_Diversity(
           loaded,
-          nspecies = c(Basal = 34, Consumer = 66) * numberOfSpecies / 100,
+          nspecies = table(x_pool$Type),
           # My standard approach for nspecies.
           preferred_rows_per_event = rows_per_event,
           divide_time_by = 1
@@ -300,7 +301,7 @@ DivAbund <- foreach::foreach(
             # These paths are of length n / 2 + 1 = 6. If we had 11, then the
             # extra patch would be on adjacent to one of the extremes (w.l.o.g.)
             # but then either one could be the extreme. So 11 also => 6.
-            cut(.x, breaks = ceiling((loaded$NumEnvironments + 1)/2))
+            cut(.x, breaks = max(ceiling((loaded$NumEnvironments + 1)/2), 2))
           } else {
             .x
           }
@@ -349,7 +350,7 @@ DivAbund <- foreach::foreach(
         loaded$Parameters$EliminationThreshold,
         rows_per_event
       ) %>% calculateAbundanceMetrics(
-        c(Basal = 34, Consumer = 66) * numberOfSpecies / 100,
+        table(x_pool$Type),
         loaded$NumEnvironments
       )
 
