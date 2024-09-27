@@ -35,13 +35,19 @@ eventsDictionaryOrigin <- expand.grid(
 ) %>% dplyr::mutate(ID = dplyr::row_number())
 
 # Dispersal: ##################################################################
+# Note: ID is not the row number, because access is via:
+# dispersalDictionaryOrigin[ifelse(is.na(dispersalDictionaryChoice),
+#                           1, dispersalDictionaryChoice + 2), ]
+# i.e. NA -> 1 (None), 0 -> 2 (1e0), 1 -> 3 (1e1), etc.
 dispersalDictionaryOrigin <- rbind(
   data.frame(Resistance = Inf, Configuration = "None"),
   expand.grid(
     Resistance = 10^c(0:9),
     Configuration = c("Ring", "Line", "Complete"),
     stringsAsFactors = FALSE
-  )) %>% dplyr::mutate(ID = dplyr::row_number())
+  )) %>% dplyr::mutate(
+    ID = c(NA, 0:nrow(dispersalDictionaryOrigin))[dplyr::row_number()]
+    )
 
 # Pool-Patch Affinity/Adaptation: #############################################
 affinityDictionaryOrigin <- expand.grid(

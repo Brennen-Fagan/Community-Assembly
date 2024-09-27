@@ -19,6 +19,9 @@ experiments <- list(
       NumberEnvironments == 1
     ),
 
+  dynDO =
+    dynamicsDictionaryOrigin[1, ], # No other options implemented.
+
   eDO =
     eventsDictionaryOrigin %>% dplyr::filter(
       EventsNumberMultiplier == 2, # Longer simulation. No changes to balance.
