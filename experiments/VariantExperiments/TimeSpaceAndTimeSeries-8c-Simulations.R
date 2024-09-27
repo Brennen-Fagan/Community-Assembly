@@ -7,11 +7,12 @@ simulationsTarget <- switch(
   "1" = "TimeSpaceAndTimeSeries-8a-DictionaryIDs.R",
   "TimeSpaceAndTimeSeries-8a-DictionaryIDs.R" # Default
 )
+directory <- '.'
+source(file.path(directory, simulationsTarget))
 
 if (runSimulationsFlag) {
-  directory <- '.'
   source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
-  source(file.path(directory, simulationsTarget))
+  source(file.path(directory, "TimeSpaceAndTimeSeries-0-Dictionaries.R"))
   source(file.path(directory, "TimeSpaceAndTimeSeries-8b-SimulationFunction.R"))
 
   library(parallel)
@@ -109,10 +110,22 @@ parameterChoices <- dplyr::bind_rows(
   }
 )
 
+# Order matters due to some transforms for the wrapper.
+# poolpatchDictionaryChoice = pc$pp, [1]
+# poolpatchSeedChoice = pc$ppSeed, [2]
+# dynamicsDictionaryChoice = pc$dyn, [3]
+# dynamicsSeedChoice = pc$dynSeed, [4]
+# eventsDictionaryChoice = pc$events, [5]
+# eventsSeedChoice = pc$eventsSeed, [6]
+# dispersalDictionaryChoice = pc$dispersal, [7]
+# distanceDictionaryChoice = pc$distance, [8]
+
 parameterChoices <- parameterChoices %>% dplyr::select(
   dplyr::starts_with("pp"),
   dplyr::starts_with("dyn"),
   dplyr::starts_with("events"),
+  dplyr::starts_with("dispersal"),
+  dplyr::starts_with("distance"),
   dplyr::starts_with("affinity"),
   dplyr::everything()
 ) %>% dplyr::arrange(
@@ -135,7 +148,7 @@ if (runSimulationsFlag) {
     pcs = parameterChoices %>% dplyr::select(-dplyr::ends_with("Seed")),
     dicts = list(poolpatchDictionaryOrigin, dynamicsDictionaryOrigin,
                  eventsDictionaryOrigin, dispersalDictionaryOrigin,
-                 affinityDictionaryOrigin, distanceDictionaryOrigin)
+                 distanceDictionaryOrigin, affinityDictionaryOrigin)
   )) %>% unique()
   toExport <- toExport[!grepl("=", toExport, fixed = TRUE) &
                          !grepl("::", toExport, fixed = TRUE) &
@@ -148,16 +161,16 @@ if (runSimulationsFlag) {
   ) %dopar% {
     pc <- unlist(pc) # untibble so we are passing numerics.
     simulationWrapper(
-      poolpatchDictionaryChoice = pc$pp,
-      poolpatchSeedChoice = pc$ppSeed,
-      dynamicsDictionaryChoice = pc$dyn,
-      dynamicsSeedChoice = pc$dynSeed,
-      eventsDictionaryChoice = pc$events,
-      eventsSeedChoice = pc$eventsSeed,
-      dispersalDictionaryChoice = pc$dispersal,
-      affinityDictionaryChoice = pc$affinity,
-      affinitySeedChoice = pc$affinitySeed,
-      distanceDictionaryChoice = pc = pc$distance,
+      poolpatchDictionaryChoice = pc[1],
+      poolpatchSeedChoice = pc[2],
+      dynamicsDictionaryChoice = pc[3],
+      dynamicsSeedChoice = pc[4],
+      eventsDictionaryChoice = pc[5],
+      eventsSeedChoice = pc[6],
+      dispersalDictionaryChoice = pc[7],
+      distanceDictionaryChoice = pc[8],
+      affinityDictionaryChoice = pc[9],
+      affinitySeedChoice = pc[10],
       returnResults = FALSE,
       saveResults = TRUE,
       skipIfSaveExists = TRUE

@@ -45,9 +45,10 @@ dispersalDictionaryOrigin <- rbind(
     Resistance = 10^c(0:9),
     Configuration = c("Ring", "Line", "Complete"),
     stringsAsFactors = FALSE
-  )) %>% dplyr::mutate(
-    ID = c(NA, 0:nrow(dispersalDictionaryOrigin))[dplyr::row_number()]
-    )
+  ))
+dispersalDictionaryOrigin <- dispersalDictionaryOrigin %>% dplyr::mutate(
+  ID = c(NA, 0:nrow(dispersalDictionaryOrigin))[dplyr::row_number()]
+)
 
 # Pool-Patch Affinity/Adaptation: #############################################
 affinityDictionaryOrigin <- expand.grid(

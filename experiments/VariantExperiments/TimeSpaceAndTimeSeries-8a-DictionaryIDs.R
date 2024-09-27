@@ -57,5 +57,10 @@ experiments <- list(
   iTDO =
     interventionTimeDictionaryOrigin %>% dplyr::filter(
       Method == "mean"
-    )
+    ),
+
+  # interventionDispersalDictionaryChoice
+  iDispChoice = "p",
+  # interventionDistanceDictionaryChoice
+  iDistChoice = "p",
 )

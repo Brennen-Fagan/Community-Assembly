@@ -21,9 +21,9 @@ simulationWrapper <- function(
   eventsDictionaryChoice,
   eventsSeedChoice,
   dispersalDictionaryChoice,
+  distanceDictionaryChoice,
   affinityDictionaryChoice,
   affinitySeedChoice,
-  distanceDictionaryChoice,
   parameters = list(), # Borrowing from stats::optim's control template
   loadPoolPatchDynamicsIfAble = TRUE,
   seedsMain = data.frame(#runif(4)*1e8 #[1] 92305891 59807071 14587749  8304800
@@ -123,7 +123,7 @@ simulationWrapper <- function(
     eventsDictionaryChoice, "-", # Sometimes want to change.
     dispersalDictionaryChoice, "-", # Commonly changed.
     distanceDictionaryChoice, "-", # Commonly changed.
-    distanceDictionaryChoice,"_", # Of Experimental interest.
+    affinityDictionaryChoice,"_", # Of Experimental interest.
     # SEEDS:
     poolpatchSeedChoice, "-",
     dynamicsSeedChoice, "-",
@@ -152,10 +152,7 @@ simulationWrapper <- function(
   datfile_ppd <- file.path(
     datfolder,
     paste0(
-      "TSTS_PoolPatchDynamics_",
-      poolpatchDictionaryChoice, "-", # Bundle Inter-Simulation Constants.
-      dynamicsDictionaryChoice, #"-",
-      ".RData"
+      "TSTS_PoolPatchDynamics_", partialID, ".RData"
     )
   )
   if (loadPoolPatchDynamicsIfAble) {
@@ -170,7 +167,6 @@ simulationWrapper <- function(
   if (exists("datfile_ppd_envir")) {
     # Pool, InteractionMatrices, DynamicsFunction, CharacteristicRate,
     Pool <- datfile_ppd_envir$Pool
-    PatchAffinities <- datfile_ppd_envir$PatchAffinities
     InteractionMatrices <- datfile_ppd_envir$InteractionMatrices
     DynamicsFunction <- datfile_ppd_envir$DynamicsFunction
     CharacteristicRate <- datfile_ppd_envir$CharacteristicRate
@@ -255,14 +251,14 @@ simulationWrapper <- function(
 
   # Affinities are no longer a part of the pool-patch framework.
   id <- affinitySeedIndex()
-  Affinities <- with(poolpatchDictionary, {
+  Affinities <- with(affinityDictionary, {
     if(!is.na(as.numeric(substr(SpeciesAffinities, 1, 1)))) {
       # Treat as numbers
       as.numeric(unlist(strsplit(SpeciesAffinities, split = ", ")))
     } else {
       # Treat as function
       withRandom(
-        retrieveFunction(SpeciesAffinities)(Basals + Consumers),
+        retrieveFunction(SpeciesAffinities)(nrow(Pool)),
         seed = withRandom(runif(id)[id] * 1e8, seed = affinitySeed)
       )
     }
@@ -271,7 +267,7 @@ simulationWrapper <- function(
   Pool <- cbind(Pool, Affinity = Affinities)
 
   id <- affinitySeedIndex()
-  PatchAffinities <- matrix(with(poolpatchDictionary, {
+  PatchAffinities <- matrix(with(affinityDictionary, {
     if(is.numeric(PatchAffinities)) {
       rep(PatchAffinities, Basals + Consumers)
     } else if(!is.na(as.numeric(substr(PatchAffinities, 1, 1)))) {
@@ -280,7 +276,7 @@ simulationWrapper <- function(
     } else {
       # Treat as function
       withRandom(
-        retrieveFunction(PatchAffinities)(NumberEnvironments),
+        retrieveFunction(PatchAffinities)(poolpatchDictionary$NumberEnvironments),
         seed = withRandom(runif(id)[id] * 1e8, seed = affinitySeed)
       )
     }
@@ -315,7 +311,7 @@ simulationWrapper <- function(
     "Exists a species which doesn't immigrate to/extirpate from an environment."
   )}
 
-  # Instantiate PerCapitaDynamics: ##############################################
+  # Instantiate PerCapitaDynamics: ############################################
   # We've already built the "functional" interactions matrix, but we now need
   # to apply the transformation r' = r rho^(sign(r)) and then combine.
 
@@ -384,7 +380,7 @@ simulationWrapper <- function(
     }
   }
 
-  # Instantiate Dispersal Matrix: ###############################################
+  # Instantiate Dispersal Matrix: #############################################
   if (poolpatchDictionary$NumberEnvironments > 1) {
     DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
       EnvironmentDistances = convertDispersalDictToDistMatrix(
