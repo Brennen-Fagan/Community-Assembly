@@ -1,3 +1,7 @@
+# Renamed from 7a and updated in line with 8 series experiments.
+# Note that while 8a pulls the values from the [Psuedo-GLOBAL] dictionaries,
+# this function only takes the row IDs needed to access (again!) the dicts.
+
 # Libraries: ##################################################################
 library(RMTRCode2)
 library(dplyr)
@@ -17,13 +21,16 @@ simulationWrapper <- function(
   eventsDictionaryChoice,
   eventsSeedChoice,
   dispersalDictionaryChoice,
+  affinityDictionaryChoice,
+  affinitySeedChoice,
   distanceDictionaryChoice,
   parameters = list(), # Borrowing from stats::optim's control template
   loadPoolPatchDynamicsIfAble = TRUE,
-  seedsMain = data.frame(
-    "pools"    = 21622193,
-    "events"   = 73825470,
-    "dynamics" = 83066253
+  seedsMain = data.frame(#runif(4)*1e8 #[1] 92305891 59807071 14587749  8304800
+    "pools"    = 92305891,
+    "events"   = 59807071,
+    "dynamics" = 14587749,
+    "affinity" = 8304800
   ),
   returnResults = FALSE,
   saveResults = TRUE,
@@ -55,6 +62,7 @@ simulationWrapper <- function(
     runif(poolpatchSeedChoice)[poolpatchSeedChoice] * 1e8,
     seed = seedsMain$pools
   )
+  poolpatchSeedIndex <- indexFactory()
 
   dynamicsDictionary <-
     dynamicsDictionaryOrigin[dynamicsDictionaryChoice, ]
@@ -62,6 +70,7 @@ simulationWrapper <- function(
     runif(dynamicsSeedChoice)[dynamicsSeedChoice] * 1e8,
     seed = seedsMain$dynamics
   )
+  dynamicsSeedIndex <- indexFactory()
 
   eventsDictionary <-
     eventsDictionaryOrigin[eventsDictionaryChoice, ]
@@ -69,6 +78,7 @@ simulationWrapper <- function(
     runif(eventsSeedChoice)[eventsSeedChoice] * 1e8,
     seed = seedsMain$events
   )
+  eventsSeedIndex <- indexFactory()
 
   dispersalDictionary <-
     dispersalDictionaryOrigin[ifelse(is.na(dispersalDictionaryChoice),
@@ -76,6 +86,14 @@ simulationWrapper <- function(
 
   distanceDictionary <-
     distanceDictionaryOrigin[distanceDictionaryChoice, ]
+
+  affinityDictionary <-
+    affinityDictionaryOrigin[affinityDictionaryChoice, ]
+  affinitySeed <- withRandom(
+    runif(affinitySeedChoice)[affinitySeedChoice] * 1e8,
+    seed = seedsMain$affinity
+  )
+  affinitySeedIndex <- indexFactory()
 
   # Files: ######################################################################
   partialID <- paste0(
@@ -104,11 +122,13 @@ simulationWrapper <- function(
     dynamicsDictionaryChoice, "-",
     eventsDictionaryChoice, "-", # Sometimes want to change.
     dispersalDictionaryChoice, "-", # Commonly changed.
-    distanceDictionaryChoice, "_",
+    distanceDictionaryChoice, "-", # Commonly changed.
+    distanceDictionaryChoice,"_", # Of Experimental interest.
     # SEEDS:
     poolpatchSeedChoice, "-",
     dynamicsSeedChoice, "-",
-    eventsSeedChoice
+    eventsSeedChoice, "-",
+    affinitySeedChoice
   )
 
 
@@ -155,6 +175,7 @@ simulationWrapper <- function(
     DynamicsFunction <- datfile_ppd_envir$DynamicsFunction
     CharacteristicRate <- datfile_ppd_envir$CharacteristicRate
   } else {
+    id <- poolpatchSeedIndex()
     Pool <- with(poolpatchDictionary, {
       do.call(what = retrieveFunction(PoolFunction),
               # TODO: the ; handling seems excessive, and was not suggested.
@@ -162,24 +183,12 @@ simulationWrapper <- function(
                 callMeMaybe2(as.list(strsplit(PoolParameters, "; ")[[1]])),
                 "Basal" = Basals,
                 "Consumer" = Consumers,
-                "seed" = withRandom(runif(1)[1] * 1e8, seed = poolpatchSeed)
+                "seed" = withRandom(runif(id)[id] * 1e8, seed = poolpatchSeed)
               )
       )
     })
 
-    Affinities <- with(poolpatchDictionary, {
-      if(!is.na(as.numeric(substr(SpeciesAffinities, 1, 1)))) {
-        # Treat as numbers
-        as.numeric(unlist(strsplit(SpeciesAffinities, split = ", ")))
-      } else {
-        # Treat as function
-        withRandom(
-          retrieveFunction(SpeciesAffinities)(Basals + Consumers),
-          seed = withRandom(runif(2)[2] * 1e8, seed = poolpatchSeed)
-        )
-      }
-    })
-
+    id <- poolpatchSeedIndex()
     Speeds <- with(poolpatchDictionary, {
       if(is.numeric(PoolDispersalSpeed)) {
         rep(PoolDispersalSpeed, Basals + Consumers)
@@ -190,40 +199,26 @@ simulationWrapper <- function(
         # Treat as function
         withRandom(
           retrieveFunction(PoolDispersalSpeed)(Basals + Consumers),
-          seed = withRandom(runif(3)[3] * 1e8, seed = poolpatchSeed)
+          seed = withRandom(runif(id)[id] * 1e8, seed = poolpatchSeed)
         )
       }
     })
 
     Pool <- cbind(
       Pool,
-      Speed = Speeds,
-      Affinity = Affinities
+      Speed = Speeds
     )
 
-    PatchAffinities <- matrix(with(poolpatchDictionary, {
-      if(is.numeric(PatchAffinities)) {
-        rep(PatchAffinities, Basals + Consumers)
-      } else if(!is.na(as.numeric(substr(PatchAffinities, 1, 1)))) {
-        # Treat as numbers
-        as.numeric(unlist(strsplit(PatchAffinities, split = ", ")))
-      } else {
-        # Treat as function
-        withRandom(
-          retrieveFunction(PatchAffinities)(NumberEnvironments),
-          seed = withRandom(runif(4)[4] * 1e8, seed = poolpatchSeed)
-        )
-      }
-    }), nrow = poolpatchDictionary$NumberEnvironments)
-
+    id <- dynamicsSeedIndex()
     # NOT THE FINAL PERCAPITADYNAMICS FUNCTION.
     DynamicsFunction <- with(dynamicsDictionary, {
       withRandom(
         retrieveFunction(DynamicsFunction),
-        seed = withRandom(runif(1)[1] * 1e8, seed = dynamicsSeed)
+        seed = withRandom(runif(id)[id] * 1e8, seed = dynamicsSeed)
       )}
     )
 
+    id <- dynamicsSeedIndex()
     IntMatFunc <- with(dynamicsDictionary, {
       withRandom(
         purrr::partial(
@@ -234,15 +229,16 @@ simulationWrapper <- function(
           # Prompt 'R purrr, using a list of arguments to partialize a function'.
           # 2024/01/19
         ),
-        seed = withRandom(runif(2)[2] * 1e8, seed = dynamicsSeed)
+        seed = withRandom(runif(id)[id] * 1e8, seed = dynamicsSeed)
       )}
     )
 
+    id <- dynamicsSeedIndex()
     InteractionMatrices <- RMTRCode2::CreateEnvironmentInteractions(
       Pool = Pool,
       NumEnvironments = poolpatchDictionary$NumberEnvironments,
       ComputeInteractionMatrix = IntMatFunc,
-      EnvironmentSeeds = withRandom(runif(3)[3] * 1e8, seed = dynamicsSeed)
+      EnvironmentSeeds = withRandom(runif(id)[id] * 1e8, seed = dynamicsSeed)
     )
 
     CharacteristicRate <- max(unlist(lapply(
@@ -250,12 +246,45 @@ simulationWrapper <- function(
     )))
 
     if (exists("datfile_ppd_write") && datfile_ppd_write) {
-      save(Pool, PatchAffinities,
+      save(Pool,
            InteractionMatrices, DynamicsFunction, CharacteristicRate,
            poolpatchSeed, dynamicsSeed, ID = partialID,
            file = datfile_ppd)
     }
   }
+
+  # Affinities are no longer a part of the pool-patch framework.
+  id <- affinitySeedIndex()
+  Affinities <- with(poolpatchDictionary, {
+    if(!is.na(as.numeric(substr(SpeciesAffinities, 1, 1)))) {
+      # Treat as numbers
+      as.numeric(unlist(strsplit(SpeciesAffinities, split = ", ")))
+    } else {
+      # Treat as function
+      withRandom(
+        retrieveFunction(SpeciesAffinities)(Basals + Consumers),
+        seed = withRandom(runif(id)[id] * 1e8, seed = affinitySeed)
+      )
+    }
+  })
+
+  Pool <- cbind(Pool, Affinity = Affinities)
+
+  id <- affinitySeedIndex()
+  PatchAffinities <- matrix(with(poolpatchDictionary, {
+    if(is.numeric(PatchAffinities)) {
+      rep(PatchAffinities, Basals + Consumers)
+    } else if(!is.na(as.numeric(substr(PatchAffinities, 1, 1)))) {
+      # Treat as numbers
+      as.numeric(unlist(strsplit(PatchAffinities, split = ", ")))
+    } else {
+      # Treat as function
+      withRandom(
+        retrieveFunction(PatchAffinities)(NumberEnvironments),
+        seed = withRandom(runif(id)[id] * 1e8, seed = affinitySeed)
+      )
+    }
+  }), nrow = poolpatchDictionary$NumberEnvironments)
 
   # Events: #####################################################################
   EventsEach <- with(poolpatchDictionary, {
