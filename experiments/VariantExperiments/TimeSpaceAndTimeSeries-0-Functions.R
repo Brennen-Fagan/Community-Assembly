@@ -29,6 +29,16 @@ withRandom <- function(expr, seed) {
   expr
 }
 
+# Function that automatically increments after use. Note that we need to store
+# the result if we want to use the same index twice.
+indexFactory <- function() {
+  index <- 1
+  function() {
+    on.exit(index <<- index + 1)
+    return(index)
+  }
+}
+
 ### Randomness: ###############################################################
 # Run runif and organise in a smooth-ish ring.
 runifRing <- function(n, ...) {
@@ -64,6 +74,9 @@ rhofunction <- function(
 
 rho.2.0.1.euclidean <- rhofunction()
 rho.2.1.2.euclidean <- rhofunction(2, 1, 2)
+rho.5.0.1.euclidean <- rhofunction(5, 0, 1)
+rho.5.1.2.euclidean <- rhofunction(5, 1, 2)
+rho.10.0.1.euclidean <- rhofunction(10, 0, 1)
 rho.10.1.2.euclidean <- rhofunction(10, 1, 2)
 
 # Easy ring gradients.

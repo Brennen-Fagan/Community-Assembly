@@ -44,7 +44,7 @@ dispersalDictionaryOrigin <- rbind(
   )) %>% dplyr::mutate(ID = dplyr::row_number())
 
 # Pool-Patch Affinity/Adaptation: #############################################
-affinityDictionaryOrigin <- data.frame(
+affinityDictionaryOrigin <- expand.grid(
   SpeciesAffinities = c(
     "rep_0",                 # Pool with {0} affinities.
     "rep_0.5",               # Pool with {0.5} affinities.
@@ -70,8 +70,9 @@ affinityDictionaryOrigin <- data.frame(
     "patchTypes.0.Half.1", # Patch {0, 0.5, 1} affinities. Gradient Ring.
     "runifRing", #           Patch [0, 1] affinities. Gradient Ring at Random.
     "evensplit_0.51" #        Patch {0.5, 1} affinities. Alternating.
-  )
-)
+  ),
+  stringsAsFactors = FALSE
+) %>% dplyr::mutate(ID = dplyr::row_number())
 
 # Distance/Intensity/Affinity Effect: #########################################
 distanceDictionaryOrigin <- data.frame(
