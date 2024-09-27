@@ -1,3 +1,4 @@
+# DEPRECATED DUE TO CHANGES IN DICTIONARIES -- 2024-09-26.
 # runSimulations <- TRUE
 runSimulationsFlag <- # Default to TRUE if runSimulations does not exist.
   (!exists("runSimulations") || get("runSimulations") == TRUE)

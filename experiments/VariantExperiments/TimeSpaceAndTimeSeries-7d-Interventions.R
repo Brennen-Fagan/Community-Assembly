@@ -1,3 +1,4 @@
+# DEPRECATED DUE TO CHANGES IN DICTIONARIES -- 2024-09-26.
 library(dplyr)
 library(parallel)
 library(doParallel)
@@ -52,7 +53,7 @@ parameterChoices <- dplyr::bind_rows(
 )
 
 # Run across each row of parameterChoices: ####################################
-clust <- parallel::makeCluster(4)
+clust <- parallel::makeCluster(8)
 doParallel::registerDoParallel(clust)
 
 toExport <- unlist(lapply(

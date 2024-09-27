@@ -10,36 +10,7 @@ poolpatchDictionaryOrigin <- expand.grid(
           "LogBodySize = c(-2, -1, -1, 0)", sep = "; ")
   ),
   PoolDispersalSpeed = 1, # Value divided by DispersalResistance to get current.
-  NumberEnvironments = c(1, 2, 10),
-  SpeciesAffinities = c(
-    # Pool with {0.5} affinities.
-    "rep_0.5",
-    # 2  # Pool {0, 1} patch affinities at random.
-    "sample.int.normalized",
-    # 3  # Pool {0, 0.5, 1} patch affinities at random.
-    "sample.int.3",
-    # 4  # Pool [0, 1] patch affinities at random.
-    "runif",
-    # 5  # Pool {0, 1} alternating affinities.
-    "evensplit_01"
-  ),
-  PatchAffinities = c(
-    # Detection via if string begins with a numeric or a non-numeric.
-    # If numeric, it takes it as a fixed set of affinities.
-    # If non-numeric, it attempts to treat the string as a function name.
-    # In the latter case, it provides ONLY NumberEnvironments as an argument.
-    "rep_0.5", #             Patch {0.5} affinities.
-    "rep_0", #               Patch {0} affinities.
-    "rep_0.25", #            Patch {0.25} affinities.
-    "rep_0.75", #            Patch {0.75} affinities.
-    "rep_1", #               Patch {1} affinities.
-    "gradientline_01", #     Patch {0, 1} affinities. Gradient Line.
-    "evensplit_01", #        Patch {0, 1} affinities. Alternating.
-    "gradientline_0half1", # Patch {0, 0.5, 1} affinities. Gradient Line.
-    "patchTypes.0.Half.1", # Patch {0, 0.5, 1} affinities. Gradient Ring.
-    "runifRing", #           Patch [0, 1] affinities. Gradient Ring at Random.
-    "evensplit_0.51" #        Patch {0.5, 1} affinities. Alternating.
-  ),
+  NumberEnvironments = c(1, 2, 6, 10, 12),
   stringsAsFactors = FALSE
 ) %>% dplyr::mutate(ID = dplyr::row_number())
 
@@ -72,11 +43,44 @@ dispersalDictionaryOrigin <- rbind(
     stringsAsFactors = FALSE
   )) %>% dplyr::mutate(ID = dplyr::row_number())
 
-# Distance/Intensity/Affinity: ################################################
+# Pool-Patch Affinity/Adaptation: #############################################
+affinityDictionaryOrigin <- data.frame(
+  SpeciesAffinities = c(
+    "rep_0",                 # Pool with {0} affinities.
+    "rep_0.5",               # Pool with {0.5} affinities.
+    "rep_1",                 # Pool with {1} affinities.
+    "sample.int.normalized", # Pool {0, 1} patch affinities at random.
+    "sample.int.3",          # Pool {0, 0.5, 1} patch affinities at random.
+    "runif",                 # Pool [0, 1] patch affinities at random.
+    "evensplit_01"           # Pool {0, 1} alternating affinities.
+  ),
+  PatchAffinities = c(
+    # Detection via if string begins with a numeric or a non-numeric.
+    # If numeric, it takes it as a fixed set of affinities.
+    # If non-numeric, it attempts to treat the string as a function name.
+    # In the latter case, it provides ONLY NumberEnvironments as an argument.
+    "rep_0", #               Patch {0} affinities.
+    "rep_0.25", #            Patch {0.25} affinities.
+    "rep_0.5", #             Patch {0.5} affinities.
+    "rep_0.75", #            Patch {0.75} affinities.
+    "rep_1", #               Patch {1} affinities.
+    "gradientline_01", #     Patch {0, 1} affinities. Gradient Line.
+    "evensplit_01", #        Patch {0, 1} affinities. Alternating.
+    "gradientline_0half1", # Patch {0, 0.5, 1} affinities. Gradient Line.
+    "patchTypes.0.Half.1", # Patch {0, 0.5, 1} affinities. Gradient Ring.
+    "runifRing", #           Patch [0, 1] affinities. Gradient Ring at Random.
+    "evensplit_0.51" #        Patch {0.5, 1} affinities. Alternating.
+  )
+)
+
+# Distance/Intensity/Affinity Effect: #########################################
 distanceDictionaryOrigin <- data.frame(
-  rhofunction = c( # Take patch
+  rhofunction = c( # Take patch and species affinities as vector arguments.
     "rho.2.0.1.euclidean",
     "rho.2.1.2.euclidean",
+    "rho.5.0.1.euclidean",
+    "rho.5.1.2.euclidean",
+    "rho.10.0.1.euclidean",
     "rho.10.1.2.euclidean",
     stringsAsFactors = FALSE
   )
@@ -91,9 +95,9 @@ interventionPatchDictionaryOrigin <- expand.grid(
     # In the latter case, it provides ONLY NumberEnvironments as an argument.
 
 
-    "rep_0.5", #             Patch {0.5} affinities.
     "rep_0", #               Patch {0} affinities.
     "rep_0.25", #            Patch {0.25} affinities.
+    "rep_0.5", #             Patch {0.5} affinities.
     "rep_0.75", #            Patch {0.75} affinities.
     "rep_1", #               Patch {1} affinities.
     "gradientline_01", #     Patch {0, 1} affinities. Gradient Line.
@@ -117,7 +121,9 @@ interventionPatchDictionaryOrigin <- expand.grid(
     0 # First
   ),
   InterventionPercentage = c(
+    1/3,
     0.5,
+    2/3,
     1
   ),
   stringsAsFactors = FALSE
