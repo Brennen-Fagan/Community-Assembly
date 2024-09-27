@@ -21,12 +21,13 @@ samplingPerAbundance <- 1/100 # Converts abundance to rate of encounter
 # calculationsPlotLong <- FALSE
 
 # Runs:
-samplingRunsPerFile <- 20 # A human readable number. Number of runs.
+# samplingRunsPerFile <- 20 # A human readable number. Number of runs.
+samplingRunsPerFile <- 1000 # A distribution building number. Number of runs.
 
 samplingPreinterventionTimeGap <- 1
 
 # Parallelization
-cores <- 1
+cores <- 6
 
 
 # Files: ######################################################################
