@@ -414,6 +414,7 @@ simulationWrapper <- function(
     Timescale = "Simulation",
     ID = fullID,
     Affinity = list(
+      SpeciesAffinities = Affinities,
       PatchAffinities = PatchAffinities,
       EffectiveReproductionRate = rprime
     )

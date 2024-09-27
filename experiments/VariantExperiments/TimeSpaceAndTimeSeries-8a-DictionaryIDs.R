@@ -62,5 +62,5 @@ experiments <- list(
   # interventionDispersalDictionaryChoice
   iDispChoice = "p",
   # interventionDistanceDictionaryChoice
-  iDistChoice = "p",
+  iDistChoice = "p"
 )

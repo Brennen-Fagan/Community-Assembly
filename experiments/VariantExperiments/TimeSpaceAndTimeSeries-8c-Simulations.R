@@ -119,6 +119,8 @@ parameterChoices <- dplyr::bind_rows(
 # eventsSeedChoice = pc$eventsSeed, [6]
 # dispersalDictionaryChoice = pc$dispersal, [7]
 # distanceDictionaryChoice = pc$distance, [8]
+# affinityDictionaryChoice = pc$affinity, [9]
+# affinitySeedChoice = pc$affinitySeed, [10]
 
 parameterChoices <- parameterChoices %>% dplyr::select(
   dplyr::starts_with("pp"),

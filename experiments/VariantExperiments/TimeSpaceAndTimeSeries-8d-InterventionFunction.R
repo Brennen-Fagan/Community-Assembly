@@ -13,7 +13,8 @@ handlerID <- function(
   ID # list containing: Tag (optional) +
   # poolpatchDictionaryChoice, poolpatchSeedChoice, dynamicsDictionaryChoice,
   # dynamicsSeedChoice, eventsDictionaryChoice, eventsSeedChoice,
-  # dispersalDictionaryChoice, distanceDictionaryChoice, Date (YYYY-MM-DD)
+  # dispersalDictionaryChoice, distanceDictionaryChoice,
+  # affinityDictionaryChoice, Date (YYYY-MM-DD)
 ) {
   # ID Handling: ##############################################################
   stopmsg <- "ID not interpreted correctly. Try providing explicit names."
@@ -39,9 +40,10 @@ handlerID <- function(
         # PARAMETERS:
         poolpatchDictionaryChoice, "-", dynamicsDictionaryChoice, "-",
         eventsDictionaryChoice, "-", dispersalDictionaryChoice, "-",
-        distanceDictionaryChoice, "_",
+        distanceDictionaryChoice, "-", affinityDictionaryChoice, "_",
         # SEEDS:
-        poolpatchSeedChoice, "-", dynamicsSeedChoice, "-", eventsSeedChoice,
+        poolpatchSeedChoice, "-", dynamicsSeedChoice, "-",
+        eventsSeedChoice, "-", affinitySeedChoice,
         ".RData")
     )
 
@@ -52,10 +54,10 @@ handlerID <- function(
     runDictionary <- dirname(ID)
     datfile <- basename(ID)
 
-  } else if (length(ID) <= 10 && length(ID) >= 8) { # Unnamed list of components
+  } else if (length(ID) <= 12 && length(ID) >= 10) { # Unnamed list of components
     runDictionary0 <- 0
     runDictionaryDate <- NULL
-    if (length(ID) > 8) {
+    if (length(ID) > 10) {
       # Maybe Date
       runDictionaryDateTest <- tryCatch(
         {
@@ -64,11 +66,11 @@ handlerID <- function(
           TRUE
         },
         error = function(e) return(FALSE))
-      if(length(ID) == 10 && !runDictionaryDateTest) {
-        stop("ID has 10 entries, but last not parsed as %Y-%m-%d date.")
+      if(length(ID) == 12 && !runDictionaryDateTest) {
+        stop("ID has 12 entries, but last not parsed as %Y-%m-%d date.")
       }
-      if (length(ID) == 10 || !runDictionaryDateTest) {
-        # == 9 entries and last is not a date (X)or have 10 entries.
+      if (length(ID) == 12 || !runDictionaryDateTest) {
+        # == 11 entries and last is not a date (X)or have 12 entries.
         runDictionaryTag <- ID[[1]]
         runDictionary0 <- 1
       } else {
@@ -102,15 +104,16 @@ handlerID <- function(
           runDictionaryTag, "_",
           # PARAMETERS:
           # poolpatchDictionaryChoice, "-", dynamicsDictionaryChoice, "-",
-          ID[[runDictionary0 + 1]], "-", ID[[runDictionary0 + 3]], "_",
+          ID[[runDictionary0 + 1]], "-", ID[[runDictionary0 + 3]], "-",
           # eventsDictionaryChoice, "-", dispersalDictionaryChoice, "-",
-          ID[[runDictionary0 + 5]], "-", ID[[runDictionary0 + 7]], "_",
-          # distanceDictionaryChoice, "_",
-          ID[[runDictionary0 + 8]], "_",
+          ID[[runDictionary0 + 5]], "-", ID[[runDictionary0 + 7]], "-",
+          # distanceDictionaryChoice, "-", affinityDictionaryChoice "_",
+          ID[[runDictionary0 + 8]], "-", ID[[runDictionary0 + 9]], "_",
           # SEEDS:
-          # poolpatchSeedChoice, "-", dynamicsSeedChoice, "-", eventsSeedChoice,
+          # poolpatchSeedChoice, "-", dynamicsSeedChoice, "-",
+          # eventsSeedChoice, "-", affinitySeedChoice
           ID[[runDictionary0 + 2]], "-", ID[[runDictionary0 + 4]], "-",
-          ID[[runDictionary0 + 6]],
+          ID[[runDictionary0 + 6]], "-", ID[[runDictionary0 + 10]],
           ".RData")
       )
 
@@ -136,10 +139,9 @@ interventionWrapper <- function(
   interventionTimeSeedChoice,
   interventionDispersalDictionaryChoice,
   interventionDistanceDictionaryChoice,
-  seedsMain = data.frame(
-    "patches"  = 10515098,
-    "times"    = 55871737,
-    "dynamics" = 11522135
+  seedsMain = data.frame(# runif(2)*1e8 # [1] 43340679 22983863
+    "patches"  = 43340679,
+    "times"    = 22983863
   ),
   returnResults = FALSE,
   saveResults = TRUE,
@@ -223,6 +225,7 @@ interventionWrapper <- function(
     runif(interventionPatchSeedChoice)[interventionPatchSeedChoice] * 1e8,
     seed = seedsMain$patches
   )
+  interventionPatchSeedIndex <- indexFactory()
 
   interventionTimeDictionary <- interventionTimeDictionaryOrigin[
     interventionTimeDictionaryChoice,
@@ -231,6 +234,7 @@ interventionWrapper <- function(
     runif(interventionTimeSeedChoice)[interventionTimeSeedChoice] * 1e8,
     seed = seedsMain$times
   )
+  interventionTimeSeedIndex <- indexFactory()
 
   if (toupper(interventionDispersalDictionaryChoice) %in%
       c("P", "PRE", "PREV", "PREVIOUS") # "PREVIOUS" is meaning. "p" for storage.
@@ -279,6 +283,7 @@ interventionWrapper <- function(
   # New values:
   # Note: this is technically excessive, but keeping the number of environments
   # in total is easier for programming below.
+  id <- interventionPatchSeedIndex()
   interventionPatchAffinities <- matrix(with(interventionPatchDictionary, {
     if(is.numeric(PatchAffinities)) {
       rep(PatchAffinities, nrow(poolMats$Pool))
@@ -289,18 +294,19 @@ interventionWrapper <- function(
       # Treat as function
       withRandom(
         retrieveFunction(PatchAffinities)(NumberOfEnvironments),
-        seed = withRandom(runif(1)[1] * 1e8, seed = interventionPatchSeed)
+        seed = withRandom(runif(id)[id] * 1e8, seed = interventionPatchSeed)
       )
     }
   }), nrow = NumberOfEnvironments)
 
   # Locations:
+  id <- interventionPatchSeedIndex()
   interventionPatches <- with(interventionPatchDictionary, {
     if (is.na(InterventionLocation)) {
       # Random: Ring style (fill rightwards)
       interventionPatches <- ((withRandom(
         sample.int(NumberOfEnvironments, 1),
-        seed = withRandom(runif(2)[2] * 1e8, seed = interventionPatchSeed)
+        seed = withRandom(runif(id)[id] * 1e8, seed = interventionPatchSeed)
       ) + 1 : ceiling(NumberOfEnvironments * InterventionPercentage)
       ) %% NumberOfEnvironments) + 1
     } else if (InterventionLocation == 0) {
@@ -329,13 +335,14 @@ interventionWrapper <- function(
   })
 
   # Time:
+  id <- interventionTimeSeedIndex()
   interventionTime <- with(interventionTimeDictionary, {
     if (Method == "mean") {
       mean(c(eval(str2lang(Time1)), eval(str2lang(Time2))))
     } else if(Method == "runif") {
       withRandom(
         runif(1, min = eval(str2lang(Time1), max = eval(str2lang(Time2)))),
-        seed = withRandom(runif(1)[1] * 1e8, seed = interventionTimeSeed)
+        seed = withRandom(runif(id)[id] * 1e8, seed = interventionTimeSeed)
       )
     } else {
       stop(paste0("Method (Intervention Time): ", method, " not implemented."))
@@ -357,7 +364,7 @@ interventionWrapper <- function(
         ifelse(
           j %in% interventionPatches, # if in intervention
           Pool$ReproductionRate[i] * rho( # recalculate for the new patches.
-            Pool[i, grepl("Affinity", colnames(Pool), fixed = TRUE)],
+            loaded$Ellipsis$Affinity$SpeciesAffinity[i],
             interventionPatchAffinities[j, ] # Forced to be a matrix.
           )[1]^sign(Pool$ReproductionRate[i]),
           loaded$Ellipsis$Affinity$EffectiveReproductionRate[ # else use old
@@ -514,6 +521,7 @@ interventionWrapper <- function(
     ParentRun = datfile,
     ID = paste0(loaded$Ellipsis$ID, "_", appendID),
     Affinity = list(
+      SpeciesAffinities = loaded$Ellipsis$Affinity$SpeciesAffinities,
       PatchAffinitiesOld = loaded$Ellipsis$Affinity$PatchAffinities,
       PatchAffinitiesIntervention = interventionPatchAffinities,
       PatchInterventions = interventionPatches,
