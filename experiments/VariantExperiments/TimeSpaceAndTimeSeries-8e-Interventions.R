@@ -35,7 +35,7 @@ parameterChoices <- parameterChoices %>% dplyr::full_join(
 )
 
 # Run across each row of parameterChoices: ####################################
-clust <- parallel::makeCluster(8)
+clust <- parallel::makeCluster(12)
 doParallel::registerDoParallel(clust)
 
 toExport <- unlist(lapply(

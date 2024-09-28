@@ -812,6 +812,166 @@ thinAbundance <- function(abundance, events, threshold,
   return(abundance)
 }
 
+thinAbundanceEqualTimeSteps <- function(abundance, events, threshold,
+                                        preferredTimeStep) {
+  time <- abundance[, 1]
+  consistentDistance <- max(diff(time), preferredTimeStep)
+  if (consistentDistance != preferredTimeStep) {
+    warning(paste0("preferredTimeStep is too small, minimum:",
+                   consistentDistance))
+  }
+  targets <- seq(from = min(time), to = max(time), by = consistentDistance)
+  rows <- unique( # Just In Case?
+    sapply(targets, function(x, y) {which.max(y >= x)}, y = time)
+  )
+
+  abundance <- abundance[rows, ]
+  abundance[, 1] <- targets
+  # Technically an approximation, but we should be high resolution
+  # enough for it not to be a problem.
+
+  # Remove illegal values (that the numerical engine uses as inbetweens).
+  toEliminate <- abundance[, -1] < threshold # & abundance[, -1] > 0
+  abundance[, -1][toEliminate] <- 0
+
+  return(abundance)
+}
+
+hillWrapper <- function(env, i) {
+  metrics <- vegan::renyi(env, hill = TRUE) # returns data.frame!
+  names(metrics) <- paste0("Hill:", names(metrics))
+  cbind(Time = time,
+        Environment1 = i,
+        Environment2 = NA,
+        metrics,
+        stringsAsFactors = FALSE) %>% tidyr::pivot_longer(
+          cols = tidyr::contains("Hill"),
+          names_to = "Metric", values_to = "Value"
+        )
+}
+
+# Based on RMTRCode2::Calculate_Diversity and calculateAbundanceMetrics as well
+# as the betapart procedure.
+# The main difference is to try to provide a uniform layout from the beginning
+calculateDiversityMetrics <- function(abundance, nspecies, nenvironments) {
+  stopifnot(nenvironments >= 1)
+
+  envs <- lapply(
+    1:nenvironments,
+    function(i, abund, numSpecies) {
+      env <- abund[, 1 + 1:numSpecies + numSpecies * (i - 1)]
+    },
+    abund = abundance,
+    numSpecies = sum(nspecies)
+  )
+
+  time <- abundance[, 1]
+
+  # Format: data.frame: Time, Environment 1, Environment 2, Metric, Value
+  # If an environment is not appropriate, we instead use NA.
+
+  # Alpha: ####################################################################
+  diversityAlpha <- dplyr::bind_rows(lapply(
+    1:nenvironments, function(i) hillWrapper(env = envs[[i]], i = i)
+  )) %>% dplyr::mutate(
+    Metric = paste0("Alpha ", Metric)
+  )
+
+  # Gamma: ####################################################################
+  if (nenvironments > 1) {
+    envgamma <- envs[[1]]
+    if (nenvironments > 1) {
+      for (i in 2:nenvironments) {
+        envgamma <- envgamma + envs[[i]]
+      }
+    }
+
+    diversityGamma <- hillWrapper(env = envgamma, i = NA) %>% dplyr::mutate(
+      Metric = paste0("Gamma ", Metric)
+    )
+  }
+
+  # Beta Spatial: #############################################################
+  if (nenvironments > 1) {
+    diversityBetaSpace <- apply(
+      abundance,
+      MARGIN = 1, # Rows
+      function(row, envs) {
+        thistime <- row[1]
+
+        # List with three components:
+        #   balance/turnover, gradient/nestedness, and total.
+        distsBC <- betapart::beta.pair.abund(
+          x = matrix(row[-1], nrow = envs, byrow = TRUE),
+          index.family = "bray"
+        )
+        distsJ <- betapart::beta.pair(
+          x = matrix((row[-1] > 0) + 0, nrow = envs, byrow = TRUE),
+          index.family = "jaccard"
+        )
+
+        dataf <- expand.grid(
+          Environment1 = 1:envs,
+          Environment2 = 1:envs
+        ) %>% dplyr::filter(
+          Environment1 < Environment2
+        ) %>% dplyr::arrange(
+          Environment1, Environment2
+        ) %>% dplyr::mutate(
+          Time = thistime,
+          SpaceBrayCurtisBalance = as.vector(distsBC),
+          SpaceBrayCurtisGradient = as.vector(distsBC),
+          SpaceBrayCurtis = as.vector(distsBC),
+          SpaceJaccardTurnover = as.vector(distsJ),
+          SpaceJaccardNestedness = as.vector(distsJ),
+          SpaceJaccard = as.vector(distsJ)
+        )
+
+        return(dataf)
+      },
+      envs = nenvironments
+    ) %>% dplyr::bind_rows() %>% tidyr::pivot_longer(
+      cols = SpaceBrayCurtisBalance:SpaceJaccard,
+      names_to = "Metric", values_to = "Value"
+    )
+  }
+
+  # Beta Temporal: ############################################################
+  # ASSUMING ALREADY EQUAL TIME DIFFERENCES.
+
+  diversityBetaTime <- dplyr::bind_rows(lapply(
+    1:nenvironments, function(i) {
+      lapply(2:nrow(envs[[i]]), function(r) {
+        target <- rbind(envs[[i]][r-1, ], envs[[i]][r, ])
+        distsBC <- betapart::beta.pair.abund(x = target, index.family = "bray")
+        distsJ <- betapart::beta.pair(x = target, index.family = "jaccard")
+        expand.grid(
+          Environment1 = i,
+          Environment2 = NA
+        ) %>% dplyr::mutate(
+          Time = envs[[i]][r, 1],
+          TimeBrayCurtisBalance = as.vector(distsBC),
+          TimeBrayCurtisGradient = as.vector(distsBC),
+          TimeBrayCurtis = as.vector(distsBC),
+          TimeJaccardTurnover = as.vector(distsJ),
+          TimeJaccardNestedness = as.vector(distsJ),
+          TimeJaccard = as.vector(distsJ)
+        )
+      }) %>% dplyr::bind_rows()
+    }
+  )) %>% tidyr::pivot_longer(
+    cols = TimeBrayCurtisBalance:TimeJaccard,
+    names_to = "Metric", values_to = "Value"
+  )
+
+  return(dplyr::bind_rows(
+    diversityAlpha,
+    if (nenvironments > 1) diversityGamma,
+    if (nenvironments > 1) diversityBetaSpace,
+    diversityBetaTime
+  ))
+}
+
 # Like Calculating Diversities, but not for binary data only.
 calculateAbundanceMetrics <- function(abundance, nspecies, nenvironments) {
   stopifnot(nenvironments >= 1)
