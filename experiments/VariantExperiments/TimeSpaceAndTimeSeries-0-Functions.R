@@ -840,8 +840,7 @@ thinAbundanceEqualTimeSteps <- function(abundance, events, threshold,
 hillWrapper <- function(env, i) {
   metrics <- vegan::renyi(env, hill = TRUE) # returns data.frame!
   names(metrics) <- paste0("Hill:", names(metrics))
-  cbind(Time = time,
-        Environment1 = i,
+  cbind(Environment1 = i,
         Environment2 = NA,
         metrics,
         stringsAsFactors = FALSE) %>% tidyr::pivot_longer(
@@ -872,7 +871,8 @@ calculateDiversityMetrics <- function(abundance, nspecies, nenvironments) {
 
   # Alpha: ####################################################################
   diversityAlpha <- dplyr::bind_rows(lapply(
-    1:nenvironments, function(i) hillWrapper(env = envs[[i]], i = i)
+    1:nenvironments,
+    function(i) cbind(Time = time, hillWrapper(env = envs[[i]], i = i))
   )) %>% dplyr::mutate(
     Metric = paste0("Alpha ", Metric)
   )
@@ -886,7 +886,8 @@ calculateDiversityMetrics <- function(abundance, nspecies, nenvironments) {
       }
     }
 
-    diversityGamma <- hillWrapper(env = envgamma, i = NA) %>% dplyr::mutate(
+    diversityGamma <-
+      cbind(Time = time, hillWrapper(env = envgamma, i = NA)) %>% dplyr::mutate(
       Metric = paste0("Gamma ", Metric)
     )
   }
@@ -896,40 +897,40 @@ calculateDiversityMetrics <- function(abundance, nspecies, nenvironments) {
     diversityBetaSpace <- apply(
       abundance,
       MARGIN = 1, # Rows
-      function(row, envs) {
+      function(row, nenv) {
         thistime <- row[1]
 
         # List with three components:
         #   balance/turnover, gradient/nestedness, and total.
         distsBC <- betapart::beta.pair.abund(
-          x = matrix(row[-1], nrow = envs, byrow = TRUE),
+          x = matrix(row[-1], nrow = nenv, byrow = TRUE),
           index.family = "bray"
         )
         distsJ <- betapart::beta.pair(
-          x = matrix((row[-1] > 0) + 0, nrow = envs, byrow = TRUE),
+          x = matrix((row[-1] > 0) + 0, nrow = nenv, byrow = TRUE),
           index.family = "jaccard"
         )
 
         dataf <- expand.grid(
-          Environment1 = 1:envs,
-          Environment2 = 1:envs
+          Environment1 = 1:nenv,
+          Environment2 = 1:nenv
         ) %>% dplyr::filter(
           Environment1 < Environment2
         ) %>% dplyr::arrange(
           Environment1, Environment2
         ) %>% dplyr::mutate(
           Time = thistime,
-          SpaceBrayCurtisBalance = as.vector(distsBC),
-          SpaceBrayCurtisGradient = as.vector(distsBC),
-          SpaceBrayCurtis = as.vector(distsBC),
-          SpaceJaccardTurnover = as.vector(distsJ),
-          SpaceJaccardNestedness = as.vector(distsJ),
-          SpaceJaccard = as.vector(distsJ)
+          SpaceBrayCurtisBalance = as.vector(distsBC$beta.bray.bal),
+          SpaceBrayCurtisGradient = as.vector(distsBC$beta.bray.gra),
+          SpaceBrayCurtis = as.vector(distsBC$beta.bray),
+          SpaceJaccardTurnover = as.vector(distsJ$beta.jtu),
+          SpaceJaccardNestedness = as.vector(distsJ$beta.jne),
+          SpaceJaccard = as.vector(distsJ$beta.jac)
         )
 
         return(dataf)
       },
-      envs = nenvironments
+      nenv = nenvironments
     ) %>% dplyr::bind_rows() %>% tidyr::pivot_longer(
       cols = SpaceBrayCurtisBalance:SpaceJaccard,
       names_to = "Metric", values_to = "Value"
@@ -943,19 +944,21 @@ calculateDiversityMetrics <- function(abundance, nspecies, nenvironments) {
     1:nenvironments, function(i) {
       lapply(2:nrow(envs[[i]]), function(r) {
         target <- rbind(envs[[i]][r-1, ], envs[[i]][r, ])
-        distsBC <- betapart::beta.pair.abund(x = target, index.family = "bray")
-        distsJ <- betapart::beta.pair(x = target, index.family = "jaccard")
+        distsBC <- betapart::beta.pair.abund(
+          x = target, index.family = "bray")
+        distsJ <- betapart::beta.pair(
+          x = (target > 0) + 0, index.family = "jaccard")
         expand.grid(
           Environment1 = i,
           Environment2 = NA
         ) %>% dplyr::mutate(
-          Time = envs[[i]][r, 1],
-          TimeBrayCurtisBalance = as.vector(distsBC),
-          TimeBrayCurtisGradient = as.vector(distsBC),
-          TimeBrayCurtis = as.vector(distsBC),
-          TimeJaccardTurnover = as.vector(distsJ),
-          TimeJaccardNestedness = as.vector(distsJ),
-          TimeJaccard = as.vector(distsJ)
+          Time = time[r],
+          TimeBrayCurtisBalance = as.vector(distsBC$beta.bray.bal),
+          TimeBrayCurtisGradient = as.vector(distsBC$beta.bray.gra),
+          TimeBrayCurtis = as.vector(distsBC$beta.bray),
+          TimeJaccardTurnover = as.vector(distsJ$beta.jtu),
+          TimeJaccardNestedness = as.vector(distsJ$beta.jne),
+          TimeJaccard = as.vector(distsJ$beta.jac)
         )
       }) %>% dplyr::bind_rows()
     }
