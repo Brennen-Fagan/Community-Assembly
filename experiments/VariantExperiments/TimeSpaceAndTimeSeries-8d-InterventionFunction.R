@@ -364,7 +364,7 @@ interventionWrapper <- function(
         ifelse(
           j %in% interventionPatches, # if in intervention
           Pool$ReproductionRate[i] * rho( # recalculate for the new patches.
-            loaded$Ellipsis$Affinity$SpeciesAffinity[i],
+            loaded$Ellipsis$Affinity$SpeciesAffinities[i],
             interventionPatchAffinities[j, ] # Forced to be a matrix.
           )[1]^sign(Pool$ReproductionRate[i]),
           loaded$Ellipsis$Affinity$EffectiveReproductionRate[ # else use old
