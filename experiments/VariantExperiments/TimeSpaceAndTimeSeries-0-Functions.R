@@ -812,15 +812,18 @@ thinAbundance <- function(abundance, events, threshold,
   return(abundance)
 }
 
-thinAbundanceEqualTimeSteps <- function(abundance, events, threshold,
-                                        preferredTimeStep) {
+thinAbundanceEqualTimeSteps <- function(
+  abundance, threshold, preferredTimeStep, preferredStart = NULL
+) {
   time <- abundance[, 1]
   consistentDistance <- max(diff(time), preferredTimeStep)
   if (consistentDistance != preferredTimeStep) {
     warning(paste0("preferredTimeStep is too small, minimum:",
                    consistentDistance))
   }
-  targets <- seq(from = min(time), to = max(time), by = consistentDistance)
+  if (is.null(preferredStart)) preferredStart <- min(time)
+  targets <- seq(from = preferredStart,
+                 to = max(time), by = consistentDistance)
   rows <- unique( # Just In Case?
     sapply(targets, function(x, y) {which.max(y >= x)}, y = time)
   )
@@ -872,7 +875,10 @@ calculateDiversityMetrics <- function(abundance, nspecies, nenvironments) {
   # Alpha: ####################################################################
   diversityAlpha <- dplyr::bind_rows(lapply(
     1:nenvironments,
-    function(i) cbind(Time = time, hillWrapper(env = envs[[i]], i = i))
+    function(i) {
+      vals <- hillWrapper(env = envs[[i]], i = i)
+      cbind(Time = rep(time, each = nrow(vals)/length(time)), vals)
+    }
   )) %>% dplyr::mutate(
     Metric = paste0("Alpha ", Metric)
   )
@@ -887,8 +893,12 @@ calculateDiversityMetrics <- function(abundance, nspecies, nenvironments) {
     }
 
     diversityGamma <-
-      cbind(Time = time, hillWrapper(env = envgamma, i = NA)) %>% dplyr::mutate(
+      hillWrapper(env = envgamma, i = NA) %>% dplyr::mutate(
       Metric = paste0("Gamma ", Metric)
+    )
+    diversityGamma <- cbind(
+      Time = rep(time, each = nrow(diversityGamma)/length(time)),
+      diversityGamma
     )
   }
 

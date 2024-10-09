@@ -516,6 +516,7 @@ interventionWrapper <- function(
     MaximumTimeStep = loaded$Parameters$MaximumTimeStep,
     BetweenEventSteps = loaded$Parameters$BetweenEventSteps,
     Verbose = TRUE,
+    HistorySeed = loaded$HistorySeed, # Not used as events are passed through.
     # Using the ellipsis pass through feature:
     Timescale = "Simulation",
     ParentRun = datfile,

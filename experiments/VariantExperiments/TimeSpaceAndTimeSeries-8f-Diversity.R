@@ -109,9 +109,10 @@ Diversity <- foreach::foreach(
 
     loaded$Abundance <- thinAbundanceEqualTimeSteps(
       abundance = loaded$Abundance,
-      events = loaded$Events,
+      # events = loaded$Events, # unnecessary here.
       threshold = loaded$Parameters$EliminationThreshold,
-      preferredTimeStep = rows_per_event # Abusing the characteristic t scale.
+      preferredTimeStep = rows_per_event, # Abusing the characteristic t scale.
+      preferredStart = ceiling(loaded$Abundance[1, 1]) # Must be at or after.
     )
 
     if (!is.null(x_pool)) {
