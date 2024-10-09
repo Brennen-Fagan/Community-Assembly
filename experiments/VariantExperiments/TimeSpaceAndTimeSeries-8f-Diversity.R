@@ -1,12 +1,12 @@
 # Introduction: ###############################################################
 # Sequel to TimeSpaceAndTimeSeries-6c-Diversities.R.
 # We're customising the previous version to the new spec of 8.
-# We're also going to try to incorporate the various diversity metrics that 
+# We're also going to try to incorporate the various diversity metrics that
 # have been additionally requested.
 
 # Parameters: #################################################################
 datfolders <- dir(pattern = "TSTS_Simulations_")
-cores <- 1 # Parallelization?
+cores <- 4 # Parallelization?
 rows_per_event <- 1 # Maximum rows per event (base resolution) is 10.
 
 # Libraries: ##################################################################
@@ -19,7 +19,6 @@ library(parallel)
 library(iterators)
 library(doParallel)
 library(foreach)
-library(doRNG)
 
 # Parallelization: ############################################################
 if (cores > 1) {
@@ -65,7 +64,7 @@ Diversity <- foreach::foreach(
             #x_properties[[1]][1] == "TSTS",
             #x_properties[[1]][2] == "Simulation"
   )
-  
+
   filename <- file.path(
     dirname(x),
     if (flag == "TSTS") {
@@ -78,7 +77,7 @@ Diversity <- foreach::foreach(
                     collapse = "_"))
     }
   )
-  
+
   if(file.exists(filename)) {
     load(filename)
   } else {
@@ -90,54 +89,54 @@ Diversity <- foreach::foreach(
     } else {
       x_pool <- NULL
     }
-    
+
     # Load result to analyse.
     loaded <- load(x) # names
     stopifnot(length(loaded) == 1)
     loaded <- (get(loaded)) # objects
-    
+
     # Unify format, double check time scale and make sure on same time scale.
     if (!"ReactionTime" %in% names(loaded$Ellipsis)) {
       loaded$Ellipsis$ReactionTime <- loaded$ReactionTime
     }
     if (loaded$Ellipsis$Timescale == "Simulation") {
-      loaded$Events$Times <- 
+      loaded$Events$Times <-
         loaded$Events$Times / loaded$Ellipsis$ReactionTime
-      loaded$Abundance[, 1] <- 
+      loaded$Abundance[, 1] <-
         loaded$Abundance[, 1] / loaded$Ellipsis$ReactionTime
       loaded$Ellipsis$Timescale <- "Characteristic"
     }
-    
+
     loaded$Abundance <- thinAbundanceEqualTimeSteps(
-      abundance = loaded$Abundance, 
-      events = loaded$Events, 
+      abundance = loaded$Abundance,
+      events = loaded$Events,
       threshold = loaded$Parameters$EliminationThreshold,
       preferredTimeStep = rows_per_event # Abusing the characteristic t scale.
     )
-    
+
     if (!is.null(x_pool)) {
       numberOfSpecies <- nrow(x_pool)
     } else {
       numberOfSpecies <- (ncol(loaded$Abundance) - 1) / loaded$NumEnvironments
     }
-    
+
     # Major edit that is somewhat of a backslide.
-    # Instead of programmatically using the named different columns of the 
+    # Instead of programmatically using the named different columns of the
     # pool, we're going to be working off of a list entry. For speed of coding,
     # I'll be treating it as a nx1 vector, rather than a possibly named matrix.
     if ("SpeciesAffinities" %in% names(loaded$Ellipsis$Affinity)) {
       # Identify Niche Cuts. If discrete, this is by value. If continuous, or
       # there are many bins, then this is by binning.
-      AffinitiesBinned <- 
+      AffinitiesBinned <-
         if (length(unique(loaded$Ellipsis$Affinity$SpeciesAffinities)) >= 5) {
-          cut(loaded$Ellipsis$Affinity$SpeciesAffinities, 
+          cut(loaded$Ellipsis$Affinity$SpeciesAffinities,
               breaks = max(ceiling((loaded$NumEnvironments + 1)/2), 5))
         } else {
           loaded$Ellipsis$Affinity$SpeciesAffinities
         }
-      
+
       DiversityNiche <- lapply(
-        unique(AffinitiesBinned), 
+        unique(AffinitiesBinned),
         function(AffinityType) {
           # Identify the subset of the abundance matrix that has the type.
           idcolumns <- c(
@@ -150,11 +149,12 @@ Diversity <- foreach::foreach(
           )
           loaded_subset <- loaded
           loaded_subset$Abundance <- loaded_subset$Abundance[, idcolumns]
-          
+
           Diversities <- calculateDiversityMetrics(
-            loaded_subset$Abundance, numberOfSpecies, loaded$NumEnvironments
+            loaded_subset$Abundance,
+            length(idcolumns) - 1, loaded$NumEnvironments
           )
-          
+
           Diversities$Subset <- AffinityType
           return(Diversities)
         }) %>% dplyr::bind_rows()
@@ -163,15 +163,22 @@ Diversity <- foreach::foreach(
       loaded$Abundance, numberOfSpecies, loaded$NumEnvironments
     )
     DiversityAll$Subset <- NA
-    
-    Diversity <- 
+
+    Diversity <-
       list(
-        Diversity = 
-          dplyr::bind_rows(DiversityAll, 
+        Diversity =
+          dplyr::bind_rows(DiversityAll,
                            if (exists("DiversityNiche")) DiversityNiche),
         Ellipsis = loaded$Ellipsis
-      ) 
-    
+      )
+
+    if ("ParentRun" %in% names(Diversity$Ellipsis))
+      Diversity$Ellipsis$GrandparentRun <- Diversity$Ellipsis$ParentRun
+    Diversity$Ellipsis$ParentRun <- x
+
     save(Diversity, file = filename)
   }
 }
+
+if (cores > 1)
+  parallel::stopCluster(clust)

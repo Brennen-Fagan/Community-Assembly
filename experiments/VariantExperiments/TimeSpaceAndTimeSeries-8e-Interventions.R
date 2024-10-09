@@ -11,7 +11,7 @@ source(file.path(directory, "TimeSpaceAndTimeSeries-8b-SimulationFunction.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-8d-InterventionFunction.R"))
 
 dirTag <- "TSTS_Simulations"
-dirDate <- "2024-09-27"
+dirDate <- "2024-10-01"
 baseTag <-  "TSTS_Simulation" # Note the distinction
 
 runSimulations <- FALSE
@@ -35,7 +35,7 @@ parameterChoices <- parameterChoices %>% dplyr::full_join(
 )
 
 # Run across each row of parameterChoices: ####################################
-clust <- parallel::makeCluster(12)
+clust <- parallel::makeCluster(20)
 doParallel::registerDoParallel(clust)
 
 toExport <- unlist(lapply(
