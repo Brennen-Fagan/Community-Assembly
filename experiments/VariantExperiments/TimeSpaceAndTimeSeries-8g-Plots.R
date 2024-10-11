@@ -172,8 +172,6 @@ diversitiesFlattened <- diversitiesFlattened %>% dplyr::mutate(
   )
 )
 
-# save(diversitiesFlattened, file = "diversitiesFlattened_plottable.RData")
-
 diversitiesFlattenedAveragedBySeed <- diversitiesFlattened %>% dplyr::group_by(
   Environment1, Environment2, Metric, Subset, PoolPatch, PoolPatchSeed,
   Interactions, InteractionsSeed, Events, EventsSeed, Dispersal, NicheDistance,
@@ -184,7 +182,7 @@ diversitiesFlattenedAveragedBySeed <- diversitiesFlattened %>% dplyr::group_by(
 ) %>% dplyr::arrange(Time) %>% dplyr::summarise(
   Mean = mean(Value),
   Slope = if (sum(!is.na(Value)) > 1) coef(lm(Value ~ Time))[2] else {NA},
-  Difference = dplyr::first(Value) - dplyr::last(Value),
+  Difference = dplyr::last(Value) - dplyr::first(Value), # Number gained.
   .groups = "drop"
 )
 
@@ -199,8 +197,14 @@ diversitiesFlattenedAveragedAcrossSeed <- diversitiesFlattenedAveragedBySeed %>%
   ) %>% dplyr::summarise(
     Mean = mean(Mean),
     Slope = mean(Slope),
-    Difference = mean(Difference)
+    Difference = mean(Difference),
+    .groups = "drop"
   )
+
+save(diversitiesFlattened,
+     diversitiesFlattenedAveragedBySeed,
+     diversitiesFlattenedAveragedAcrossSeed,
+     file = "diversitiesFlattened_plottable.RData")
 
 # Proper Plotting: ############################################################
 plotDiversityOverview <- function(d, measures) {
