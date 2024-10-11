@@ -165,8 +165,6 @@ diversitiesFlattened <- diversitiesFlattened %>% dplyr::mutate(
     affinityDictionaryOrigin$SpeciesAffinities[as.numeric(Affinity)]
 )
 
-# save(diversitiesFlattened, file = "diversitiesFlattened_plottable.RData")
-
 diversitiesFlattened <- diversitiesFlattened %>% dplyr::mutate(
   Value = dplyr::case_when(
     Metric == "Alpha Hill:0" & is.na(Value) ~ 0,
@@ -174,17 +172,20 @@ diversitiesFlattened <- diversitiesFlattened %>% dplyr::mutate(
   )
 )
 
+# save(diversitiesFlattened, file = "diversitiesFlattened_plottable.RData")
+
 diversitiesFlattenedAveragedBySeed <- diversitiesFlattened %>% dplyr::group_by(
   Environment1, Environment2, Metric, Subset, PoolPatch, PoolPatchSeed,
   Interactions, InteractionsSeed, Events, EventsSeed, Dispersal, NicheDistance,
-  Affinity, InterventionPatchType, InterventionPatchSeed,
+  Affinity, AffinitySeed, InterventionPatchType, InterventionPatchSeed,
   InterventionTimeType, InterventionTimeSeed, InterventionDispersal,
   InterventionNicheDistance, Intervention, SpeciesAffinity,
   Window = round(Time/10)*10
 ) %>% dplyr::arrange(Time) %>% dplyr::summarise(
   Mean = mean(Value),
-  Slope = coef(lm(Value ~ Time))[2],
-  Difference = dplyr::first(Value) - dplyr::last(Value)
+  Slope = if (sum(!is.na(Value)) > 1) coef(lm(Value ~ Time))[2] else {NA},
+  Difference = dplyr::first(Value) - dplyr::last(Value),
+  .groups = "drop"
 )
 
 diversitiesFlattenedAveragedAcrossSeed <- diversitiesFlattenedAveragedBySeed %>%
