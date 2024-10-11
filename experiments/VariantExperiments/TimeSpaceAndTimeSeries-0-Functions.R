@@ -72,6 +72,7 @@ rhofunction <- function(
   }
 }
 
+rho.noop <- function(m, n) {1}
 rho.2.0.1.euclidean <- rhofunction()
 rho.2.1.2.euclidean <- rhofunction(2, 1, 2)
 rho.5.0.1.euclidean <- rhofunction(5, 0, 1)

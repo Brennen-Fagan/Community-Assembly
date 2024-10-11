@@ -13,6 +13,7 @@ handlerID <- function(
   ID # list containing: Tag (optional) +
   # poolpatchDictionaryChoice, poolpatchSeedChoice, dynamicsDictionaryChoice,
   # dynamicsSeedChoice, eventsDictionaryChoice, eventsSeedChoice,
+  # initialConditionsDictionaryChoice, initialConditionsSeedChoice,
   # dispersalDictionaryChoice, distanceDictionaryChoice,
   # affinityDictionaryChoice, Date (YYYY-MM-DD)
 ) {
@@ -39,11 +40,13 @@ handlerID <- function(
         runDictionaryTag, "_",
         # PARAMETERS:
         poolpatchDictionaryChoice, "-", dynamicsDictionaryChoice, "-",
-        eventsDictionaryChoice, "-", dispersalDictionaryChoice, "-",
+        eventsDictionaryChoice, "-", initialConditionsDictionaryChoice, "-",
+        dispersalDictionaryChoice, "-",
         distanceDictionaryChoice, "-", affinityDictionaryChoice, "_",
         # SEEDS:
         poolpatchSeedChoice, "-", dynamicsSeedChoice, "-",
-        eventsSeedChoice, "-", affinitySeedChoice,
+        eventsSeedChoice, "-", initialConditionsSeedChoice, "-",
+        affinitySeedChoice,
         ".RData")
     )
 
@@ -54,10 +57,10 @@ handlerID <- function(
     runDictionary <- dirname(ID)
     datfile <- basename(ID)
 
-  } else if (length(ID) <= 12 && length(ID) >= 10) { # Unnamed list of components
+  } else if (length(ID) <= 14 && length(ID) >= 12) { # Unnamed list of components
     runDictionary0 <- 0
     runDictionaryDate <- NULL
-    if (length(ID) > 10) {
+    if (length(ID) > 12) {
       # Maybe Date
       runDictionaryDateTest <- tryCatch(
         {
@@ -66,11 +69,11 @@ handlerID <- function(
           TRUE
         },
         error = function(e) return(FALSE))
-      if(length(ID) == 12 && !runDictionaryDateTest) {
-        stop("ID has 12 entries, but last not parsed as %Y-%m-%d date.")
+      if(length(ID) == 14 && !runDictionaryDateTest) {
+        stop("ID has 14 entries, but last not parsed as %Y-%m-%d date.")
       }
-      if (length(ID) == 12 || !runDictionaryDateTest) {
-        # == 11 entries and last is not a date (X)or have 12 entries.
+      if (length(ID) == 14 || !runDictionaryDateTest) {
+        # == 13 entries and last is not a date (X)or have 14 entries.
         runDictionaryTag <- ID[[1]]
         runDictionary0 <- 1
       } else {
@@ -99,21 +102,26 @@ handlerID <- function(
         runDictionary <- candidates
       }
 
+      # , ,
       datfile <- with(
         ID, paste0(
           runDictionaryTag, "_",
           # PARAMETERS:
           # poolpatchDictionaryChoice, "-", dynamicsDictionaryChoice, "-",
           ID[[runDictionary0 + 1]], "-", ID[[runDictionary0 + 3]], "-",
-          # eventsDictionaryChoice, "-", dispersalDictionaryChoice, "-",
+          # eventsDictionaryChoice, "-", initialConditionsDictionaryChoice, "-",
           ID[[runDictionary0 + 5]], "-", ID[[runDictionary0 + 7]], "-",
-          # distanceDictionaryChoice, "-", affinityDictionaryChoice "_",
-          ID[[runDictionary0 + 8]], "-", ID[[runDictionary0 + 9]], "_",
+          # dispersalDictionaryChoice, "-", distanceDictionaryChoice, "-",
+          ID[[runDictionary0 + 9]], "-", ID[[runDictionary0 + 10]], "-",
+          # affinityDictionaryChoice "_",
+          ID[[runDictionary0 + 11]], "_",
           # SEEDS:
           # poolpatchSeedChoice, "-", dynamicsSeedChoice, "-",
-          # eventsSeedChoice, "-", affinitySeedChoice
+          # eventsSeedChoice, "-", initialConditionsSeedChoice, "-",
+          # affinitySeedChoice
           ID[[runDictionary0 + 2]], "-", ID[[runDictionary0 + 4]], "-",
-          ID[[runDictionary0 + 6]], "-", ID[[runDictionary0 + 10]],
+          ID[[runDictionary0 + 6]], "-", ID[[runDictionary0 + 8]], "-",
+          ID[[runDictionary0 + 12]],
           ".RData")
       )
 

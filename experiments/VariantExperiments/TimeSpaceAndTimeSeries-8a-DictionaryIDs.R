@@ -24,9 +24,17 @@ experiments <- list(
 
   eDO =
     eventsDictionaryOrigin %>% dplyr::filter(
-      EventsNumberMultiplier == 2, # Longer simulation. No changes to balance.
+      EventsNumberMultiplier == 20, # Longer simulation. Keep number same while
+      ImmigrationMultiplier == 0.1, # Decreasing rate of occurrence.
+      ExtirpationMultiplier == 0.1,
       ExtirpationProportion == 1 # Extirpation == Extinction in a 1 patch system.
     ),
+
+  icDO = initialConditionsDictionaryOrigin %>% dplyr::filter(
+    (Species == "None") |
+      (Species == "Basal" & Method == "Solve") |
+      (Species == "All" & Method == "InverseSize")
+  ),
 
   dispDO =
     dispersalDictionaryOrigin %>% dplyr::filter(
@@ -41,7 +49,8 @@ experiments <- list(
 
   distDO =
     distanceDictionaryOrigin %>% dplyr::filter(
-      rhofunction %in% c("rho.2.1.2.euclidean",
+      rhofunction %in% c("rho.noop",
+                         "rho.2.1.2.euclidean",
                          "rho.5.1.2.euclidean",
                          "rho.10.1.2.euclidean")
     ),

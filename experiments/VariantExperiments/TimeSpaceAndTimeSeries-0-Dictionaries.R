@@ -25,13 +25,28 @@ dynamicsDictionaryOrigin <- data.frame(
 # Events: #####################################################################
 eventsDictionaryOrigin <- expand.grid(
   EventsFunction = "defaultEvents", # Takes Number of Environments and Species.
-  EventsNumberMultiplier = c(1, 2),
-  ImmigrationMultiplier = 1,
+  EventsNumberMultiplier = c(1, 2, 10, 20), # I.e. how many more events
+  ImmigrationMultiplier = c(0.1, 1, 10), # Mult. is on rate and number.
   ImmigrationFunction = "RMTRCode2::ArrivalFUN_Example2",
-  ExtirpationMultiplier = 1, # Frequency multiplier
+  ExtirpationMultiplier = c(0.1, 1, 10), # Frequency multiplier
   ExtirpationFunction = "RMTRCode2::ExtinctFUN_Example2",
   ExtirpationProportion = c(1, 0.9, 0), # Proportion of population removed.
   stringsAsFactors = FALSE
+) %>% dplyr::mutate(ID = dplyr::row_number())
+
+# Initial Conditions: #########################################################
+initialConditionsDictionaryOrigin <- rbind(
+  data.frame(Species = "None", Method = NA, Argument = NA,
+             stringsAsFactors = FALSE),
+  data.frame(Species = c("Basal", "All"),
+             Method = c("Solve",  "InverseSize"), Argument = NA,
+             stringsAsFactors = FALSE),
+  expand.grid(
+    Species = c("Basal", "All"),
+    Method = c("Set", "Random"),
+    Argument = c(1, 100, 1000),
+    stringsAsFactors = FALSE
+  )
 ) %>% dplyr::mutate(ID = dplyr::row_number())
 
 # Dispersal: ##################################################################
@@ -84,6 +99,7 @@ affinityDictionaryOrigin <- expand.grid(
 # Distance/Intensity/Affinity Effect: #########################################
 distanceDictionaryOrigin <- data.frame(
   rhofunction = c( # Take patch and species affinities as vector arguments.
+    "rho.noop", # Just returns 1.
     "rho.2.0.1.euclidean",
     "rho.2.1.2.euclidean",
     "rho.5.0.1.euclidean",

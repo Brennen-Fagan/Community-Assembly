@@ -20,6 +20,8 @@ simulationWrapper <- function(
   dynamicsSeedChoice,
   eventsDictionaryChoice,
   eventsSeedChoice,
+  initialConditionsDictionaryChoice,
+  initialConditionsSeedChoice,
   dispersalDictionaryChoice,
   distanceDictionaryChoice,
   affinityDictionaryChoice,
@@ -27,10 +29,11 @@ simulationWrapper <- function(
   parameters = list(), # Borrowing from stats::optim's control template
   loadPoolPatchDynamicsIfAble = TRUE,
   seedsMain = data.frame(#runif(4)*1e8 #[1] 92305891 59807071 14587749  8304800
-    "pools"    = 92305891,
-    "events"   = 59807071,
-    "dynamics" = 14587749,
-    "affinity" = 8304800
+    "pools"             = 92305891,
+    "events"            = 59807071,
+    "dynamics"          = 14587749,
+    "affinity"          = 8304800,
+    "initialConditions" = 62413105 # runif(1)*1e8 #[1] 62413105
   ),
   returnResults = FALSE,
   saveResults = TRUE,
@@ -80,6 +83,14 @@ simulationWrapper <- function(
   )
   eventsSeedIndex <- indexFactory()
 
+  initialConditionsDictionary <-
+    initialConditionsDictionaryOrigin[initialConditionsDictionaryChoice,]
+  initialConditionsSeed <- withRandom(
+    runif(initialConditionsSeedChoice)[initialConditionsSeedChoice] * 1e8,
+    seed = seedsMain$initialConditions
+  )
+  initialConditionsSeedIndex <- indexFactory()
+
   dispersalDictionary <-
     dispersalDictionaryOrigin[ifelse(is.na(dispersalDictionaryChoice),
                                      1, dispersalDictionaryChoice + 2), ]
@@ -121,6 +132,7 @@ simulationWrapper <- function(
     poolpatchDictionaryChoice, "-", # Bundle Inter-Simulation Constants.
     dynamicsDictionaryChoice, "-",
     eventsDictionaryChoice, "-", # Sometimes want to change.
+    initialConditionsDictionaryChoice, "-",
     dispersalDictionaryChoice, "-", # Commonly changed.
     distanceDictionaryChoice, "-", # Commonly changed.
     affinityDictionaryChoice,"_", # Of Experimental interest.
@@ -128,6 +140,7 @@ simulationWrapper <- function(
     poolpatchSeedChoice, "-",
     dynamicsSeedChoice, "-",
     eventsSeedChoice, "-",
+    initialConditionsSeedChoice, "-",
     affinitySeedChoice
   )
 
@@ -396,9 +409,41 @@ simulationWrapper <- function(
       )
   }
 
+  # Set initial population conditions: ########################################
+  # For each environment, decide what to instantiate, apply the method, then
+  # supply the remainders (within the environment for correct order) with 0s.
+  # Following calculations assume that the pool is ordered basal first.
+  popInitial <-
+    unlist(lapply(
+      1:poolpatchDictionary$NumberEnvironments,
+      function(i) {
+        pI <- rep(0, nrow(Pool))
+
+        pICalc <- switch(
+          initialConditionsDictionary$Species,
+          "None" = NA,
+          "Basal" = 1:sum(Pool$Type == "Basal"),
+          "All" = 1:nrow(Pool))
+
+        if (!is.na(pICalc)) {
+          pI[pICalc] <- switch(
+            initialConditionsDictionary$Method,
+            "Solve" = solve(InteractionMatrices$Mats[[i]][pICalc, pICalc],
+                            rprime),
+            "InverseSize" = 1/Pool$Size[pICalc],
+            "Set" = rep(initialConditionsDictionary$Argument, length(pICalc)),
+            "Random" = runif(length(pICalc),
+                             min = params$EliminationThreshold,
+                             max = initialConditionsDictionary$Argument)
+          )
+        }
+        return(pI)
+      }))
+
   # Run Simulation: ###########################################################
   result <- RMTRCode2::MultipleNumericalAssembly_Dispersal(
     Pool = Pool,
+    PopulationInitial = popInitial,
     NumEnvironments = poolpatchDictionary$NumberEnvironments,
     CharacteristicRate = CharacteristicRate,
     Events = Events,
