@@ -121,6 +121,10 @@ Diversity <- foreach::foreach(
       numberOfSpecies <- (ncol(loaded$Abundance) - 1) / loaded$NumEnvironments
     }
 
+
+    # Bad implementation (in a few ways!); bins presences in 10s of time units.
+    Presence <- RMTRCode2::Calculate_Species(loaded, bintimes = TRUE)
+
     # Major edit that is somewhat of a backslide.
     # Instead of programmatically using the named different columns of the
     # pool, we're going to be working off of a list entry. For speed of coding,
@@ -135,6 +139,11 @@ Diversity <- foreach::foreach(
         } else {
           loaded$Ellipsis$Affinity$SpeciesAffinities
         }
+
+      # If Basal/Consumer is present, we can break it into the constituents.
+      if ("Type" %in% names(x_pool)) {
+        AffinitiesBinned <- paste0(x_pool$Type, "_", AffinitiesBinned)
+      }
 
       DiversityNiche <- lapply(
         unique(AffinitiesBinned),
@@ -159,7 +168,18 @@ Diversity <- foreach::foreach(
           Diversities$Subset <- AffinityType
           return(Diversities)
         }) %>% dplyr::bind_rows()
+
+      # Add in the relevant trait information.
+      Presence <- Presence %>% dplyr::left_join(
+        y = data.frame(
+          Species = 1:length(loaded$Ellipsis$Affinity$SpeciesAffinities),
+          Size = if ("Size" %in% names(x_pool)) x_pool$Size,
+          Type = if ("Type" %in% names(x_pool)) x_pool$Type,
+          Affinity = loaded$Ellipsis$Affinity$SpeciesAffinities
+        ), by = "Species"
+      )
     }
+
     DiversityAll <- calculateDiversityMetrics(
       loaded$Abundance, numberOfSpecies, loaded$NumEnvironments
     )
@@ -170,6 +190,7 @@ Diversity <- foreach::foreach(
         Diversity =
           dplyr::bind_rows(DiversityAll,
                            if (exists("DiversityNiche")) DiversityNiche),
+        Presence = Presence,
         Ellipsis = loaded$Ellipsis
       )
 
@@ -177,6 +198,8 @@ Diversity <- foreach::foreach(
       Diversity$Ellipsis$GrandparentRun <- Diversity$Ellipsis$ParentRun
     Diversity$Ellipsis$ParentRun <- x
 
+    # So now Diversity contains summary statistics, presence/absence values,
+    # and simulation metadata.
     save(Diversity, file = filename)
   }
 }

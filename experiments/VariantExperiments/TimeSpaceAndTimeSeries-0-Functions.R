@@ -902,6 +902,18 @@ calculateDiversityMetrics <- function(abundance, nspecies, nenvironments) {
     )
   }
 
+  # Gamma Temporal: ###########################################################
+  diversityGammaTemporal <- dplyr::bind_rows(lapply(
+    1:nenvironments,
+    function(i) {
+      # Gamma (spatial) adds across environments; this adds across times.
+      vals <- hillWrapper(env = colSums(envs[[i]]), i = i)
+      cbind(Time = NA, vals)
+    }
+  )) %>% dplyr::mutate(
+    Metric = paste0("GammaTemporal ", Metric)
+  )
+
   # Beta Spatial: #############################################################
   if (nenvironments > 1) {
     diversityBetaSpace <- apply(
