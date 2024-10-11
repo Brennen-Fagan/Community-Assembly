@@ -413,6 +413,7 @@ simulationWrapper <- function(
   # For each environment, decide what to instantiate, apply the method, then
   # supply the remainders (within the environment for correct order) with 0s.
   # Following calculations assume that the pool is ordered basal first.
+  id <- initialConditionsSeedIndex()
   popInitial <-
     unlist(lapply(
       1:poolpatchDictionary$NumberEnvironments,
@@ -425,16 +426,20 @@ simulationWrapper <- function(
           "Basal" = 1:sum(Pool$Type == "Basal"),
           "All" = 1:nrow(Pool))
 
-        if (!is.na(pICalc)) {
+        if (!is.na(pICalc[1])) {
           pI[pICalc] <- switch(
             initialConditionsDictionary$Method,
             "Solve" = solve(InteractionMatrices$Mats[[i]][pICalc, pICalc],
-                            rprime),
+                            -rprime[pICalc]), # TODO rprime might be a function!
             "InverseSize" = 1/Pool$Size[pICalc],
             "Set" = rep(initialConditionsDictionary$Argument, length(pICalc)),
-            "Random" = runif(length(pICalc),
-                             min = params$EliminationThreshold,
-                             max = initialConditionsDictionary$Argument)
+            "Random" = withRandom(
+              runif(length(pICalc),
+                    min = params$EliminationThreshold,
+                    max = initialConditionsDictionary$Argument),
+              seed = withRandom(runif(id)[id] * 1e8,
+                                seed = initialConditionsSeed)
+            )
           )
         }
         return(pI)

@@ -29,9 +29,11 @@ if (runSimulationsFlag) {
 numberPools <- 4
 numberHistories <- 1
 numberAffinities <- 1
+numberInitConds <- 1
 poolSeedOffset <- 30
 historiesSeedOffset <- 53
 affinitiesSeedOffset <- 1
+initialConditionsSeedOffset <- 1
 
 parameterChoices <- with(
   experiments,
@@ -39,6 +41,7 @@ parameterChoices <- with(
     pp = ppDO$ID,
     dyn = dynDO$ID,
     events = eDO$ID,
+    initconds = icDO$ID,
     dispersal = dispDO$ID,
     affinity = aDO$ID,
     distance = distDO$ID
@@ -110,6 +113,26 @@ parameterChoices <- dplyr::bind_rows(
   }
 )
 
+parameterChoices <- parameterChoices %>% dplyr::group_by(
+  pp, ppSeed, initconds # Maybe need to add events here?
+) %>% dplyr::mutate(
+  # Repeats across distances and dispersals
+  initcondsSeed =
+    (dplyr::cur_group_id() - 1) * numberInitConds + initialConditionsSeedOffset
+) %>% dplyr::ungroup(
+)
+
+parameterChoices <- dplyr::bind_rows(
+  parameterChoices,
+  if (numberInitConds > 1) {
+    dplyr::bind_rows(lapply(1:(numberInitConds - 1), function(i) {
+      parameterChoices %>% dplyr::mutate(
+        initcondsSeed = initcondsSeed + i
+      )
+    }))
+  }
+)
+
 # Order matters due to some transforms for the wrapper.
 # poolpatchDictionaryChoice = pc$pp, [1]
 # poolpatchSeedChoice = pc$ppSeed, [2]
@@ -117,15 +140,18 @@ parameterChoices <- dplyr::bind_rows(
 # dynamicsSeedChoice = pc$dynSeed, [4]
 # eventsDictionaryChoice = pc$events, [5]
 # eventsSeedChoice = pc$eventsSeed, [6]
-# dispersalDictionaryChoice = pc$dispersal, [7]
-# distanceDictionaryChoice = pc$distance, [8]
-# affinityDictionaryChoice = pc$affinity, [9]
-# affinitySeedChoice = pc$affinitySeed, [10]
+# initialConditionsDictionaryChoice = pc$initconds, [7]
+# initialConditionsSeedChoice = pc$initcondsSeed, [8]
+# dispersalDictionaryChoice = pc$dispersal, [9]
+# distanceDictionaryChoice = pc$distance, [10]
+# affinityDictionaryChoice = pc$affinity, [11]
+# affinitySeedChoice = pc$affinitySeed, [12]
 
 parameterChoices <- parameterChoices %>% dplyr::select(
   dplyr::starts_with("pp"),
   dplyr::starts_with("dyn"),
   dplyr::starts_with("events"),
+  dplyr::starts_with("initconds"),
   dplyr::starts_with("dispersal"),
   dplyr::starts_with("distance"),
   dplyr::starts_with("affinity"),
@@ -139,7 +165,7 @@ if (runSimulationsFlag) {
   clust <- parallel::makeCluster(12)
   doParallel::registerDoParallel(clust)
   toExport <- unlist(lapply(
-    1:6, # Non-seed columns of parameterChoices
+    1:7, # Non-seed columns of parameterChoices
     function(id, pcs, dicts) {
       indices <- unique(unlist(pcs[, id]))
       dictChoices <- dicts[[id]][indices, ]
@@ -149,7 +175,8 @@ if (runSimulationsFlag) {
     },
     pcs = parameterChoices %>% dplyr::select(-dplyr::ends_with("Seed")),
     dicts = list(poolpatchDictionaryOrigin, dynamicsDictionaryOrigin,
-                 eventsDictionaryOrigin, dispersalDictionaryOrigin,
+                 eventsDictionaryOrigin, initialConditionsDictionaryOrigin,
+                 dispersalDictionaryOrigin,
                  distanceDictionaryOrigin, affinityDictionaryOrigin)
   )) %>% unique()
   toExport <- toExport[!grepl("=", toExport, fixed = TRUE) &
@@ -169,10 +196,12 @@ if (runSimulationsFlag) {
       dynamicsSeedChoice = pc[4],
       eventsDictionaryChoice = pc[5],
       eventsSeedChoice = pc[6],
-      dispersalDictionaryChoice = pc[7],
-      distanceDictionaryChoice = pc[8],
-      affinityDictionaryChoice = pc[9],
-      affinitySeedChoice = pc[10],
+      initialConditionsDictionaryChoice = pc[7],
+      initialConditionsSeedChoice = pc[8],
+      dispersalDictionaryChoice = pc[9],
+      distanceDictionaryChoice = pc[10],
+      affinityDictionaryChoice = pc[11],
+      affinitySeedChoice = pc[12],
       returnResults = FALSE,
       saveResults = TRUE,
       skipIfSaveExists = TRUE
