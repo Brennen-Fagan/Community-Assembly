@@ -842,7 +842,12 @@ thinAbundanceEqualTimeSteps <- function(
 }
 
 hillWrapper <- function(env, i) {
-  metrics <- vegan::renyi(env, hill = TRUE) # returns data.frame!
+  metrics <- vegan::renyi(env, hill = TRUE) # returns data.frame, but only if
+  if (length(dim(env)) <= 1 || nrow(env) == 1) {# nrow > 1.
+    tempnames <- names(metrics)
+    metrics <- data.frame(matrix(metrics, nrow = 1))
+    colnames(metrics) <- tempnames
+  }
   names(metrics) <- paste0("Hill:", names(metrics))
   cbind(Environment1 = i,
         Environment2 = NA,
