@@ -99,7 +99,8 @@ Diversity <- foreach::foreach(
     if (!"ReactionTime" %in% names(loaded$Ellipsis)) {
       loaded$Ellipsis$ReactionTime <- loaded$ReactionTime
     }
-    if (loaded$Ellipsis$Timescale == "Simulation") {
+    if (!"Timescale" %in% names(loaded$Ellipsis) ||
+        loaded$Ellipsis$Timescale == "Simulation") {
       loaded$Events$Times <-
         loaded$Events$Times / loaded$Ellipsis$ReactionTime
       loaded$Abundance[, 1] <-
@@ -115,15 +116,15 @@ Diversity <- foreach::foreach(
       preferredStart = ceiling(loaded$Abundance[1, 1]) # Must be at or after.
     )
 
-    if (!is.null(x_pool)) {
+    if (exists("x_pool") && !is.null(x_pool)) {
       numberOfSpecies <- nrow(x_pool)
     } else {
       numberOfSpecies <- (ncol(loaded$Abundance) - 1) / loaded$NumEnvironments
     }
 
 
-    # Bad implementation (in a few ways!); bins presences in 10s of time units.
-    Presence <- RMTRCode2::Calculate_Species(loaded, bintimes = TRUE)
+    # Bad implementation (in a few ways!); bins presences in 0.1s of time units.
+    Presence <- RMTRCode2::Calculate_Species(loaded, bintimes = FALSE)
 
     # Major edit that is somewhat of a backslide.
     # Instead of programmatically using the named different columns of the

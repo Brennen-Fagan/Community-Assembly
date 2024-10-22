@@ -11,7 +11,7 @@ source(file.path(directory, "TimeSpaceAndTimeSeries-8b-SimulationFunction.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-8d-InterventionFunction.R"))
 
 dirTag <- "TSTS_Simulations"
-dirDate <- "2024-10-01"
+dirDate <- "2024-10-11"
 baseTag <-  "TSTS_Simulation" # Note the distinction
 
 runSimulations <- FALSE

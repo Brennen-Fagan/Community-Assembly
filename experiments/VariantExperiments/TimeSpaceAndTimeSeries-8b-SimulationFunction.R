@@ -43,7 +43,7 @@ simulationWrapper <- function(
   #  Parameters: ##############################################################
   params <- list(
     EliminationThreshold = 10^-4, # Below which species are removed.
-    ArrivalDensity =  4 * 10 ^ 3, # Traill et al. 2007: MULTIPLIER ON ABOVE.
+    ArrivalDensity =  4 * 10 ^ 3 * 10^-4, # Traill et al. 2007: MULTIPLIED BY ET.
     MaximumTimeStep = 1, # Maximum time solver can proceed without elimination.
     BetweenEventSteps = 10 # Number of steps to reach next event to smooth.
   )
@@ -459,7 +459,7 @@ simulationWrapper <- function(
     ExtinctionProportion = eventsDictionary$ExtirpationProportion,
     MaximumTimeStep = params$MaximumTimeStep,
     BetweenEventSteps = params$BetweenEventSteps,
-    Verbose = TRUE,
+    Verbose = FALSE,
     # Using the ellipsis pass through feature:
     Timescale = "Simulation",
     ID = fullID,

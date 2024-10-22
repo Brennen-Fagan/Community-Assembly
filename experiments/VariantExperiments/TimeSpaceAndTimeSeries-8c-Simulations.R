@@ -2,10 +2,16 @@
 runSimulationsFlag <- # Default to TRUE if runSimulations does not exist.
   (!exists("runSimulations") || get("runSimulations") == TRUE)
 
+simulationsTargets <- c(
+  "TimeSpaceAndTimeSeries-8a-DictionaryIDs.R",
+  "TimeSpaceAndTimeSeries-8a2-DictionaryIDs.R"
+)
+
 simulationsTarget <- switch(
   EXPR = {if(exists("simulationsTargetIndex")) simulationsTargetIndex else "NA"},
-  "1" = "TimeSpaceAndTimeSeries-8a-DictionaryIDs.R",
-  "TimeSpaceAndTimeSeries-8a-DictionaryIDs.R" # Default
+  "1" = simulationsTargets[1],
+  "2" = simulationsTargets[2],
+  simulationsTargets[1] # Default
 )
 directory <- '.'
 source(file.path(directory, simulationsTarget))
@@ -26,14 +32,28 @@ if (runSimulationsFlag) {
 #   1:29 (poolpatch), 1:29 (dynamics), 1:52 (events)
 
 # Parameters: #################################################################
-numberPools <- 4
-numberHistories <- 1
-numberAffinities <- 1
-numberInitConds <- 1
-poolSeedOffset <- 30
-historiesSeedOffset <- 53
-affinitiesSeedOffset <- 1
-initialConditionsSeedOffset <- 1
+if (simulationsTarget == simulationsTargets[1]) {
+  numberPools <- 4
+  numberHistories <- 1
+  numberAffinities <- 1
+  numberInitConds <- 1
+  poolSeedOffset <- 30
+  historiesSeedOffset <- 53
+  affinitiesSeedOffset <- 1
+  initialConditionsSeedOffset <- 1
+} else if (simulationsTarget == simulationsTargets[2]) {
+  numberPools <- 1
+  numberHistories <- 1
+  numberAffinities <- 1
+  numberInitConds <- 1
+  poolSeedOffset <- 34
+  historiesSeedOffset <- 57
+  affinitiesSeedOffset <- 13
+  initialConditionsSeedOffset <- 81
+} else {
+  stop("Settings not detected properly.")
+}
+
 
 parameterChoices <- with(
   experiments,
@@ -162,7 +182,7 @@ parameterChoices <- parameterChoices %>% dplyr::select(
 
 # Run across each row of parameterChoices: ####################################
 if (runSimulationsFlag) {
-  clust <- parallel::makeCluster(12)
+  clust <- parallel::makeCluster(min(nrow(parameterChoices), 12))
   doParallel::registerDoParallel(clust)
   toExport <- unlist(lapply(
     1:7, # Non-seed columns of parameterChoices

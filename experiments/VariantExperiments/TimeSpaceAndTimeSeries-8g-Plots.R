@@ -1,4 +1,4 @@
-datfolders <- dir(pattern = "TSTS_Simulations_")
+datfolders <- dir(pattern = "TSTS_Simulations_.+2024-10-11$") # Regex
 
 # Problems with X11
 options(bitmapType = "cairo")
@@ -132,10 +132,12 @@ diversitiesFlattened <- do.call(rbind, lapply(diversities, function(d) {
     InteractionsSeed = id[[2]][2],
     Events = id[[1]][3],
     EventsSeed = id[[2]][3],
-    Dispersal = id[[1]][4],
-    NicheDistance = id[[1]][5],
-    Affinity = id[[1]][6],
-    AffinitySeed = id[[2]][4],
+    InitialConditions = id[[1]][4],
+    InitialConditionsSeed = id[[2]][4],
+    Dispersal = id[[1]][5],
+    NicheDistance = id[[1]][6],
+    Affinity = id[[1]][7],
+    AffinitySeed = id[[2]][5],
     InterventionPatchType = id[[3]][1],
     InterventionPatchSeed = id[[4]][1],
     InterventionTimeType = id[[3]][2],
@@ -144,6 +146,8 @@ diversitiesFlattened <- do.call(rbind, lapply(diversities, function(d) {
     InterventionNicheDistance = id[[3]][4]
   )
 }))
+
+rm(diversities)
 
 diversitiesInterventionStrings <- diversitiesFlattened %>% dplyr::select(
   Affinity, PoolPatch, InterventionPatchType
@@ -174,7 +178,8 @@ diversitiesFlattened <- diversitiesFlattened %>% dplyr::mutate(
 
 diversitiesFlattenedAveragedBySeed <- diversitiesFlattened %>% dplyr::group_by(
   Environment1, Environment2, Metric, Subset, PoolPatch, PoolPatchSeed,
-  Interactions, InteractionsSeed, Events, EventsSeed, Dispersal, NicheDistance,
+  Interactions, InteractionsSeed, Events, EventsSeed,
+  InitialConditions, InitialConditionsSeed, Dispersal, NicheDistance,
   Affinity, AffinitySeed, InterventionPatchType, InterventionPatchSeed,
   InterventionTimeType, InterventionTimeSeed, InterventionDispersal,
   InterventionNicheDistance, Intervention, SpeciesAffinity,
@@ -189,7 +194,8 @@ diversitiesFlattenedAveragedBySeed <- diversitiesFlattened %>% dplyr::group_by(
 diversitiesFlattenedAveragedAcrossSeed <- diversitiesFlattenedAveragedBySeed %>%
   dplyr::group_by(
     Environment1, Environment2, Metric, Subset, PoolPatch,
-    Interactions, Events, Dispersal, NicheDistance,
+    Interactions, Events,
+    InitialConditions, Dispersal, NicheDistance,
     Affinity, InterventionPatchType,
     InterventionTimeType, InterventionDispersal,
     InterventionNicheDistance, Intervention, SpeciesAffinity,
