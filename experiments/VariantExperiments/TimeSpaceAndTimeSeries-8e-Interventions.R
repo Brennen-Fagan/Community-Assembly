@@ -11,7 +11,7 @@ source(file.path(directory, "TimeSpaceAndTimeSeries-8b-SimulationFunction.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-8d-InterventionFunction.R"))
 
 dirTag <- "TSTS_Simulations"
-dirDate <- "2024-10-11"
+dirDate <- "2024-10-22"
 baseTag <-  "TSTS_Simulation" # Note the distinction
 
 runSimulations <- FALSE
@@ -35,11 +35,11 @@ parameterChoices <- parameterChoices %>% dplyr::full_join(
 )
 
 # Run across each row of parameterChoices: ####################################
-clust <- parallel::makeCluster(20)
+clust <- parallel::makeCluster(4)
 doParallel::registerDoParallel(clust)
 
 toExport <- unlist(lapply(
-  1:8, # Non-seed, non-previous columns of parameterChoices
+  1:9, # Non-seed, non-previous columns of parameterChoices
   function(id, pcs, dicts) {
     indices <- unique(unlist(pcs[, id]))
     dictChoices <- dicts[[id]][indices, ]
@@ -49,7 +49,8 @@ toExport <- unlist(lapply(
   },
   pcs = parameterChoices %>% dplyr::select(-dplyr::ends_with("Seed")),
   dicts = list(poolpatchDictionaryOrigin, dynamicsDictionaryOrigin,
-               eventsDictionaryOrigin, dispersalDictionaryOrigin,
+               eventsDictionaryOrigin, initialConditionsDictionaryOrigin,
+               dispersalDictionaryOrigin,
                distanceDictionaryOrigin, affinityDictionaryOrigin,
                interventionPatchDictionaryOrigin,
                interventionTimeDictionaryOrigin)
@@ -74,10 +75,12 @@ success <- foreach::foreach(
     #   dynamicsSeedChoice = pc$dynSeed, [4]
     #   eventsDictionaryChoice = pc$events, [5]
     #   eventsSeedChoice = pc$eventsSeed, [6]
-    #   dispersalDictionaryChoice = pc$dispersal, [7]
-    #   distanceDictionaryChoice = pc$distance, [8]
-    #   affinityDictionaryChoice = pc$affinity, [9]
-    #   affinitySeedChoice = pc$affinitySeed, [10]
+    #   initialConditionsDictionaryChoice = pc$initconds, [7]
+    #   initialConditionsSeedChoice = pc$initcondsSeed, [8]
+    #   dispersalDictionaryChoice = pc$dispersal, [9]
+    #   distanceDictionaryChoice = pc$distance, [10]
+    #   affinityDictionaryChoice = pc$affinity, [11]
+    #   affinitySeedChoice = pc$affinitySeed, [12]
     #   Date = fileDates
     # ),
     ID = file.path(
@@ -88,16 +91,17 @@ success <- foreach::foreach(
       paste0(
         baseTag,
         "_", pc[[1]], "-", pc[[3]], "-", pc[[5]],
-        "-", pc[[7]], "-", pc[[8]], "-", pc[[9]],
-        "_", pc[[2]], "-", pc[[4]], "-", pc[[6]], "-", pc[[10]], ".RData"
+        "-", pc[[7]], "-", pc[[9]], "-", pc[[10]], "-", pc[[11]],
+        "_", pc[[2]], "-", pc[[4]], "-", pc[[6]], "-", pc[[8]], "-", pc[[12]],
+        ".RData"
       )
     ),
-    interventionPatchDictionaryChoice = pc[[11]],
-    interventionPatchSeedChoice = pc[[12]],
-    interventionTimeDictionaryChoice = pc[[13]],
-    interventionTimeSeedChoice = pc[[14]],
-    interventionDispersalDictionaryChoice = pc[[15]],
-    interventionDistanceDictionaryChoice = pc[[16]],
+    interventionPatchDictionaryChoice = pc[[13]],
+    interventionPatchSeedChoice = pc[[14]],
+    interventionTimeDictionaryChoice = pc[[15]],
+    interventionTimeSeedChoice = pc[[16]],
+    interventionDispersalDictionaryChoice = pc[[17]],
+    interventionDistanceDictionaryChoice = pc[[18]],
     returnResults = FALSE,
     saveResults = TRUE,
     skipIfSaveExists = TRUE
