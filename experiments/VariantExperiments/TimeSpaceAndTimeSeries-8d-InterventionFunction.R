@@ -249,7 +249,7 @@ interventionWrapper <- function(
   ) {
     interventionDispersalDictionaryChoice <- as.numeric(strsplit(
       datfile_properties[[1]][3], split = '-'
-    )[[1]][4])
+    )[[1]][5])
   }
   interventionDispersalDictionary <- dispersalDictionaryOrigin[
     ifelse(is.na(interventionDispersalDictionaryChoice),
@@ -261,7 +261,7 @@ interventionWrapper <- function(
   ) {
     interventionDistanceDictionaryChoice <- as.numeric(strsplit(
       datfile_properties[[1]][3], split = '-'
-    )[[1]][5])
+    )[[1]][6])
   }
   interventionDistanceDictionary <-
     distanceDictionaryOrigin[interventionDistanceDictionaryChoice, ]
