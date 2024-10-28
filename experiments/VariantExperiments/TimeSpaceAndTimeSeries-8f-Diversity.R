@@ -75,6 +75,8 @@ Diversity <- foreach::foreach(
       paste0("TSTS_Diversity_",
              paste0(x_properties[[1]][5:length(x_properties[[1]])],
                     collapse = "_"))
+    } else {
+      paste0("Diversity_", x)
     }
   )
 

@@ -105,9 +105,9 @@ distanceDictionaryOrigin <- data.frame(
     "rho.5.0.1.euclidean",
     "rho.5.1.2.euclidean",
     "rho.10.0.1.euclidean",
-    "rho.10.1.2.euclidean",
-    stringsAsFactors = FALSE
-  )
+    "rho.10.1.2.euclidean"
+  ),
+  stringsAsFactors = FALSE
 ) %>% dplyr::mutate(ID = dplyr::row_number())
 
 # Intervention Patch Affinities: ##############################################
