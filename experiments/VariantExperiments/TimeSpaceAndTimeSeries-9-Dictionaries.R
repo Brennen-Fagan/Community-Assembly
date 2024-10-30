@@ -14,7 +14,7 @@ poolpatchDictionaryOrigin <- expand.grid(
   PoolK3ConsumerPredationRange = 10^c(-1, -0.5, log10(0.5), 0),
   PoolK4ConsumerEfficiency = c(0.05, 0.1, 0.15, 0.2),
   PoolK5BasalBiomass = c(30, 100, 300),
-  PoolK6CoefOfVariation = c(0, 0.1, 0.2),
+  PoolK6CoefOfVariation = c(0.01, 0.1, 0.2),
   PoolBasalLogBodySize = c("c(-2, -1)", "c(-2, 0)", "c(-3, -1)"),
   PoolConsumerLogBodySize = c("c(-1, -0)", "c(-1, 1)", "c(-1, 2)"),
   PoolDispersalSpeed = 1, # Value divided by DispersalResistance to get current.

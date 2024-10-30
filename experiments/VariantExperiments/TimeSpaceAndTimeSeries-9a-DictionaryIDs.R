@@ -78,6 +78,92 @@ LatinHypercube <- LatinHypercube %>% dplyr::mutate(
                 })
 )
 
-experiments <- apply(LatinHypercube, MARGIN = 1, function(params) {
+experiments <- lapply(1:nrow(LatinHypercube), function(i) {
+  params <- LatinHypercube[i, ]
   
+  list(
+    ppDO =
+      poolpatchDictionaryOrigin %>% dplyr::filter(
+        BasalConsumerRatio == 0.5, # 2 Consumers for Each Basal
+        NSpecies == 200,
+        # Standard, and only implemented, LM1996 Function and Parameters,
+        PoolDispersalSpeed == 1,
+        NumberEnvironments == 1,
+        
+        apply(dplyr::across(# deprecated, but if_all doesn't permit cur_column 
+          #             (despite documentation saying otherwise)
+          .cols = dplyr::any_of(names(params)),
+          .fns = function(colval) {
+            colname <- dplyr::cur_column()
+            params[[colname]] == colval
+          }
+        ), 1, all)
+      ),
+    
+    dynDO =
+      dynamicsDictionaryOrigin %>% dplyr::filter(
+        apply(dplyr::across(# deprecated, but if_all doesn't permit cur_column 
+          #             (despite documentation saying otherwise)
+          .cols = dplyr::any_of(names(params)),
+          .fns = function(colval) {
+            colname <- dplyr::cur_column()
+            params[[colname]] == colval
+          }
+        ), 1, all)
+      ),
+
+    eDO =
+      eventsDictionaryOrigin %>% dplyr::filter(
+        EventsNumberMultiplier == 20, # Longer simulation. Keep number same while
+        ImmigrationMultiplier == 0.1, # Decreasing rate of occurrence.
+        ExtirpationMultiplier == 0.1,
+        ExtirpationProportion == 1, # Extirpation == Extinction in a 1 patch system.
+        apply(dplyr::across(# deprecated, but if_all doesn't permit cur_column 
+          #             (despite documentation saying otherwise)
+          .cols = dplyr::any_of(names(params)),
+          .fns = function(colval) {
+            colname <- dplyr::cur_column()
+            params[[colname]] == colval
+          }
+        ), 1, all)
+      ),
+
+    icDO = initialConditionsDictionaryOrigin %>% dplyr::filter(
+      Species == "None"
+    ),
+
+    dispDO =
+      dispersalDictionaryOrigin %>% dplyr::filter(
+        Configuration == "None" # Doesn't make sense for 1 patch systems.
+      ),
+
+    distDO =
+      distanceDictionaryOrigin %>% dplyr::filter(
+        rhofunction %in% c("rho.noop")
+      ),
+
+    aDO =
+      affinityDictionaryOrigin %>% dplyr::filter(
+        SpeciesAffinities %in% c("evensplit_01"),
+        PatchAffinities %in% c("rep_0")
+      )#,
+
+    # iPDO =
+    #   # Note: Every combination of iPDO with ppDO.
+    #   interventionPatchDictionaryOrigin %>% dplyr::filter(
+    #     PatchAffinities %in% c("rep_0", "rep_0.25", "rep_0.5", "rep_0.75", "rep_1"),
+    #     InterventionLocation == 1,
+    #     InterventionPercentage == 1
+    #   ),
+    # 
+    # iTDO =
+    #   interventionTimeDictionaryOrigin %>% dplyr::filter(
+    #     Method == "mean"
+    #   ),
+    # 
+    # # interventionDispersalDictionaryChoice
+    # iDispChoice = "p",
+    # # interventionDistanceDictionaryChoice
+    # iDistChoice = "p"
+  )
 })
