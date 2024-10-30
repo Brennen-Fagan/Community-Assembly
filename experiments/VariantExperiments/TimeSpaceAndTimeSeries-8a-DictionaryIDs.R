@@ -41,18 +41,18 @@ experiments <- list(
       Configuration == "None" # Doesn't make sense for 1 patch systems.
     ),
 
-  aDO =
-    affinityDictionaryOrigin %>% dplyr::filter(
-      SpeciesAffinities %in% c("evensplit_01", "rep_0", "rep_1", "runif"),
-      PatchAffinities %in% c("rep_0", "rep_0.25", "rep_0.5", "rep_0.75", "rep_1")
-    ),
-
   distDO =
     distanceDictionaryOrigin %>% dplyr::filter(
       rhofunction %in% c("rho.noop",
                          "rho.2.1.2.euclidean",
                          "rho.5.1.2.euclidean",
                          "rho.10.1.2.euclidean")
+    ),
+
+  aDO =
+    affinityDictionaryOrigin %>% dplyr::filter(
+      SpeciesAffinities %in% c("evensplit_01", "rep_0", "rep_1", "runif"),
+      PatchAffinities %in% c("rep_0", "rep_0.25", "rep_0.5", "rep_0.75", "rep_1")
     ),
 
   iPDO =

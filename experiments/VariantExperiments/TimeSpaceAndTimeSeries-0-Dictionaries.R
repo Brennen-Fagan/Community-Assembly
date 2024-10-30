@@ -65,6 +65,20 @@ dispersalDictionaryOrigin <- dispersalDictionaryOrigin %>% dplyr::mutate(
   ID = c(NA, 0:nrow(dispersalDictionaryOrigin))[dplyr::row_number()]
 )
 
+# Distance/Intensity/Affinity Effect: #########################################
+distanceDictionaryOrigin <- data.frame(
+  rhofunction = c( # Take patch and species affinities as vector arguments.
+    "rho.noop", # Just returns 1.
+    "rho.2.0.1.euclidean",
+    "rho.2.1.2.euclidean",
+    "rho.5.0.1.euclidean",
+    "rho.5.1.2.euclidean",
+    "rho.10.0.1.euclidean",
+    "rho.10.1.2.euclidean"
+  ),
+  stringsAsFactors = FALSE
+) %>% dplyr::mutate(ID = dplyr::row_number())
+
 # Pool-Patch Affinity/Adaptation: #############################################
 affinityDictionaryOrigin <- expand.grid(
   SpeciesAffinities = c(
@@ -92,20 +106,6 @@ affinityDictionaryOrigin <- expand.grid(
     "patchTypes.0.Half.1", # Patch {0, 0.5, 1} affinities. Gradient Ring.
     "runifRing", #           Patch [0, 1] affinities. Gradient Ring at Random.
     "evensplit_0.51" #        Patch {0.5, 1} affinities. Alternating.
-  ),
-  stringsAsFactors = FALSE
-) %>% dplyr::mutate(ID = dplyr::row_number())
-
-# Distance/Intensity/Affinity Effect: #########################################
-distanceDictionaryOrigin <- data.frame(
-  rhofunction = c( # Take patch and species affinities as vector arguments.
-    "rho.noop", # Just returns 1.
-    "rho.2.0.1.euclidean",
-    "rho.2.1.2.euclidean",
-    "rho.5.0.1.euclidean",
-    "rho.5.1.2.euclidean",
-    "rho.10.0.1.euclidean",
-    "rho.10.1.2.euclidean"
   ),
   stringsAsFactors = FALSE
 ) %>% dplyr::mutate(ID = dplyr::row_number())
