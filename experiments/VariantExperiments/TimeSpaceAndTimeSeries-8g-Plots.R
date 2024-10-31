@@ -1,4 +1,4 @@
-datfolders <- dir(pattern = "TSTS_Simulations_.+2024-10-11$") # Regex
+datfolders <- dir(pattern = "TSTS_Simulations_.+2024-10-31$") # Regex
 
 # Problems with X11
 options(bitmapType = "cairo")
@@ -9,7 +9,7 @@ library(tidyr)
 
 library(ggplot2)
 
-source("TimeSpaceAndTimeSeries-0-Dictionaries.R")
+source("TimeSpaceAndTimeSeries-9-Dictionaries.R")
 source('TimeSpaceAndTimeSeries-0-Functions.R')
 
 # Not a finished function!
@@ -75,30 +75,6 @@ diversities <- lapply(
     stopifnot(length(names) == 1)
     return(c(get(names), "Dir" = dirname(x), "File" = basename(x)))
   })
-
-
-# Fix issue with the wrong name for "Time" (time).
-# with(diversities[[1]]$Diversity %>% dplyr::mutate(
-#   Time2 = Time,
-#   Time = ifelse(is.na(time), 0, time) +
-#     ifelse(is.na(Time), 0, Time)),
-#   all((is.na(Time2) & Time == time) | (is.na(time) & Time == Time2))
-# )
-diversities <- lapply(
-  diversities,
-  function(d) {
-    if ("time" %in% names(d$Diversity) &&
-        "Time" %in% names(d$Diversity)) {
-      d$Diversity <- d$Diversity %>% dplyr::mutate(
-        Time = ifelse(is.na(time), 0, time) +
-          ifelse(is.na(Time), 0, Time)
-      ) %>% dplyr::select(-time) %>% dplyr::select(
-        Time, dplyr::everything()
-      )
-    }
-    return(d)
-  }
-)
 
 # Append Information of Parameters etc. to data.frames before consolidation.
 diversitiesFlattened <- do.call(rbind, lapply(diversities, function(d) {
@@ -176,6 +152,14 @@ diversitiesFlattened <- diversitiesFlattened %>% dplyr::mutate(
   )
 )
 
+diversitiesFlattened <- diversitiesFlattened %>% dplyr::filter(
+  Metric %in% c(
+    "Alpha Hill:0", "Alpha Hill:1", "Alpha Hill:Inf",
+    "TimeBrayCurtis", "TimeBrayCurtisBalance", "TimeBrayCurtisGradient",
+    "TimeJaccard", "TimeJaccardNestedness", "TimeJaccardTurnover"
+    )
+)
+
 diversitiesFlattenedAveragedBySeed <- diversitiesFlattened %>% dplyr::group_by(
   Environment1, Environment2, Metric, Subset, PoolPatch, PoolPatchSeed,
   Interactions, InteractionsSeed, Events, EventsSeed,
@@ -183,34 +167,82 @@ diversitiesFlattenedAveragedBySeed <- diversitiesFlattened %>% dplyr::group_by(
   Affinity, AffinitySeed, InterventionPatchType, InterventionPatchSeed,
   InterventionTimeType, InterventionTimeSeed, InterventionDispersal,
   InterventionNicheDistance, Intervention, SpeciesAffinity,
-  Window = round(Time/10)*10
+  Window = round(Time/1000)*1000
 ) %>% dplyr::arrange(Time) %>% dplyr::summarise(
   Mean = mean(Value),
+  StDev = sqrt(var(Value)),
   Slope = if (sum(!is.na(Value)) > 1) coef(lm(Value ~ Time))[2] else {NA},
   Difference = dplyr::last(Value) - dplyr::first(Value), # Number gained.
   .groups = "drop"
+) %>% dplyr::mutate(
+  # Many extremely small values.
+  Slope = ifelse(abs(Slope) < sqrt(.Machine$double.eps), 0, Slope)
 )
-
-diversitiesFlattenedAveragedAcrossSeed <- diversitiesFlattenedAveragedBySeed %>%
-  dplyr::group_by(
-    Environment1, Environment2, Metric, Subset, PoolPatch,
-    Interactions, Events,
-    InitialConditions, Dispersal, NicheDistance,
-    Affinity, InterventionPatchType,
-    InterventionTimeType, InterventionDispersal,
-    InterventionNicheDistance, Intervention, SpeciesAffinity,
-    Window
-  ) %>% dplyr::summarise(
-    Mean = mean(Mean),
-    Slope = mean(Slope),
-    Difference = mean(Difference),
-    .groups = "drop"
-  )
 
 save(diversitiesFlattened,
      diversitiesFlattenedAveragedBySeed,
-     diversitiesFlattenedAveragedAcrossSeed,
-     file = "diversitiesFlattened_plottable.RData")
+     file = "diversitiesFlattened9_plottable.RData")
+
+basecase <- c(
+  "PoolK1InteractionEffectiveness" = 0.01,
+  "PoolK2ConsumerSizeAdvantage" = 10,
+  "PoolK3ConsumerPredationRange" = 0.5,
+  "PoolK4ConsumerEfficiency" = 0.2,
+  "PoolK5BasalBiomass" =  100,
+  "PoolK6CoefOfVariation" = 0.1,
+  "PoolBasalLogBodySize" = "c(-2, -1)",
+  "PoolConsumerLogBodySize" = "c(-1, -0)",
+  "InteractionK1InteractionEffectiveness" = 0.01,
+  "InteractionK2ConsumerSizeAdvantage" = 10,
+  "InteractionK3ConsumerPredationRange" = 0.5,
+  "InteractionK4ConsumerEfficiency" = 0.2,
+  "InteractionK5BasalBiomass" =  100,
+  "InteractionK6CoefOfVariation" = 0.1,
+  "InteractionEliminationThreshold" = 1e-04,
+  "ColonizationPropaguleSize" = 0.4
+)
+
+# Add columns for whatever regression we perform,
+# but remove those that aren't varying or whose variations aren't useful.
+diversitiesFlattenedAveragedBySeed <-
+  diversitiesFlattenedAveragedBySeed %>% dplyr::left_join(
+    poolpatchDictionaryOrigin %>% dplyr::mutate(ID = as.character(ID)),
+    by = c("PoolPatch" = "ID")
+  ) %>% dplyr::left_join(
+    dynamicsDictionaryOrigin %>% dplyr::mutate(ID = as.character(ID)),
+    by = c("Interactions" = "ID")
+  ) %>% dplyr::left_join(
+    eventsDictionaryOrigin %>% dplyr::mutate(ID = as.character(ID)),
+    by = c("Events" = "ID")
+  ) %>% dplyr::select_if( # Not Varying
+    .predicate = function(x) length(unique(x)) > 1
+    ) %>% dplyr::select(
+      -PoolPatch, -Interactions, -Events, # Not Useful After Join.
+      -dplyr::ends_with("Seed")
+    ) %>% dplyr::mutate(
+      dplyr::across(PoolK1InteractionEffectiveness:ColonizationPropaguleSize,
+                    .fns = function(column) {
+                      levs <- sort(unique(column))
+                      relevel(
+                        factor(column, levels = levs),
+                        ref = basecase[[dplyr::cur_column()]]
+                      )
+                    })
+    )
+
+checks <- lapply(
+  paste0(names(diversitiesFlattenedAveragedBySeed)[4:7], "~",
+         paste0(names(diversitiesFlattenedAveragedBySeed)[-c(1,2, 4:7)],
+                collapse = "+")),
+  as.formula)
+
+diversitiesFlattenedAveragedBySeed %>% dplyr::group_by(
+  Metric, Subset
+) %>% dplyr::group_map(.f = function(rows, key) {
+  # Regression, controlling for
+  retval <- lm(checks[[1]], data = rows)
+  list(key, retval)
+})
 
 # Proper Plotting: ############################################################
 plotDiversityOverview <- function(d, measures) {
