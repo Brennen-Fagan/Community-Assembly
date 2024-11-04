@@ -3,7 +3,8 @@ runSimulationsFlag <- # Default to TRUE if runSimulations does not exist.
   (!exists("runSimulations") || get("runSimulations") == TRUE)
 
 simulationsTargets <- c(
-  "TimeSpaceAndTimeSeries-9a-DictionaryIDs.R"#,
+  "TimeSpaceAndTimeSeries-9a-DictionaryIDs.R",
+  "TimeSpaceAndTimeSeries-9a2-DictionaryIDs.R"#,
 )
 
 simulationsTarget <- switch(
@@ -11,8 +12,8 @@ simulationsTarget <- switch(
     if(exists("simulationsTargetIndex")) simulationsTargetIndex else "NA"
     },
   "1" = simulationsTargets[1],
-  # "2" = simulationsTargets[2],
-  simulationsTargets[1] # Default
+  "2" = simulationsTargets[2],
+  simulationsTargets[2] # Default
 )
 directory <- '.'
 source(file.path(directory, simulationsTarget))
@@ -28,7 +29,7 @@ if (runSimulationsFlag) {
   library(iterators)
 }
 
-cores <- 1 # Normally happy to put higher, but there's not the redundancy of
+cores <- 8 # Normally happy to put higher, but there's not the redundancy of
 # pools in this go round, so each pool needs to be made, and that takes a lot
 # of cores!
 
@@ -37,6 +38,7 @@ cores <- 1 # Normally happy to put higher, but there's not the redundancy of
 #   1:34 (poolpatch), 1:34 (dynamics), 1:57 (events)
 # Lost track somewhere of initialConditionsSeedOffset and affinitiesSeedOffset,
 # so setting to max of these two values: 81 (+ 1).
+# through 9a: 84-84-107-131-131
 # Parameters: #################################################################
 if (simulationsTarget == simulationsTargets[1]) {
   numberPools <- 1
@@ -47,8 +49,15 @@ if (simulationsTarget == simulationsTargets[1]) {
   historiesSeedOffset <- 58
   initialConditionsSeedOffset <- 82
   affinitiesSeedOffset <- 82
-# } else if (simulationsTarget == simulationsTargets[2]) {
-#   ...
+} else if (simulationsTarget == simulationsTargets[2]) {
+  numberPools <- 4
+  numberHistories <- 4
+  numberAffinities <- 1
+  numberInitConds <- 1
+  poolSeedOffset <- 85
+  historiesSeedOffset <- 108
+  initialConditionsSeedOffset <- 132
+  affinitiesSeedOffset <- 132
 } else {
   stop("Settings not detected properly.")
 }
