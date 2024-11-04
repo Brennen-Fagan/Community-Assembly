@@ -5,9 +5,15 @@
 # have been additionally requested.
 
 # Parameters: #################################################################
-datfolders <- dir(pattern = "TSTS_Simulations_")
+datfolders <- dir(pattern = "TSTS_Simulations_.+2024-11-04$")
+# datfolders <- dir(pattern = "CompareEliminationThresholds$")
 cores <- 4 # Parallelization?
-rows_per_event <- 1 # Maximum rows per event (base resolution) is 10.
+preferredTimestep <- 10
+# Minimum number of rows per event is 10.
+# Default timesteps per event is 1.
+# The minimum timestep is thus ~0.1 (assuming equal division).
+# In practice, the minimum is quite higher, based on the maximum diff during
+# particularly slow periods.
 
 # Libraries: ##################################################################
 library(dplyr)
@@ -114,7 +120,7 @@ Diversity <- foreach::foreach(
       abundance = loaded$Abundance,
       # events = loaded$Events, # unnecessary here.
       threshold = loaded$Parameters$EliminationThreshold,
-      preferredTimeStep = rows_per_event, # Abusing the characteristic t scale.
+      preferredTimeStep = preferredTimestep, # Abusing the characteristic t scale.
       preferredStart = ceiling(loaded$Abundance[1, 1]) # Must be at or after.
     )
 
