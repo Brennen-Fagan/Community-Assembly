@@ -1,5 +1,25 @@
 library(dplyr)
 
+basecase <- data.frame(
+  "PoolK1InteractionEffectiveness" = 0.01,
+  "PoolK2ConsumerSizeAdvantage" = 10,
+  "PoolK3ConsumerPredationRange" = 0.5,
+  "PoolK4ConsumerEfficiency" = 0.2,
+  "PoolK5BasalBiomass" =  100,
+  "PoolK6CoefOfVariation" = 0.1,
+  "PoolBasalLogBodySize" = "c(-2, -1)",
+  "PoolConsumerLogBodySize" = "c(-1, -0)",
+  "InteractionK1InteractionEffectiveness" = 0.01,
+  "InteractionK2ConsumerSizeAdvantage" = 10,
+  "InteractionK3ConsumerPredationRange" = 0.5,
+  "InteractionK4ConsumerEfficiency" = 0.2,
+  "InteractionK5BasalBiomass" =  100,
+  "InteractionK6CoefOfVariation" = 0.1,
+  "InteractionEliminationThreshold" = 1e-04,
+  "ColonizationPropaguleSize" = 0.4,
+  stringsAsFactors = FALSE
+)
+
 # Pool-Patch: #################################################################
 poolpatchDictionaryOrigin <- expand.grid(
   BasalConsumerRatio = 1/2,

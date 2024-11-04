@@ -36,8 +36,8 @@ interventionNamingScheme <- function(aff, ppa, ipt) {
       "(", retrieveFunction(ipDO$PatchAffinities)(ppDO$NumberEnvironments), ")"
     )
   } else if (is.na(ipDO$InterventionLocation) ||
-      !explicit ||
-      !grepl(pattern = "rep", ipDO$PatchAffinities)) {
+             !explicit ||
+             !grepl(pattern = "rep", ipDO$PatchAffinities)) {
 
     finState <- # InterventionPercentage is a bit of a misnomer!
       paste0(ipDO$InterventionPercentage * 100, "%", ipDO$PatchAffinities)
@@ -127,13 +127,13 @@ rm(diversities)
 
 diversitiesInterventionStrings <- diversitiesFlattened %>% dplyr::select(
   Affinity, PoolPatch, InterventionPatchType
-  ) %>% dplyr::distinct(
-  ) %>% dplyr::mutate(
-    Intervention = unlist(mapply(
-      FUN = interventionNamingScheme,
-      Affinity, PoolPatch, InterventionPatchType
-    ))
-  )
+) %>% dplyr::distinct(
+) %>% dplyr::mutate(
+  Intervention = unlist(mapply(
+    FUN = interventionNamingScheme,
+    Affinity, PoolPatch, InterventionPatchType
+  ))
+)
 
 diversitiesFlattened <- diversitiesFlattened %>% dplyr::left_join(
   diversitiesInterventionStrings,
@@ -157,7 +157,7 @@ diversitiesFlattened <- diversitiesFlattened %>% dplyr::filter(
     "Alpha Hill:0", "Alpha Hill:1", "Alpha Hill:Inf",
     "TimeBrayCurtis", "TimeBrayCurtisBalance", "TimeBrayCurtisGradient",
     "TimeJaccard", "TimeJaccardNestedness", "TimeJaccardTurnover"
-    )
+  )
 )
 
 diversitiesFlattenedAveragedBySeed <- diversitiesFlattened %>% dplyr::group_by(
@@ -216,19 +216,19 @@ diversitiesFlattenedAveragedBySeed <-
     by = c("Events" = "ID")
   ) %>% dplyr::select_if( # Not Varying
     .predicate = function(x) length(unique(x)) > 1
-    ) %>% dplyr::select(
-      -PoolPatch, -Interactions, -Events, # Not Useful After Join.
-      -dplyr::ends_with("Seed")
-    ) %>% dplyr::mutate(
-      dplyr::across(PoolK1InteractionEffectiveness:ColonizationPropaguleSize,
-                    .fns = function(column) {
-                      levs <- sort(unique(column))
-                      relevel(
-                        factor(column, levels = levs),
-                        ref = basecase[[dplyr::cur_column()]]
-                      )
-                    })
-    )
+  ) %>% dplyr::select(
+    -PoolPatch, -Interactions, -Events, # Not Useful After Join.
+    -dplyr::ends_with("Seed")
+  ) %>% dplyr::mutate(
+    dplyr::across(PoolK1InteractionEffectiveness:ColonizationPropaguleSize,
+                  .fns = function(column) {
+                    levs <- sort(unique(column))
+                    relevel(
+                      factor(column, levels = levs),
+                      ref = basecase[[dplyr::cur_column()]]
+                    )
+                  })
+  )
 
 checks <- lapply(
   paste0(names(diversitiesFlattenedAveragedBySeed)[4:7], "~",
@@ -236,13 +236,101 @@ checks <- lapply(
                 collapse = "+")),
   as.formula)
 
-diversitiesFlattenedAveragedBySeed %>% dplyr::group_by(
+straightlines <- diversitiesFlattenedAveragedBySeed %>% dplyr::group_by(
   Metric, Subset
 ) %>% dplyr::group_map(.f = function(rows, key) {
   # Regression, controlling for
   retval <- lm(checks[[1]], data = rows)
   list(key, retval)
 })
+
+stopifnot(unlist(lapply(straightlines, function(sl) {
+  all(names(straightlines[[1]][[2]]$coefficients) ==
+        names(sl[[2]]$coefficients))
+})))
+
+coefficientmatrix <- cbind(
+  do.call(
+    rbind,
+    lapply(straightlines, function(x) x[[1]])
+  ),
+  do.call(
+    rbind, lapply(straightlines, function(x)
+      data.frame(t(data.frame(x[[2]]$coefficients))))
+  )
+)
+
+coefficientsdf <- tidyr::pivot_longer(
+  coefficientmatrix, cols = -c(Metric, Subset),
+  names_to = "CoefficientLevel",
+  values_to = "Change"
+) %>% dplyr::mutate(
+  CoefficientLevel = ifelse(grepl("Intercept", CoefficientLevel),
+                            "Intercept", CoefficientLevel)
+) %>% tidyr::separate(
+  col = CoefficientLevel, into = c("Coefficient", "Level"),
+  fill = "right",
+  sep = "(?<=[a-z])(?=[.0-9]+$)"
+  # Split between letters left and ending number right
+) %>% dplyr::group_by(
+  Coefficient
+) %>% dplyr::group_modify(
+  # Use the basecase as a 0 color level. Then +1 is a single increase.
+  .f = function(value, key) {
+    if (! key$Coefficient[1] %in% names(basecase)) {
+      return(value %>% dplyr::mutate(StepsFromBase = 0))
+    }
+    basevalue <- basecase[names(basecase) == key$Coefficient[1]]
+    uniquevalues <- unique(value$Level)
+    allvalues <- sort(c(basevalue, uniquevalues))
+    numbers <- 1:length(allvalues) - which(basevalue == allvalues)
+    value %>% dplyr::left_join(
+      data.frame(Level = allvalues, StepsFromBase = numbers),
+      by = c("Level")
+    )
+  }
+)
+
+# Overall Plot:
+ggplot2::ggplot(
+  coefficientsdf %>% dplyr::filter(
+    ! Metric %in% c("Alpha Hill:1", "Alpha Hill:Inf")
+  ),
+  ggplot2::aes(fill = StepsFromBase,
+               x = Coefficient, y = Change)
+) + ggplot2::geom_hline(
+  yintercept = 0
+) + ggplot2::geom_point(
+  color = "black", shape = 21
+) + ggplot2::facet_grid(
+  Metric ~  Subset, scales = "free_y"
+) + ggplot2::theme(
+  axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust = 1)
+) + ggplot2::scale_fill_gradient2(low = "orange", high = "blue", mid = "grey")
+# Good news:
+# Since we weren't worried about the effects of the affinity, different
+# affinities should and do appear the same. Easy double check with 9a distDO.
+# While we are averaging over large time periods, it appears that the window
+# does not have effect, perhaps because of the size of the averaging.
+# It also looks like the effects are largely the same between different metrics
+# for the same alpha diversity.
+ggplot2::ggplot(
+  coefficientsdf %>% dplyr::filter(
+    ! Metric %in% c("Alpha Hill:1", "Alpha Hill:Inf"),
+    grepl(pattern = "BodySize", Coefficient)
+  ),
+  ggplot2::aes(fill = Level,
+               x = Coefficient, y = Change)
+) + ggplot2::geom_hline(
+  yintercept = 0
+) + ggplot2::geom_point(
+  color = "black", shape = 21
+) + ggplot2::facet_grid(
+  Metric ~  Subset, scales = "free_y"
+) + ggplot2::theme(
+  axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust = 1)
+# ) + ggplot2::scale_fill_gradient2(low = "orange", high = "blue", mid = "grey"
+                                  )
 
 # Proper Plotting: ############################################################
 plotDiversityOverview <- function(d, measures) {
