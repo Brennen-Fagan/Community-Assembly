@@ -5,7 +5,7 @@
 # have been additionally requested.
 
 # Parameters: #################################################################
-datfolders <- dir(pattern = "TSTS_Simulations_.+2024-11-04$")
+datfolders <- dir(pattern = "TSTS_Simulations_.+2024-11-11$")
 # datfolders <- dir(pattern = "CompareEliminationThresholds$")
 cores <- 4 # Parallelization?
 preferredTimestep <- 10

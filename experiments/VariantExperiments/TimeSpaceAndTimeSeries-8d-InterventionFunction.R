@@ -6,7 +6,7 @@ library(Matrix)
 # Directory Functions and Objects: ############################################
 directory <- "." # Should be "VariantExperiments"
 source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
-source(file.path(directory, "TimeSpaceAndTimeSeries-0-Dictionaries.R"))
+source(file.path(directory, "TimeSpaceAndTimeSeries-9-Dictionaries.R"))
 
 # Function Definition: ########################################################
 handlerID <- function(
