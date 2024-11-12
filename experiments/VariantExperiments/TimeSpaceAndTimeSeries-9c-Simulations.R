@@ -4,16 +4,22 @@ runSimulationsFlag <- # Default to TRUE if runSimulations does not exist.
 
 simulationsTargets <- c(
   "TimeSpaceAndTimeSeries-9a-DictionaryIDs.R",
-  "TimeSpaceAndTimeSeries-9a2-DictionaryIDs.R"#,
+  "TimeSpaceAndTimeSeries-9a2-DictionaryIDs.R",
+  "TimeSpaceAndTimeSeries-9a3-DictionaryIDs.R",
+  "TimeSpaceAndTimeSeries-9a4-DictionaryIDs.R",
+  "TimeSpaceAndTimeSeries-9a5-DictionaryIDs.R"#,
 )
 
 simulationsTarget <- switch(
   EXPR = {
     if(exists("simulationsTargetIndex")) simulationsTargetIndex else "NA"
-    },
+  },
   "1" = simulationsTargets[1],
   "2" = simulationsTargets[2],
-  simulationsTargets[2] # Default
+  "3" = simulationsTargets[3],
+  "4" = simulationsTargets[4],
+  "5" = simulationsTargets[5],
+  simulationsTargets[length(simulationsTargets)] # Default
 )
 directory <- '.'
 source(file.path(directory, simulationsTarget))
@@ -58,6 +64,33 @@ if (simulationsTarget == simulationsTargets[1]) {
   historiesSeedOffset <- 108
   initialConditionsSeedOffset <- 132
   affinitiesSeedOffset <- 132
+} else if (simulationsTarget == simulationsTargets[3]) {
+  numberPools <- 1
+  numberHistories <- 1
+  numberAffinities <- 1
+  numberInitConds <- 1
+  poolSeedOffset <- 89
+  historiesSeedOffset <- 123
+  initialConditionsSeedOffset <- 135
+  affinitiesSeedOffset <- 135
+} else if (simulationsTarget == simulationsTargets[4]) {
+  numberPools <- 3
+  numberHistories <- 4
+  numberAffinities <- 1
+  numberInitConds <- 1
+  poolSeedOffset <- 188
+  historiesSeedOffset <- 222
+  initialConditionsSeedOffset <- 234
+  affinitiesSeedOffset <- 234
+} else if (simulationsTarget == simulationsTargets[5]) {
+  numberPools <- 1
+  numberHistories <- 1
+  numberAffinities <- 1
+  numberInitConds <- 1
+  poolSeedOffset <- 191
+  historiesSeedOffset <- 234
+  initialConditionsSeedOffset <- 237
+  affinitiesSeedOffset <- 237
 } else {
   stop("Settings not detected properly.")
 }
@@ -65,20 +98,20 @@ if (simulationsTarget == simulationsTargets[1]) {
 
 parameterChoices <- dplyr::bind_rows(lapply(
   experiments, function(experiment) {
-  with(
-    experiment,
-    expand.grid( # All combinations!
-    pp = ppDO$ID,
-    dyn = dynDO$ID,
-    events = eDO$ID,
-    initconds = icDO$ID,
-    dispersal = dispDO$ID,
-    affinity = aDO$ID,
-    distance = distDO$ID
-  )
-)})) %>% dplyr::arrange(
-  pp, dyn, events, initconds, dispersal, affinity, distance
-)
+    with(
+      experiment,
+      expand.grid( # All combinations!
+        pp = ppDO$ID,
+        dyn = dynDO$ID,
+        events = eDO$ID,
+        initconds = icDO$ID,
+        dispersal = dispDO$ID,
+        affinity = aDO$ID,
+        distance = distDO$ID
+      )
+    )})) %>% dplyr::arrange(
+      pp, dyn, events, initconds, dispersal, affinity, distance
+    )
 
 # Add seeds
 # 4 unique pool-patch replicates, each pool assigned (one set of) one patch.
@@ -194,8 +227,13 @@ parameterChoices <- parameterChoices %>% dplyr::select(
 
 # Run across each row of parameterChoices: ####################################
 if (runSimulationsFlag) {
-  clust <- parallel::makeCluster(min(nrow(parameterChoices), cores))
-  doParallel::registerDoParallel(clust)
+  if (cores > 1) {
+    clust <- parallel::makeCluster(min(nrow(parameterChoices), cores))
+    doParallel::registerDoParallel(clust)
+    `%op%` <- `%dopar%`
+  } else {
+    `%op%` <- `%do%`
+  }
   toExport <- unlist(lapply(
     1:7, # Non-seed columns of parameterChoices
     function(id, pcs, dicts) {
@@ -219,7 +257,7 @@ if (runSimulationsFlag) {
   success <- foreach::foreach(
     pc = iterators::iter(parameterChoices, by = "row"),
     .packages = c("RMTRCode2", "dplyr"), .export = toExport
-  ) %dopar% {
+  ) %op% {
     pc <- unlist(pc) # untibble so we are passing numerics.
     simulationWrapper(
       poolpatchDictionaryChoice = pc[1],
@@ -240,5 +278,6 @@ if (runSimulationsFlag) {
     )
   }
 
-  parallel::stopCluster(clust)
+  if (cores > 1)
+    parallel::stopCluster(clust)
 }

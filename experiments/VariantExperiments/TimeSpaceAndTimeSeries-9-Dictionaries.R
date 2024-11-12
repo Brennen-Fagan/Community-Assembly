@@ -3,15 +3,15 @@ library(dplyr)
 basecase <- data.frame(
   "PoolK1InteractionEffectiveness" = 0.01,
   "PoolK2ConsumerSizeAdvantage" = 10,
-  "PoolK3ConsumerPredationRange" = 0.5,
+  "PoolK3ConsumerPredationRange" = 0.5, # -> 10^-1
   "PoolK4ConsumerEfficiency" = 0.2,
   "PoolK5BasalBiomass" =  100,
   "PoolK6CoefOfVariation" = 0.1,
   "PoolBasalLogBodySize" = "c(-2, -1)",
-  "PoolConsumerLogBodySize" = "c(-1, -0)",
+  "PoolConsumerLogBodySize" = "c(-1, -0)", # -> c(-1, 1)
   "InteractionK1InteractionEffectiveness" = 0.01,
   "InteractionK2ConsumerSizeAdvantage" = 10,
-  "InteractionK3ConsumerPredationRange" = 0.5,
+  "InteractionK3ConsumerPredationRange" = 0.5, # -> 10^-1
   "InteractionK4ConsumerEfficiency" = 0.2,
   "InteractionK5BasalBiomass" =  100,
   "InteractionK6CoefOfVariation" = 0.1,
@@ -31,12 +31,12 @@ poolpatchDictionaryOrigin <- expand.grid(
   # ),
   PoolK1InteractionEffectiveness = 10^c(-2, -1.5, -1, -0.5),
   PoolK2ConsumerSizeAdvantage = 10^c(1, 1.5),
-  PoolK3ConsumerPredationRange = 10^c(-1, -0.5, log10(0.5), 0),
+  PoolK3ConsumerPredationRange = 10^c(-1.5, -1, -0.5, log10(0.5), 0),
   PoolK4ConsumerEfficiency = c(0.05, 0.1, 0.15, 0.2),
   PoolK5BasalBiomass = c(30, 100, 300),
   PoolK6CoefOfVariation = c(0.01, 0.1, 0.2),
   PoolBasalLogBodySize = c("c(-2, -1)", "c(-2, 0)", "c(-3, -1)"),
-  PoolConsumerLogBodySize = c("c(-1, -0)", "c(-1, 1)", "c(-1, 2)"),
+  PoolConsumerLogBodySize = c("c(-1, 0)", "c(-1, 1)", "c(-1, 2)"),
   PoolDispersalSpeed = 1, # Value divided by DispersalResistance to get current.
   NumberEnvironments = c(1, 2, 6, 10, 12),
   stringsAsFactors = FALSE
@@ -48,10 +48,10 @@ dynamicsDictionaryOrigin <- expand.grid(
   # InteractionParameters = "Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1)",
   InteractionK1InteractionEffectiveness = 10^c(-2, -1.5, -1, -0.5),
   InteractionK2ConsumerSizeAdvantage = 10^c(1, 1.5),
-  InteractionK3ConsumerPredationRange = 10^c(-1, -0.5, log10(0.5), 0),
+  InteractionK3ConsumerPredationRange = 10^c(-1.5, -1, -0.5, log10(0.5), 0),
   InteractionK4ConsumerEfficiency = c(0.05, 0.1, 0.15, 0.2),
   InteractionK5BasalBiomass = c(30, 100, 300),
-  InteractionK6CoefOfVariation = c(0, 0.1, 0.2),
+  InteractionK6CoefOfVariation = c(0, 0.01, 0.1, 0.2),
   InteractionEliminationThreshold = 10^c(-5, -4, -3),
   DynamicsFunction = "RMTRCode2::PerCapitaDynamics_Type1",
   stringsAsFactors = FALSE
