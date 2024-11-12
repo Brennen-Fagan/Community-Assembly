@@ -7,35 +7,65 @@ library(iterators)
 directory <- '.'
 source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-0-Interventions.R"))
-source(file.path(directory, "TimeSpaceAndTimeSeries-8b-SimulationFunction.R"))
+source(file.path(directory, "TimeSpaceAndTimeSeries-9b-SimulationFunction.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-8d-InterventionFunction.R"))
 
 dirTag <- "TSTS_Simulations"
-dirDate <- "2024-10-22"
+dirDate <- "2024-11-11"
 baseTag <-  "TSTS_Simulation" # Note the distinction
 
 runSimulations <- FALSE
-source(file.path(directory, "TimeSpaceAndTimeSeries-8c-Simulations.R"))
+source(file.path(directory, "TimeSpaceAndTimeSeries-9c-Simulations.R"))
 # For Side Effects, specifically parameterChoices.
 
 stopifnot(exists("parameterChoices"))
 
-# All combinations!!!
-parameterChoices <- parameterChoices %>% dplyr::full_join(
-  with(experiments, expand.grid(
-    ip = iPDO$ID,
-    ipSeed = 1, # No random components
-    it = iTDO$ID,
-    itSeed = 1, # No random components
-    itDisp = iDispChoice,
-    itDist = iDistChoice,
-    stringsAsFactors = FALSE
-  )),
-  by = character() # cross-join
+# Previously: # All combinations!!!
+# parameterChoices <- parameterChoices %>% dplyr::full_join(
+#   with(experiments, expand.grid(
+#     ip = iPDO$ID,
+#     ipSeed = 1, # No random components
+#     it = iTDO$ID,
+#     itSeed = 1, # No random components
+#     itDisp = iDispChoice,
+#     itDist = iDistChoice,
+#     stringsAsFactors = FALSE
+#   )),
+#   by = character() # cross-join
+# )
+
+# Now, build for separate combinations.
+interventionChoices <- dplyr::bind_rows(lapply(
+  experiments, function(experiment) {
+    with(
+      experiment,
+      expand.grid( # All combinations!
+        pp = ppDO$ID,
+        dyn = dynDO$ID,
+        events = eDO$ID,
+        initconds = icDO$ID,
+        dispersal = dispDO$ID,
+        affinity = aDO$ID,
+        distance = distDO$ID,
+        # Need the above for incoming left_join. Below is the new stuff.
+        ip = iPDO$ID,
+        ipSeed = 1, # No random components
+        it = iTDO$ID,
+        itSeed = 1, # No random components
+        itDisp = iDispChoice,
+        itDist = iDistChoice,
+        stringsAsFactors = FALSE
+      )
+    )}))
+
+parameterChoices <- parameterChoices %>% dplyr::left_join(
+  interventionChoices,
+  by = c("pp", "dyn", "events", "initconds",
+         "dispersal", "affinity", "distance")
 )
 
 # Run across each row of parameterChoices: ####################################
-clust <- parallel::makeCluster(4)
+clust <- parallel::makeCluster(12)
 doParallel::registerDoParallel(clust)
 
 toExport <- unlist(lapply(
