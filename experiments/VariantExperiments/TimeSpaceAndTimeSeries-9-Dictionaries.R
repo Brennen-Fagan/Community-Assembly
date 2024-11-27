@@ -22,8 +22,8 @@ basecase <- data.frame(
 
 # Pool-Patch: #################################################################
 poolpatchDictionaryOrigin <- expand.grid(
-  BasalConsumerRatio = 1/2,
-  NSpecies = c(100, 200),
+  BasalConsumerRatio = c(1/3, 1/2, 2/3, 1),
+  NSpecies = floor(10^c(1, 1.5, 1.75, 2, 2.15, log10(200), log10(300))),
   PoolFunction = "RMTRCode2::LawMorton1996_species",
   # PoolParameters = c(
   #   paste("Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1)",
@@ -36,7 +36,7 @@ poolpatchDictionaryOrigin <- expand.grid(
   PoolK5BasalBiomass = c(30, 100, 300),
   PoolK6CoefOfVariation = c(0.01, 0.1, 0.2),
   PoolBasalLogBodySize = c("c(-2, -1)", "c(-2, 0)", "c(-3, -1)"),
-  PoolConsumerLogBodySize = c("c(-1, 0)", "c(-1, 1)", "c(-1, 2)"),
+  PoolConsumerLogBodySize = c("c(-1, 0)", "c(-1, 0.5)", "c(-1, 1)", "c(-1, 2)"),
   PoolDispersalSpeed = 1, # Value divided by DispersalResistance to get current.
   NumberEnvironments = c(1, 2, 6, 10, 12),
   stringsAsFactors = FALSE
@@ -52,7 +52,7 @@ dynamicsDictionaryOrigin <- expand.grid(
   InteractionK4ConsumerEfficiency = c(0.05, 0.1, 0.15, 0.2),
   InteractionK5BasalBiomass = c(30, 100, 300),
   InteractionK6CoefOfVariation = c(0, 0.01, 0.1, 0.2),
-  InteractionEliminationThreshold = 10^c(-5, -4, -3),
+  InteractionEliminationThreshold = 10^c(-7, -6, -5, -4, -3),
   DynamicsFunction = "RMTRCode2::PerCapitaDynamics_Type1",
   stringsAsFactors = FALSE
 ) %>% dplyr::mutate(ID = dplyr::row_number())
@@ -63,7 +63,7 @@ eventsDictionaryOrigin <- expand.grid(
   EventsNumberMultiplier = c(1, 2, 10, 20), # I.e. how many more events
   ImmigrationMultiplier = c(0.1, 1, 10), # Mult. is on rate and number.
   ImmigrationFunction = "RMTRCode2::ArrivalFUN_Example2",
-  ColonizationPropaguleSize = c(0.04, 0.4, 4), # Initial abundance on Colonize.
+  ColonizationPropaguleSize = c(0.0004, 0.004, 0.04, 0.4, 4), # Initial abundance on Colonize.
   ExtirpationMultiplier = c(0.1, 1, 10), # Frequency multiplier
   ExtirpationFunction = "RMTRCode2::ExtinctFUN_Example2",
   ExtirpationProportion = c(1, 0.9, 0), # Proportion of population removed.
