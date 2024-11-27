@@ -1,4 +1,4 @@
-datfolders <- dir(pattern = "TSTS_Simulations_.+2024-11-08$") # Regex
+datfolders <- dir(pattern = "TSTS_Simulations_")#.+2024-11-13$") # Regex
 
 # Problems with X11
 options(bitmapType = "cairo")
@@ -184,11 +184,14 @@ save(diversitiesFlattened,
      file = "diversitiesFlattened9_plottable.RData")
 
 basecase <- c(
+  "BasalConsumerRatio" = 0.5,
+  "NSpecies" = 200,
   "PoolK1InteractionEffectiveness" = 0.01,
   "PoolK2ConsumerSizeAdvantage" = 10,
   "PoolK3ConsumerPredationRange" = 0.1,
   "PoolK4ConsumerEfficiency" = 0.2,
-  "PoolK5BasalBiomass" =  100,
+  # "PoolK5BasalBiomass" =  100,
+  "PoolK5BasalBiomass" =  30,
   "PoolK6CoefOfVariation" = 0.1,
   "PoolBasalLogBodySize" = "c(-2, -1)",
   "PoolConsumerLogBodySize" = "c(-1, 1)",
@@ -196,10 +199,13 @@ basecase <- c(
   "InteractionK2ConsumerSizeAdvantage" = 10,
   "InteractionK3ConsumerPredationRange" = 0.1,
   "InteractionK4ConsumerEfficiency" = 0.2,
-  "InteractionK5BasalBiomass" =  100,
+  # "InteractionK5BasalBiomass" =  100,
+  "InteractionK5BasalBiomass" =  30,
   "InteractionK6CoefOfVariation" = 0.1,
-  "InteractionEliminationThreshold" = 1e-04,
-  "ColonizationPropaguleSize" = 0.4
+  # "InteractionEliminationThreshold" = 1e-04,
+  # "ColonizationPropaguleSize" = 0.4
+  "InteractionEliminationThreshold" = 1e-05,
+  "ColonizationPropaguleSize" = 0.04
 )
 
 # Add columns for whatever regression we perform,
@@ -217,10 +223,10 @@ diversitiesFlattenedAveragedBySeed <-
   ) %>% dplyr::select_if( # Not Varying
     .predicate = function(x) length(unique(x)) > 1
   ) %>% dplyr::select(
-    -PoolPatch, -Interactions, -Events, # Not Useful After Join.
+    -dplyr::any_of(c("PoolPatch", "Interactions", "Events")), # Not Useful After Join.
     -dplyr::ends_with("Seed")
   ) %>% dplyr::mutate(
-    dplyr::across(PoolK1InteractionEffectiveness:ColonizationPropaguleSize,
+    dplyr::across(dplyr::any_of(names(basecase)),
                   .fns = function(column) {
                     base <- basecase[[dplyr::cur_column()]]
                     base <- as(base, typeof(column[1]))
@@ -240,28 +246,43 @@ diversitiesFlattenedAveragedBySeed <-
 # but they might be driven by the changes in pools and interaction matrices.)
 
 dfabs2 <- diversitiesFlattenedAveragedBySeed %>% dplyr::select(
-  -c(PoolK1InteractionEffectiveness:PoolK5BasalBiomass)
+  -dplyr::any_of(c("PoolK1InteractionEffectiveness",
+                   "PoolK2ConsumerSizeAdvantage",
+                   "PoolK3ConsumerPredationRange",
+                   "PoolK4ConsumerEfficiency",
+                   "PoolK5BasalBiomass"))
 )
 
+metrics <- c("Mean", "StDev", "Slope", "Difference")
 checks <- lapply(
-  paste0(names(diversitiesFlattenedAveragedBySeed)[4:7], "~",
-         paste0(names(diversitiesFlattenedAveragedBySeed)[-c(1,2, 4:7)],
-                collapse = "+")),
+  paste0(metrics, "~",
+         paste0(names(diversitiesFlattenedAveragedBySeed)[
+           !names(diversitiesFlattenedAveragedBySeed) %in%
+             c(metrics, "Metric", "Subset")
+           ],
+           collapse = "+")),
   as.formula)
 checks2 <- lapply(
-  paste0(names(dfabs2)[4:7], "~",
-         paste0(names(dfabs2)[-c(1,2, 4:7)],
-                collapse = "+")),
+  paste0(metrics, "~",
+         paste0(names(dfabs2)[
+           !names(dfabs2) %in%
+             c(metrics, "Metric", "Subset")
+           ],
+           collapse = "+")),
   as.formula)
 
-straightlines <- diversitiesFlattenedAveragedBySeed %>% dplyr::group_by(
+straightlines <- diversitiesFlattenedAveragedBySeed %>% dplyr::filter(
+  Metric == "Alpha Hill:0"
+  )  %>% dplyr::group_by(
   Metric, Subset
 ) %>% dplyr::group_map(.f = function(rows, key) {
   # Regression, controlling for
   retval <- lm(checks[[1]], data = rows)
   list(key, retval)
 })
-straightlines2 <- dfabs2 %>% dplyr::group_by(
+straightlines2 <- dfabs2 %>% dplyr::filter(
+  Metric == "Alpha Hill:0"
+) %>% dplyr::group_by(
   Metric, Subset
 ) %>% dplyr::group_map(.f = function(rows, key) {
   # Regression, controlling for
@@ -310,19 +331,31 @@ coefficientsdf <- tidyr::pivot_longer(
 ) %>% dplyr::group_by(
   Coefficient
 ) %>% dplyr::group_modify(
-  # Use the basecase as a 0 color level. Then +1 is a single increase.
+  # Use the basecase as a 0 color level. Then +1 is a single step increase.
   .f = function(value, key) {
     if (! key$Coefficient[1] %in% names(basecase)) {
       return(value %>% dplyr::mutate(StepsFromBase = 0))
     }
     basevalue <- basecase[names(basecase) == key$Coefficient[1]]
+    value$Level <- gsub(pattern = "^[.]", replacement = "",
+                        x = value$Level)
     uniquevalues <- unique(value$Level)
-    allvalues <- sort(c(basevalue, uniquevalues))
+    allvalues <- c(gsub(pattern = "^[.]", replacement = "",
+                        x = basevalue), uniquevalues)
+    numvalues <- tryCatch({as.numeric(allvalues)},
+                          warning = function(w) {
+                            return(NA)
+                          })
+    if (!any(is.na(numvalues))) {
+      allvalues <- numvalues
+      value$Level <- as.numeric(value$Level)
+    }
+    allvalues <- sort(allvalues)
     numbers <- 1:length(allvalues) - which(basevalue == allvalues)
     value %>% dplyr::left_join(
       data.frame(Level = allvalues, StepsFromBase = numbers),
       by = c("Level")
-    )
+    ) %>% dplyr::mutate(Level = as.character(Level))
   }
 )
 coefficientsdf2 <- tidyr::pivot_longer(
@@ -340,19 +373,31 @@ coefficientsdf2 <- tidyr::pivot_longer(
 ) %>% dplyr::group_by(
   Coefficient
 ) %>% dplyr::group_modify(
-  # Use the basecase as a 0 color level. Then +1 is a single increase.
+  # Use the basecase as a 0 color level. Then +1 is a single step increase.
   .f = function(value, key) {
     if (! key$Coefficient[1] %in% names(basecase)) {
       return(value %>% dplyr::mutate(StepsFromBase = 0))
     }
     basevalue <- basecase[names(basecase) == key$Coefficient[1]]
+    value$Level <- gsub(pattern = "^[.]", replacement = "",
+                        x = value$Level)
     uniquevalues <- unique(value$Level)
-    allvalues <- sort(c(basevalue, uniquevalues))
+    allvalues <- c(gsub(pattern = "^[.]", replacement = "",
+                        x = basevalue), uniquevalues)
+    numvalues <- tryCatch({as.numeric(allvalues)},
+                          warning = function(w) {
+                            return(NA)
+                          })
+    if (!any(is.na(numvalues))) {
+      allvalues <- numvalues
+      value$Level <- as.numeric(value$Level)
+    }
+    allvalues <- sort(allvalues)
     numbers <- 1:length(allvalues) - which(basevalue == allvalues)
     value %>% dplyr::left_join(
       data.frame(Level = allvalues, StepsFromBase = numbers),
       by = c("Level")
-    )
+    ) %>% dplyr::mutate(Level = as.character(Level))
   }
 )
 
@@ -360,18 +405,23 @@ coefficientsdf2 <- tidyr::pivot_longer(
 ggplot2::ggplot(
   coefficientsdf %>% dplyr::filter(
     # ! Metric %in% c("Alpha Hill:1", "Alpha Hill:Inf")
+    Coefficient != "Intercept"
   ),
   ggplot2::aes(fill = StepsFromBase,
                x = Coefficient, y = Change)
 ) + ggplot2::geom_hline(
   yintercept = 0
 ) + ggplot2::geom_point(
-  color = "black", shape = 21
+  color = "black", shape = 21, size = 4
 ) + ggplot2::facet_grid(
   Metric ~  Subset, scales = "free_y"
 ) + ggplot2::theme(
   axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust = 1)
-) + ggplot2::scale_fill_gradient2(low = "orange", high = "blue", mid = "grey")
+) + ggplot2::scale_fill_gradient2(
+  low = "orange", high = "blue", mid = "grey"
+  ) + ggplot2::scale_y_continuous(
+    minor_breaks = function(y) {seq(floor(y[1]), ceiling(y[2]))}
+    )
 # Good news:
 # Since we weren't worried about the effects of the affinity, different
 # affinities should and do appear the same. Easy double check with 9a distDO.
@@ -389,12 +439,35 @@ ggplot2::ggplot(
 ) + ggplot2::geom_hline(
   yintercept = 0
 ) + ggplot2::geom_point(
-  color = "black", shape = 21
+  color = "black", shape = 21, size = 4
 ) + ggplot2::facet_grid(
   Metric ~  Subset, scales = "free_y"
 ) + ggplot2::theme(
   axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust = 1)
   # ) + ggplot2::scale_fill_gradient2(low = "orange", high = "blue", mid = "grey"
+) + ggplot2::scale_y_continuous(
+  minor_breaks = function(y) {seq(floor(y[1]), ceiling(y[2]))}
+)
+
+ggplot2::ggplot(
+  diversitiesFlattenedAveragedBySeed %>% tidyr::separate(
+    Subset, into = c("Type", "Affinity"), sep = "[_]"
+  ) %>% dplyr::mutate(
+    Type = ifelse(is.na(Type), "All", Type)
+  ) %>% dplyr::filter(
+    Metric == "Alpha Hill:0"
+  ),
+  ggplot2::aes(
+    y = Mean,
+    fill = InteractionEliminationThreshold,
+    x = ColonizationPropaguleSize
+  )
+) + ggplot2::geom_boxplot(
+  notch = TRUE
+) + ggplot2::facet_grid(
+  Metric ~  Type, scales = "free_y"
+) + ggplot2::scale_y_continuous(
+  minor_breaks = function(y) {seq(floor(y[1]), ceiling(y[2]))}
 )
 
 # Proper Plotting: ############################################################
