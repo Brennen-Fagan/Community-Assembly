@@ -133,6 +133,9 @@ Diversity <- foreach::foreach(
 
     # Bad implementation (in a few ways!); bins presences in 0.1s of time units.
     Presence <- RMTRCode2::Calculate_Species(loaded, bintimes = FALSE)
+    if (nrow(Presence) == 0) {
+      warning("No species presences detected at this resolution.")
+    }
 
     # Major edit that is somewhat of a backslide.
     # Instead of programmatically using the named different columns of the
@@ -179,14 +182,16 @@ Diversity <- foreach::foreach(
         }) %>% dplyr::bind_rows()
 
       # Add in the relevant trait information.
-      Presence <- Presence %>% dplyr::left_join(
-        y = data.frame(
-          Species = 1:length(loaded$Ellipsis$Affinity$SpeciesAffinities),
-          Size = if ("Size" %in% names(x_pool)) x_pool$Size,
-          Type = if ("Type" %in% names(x_pool)) x_pool$Type,
-          Affinity = loaded$Ellipsis$Affinity$SpeciesAffinities
-        ), by = "Species"
-      )
+      if (nrow(Presence) > 0) {
+        Presence <- Presence %>% dplyr::left_join(
+          y = data.frame(
+            Species = 1:length(loaded$Ellipsis$Affinity$SpeciesAffinities),
+            Size = if ("Size" %in% names(x_pool)) x_pool$Size,
+            Type = if ("Type" %in% names(x_pool)) x_pool$Type,
+            Affinity = loaded$Ellipsis$Affinity$SpeciesAffinities
+          ), by = "Species"
+        )
+      }
     }
 
     DiversityAll <- calculateDiversityMetrics(
