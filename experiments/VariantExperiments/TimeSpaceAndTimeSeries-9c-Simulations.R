@@ -9,7 +9,8 @@ simulationsTargets <- c(
   "TimeSpaceAndTimeSeries-9a4-DictionaryIDs.R",
   "TimeSpaceAndTimeSeries-9a5-DictionaryIDs.R",
   "TimeSpaceAndTimeSeries-9a6-DictionaryIDs.R",
-  "TimeSpaceAndTimeSeries-9a7-DictionaryIDs.R"#,
+  "TimeSpaceAndTimeSeries-9a7-DictionaryIDs.R",
+  "TimeSpaceAndTimeSeries-9a8-DictionaryIDs.R"#,
 )
 
 simulationsTarget <- switch(
@@ -23,6 +24,7 @@ simulationsTarget <- switch(
   "5" = simulationsTargets[5],
   "6" = simulationsTargets[6],
   "7" = simulationsTargets[7],
+  "8" = simulationsTargets[8],
   simulationsTargets[length(simulationsTargets)] # Default
 )
 directory <- '.'
@@ -113,6 +115,15 @@ if (simulationsTarget == simulationsTargets[1]) {
   historiesSeedOffset <- 285
   initialConditionsSeedOffset <- 288
   affinitiesSeedOffset <- 292
+} else if (simulationsTarget == simulationsTargets[8]) {
+  numberPools <- 2
+  numberHistories <- 1
+  numberAffinities <- 1
+  numberInitConds <- 1
+  poolSeedOffset <- 341
+  historiesSeedOffset <- 384
+  initialConditionsSeedOffset <- 387
+  affinitiesSeedOffset <- 391
 } else {
   stop("Settings not detected properly.")
 }
