@@ -23,24 +23,25 @@
 options(bitmapType = "cairo")
 
 systype <- match.arg(
-  "Intervention",
+  "Simulation",
   c("Simulation", "Intervention")
 )
 
-# Intervention specific version
-# LOAD POOLPATCHDYNAMICS
-# LOAD INTERVENTION
+directory <- '.' # Assumed to be VariantExperiments
+source(file.path(directory, "TimeSpaceAndTimeSeries-9-Dictionaries.R"))
 
-set <- "18-1"
-tag <- paste0(set, "-2-25-2_6-6-6",
-              if (systype == "Intervention") "_40-1-15-2_1-1")
-dir <- "TSTS_Simulations_18-1_6-6_2024-03-08"
+# E.g. TSTS_Diversity_142486-4929-28-1-NA-3-1_341-341-384-387-391
+# or TSTS_Diversity_142486-4929-28-1-NA-3-1_341-341-384-387-391_111-1-p-p_1-1
+set <- "142486-4929"; initSeeds <- "341-341"; date <- "2024-11-30"
+tag <- paste0(set, "-28-1-NA-3-1_", initSeeds, "-384-387-391",
+              if (systype == "Intervention") "_111-1-p-p_1-1")
+dir <- paste0("TSTS_Simulations_", set, "_", initSeeds, "_", date)
 load(file.path(dir, paste0("TSTS_", systype, "_", tag, ".RData")))
-load(file.path(dir, paste0("TSTS_PoolPatchDynamics_", set, ".RData")))
+load(file.path(dir, paste0("TSTS_PoolPatchDynamics_", set, "_", initSeeds, ".RData")))
 load(file.path(dir, paste0("TSTS_Diversity_", tag, ".RData")))
-load(file.path(dir, paste0("TSTS_DivAbund_", tag, ".RData")))
+# load(file.path(dir, paste0("TSTS_DivAbund_", tag, ".RData"))) # Deprecated.
 
-library(dplyr)
+
 
 threshold <- 0.00 # in [0, 1]
 
@@ -53,16 +54,20 @@ if (systype == "Intervention") {
   timesInUse <- rep(TRUE, nrow(result$Abundance))
   times <- result$Abundance[, 1]
 }
-jaccard <- lapply(Diversity$Diversities$beta, as.data.frame)
-jaccard <- lapply(jaccard, function(x) {x$Jaccard <- as.numeric(x$Jaccard); x})
-jaccard <- jaccard %>% dplyr::bind_rows() %>% dplyr::filter(
-  Env1 == 1#, Time > result$Ellipsis$Affinity$TimeIntervention
-)
-braycurtis <- DivAbund$DivAbund$beta
-braycurtis$BrayCurtis <- as.numeric(braycurtis$BrayCurtis)
-braycurtis <- braycurtis %>% dplyr::filter(
-  Env1 == 1#, Time > result$Ellipsis$Affinity$TimeIntervention
-)
+
+# Currently working in 1 patch environments, so I can't test how I might want to
+# adapt these.
+# jaccard <- lapply(Diversity$Diversities$beta, as.data.frame)
+# jaccard <- lapply(jaccard, function(x) {x$Jaccard <- as.numeric(x$Jaccard); x})
+# jaccard <- jaccard %>% dplyr::bind_rows() %>% dplyr::filter(
+#   Env1 == 1#, Time > result$Ellipsis$Affinity$TimeIntervention
+# )
+# braycurtis <- DivAbund$DivAbund$beta
+# braycurtis$BrayCurtis <- as.numeric(braycurtis$BrayCurtis)
+# braycurtis <- braycurtis %>% dplyr::filter(
+#   Env1 == 1#, Time > result$Ellipsis$Affinity$TimeIntervention
+# )
+
 if (result$Ellipsis$Timescale == "Simulation") {
   times <- times / result$ReactionTime
   #jaccard$Time <- jaccard$Time / result$ReactionTime
@@ -101,55 +106,56 @@ environs <- lapply(
 
     ### Recreate Dispersal Matrix: ############################################
     if (systype == "Intervention") {
-      dispersalDictionaryChoice <-
-        as.numeric((
-          (strsplit(result$Ellipsis$ID, "_")[[1]][3]) %>% strsplit("-")
-        )[[1]][3])
+      dispersalDictionaryChoice <-(
+        (strsplit(result$Ellipsis$ID, "_")[[1]][3]) %>% strsplit("-")
+      )[[1]][3]
+
+      if (dispersalDictionaryChoice == "p") {
+        # Invoke Previous.
+        dispersalDictionaryChoice <-
+          as.numeric((
+            (strsplit(result$Ellipsis$ID, "_")[[1]][1]) %>% strsplit("-")
+          )[[1]][5])
+
+      } else if (dispersalDictionaryChoice == "NA") {
+        # True NAs dealt with
+        dispersalDictionaryChoice <- NA
+
+      } else {
+        # Convert to Numeric and make sure conversion worked.
+        dispersalDictionaryChoice <- tryCatch({
+          as.numeric(dispersalDictionaryChoice)
+          }, error = function(e) {return(e)})
+        stopifnot(!is.na(dispersalDictionaryChoice) || # stop if (false) NA
+                    is.numeric(dispersalDictionaryChoice)) # stop if not numeric
+      }
     } else if (systype == "Simulation") {
       dispersalDictionaryChoice <-
         as.numeric((
           (strsplit(result$Ellipsis$ID, "_")[[1]][1]) %>% strsplit("-")
-        )[[1]][4])
+        )[[1]][5])
+    } else {
+      stop("systype not detected/understood when retrieving dispersal matrix.")
     }
 
-    dispersalDictionary <- rbind(
-      data.frame(Resistance = Inf, Configuration = "None"),
-      expand.grid(
-        Resistance = 10^c(0:9),
-        Configuration = c("Ring", "Line", "Complete")
-      ))[ifelse(is.na(dispersalDictionaryChoice),
-                1, dispersalDictionaryChoice + 2), ]
+    dispersalDictionary <-
+      dispersalDictionaryOrigin[ifelse(is.na(dispersalDictionaryChoice),
+                                       1, dispersalDictionaryChoice + 2), ]
 
-    DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
-      EnvironmentDistances = with(c(
-        dispersalDictionary,
-        Environments = result$NumEnvironments
-      ), {
-        if (Configuration == "None") {
-          DistanceMatrix <- Matrix::sparseMatrix(
-            i = Environments, j = Environments, x = 0)
-        }
-        if (Configuration == "Ring" || Configuration == "Line")
-          DistanceMatrix <- Matrix::bandSparse(
-            Environments, k = c(-1, 1),
-            diagonals = list(rep(Resistance, Environments - 1),
-                             rep(Resistance, Environments - 1))
-          )
-        if (Configuration == "Ring") {
-          DistanceMatrix[Environments, 1] <- Resistance
-          DistanceMatrix[1, Environments] <- Resistance
-        }
-        if (Configuration == "Complete") {
-          DistanceMatrix <- matrix(Resistance,
-                                   nrow = Environments,
-                                   ncol = Environments)
-          diag(DistanceMatrix) <- 0
-        }
-        DistanceMatrix
-      }
-      ),
-      SpeciesSpeeds = Pool$Speed
-    )
+    if (result$NumEnvironments > 1) {
+      DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
+        EnvironmentDistances = convertDispersalDictToDistMatrix(
+          dispersalDictionary,
+          nEnv = result$NumEnvironments
+        ),
+        SpeciesSpeeds = Pool$Speed
+      )
+    } else {
+      DispersalMatrix <- Matrix::sparseMatrix(
+        i = {}, j = {}, # From documentation
+        dims = c(nrow(Pool), nrow(Pool))
+      )
+    }
 
     In <- DispersalMatrix
     In[In < 0] <- 0
@@ -161,7 +167,7 @@ environs <- lapply(
       Abundance = temp,
       Size = Pool$Size[keep],
       Type = Pool$Type[keep],
-      Affinity = Pool$Affinity[keep],
+      Affinity = result$Ellipsis$Affinity$SpeciesAffinities[keep],
       Matrix = interactions,
       DispersalGain = In[indices[keep] - 1, ], # -1 since time not in Dispersal
       DispersalLoss = Out[indices[keep] - 1, ],
@@ -190,11 +196,11 @@ environs <- lapply(environs, function(x) {
 
 # Each Row is then a set of nodes at a specific time.
 # We'll generate each plot from each row, although we may want to consider the
-# timing of events, but checking plot(temp[, 1]) suggests roughly linearity.
-# plot(temp[, 1])
-# lines(seq(from = temp[1, 1],
-#           to = temp[nrow(temp), 1],
-#           length.out = nrow(temp)), col = "red")
+# timing of events, but checking time plot suggests roughly linearity.
+# plot(result$Abundance[, 1])
+# lines(seq(from = result$Abundance[1, 1],
+#           to = result$Abundance[nrow(result$Abundance), 1],
+#           length.out = nrow(result$Abundance)), col = "red")
 
 
 # Plotting: ###################################################################
@@ -213,7 +219,7 @@ library(ggpubr)
 library(animation)
 
 ### Helper Functions: #########################################################
-# These need to be called multiple times do to have (nontrivial) layouts.
+# These need to be called multiple times so to have (nontrivial) layouts.
 createBaseGraph <- function(timestep, environs) {
   lapply(
     environs, function(e) {
@@ -237,7 +243,7 @@ createBaseGraph <- function(timestep, environs) {
         Affinity = e$Affinity
       )
 
-      if (sum(e$Abundance[timestep, ] > 0) > 1) {
+      if (sum(e$Abundance[timestep, ] > 0) >= 1) { # If any abundance...
         g <- g %>% tidygraph::activate(edges) %>% tidygraph::mutate(
           Type = ifelse(weight > 0, "Consumption", ifelse(
             to == from, "Intraspecific", "Predation"
@@ -502,6 +508,8 @@ animation::saveVideo(
     )) {
       # ani.options(ani.height = 1280 * 2, ani.width = 1024 * 2, interval = 1)
 
+      timestep <- round(timestep)
+
       if (!anyAbundanceSoFar) {
         if (!any(result$Abundance[timesInUse,][timestep, -1] > 0)) {
           next
@@ -509,8 +517,6 @@ animation::saveVideo(
           anyAbundanceSoFar <- TRUE
         }
       }
-
-      timestep <- round(timestep)
 
       graf <- createBaseGraph(timestep, environs)
       graf <- addIntrinsicToGraph(graf, timestep, environs)
@@ -585,20 +591,20 @@ animation::saveVideo(
             ) %>% cor())[1, 2]# %>% signif(digits = 2)
 
 
-          jacWith1 <- jaccard %>% dplyr::filter(
-            Env2 == i
-          )
-          jacWith1 <- jacWith1[
-            which.min(abs(jacWith1$Time - times[timestep])),
-            ]$Jaccard #%>% signif(digits = 4)
-
-
-          bcWith1 <- braycurtis %>% dplyr::filter(
-            Env2 == i
-          )
-          bcWith1 <- bcWith1[
-            which.min(abs(bcWith1$Time - times[timestep])),
-            ]$BrayCurtis #%>% signif(digits = 4)
+          # jacWith1 <- jaccard %>% dplyr::filter(
+          #   Env2 == i
+          # )
+          # jacWith1 <- jacWith1[
+          #   which.min(abs(jacWith1$Time - times[timestep])),
+          #   ]$Jaccard #%>% signif(digits = 4)
+          #
+          #
+          # bcWith1 <- braycurtis %>% dplyr::filter(
+          #   Env2 == i
+          # )
+          # bcWith1 <- bcWith1[
+          #   which.min(abs(bcWith1$Time - times[timestep])),
+          #   ]$BrayCurtis #%>% signif(digits = 4)
         }
 
         lastSuccessfulNeutralExtirpation <- result$Events
@@ -696,8 +702,9 @@ animation::saveVideo(
                   round(lastSuccessfulNeutralExtirpation$Times,
                         digits = 1))},
                 if(i != 1) {paste(
-                  c("R:", "Jac:", "BC:"),
-                  unlist(lapply(c(corWith1, jacWith1, bcWith1), function(x) {
+                  c("R:"),#, "Jac:", "BC:"),
+                  unlist(lapply(c(corWith1),#, jacWith1, bcWith1),
+                                function(x) {
                     if (is.na(x)) {
                       " NA        "
                     } else if (x == 1) {
@@ -798,50 +805,58 @@ animation::saveVideo(
         list(
           # Alpha Richness
           ggplot2::ggplot(
-            Diversity$Diversities$alpha %>% mutate(
-              Environment = as.factor(Environment)
+            Diversity$Diversity %>% dplyr::filter(
+              Metric == "Alpha Hill:0",
+              is.na(Subset)
+            ) %>% mutate(
+              Environment1 = as.factor(Environment1)
             ),
-            ggplot2::aes(x = Time, y = Richness,
-                         color = Environment, linetype = Environment)
+            ggplot2::aes(x = Time, y = Value,
+                         color = Environment1, linetype = Environment1)
           ) + ggplot2::geom_line(
+          ) + ggplot2::ylab(
+            "Richness"
           ),
-          # Gamma Richness
-          ggplot2::ggplot(
-            Diversity$Diversities$gamma %>% dplyr::filter(
-              Aggregation == "Gamma"
-            ),
-            ggplot2::aes(x = Time, y = Richness)
-          ) + ggplot2::geom_line(
-          ),
-          # Beta Jaccard
-          ggplot2::ggplot(
-            Diversity$Diversities$beta %>% dplyr::bind_rows() ,
-            ggplot2::aes(x = Time, y = Jaccard,
-                         group = interaction(Env1, Env2))
-          ) + ggplot2::geom_line(
-          ),
+          # # Gamma Richness
+          # ggplot2::ggplot(
+          #   Diversity$Diversities$gamma %>% dplyr::filter(
+          #     Aggregation == "Gamma"
+          #   ),
+          #   ggplot2::aes(x = Time, y = Richness)
+          # ) + ggplot2::geom_line(
+          # ),
+          # # Beta Jaccard
+          # ggplot2::ggplot(
+          #   Diversity$Diversities$beta %>% dplyr::bind_rows() ,
+          #   ggplot2::aes(x = Time, y = Jaccard,
+          #                group = interaction(Env1, Env2))
+          # ) + ggplot2::geom_line(
+          # ),
           # Alpha exp(Evenness)
           ggplot2::ggplot(
-            DivAbund$DivAbund$alpha %>% mutate(
-              Environment = as.factor(Environment)
+            Diversity$Diversity %>% dplyr::filter(
+              Metric == "Alpha Hill:1",
+              is.na(Subset)
+            ) %>% mutate(
+              Environment1 = as.factor(Environment1)
             ),
-            ggplot2::aes(x = Time, y = `1, All`,
-                         color = Environment, linetype = Environment)
+            ggplot2::aes(x = Time, y = Value,
+                         color = Environment1, linetype = Environment1)
           ) + ggplot2::geom_line(
-          ) + ggplot2::ylab("Exp(Evenness)"),
-          # Gamma exp(Evenness)
-          ggplot2::ggplot(
-            DivAbund$DivAbund$gamma,
-            ggplot2::aes(x = Time, y = `1, All`)
-          ) + ggplot2::geom_line(
-          ) + ggplot2::ylab("Exp(Evenness)"),
-          # Beta Bray-Curtis
-          ggplot2::ggplot(
-            DivAbund$DivAbund$beta ,
-            ggplot2::aes(x = Time, y = BrayCurtis,
-                         group = interaction(Env1, Env2))
-          ) + ggplot2::geom_line(
-          )
+          ) + ggplot2::ylab("Exp(Evenness)")#,
+          # # Gamma exp(Evenness)
+          # ggplot2::ggplot(
+          #   DivAbund$DivAbund$gamma,
+          #   ggplot2::aes(x = Time, y = `1, All`)
+          # ) + ggplot2::geom_line(
+          # ) + ggplot2::ylab("Exp(Evenness)"),
+          # # Beta Bray-Curtis
+          # ggplot2::ggplot(
+          #   DivAbund$DivAbund$beta ,
+          #   ggplot2::aes(x = Time, y = BrayCurtis,
+          #                group = interaction(Env1, Env2))
+          # ) + ggplot2::geom_line(
+          # )
         ),
         plotEventRug
       )
@@ -854,14 +869,14 @@ animation::saveVideo(
 
       tempplot <- ggpubr::ggarrange(
         plotlist = plots, #combinedplots,
-        ncol = 2, nrow = 1,
+        # ncol = 2, nrow = 1,
         common.legend = TRUE,
         legend = "bottom"
       )
 
       tempdashboard <- ggpubr::ggarrange(
         plotlist = dashboard, #combinedplots,
-        ncol = 3, nrow = 2,
+        # ncol = 3, nrow = 2,
         common.legend = TRUE,
         legend = "bottom"
       )
@@ -872,6 +887,7 @@ animation::saveVideo(
       )
 
       plot(tempfull)
+      print(largestTotalEffect)
     }
   }
 )
