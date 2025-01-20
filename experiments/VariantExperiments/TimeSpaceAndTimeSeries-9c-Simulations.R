@@ -10,7 +10,8 @@ simulationsTargets <- c(
   "TimeSpaceAndTimeSeries-9a5-DictionaryIDs.R",
   "TimeSpaceAndTimeSeries-9a6-DictionaryIDs.R",
   "TimeSpaceAndTimeSeries-9a7-DictionaryIDs.R",
-  "TimeSpaceAndTimeSeries-9a8-DictionaryIDs.R"#,
+  "TimeSpaceAndTimeSeries-9a8-DictionaryIDs.R",
+  "TimeSpaceAndTimeSeries-9a9-DictionaryIDs.R"#,
 )
 
 simulationsTarget <- switch(
@@ -25,6 +26,7 @@ simulationsTarget <- switch(
   "6" = simulationsTargets[6],
   "7" = simulationsTargets[7],
   "8" = simulationsTargets[8],
+  "9" = simulationsTargets[9],
   simulationsTargets[length(simulationsTargets)] # Default
 )
 directory <- '.'
@@ -124,6 +126,15 @@ if (simulationsTarget == simulationsTargets[1]) {
   historiesSeedOffset <- 384
   initialConditionsSeedOffset <- 387
   affinitiesSeedOffset <- 391
+} else if (simulationsTarget == simulationsTargets[9]) {
+  numberPools <- 44 # Power Analysis: detect 95% non-zero if 2 richdiff at 8sd.
+  numberHistories <- 1 # Could rerun pools w/diff hists if needed, use offset.
+  numberAffinities <- 1 # Mostly for runif case, but should just do as above.
+  numberInitConds <- 1 # Starting from none anyways.
+  poolSeedOffset <- 343
+  historiesSeedOffset <- 386
+  initialConditionsSeedOffset <- 389
+  affinitiesSeedOffset <- 431
 } else {
   stop("Settings not detected properly.")
 }
@@ -256,6 +267,21 @@ parameterChoices <- parameterChoices %>% dplyr::select(
   dplyr::everything()
 ) %>% dplyr::arrange(
   dplyr::across(dplyr::everything())
+)
+
+# Going to try to get clever to spread out the pool generation.
+parameterChoices <- parameterChoices %>% dplyr::mutate(
+  firsts = !duplicated(interaction(ppSeed, dynSeed))
+) %>% dplyr::group_by(
+  firsts
+) %>% dplyr::mutate(
+  priority = ifelse(
+    # If you're a first, increase priority so that there are two runs
+    # between all cores and each new pool creation roughly.
+    firsts, (dplyr::row_number() - 1) * cores * 2, dplyr::row_number()
+  )
+) %>% dplyr::arrange(
+  priority
 )
 
 # Run across each row of parameterChoices: ####################################
