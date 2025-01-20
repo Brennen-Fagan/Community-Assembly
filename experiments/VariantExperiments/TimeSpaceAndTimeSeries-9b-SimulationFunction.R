@@ -44,8 +44,8 @@ simulationWrapper <- function(
   params <- list(
     EliminationThreshold = 10^-4, # Below which species are removed.
     ArrivalDensity =  4 * 10 ^ 3 * 10^-4, # Traill et al. 2007: MULTIPLIED BY ET.
-    MaximumTimeStep = 1, # Maximum time solver can proceed without elimination.
-    BetweenEventSteps = 10 # Number of steps to reach next event to smooth.
+    MaximumTimeStep = 5, # Maximum time solver can proceed without elimination. # From 1
+    BetweenEventSteps = 2 # Number of steps to reach next event to smooth. # From 10
   )
   namespold <- names(params)
   params[(namespnew <- names(parameters))] <- parameters

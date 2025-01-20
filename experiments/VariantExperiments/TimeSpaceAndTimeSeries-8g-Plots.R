@@ -1,4 +1,5 @@
-datfolders <- dir(pattern = "TSTS_Simulations_")#.+2024-11-13$") # Regex
+# datfolders <- dir(pattern = "TSTS_Simulations_")
+datfolders <- dir(pattern = "TSTS_Simulations_.+2024-11-30$") # Regex
 
 # Problems with X11
 options(bitmapType = "cairo")
@@ -101,7 +102,45 @@ diversitiesFlattened <- do.call(rbind, lapply(diversities, function(d) {
     id[[4]] <- rep(NA, 2)
   }
 
-  d$Diversity %>% dplyr::mutate(
+  pres <- d$Presence %>% dplyr::mutate(
+    Environment1 = Environment,
+    Environment2 = NA
+  ) %>% dplyr::group_by(
+    Time, Environment1, Environment2
+  ) %>% dplyr::mutate(
+    `Average Size:0` = mean(Size),
+    `Average Size:1` = mean(Size*Abundance)/sum(Abundance),
+    `St.Dev. Size:0` = sqrt(var(Size)),
+    `St.Dev. Size:1` = sqrt(var(Size*Abundance/sum(Abundance))),
+    `Ratio Con/Bas:0` = sum(Type == "Consumer")/sum(Type == "Basal"),
+    `Ratio Con/Bas:1` = sum((Type == "Consumer") * Abundance) /
+      sum((Type == "Basal") * Abundance),
+    `Average Aff.:0` = mean(Affinity),
+    `Average Aff.:1` = mean(Affinity*Abundance)/sum(Abundance)
+  ) %>% tidyr::pivot_longer(
+    cols = `Average Size:0`:`Average Aff.:1`,
+    names_to = "Metric", values_to = "Value"
+  ) %>% dplyr::mutate(
+    Subset = NA
+  )
+
+  pres_subset <- d$Presence %>% dplyr::mutate(
+    Environment1 = Environment,
+    Environment2 = NA,
+    Subset = paste0(Type, "_", Affinity)
+  ) %>% dplyr::group_by(
+    Time, Environment1, Environment2, Subset
+  ) %>% dplyr::mutate(
+    `Average Size:0` = mean(Size),
+    `Average Size:1` = mean(Size*Abundance)/sum(Abundance),
+    `St.Dev. Size:0` = sqrt(var(Size)),
+    `St.Dev. Size:1` = sqrt(var(Size*Abundance/sum(Abundance)))
+  ) %>% tidyr::pivot_longer(
+    cols = `Average Size:0`:`St.Dev. Size:1`,
+    names_to = "Metric", values_to = "Value"
+  )
+
+  d$Diversity %>% dplyr::bind_rows(pres, pres_subset) %>% dplyr::mutate(
     PoolPatch = id[[1]][1],
     PoolPatchSeed = id[[2]][1],
     Interactions = id[[1]][2],
@@ -152,13 +191,13 @@ diversitiesFlattened <- diversitiesFlattened %>% dplyr::mutate(
   )
 )
 
-diversitiesFlattened <- diversitiesFlattened %>% dplyr::filter(
-  Metric %in% c(
-    "Alpha Hill:0", "Alpha Hill:1", "Alpha Hill:Inf",
-    "TimeBrayCurtis", "TimeBrayCurtisBalance", "TimeBrayCurtisGradient",
-    "TimeJaccard", "TimeJaccardNestedness", "TimeJaccardTurnover"
-  )
-)
+# diversitiesFlattened <- diversitiesFlattened %>% dplyr::filter(
+#   Metric %in% c(
+#     "Alpha Hill:0", "Alpha Hill:1", "Alpha Hill:Inf",
+#     "TimeBrayCurtis", "TimeBrayCurtisBalance", "TimeBrayCurtisGradient",
+#     "TimeJaccard", "TimeJaccardNestedness", "TimeJaccardTurnover"
+#   )
+# )
 
 diversitiesFlattenedAveragedBySeed <- diversitiesFlattened %>% dplyr::group_by(
   Environment1, Environment2, Metric, Subset, PoolPatch, PoolPatchSeed,
@@ -273,7 +312,7 @@ checks2 <- lapply(
 
 straightlines <- diversitiesFlattenedAveragedBySeed %>% dplyr::filter(
   Metric == "Alpha Hill:0"
-  )  %>% dplyr::group_by(
+)  %>% dplyr::group_by(
   Metric, Subset
 ) %>% dplyr::group_map(.f = function(rows, key) {
   # Regression, controlling for
@@ -419,9 +458,9 @@ ggplot2::ggplot(
   axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust = 1)
 ) + ggplot2::scale_fill_gradient2(
   low = "orange", high = "blue", mid = "grey"
-  ) + ggplot2::scale_y_continuous(
-    minor_breaks = function(y) {seq(floor(y[1]), ceiling(y[2]))}
-    )
+) + ggplot2::scale_y_continuous(
+  minor_breaks = function(y) {seq(floor(y[1]), ceiling(y[2]))}
+)
 # Good news:
 # Since we weren't worried about the effects of the affinity, different
 # affinities should and do appear the same. Easy double check with 9a distDO.
@@ -475,7 +514,25 @@ plotDiversityOverview <- function(d, measures) {
   d <- d %>% dplyr::filter(
     Metric %in% measures
   )
-  ggplot2::ggplot(
+  hits0 <- d %>% dplyr::filter(
+    Time != 0
+  ) %>% dplyr::group_by(
+    Environment1, Environment2, Metric, Subset,
+    PoolPatch, PoolPatchSeed,
+    Interactions, InteractionsSeed,
+    Events, EventsSeed, Dispersal, NicheDistance, Affinity,
+    InterventionPatchType, InterventionPatchSeed,
+    InterventionTimeType, InterventionTimeSeed,
+    InterventionDispersal, InterventionNicheDistance,
+    Intervention
+  ) %>% dplyr::summarise(
+    Any0 = any(Value == 0),
+    position = max(Value),
+    .groups = "drop"
+  ) %>% dplyr::filter(
+    Any0
+  )
+  obj <- ggplot2::ggplot(
     d,
     ggplot2::aes(
       x = Time,
@@ -520,6 +577,24 @@ plotDiversityOverview <- function(d, measures) {
   ) + ggplot2::facet_wrap(
     . ~ Metric + Subset + SpeciesAffinity
   )
+  if (nrow(hits0)!=0) {
+    obj + ggplot2::geom_text(
+      data = hits0,
+      mapping = ggplot2::aes(
+        x = max(d$Time)*1.05,
+        y = position,
+        group = paste(Environment1, Environment2, Metric, Subset,
+                      PoolPatch, PoolPatchSeed,
+                      Interactions, InteractionsSeed,
+                      Events, EventsSeed, Dispersal, NicheDistance, Affinity,
+                      InterventionPatchType, InterventionPatchSeed,
+                      InterventionTimeType, InterventionTimeSeed,
+                      InterventionDispersal, InterventionNicheDistance),
+        color = interaction(Intervention)
+      ),
+      label = "*"
+    )
+  } else obj
 }
 
 # e.g. plotDiversityOverview(diversitiesFlattened %>% dplyr::filter(PoolPatchSeed == 30, Intervention %in% c("(0)", "(0)->(1)"), SpeciesAffinity %in% c("evensplit_01"), NicheDistance == 6), "Alpha Hill:0")
@@ -559,4 +634,57 @@ ggplot(
   color = "black"
 ) + facet_grid(
   Subset ~ PoolPatchSeed
+)
+
+# Or the intervention overview plot:
+plotDiversityOverview(
+  diversitiesFlattened %>% dplyr::filter(
+    SpeciesAffinity %in% c("evensplit_01"),
+    NicheDistance == 7,
+    is.na(Subset)
+  ) %>% dplyr::mutate(
+    Intervention = factor(
+      Intervention,
+      levels = c(
+        "(0)", "(0)->(0)", "(0)->(0.25)", "(0)->(0.5)", "(0)->(0.75)", "(0)->(1)",
+        "(0.25)", "(0.25)->(0)", "(0.25)->(0.25)", "(0.25)->(0.5)", "(0.25)->(0.75)", "(0.25)->(1)",
+        "(0.5)", "(0.5)->(0)", "(0.5)->(0.25)", "(0.5)->(0.5)", "(0.5)->(0.75)", "(0.5)->(1)",
+        "(0.75)", "(0.75)->(0)", "(0.75)->(0.25)", "(0.75)->(0.5)", "(0.75)->(0.75)", "(0.75)->(1)",
+        "(1)", "(1)->(0)", "(1)->(0.25)", "(1)->(0.5)", "(1)->(0.75)", "(1)->(1)"
+        )
+    )),
+  "Alpha Hill:0"
+) + ggplot2::facet_wrap(
+  .~Intervention,
+  nrow = 5
+) + ggplot2::theme(
+  legend.position = "none"
+) + ggplot2::geom_boxplot(
+  ggplot2::aes(x = 34000),
+  width = 1000
+  )
+
+
+# Hurst Exponents?
+
+diversitiesFlattened %>% dplyr::filter(
+  SpeciesAffinity %in% c("evensplit_01"),
+  NicheDistance == 7,
+  PoolPatchSeed == "341",
+  Metric == "Alpha Hill:0",
+  is.na(Subset)
+) %>% dplyr::group_by(Intervention) %>% dplyr::arrange(Time) %>% dplyr::mutate(
+  Hurst1 = Value - lag(Value),
+  Hurst2 = Value - lag(Value,n = 2),
+  Hurst4 = Value - lag(Value,n = 4),
+  Hurst8 = Value - lag(Value,n = 8),
+  Hurst16 = Value - lag(Value,n = 16),
+  Hurst32 = Value - lag(Value,n = 32),
+  Hurst64 = Value - lag(Value,n = 64),
+  Hurst128 = Value - lag(Value,n = 128),
+  Hurst256 = Value - lag(Value,n = 256),
+  Hurst512 = Value - lag(Value,n = 512),
+  Hurst1024 = Value - lag(Value,n = 1024)
+) %>% dplyr::summarise(
+  dplyr::across(starts_with("Hurst"), .fns = var, na.rm = TRUE)
 )

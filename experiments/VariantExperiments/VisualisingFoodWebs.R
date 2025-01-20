@@ -18,12 +18,13 @@
 
 # I'm thinking dim on the grid is best bet.
 # #############################################################################
+library(dplyr)
 
 # Problems with X11
 options(bitmapType = "cairo")
 
 systype <- match.arg(
-  "Simulation",
+  "Intervention",
   c("Simulation", "Intervention")
 )
 
@@ -32,9 +33,10 @@ source(file.path(directory, "TimeSpaceAndTimeSeries-9-Dictionaries.R"))
 
 # E.g. TSTS_Diversity_142486-4929-28-1-NA-3-1_341-341-384-387-391
 # or TSTS_Diversity_142486-4929-28-1-NA-3-1_341-341-384-387-391_111-1-p-p_1-1
+# TSTS_Diversity_142486-4929-28-1-NA-7-35_341-341-384-387-410
 set <- "142486-4929"; initSeeds <- "341-341"; date <- "2024-11-30"
-tag <- paste0(set, "-28-1-NA-3-1_", initSeeds, "-384-387-391",
-              if (systype == "Intervention") "_111-1-p-p_1-1")
+tag <- paste0(set, "-28-1-NA-7-7_", initSeeds, "-384-387-394",
+              if (systype == "Intervention") "_115-1-p-p_1-1") # usually 111:115
 dir <- paste0("TSTS_Simulations_", set, "_", initSeeds, "_", date)
 load(file.path(dir, paste0("TSTS_", systype, "_", tag, ".RData")))
 load(file.path(dir, paste0("TSTS_PoolPatchDynamics_", set, "_", initSeeds, ".RData")))
@@ -43,7 +45,7 @@ load(file.path(dir, paste0("TSTS_Diversity_", tag, ".RData")))
 
 
 
-threshold <- 0.00 # in [0, 1]
+threshold <- 1e-7 # in [0, 1]
 
 if (systype == "Intervention") {
   timesInUse <-
@@ -125,7 +127,7 @@ environs <- lapply(
         # Convert to Numeric and make sure conversion worked.
         dispersalDictionaryChoice <- tryCatch({
           as.numeric(dispersalDictionaryChoice)
-          }, error = function(e) {return(e)})
+        }, error = function(e) {return(e)})
         stopifnot(!is.na(dispersalDictionaryChoice) || # stop if (false) NA
                     is.numeric(dispersalDictionaryChoice)) # stop if not numeric
       }
@@ -491,6 +493,12 @@ graf4Layout <- addIntrinsicToGraph(graf4Layout, timestepLayout, environs)
 graf4Layout <- thresholdGraphEdges(graf4Layout, threshold)
 lay <- computeGraphLayout(graf4Layout)
 
+# This might cause problems with the diet???
+# temp <- apply(result$Abundance[, -1] > result$Parameters$EliminationThreshold,
+#               2, which.max)
+# temp <- temp[names(temp) %in% lay$name]
+# temp <- temp[order(names(temp))]
+# lay <- lay %>% dplyr::arrange(name) %>% dplyr::mutate(x = temp)
 #
 #
 # # GIF
@@ -499,7 +507,7 @@ lay <- computeGraphLayout(graf4Layout)
 # Video
 animation::saveVideo(
   # video.name = "test.mp4",
-  video.name = paste0("test_", tag, ".mp4"),
+  video.name = paste0("test2_", tag, ".mp4"),
   ani.height = 1024 * 2, ani.width = 1280 * 2, interval = 0.1,
   expr = {
     for (timestep in seq(from = 1, to = nrow(environs[[1]]$Abundance),
@@ -680,7 +688,8 @@ animation::saveVideo(
           values = edgecolors, drop = FALSE
         ) + scale_edge_alpha(
           name = "Contribution %",
-          transform = "sqrt", breaks = c(1e-5, 1e-3, 1e-1), limits = c(1e-7, 1)
+          transform = "sqrt", breaks = c(1e-5, 1e-3, 1e-1),
+          limits = c(threshold, 1)
         ) + theme_minimal(
         ) + ylab(
           "Log10(Size)"
@@ -705,101 +714,155 @@ animation::saveVideo(
                   c("R:"),#, "Jac:", "BC:"),
                   unlist(lapply(c(corWith1),#, jacWith1, bcWith1),
                                 function(x) {
-                    if (is.na(x)) {
-                      " NA        "
-                    } else if (x == 1) {
-                      " 1         "
-                    } else if (x == 0) {
-                      " 0         "
-                    } else if (x > 0) {
-                      paste0(" ", formatC(x,preserve.width = "common",
-                                          digits = 4, format = "f"))
-                    } else {
-                      formatC(x,preserve.width = "common",
-                              digits = 4, format = "f")
-                    }
-                  })),
+                                  if (is.na(x)) {
+                                    " NA        "
+                                  } else if (x == 1) {
+                                    " 1         "
+                                  } else if (x == 0) {
+                                    " 0         "
+                                  } else if (x > 0) {
+                                    paste0(" ", formatC(x,preserve.width = "common",
+                                                        digits = 4, format = "f"))
+                                  } else {
+                                    formatC(x,preserve.width = "common",
+                                            digits = 4, format = "f")
+                                  }
+                                })),
                   collapse = ", "
                 )}
           )
         )
       })
 
-      # # https://archive.schochastics.net/post/ggraph-tricks-for-common-problems/
-      # pointsAsBarPlots <- lapply(graf, function(g) {
-      #   df <- g %>% activate(
-      #     edges
-      #   ) %>% igraph::as_data_frame(
-      #   ) %>% dplyr::mutate(
-      #     Node = ifelse(
-      #       # Not Decay or Negative Dispersal, use To, else From.
-      #       !Type == "Decay" & !(Type == "Dispersal" & Linetype == "Negative"),
-      #       to, from)
-      #   ) %>% dplyr::filter(
-      #     Node %in% (g %>% activate(nodes) %>% filter(Present) %>% pull(name))
-      #   ) %>% dplyr::group_by(
-      #     Node, Type, Linetype
-      #   ) %>% dplyr::summarise(
-      #     TotalEffect = sum(weight),
-      #     .groups = "drop"
-      #   )
-      #
-      #   limits <- range(df$TotalEffect)
-      #
-      #   df %>% dplyr::group_by(Node) %>% dplyr::group_map(
-      #     .f = function(.x, .y) {
-      #       grob <- ggplot2::ggplotGrob(
-      #         ggplot2::ggplot(
-      #           .x
-      #         ) + ggplot2::geom_col(
-      #           ggplot2::aes(
-      #             x = interaction(Type, Linetype),
-      #             y = TotalEffect,
-      #             fill = Type
-      #           )
-      #         ) + ggplot2::scale_fill_manual(
-      #           values = edgecolors
-      #         ) + ggplot2::coord_cartesian(
-      #           ylim = limits,
-      #           expand = FALSE
-      #         ) + ggplot2::theme(
-      #           legend.position = "none",
-      #           panel.background =
-      #             ggplot2::element_rect(fill = "white", color = NA),
-      #           line = ggplot2::element_blank(),
-      #           text = ggplot2::element_blank()
-      #         )
-      #       )
-      #       coordinates <- grob$layout[grob$layout$name == "panel", ]
-      #       list(
-      #         node = .y$Node,
-      #         grobs = grob[coordinates$t:coordinates$b,
-      #                      coordinates$l:coordinates$r]
-      #       )
-      #     }
-      #   )
-      # })
-      #
-      # annotationspace <- 0.14
-      #
-      # barplotsAsAnnotations <- lapply(pointsAsBarPlots, function(g) {
-      #   lapply(g, function(bp) {
-      #     node <- bp$node
-      #     grob <- bp$grobs
-      #     xy <- lay %>% dplyr::filter(name == node) %>% dplyr::select(x, y)
-      #     ggplot2::annotation_custom(
-      #       grob,
-      #       xmin = xy$x - annotationspace * 2,
-      #       xmax = xy$x + annotationspace * 2,
-      #       ymin = xy$y - annotationspace / 10,
-      #       ymax = xy$y + annotationspace / 10
-      #     )
-      #   })
-      # })
-      #
-      # combinedplots <- lapply(seq_along(graf), function(i) {
-      #   Reduce("+", barplotsAsAnnotations[[i]], plots[[i]])
-      # })
+      # https://archive.schochastics.net/post/ggraph-tricks-for-common-problems/
+      pointsAsBarPlots <- lapply(graf, function(g) {
+        # GAINS VERSION
+        #   df <- g %>% activate(
+        #     edges
+        #   ) %>% igraph::as_data_frame(
+        #   ) %>% dplyr::mutate(
+        #     Node = ifelse(
+        #       # Not Decay or Negative Dispersal, use To, else From.
+        #       !Type == "Decay" & !(Type == "Dispersal" & Linetype == "Negative"),
+        #       to, from)
+        #   ) %>% dplyr::filter(
+        #     Node %in% (g %>% activate(nodes) %>% filter(Present) %>% pull(name))
+        #   ) %>% dplyr::group_by(
+        #     Node, Type, Linetype
+        #   ) %>% dplyr::summarise(
+        #     TotalEffect = sum(weight),
+        #     .groups = "drop"
+        #   )
+        #
+        #   limits <- range(df$TotalEffect)
+        #
+        #   df %>% dplyr::group_by(Node) %>% dplyr::group_map(
+        #     .f = function(.x, .y) {
+        #       grob <- ggplot2::ggplotGrob(
+        #         ggplot2::ggplot(
+        #           .x
+        #         ) + ggplot2::geom_col(
+        #           ggplot2::aes(
+        #             x = interaction(Type, Linetype),
+        #             y = TotalEffect,
+        #             fill = Type
+        #           )
+        #         ) + ggplot2::scale_fill_manual(
+        #           values = edgecolors
+        #         ) + ggplot2::coord_cartesian(
+        #           ylim = limits,
+        #           expand = FALSE
+        #         ) + ggplot2::theme(
+        #           legend.position = "none",
+        #           panel.background =
+        #             ggplot2::element_rect(fill = "white", color = NA),
+        #           line = ggplot2::element_blank(),
+        #           text = ggplot2::element_blank()
+        #         )
+        #       )
+        #       coordinates <- grob$layout[grob$layout$name == "panel", ]
+        #       list(
+        #         node = .y$Node,
+        #         grobs = grob[coordinates$t:coordinates$b,
+        #                      coordinates$l:coordinates$r]
+        #       )
+        #     }
+        #   )
+        # })
+        #
+        # DIET VERSION:
+        df <- g %E>% igraph::as_data_frame(
+        ) %>% dplyr::filter(
+          Type == "Consumption"
+        ) %>% dplyr::mutate(
+          from = as.numeric(from)
+        ) %>% dplyr::left_join(
+          Pool %>% dplyr::select(
+            ID, Type
+          ) %>% dplyr::rename(
+            Prey = Type
+          ),
+          by = c("from" = "ID")
+        ) %>% dplyr::group_by(
+          to, Prey
+        ) %>% dplyr::summarise(
+          Diet = sum(PercentContribution),
+          .groups = "drop"
+        ) %>% dplyr::rename(
+          Node = to
+        )
+
+        df %>% dplyr::group_by(Node) %>% dplyr::group_map(
+          .f = function(.x, .y) {
+            grob <- ggplot2::ggplotGrob(
+              ggplot2::ggplot(
+                .x
+              ) + ggplot2::geom_col(
+                ggplot2::aes(x = 1, fill = Prey, y = Diet)
+              ) + ggplot2::scale_fill_manual(
+                values = c("Basal" = "darkgreen", "Consumer" = "goldenrod")
+              ) + ggplot2::coord_cartesian(
+                expand = FALSE
+              ) + ggplot2::theme(
+                legend.position = "none",
+                panel.background =
+                  ggplot2::element_rect(fill = "white", color = NA),
+                line = ggplot2::element_blank(),
+                text = ggplot2::element_blank()
+              )
+            )
+            coordinates <- grob$layout[grob$layout$name == "panel", ]
+            list(
+              node = .y$Node,
+              grobs = grob[coordinates$t:coordinates$b,
+                           coordinates$l:coordinates$r]
+            )
+          }
+        )
+      }
+      )
+
+      annotationspace <- 0.14
+
+      barplotsAsAnnotations <- lapply(pointsAsBarPlots, function(g) {
+        lapply(g, function(bp) {
+          node <- bp$node
+          grob <- bp$grobs
+          xy <- lay %>% dplyr::filter(name == node) %>% dplyr::select(x, y)
+          # print(xy)
+          ggplot2::annotation_custom(
+            grob,
+            xmin = xy$x - annotationspace * 2,
+            xmax = xy$x + annotationspace * 2,
+            ymin = xy$y - annotationspace / 10,
+            ymax = xy$y + annotationspace / 10
+          )
+        })
+      })
+
+      combinedplots <- lapply(seq_along(graf), function(i) {
+        Reduce("+", barplotsAsAnnotations[[i]], plots[[i]])
+      })
 
       dashboard <- lapply(
         list(
@@ -816,6 +879,19 @@ animation::saveVideo(
           ) + ggplot2::geom_line(
           ) + ggplot2::ylab(
             "Richness"
+          ),
+          ggplot2::ggplot(
+            Diversity$Diversity %>% dplyr::filter(
+              Metric == "TimeJaccard",
+              is.na(Subset)
+            ) %>% mutate(
+              Environment1 = as.factor(Environment1)
+            ),
+            ggplot2::aes(x = Time, y = Value,
+                         color = Environment1, linetype = Environment1)
+          ) + ggplot2::geom_line(
+          ) + ggplot2::ylab(
+            "Temporal Jaccard"
           ),
           # # Gamma Richness
           # ggplot2::ggplot(
@@ -843,7 +919,20 @@ animation::saveVideo(
             ggplot2::aes(x = Time, y = Value,
                          color = Environment1, linetype = Environment1)
           ) + ggplot2::geom_line(
-          ) + ggplot2::ylab("Exp(Evenness)")#,
+          ) + ggplot2::ylab("Exp(Evenness)"),
+          ggplot2::ggplot(
+            Diversity$Diversity %>% dplyr::filter(
+              Metric == "TimeBrayCurtis",
+              is.na(Subset)
+            ) %>% mutate(
+              Environment1 = as.factor(Environment1)
+            ),
+            ggplot2::aes(x = Time, y = Value,
+                         color = Environment1, linetype = Environment1)
+          ) + ggplot2::geom_line(
+          ) + ggplot2::ylab(
+            "Temporal Bray Curtis"
+          )#,
           # # Gamma exp(Evenness)
           # ggplot2::ggplot(
           #   DivAbund$DivAbund$gamma,
@@ -868,21 +957,21 @@ animation::saveVideo(
       })
 
       tempplot <- ggpubr::ggarrange(
-        plotlist = plots, #combinedplots,
+        plotlist = combinedplots, # plots
         # ncol = 2, nrow = 1,
         common.legend = TRUE,
         legend = "bottom"
       )
 
       tempdashboard <- ggpubr::ggarrange(
-        plotlist = dashboard, #combinedplots,
+        plotlist = dashboard,
         # ncol = 3, nrow = 2,
         common.legend = TRUE,
         legend = "bottom"
       )
 
       tempfull <- ggpubr::ggarrange(
-        plotlist = list(tempplot, tempdashboard), #combinedplots,
+        plotlist = list(tempplot, tempdashboard),
         ncol = 1, nrow = 2, heights = c(3, 1)
       )
 

@@ -11,8 +11,10 @@ source(file.path(directory, "TimeSpaceAndTimeSeries-9b-SimulationFunction.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-8d-InterventionFunction.R"))
 
 dirTag <- "TSTS_Simulations"
-dirDate <- "2024-11-11"
+dirDate <- "2024-11-30"
 baseTag <-  "TSTS_Simulation" # Note the distinction
+# simulationsTargetIndex <- ... # Can set, or let default to most recent.
+cores <- 12
 
 runSimulations <- FALSE
 source(file.path(directory, "TimeSpaceAndTimeSeries-9c-Simulations.R"))
@@ -65,7 +67,7 @@ parameterChoices <- parameterChoices %>% dplyr::left_join(
 )
 
 # Run across each row of parameterChoices: ####################################
-clust <- parallel::makeCluster(12)
+clust <- parallel::makeCluster(min(nrow(parameterChoices), cores))
 doParallel::registerDoParallel(clust)
 
 toExport <- unlist(lapply(
@@ -94,7 +96,7 @@ success <- foreach::foreach(
   pc = iterators::iter(parameterChoices, by = "row"),
   .packages = c("RMTRCode2", "dplyr"), .export = toExport
 ) %dopar% {
-# ) %do% {
+  # ) %do% {
   pc <- as.list(pc) # untibble so we are passing numerics and strings.
   interventionWrapper(
     # ID = list(
