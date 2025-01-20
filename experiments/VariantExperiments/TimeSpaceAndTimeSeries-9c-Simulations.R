@@ -43,7 +43,7 @@ if (runSimulationsFlag) {
   library(iterators)
 }
 
-cores <- 8 # Normally happy to put higher, but there's not the redundancy of
+cores <- 16 # Normally happy to put higher, but there's not the redundancy of
 # pools in this go round, so each pool needs to be made, and that takes a lot
 # of cores!
 

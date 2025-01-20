@@ -8,13 +8,13 @@ directory <- '.'
 source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-0-Interventions.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-9b-SimulationFunction.R"))
-source(file.path(directory, "TimeSpaceAndTimeSeries-8d-InterventionFunction.R"))
+source(file.path(directory, "TimeSpaceAndTimeSeries-9d-InterventionFunction.R"))
 
 dirTag <- "TSTS_Simulations"
 dirDate <- "2024-11-30"
-baseTag <-  "TSTS_Simulation" # Note the distinction
+baseTag <-  "TSTS_Simulation" # Note the distinction ("s").
 # simulationsTargetIndex <- ... # Can set, or let default to most recent.
-cores <- 12
+cores <- 16
 
 runSimulations <- FALSE
 source(file.path(directory, "TimeSpaceAndTimeSeries-9c-Simulations.R"))
@@ -65,6 +65,15 @@ parameterChoices <- parameterChoices %>% dplyr::left_join(
   by = c("pp", "dyn", "events", "initconds",
          "dispersal", "affinity", "distance")
 )
+
+# Since we've had success with making sure that the interruptions that do
+# nothing do in fact do nothing, we can eliminate those from the parameter
+# choices.
+# (Note: no need to prioritise since all pools are already made.)
+parameterChoices <- parameterChoices %>% dplyr::filter(
+  affinityDictionaryOrigin$PatchAffinities[affinity] !=
+    interventionPatchDictionaryOrigin$PatchAffinities[ip]
+) %>% dplyr::select(-priority)
 
 # Run across each row of parameterChoices: ####################################
 clust <- parallel::makeCluster(min(nrow(parameterChoices), cores))
