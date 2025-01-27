@@ -8,7 +8,7 @@
 #datfolders <- dir(pattern = "TSTS_Simulations_")#.+2024-11-19$")
 datfolders <- dir(pattern = "TSTS_Simulations_.+2025-01-2.$")
 # datfolders <- dir(pattern = "CompareEliminationThresholds$")
-cores <- 8 # Parallelization?
+cores <- 4 # Parallelization?
 preferredTimestep <- 10 # Characteristic Time Scale Units
 # Previously Event rate was ~1/CTU, now it's more like ~0.1/CTU in theory.
 # (This seems reasonably close in practice looking at 1 example and observing
