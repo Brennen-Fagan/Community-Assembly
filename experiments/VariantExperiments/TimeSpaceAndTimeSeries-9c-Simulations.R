@@ -3,8 +3,8 @@ runSimulationsFlag <- # Default to TRUE if runSimulations does not exist.
   (!exists("runSimulations") || get("runSimulations") == TRUE)
 
 logisticCarryingCapacity <-
-  # NULL # OR
-  list(Basal = 1000) # 300 or 3000 also have arguments.
+  NULL # OR
+  # list(Basal = 1000) # 300 or 3000 also have arguments.
 
 simulationsTargets <- c(
   "TimeSpaceAndTimeSeries-9a-DictionaryIDs.R",
@@ -47,7 +47,8 @@ if (runSimulationsFlag) {
   library(iterators)
 }
 
-cores <- 1 # Normally happy to put higher, but there's not the redundancy of
+if (!exists("cores"))
+  cores <- 1 # Normally happy to put higher, but there's not the redundancy of
 # pools in this go round, so each pool needs to be made, and that takes a lot
 # of cores!
 
