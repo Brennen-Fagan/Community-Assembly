@@ -35,6 +35,7 @@ simulationWrapper <- function(
     "affinity"          = 8304800,
     "initialConditions" = 62413105 # runif(1)*1e8 #[1] 62413105
   ),
+  logisticCarryingCapacity = NULL, # list(Basal=x, Consumer=y) or (Total=z)
   returnResults = FALSE,
   saveResults = TRUE,
   skipIfSaveExists = TRUE, # Precedence over the next argument.
@@ -378,6 +379,43 @@ simulationWrapper <- function(
       }
     ) ^ sign(rep(Pool$ReproductionRate, poolpatchDictionary$NumberEnvironments))
 
+  if (!is.null(logisticCarryingCapacity)) {
+    if ("basal" %in% tolower(names(logisticCarryingCapacity))) {
+      if ("consumer" %in% tolower(names(logisticCarryingCapacity))) {
+        # Both Basal and Consumer, but separately. See below for descriptions.
+        stop("logisticCarryingCapacity term not implemented.")
+      } else {
+        # Only Basal
+        rprimeMax <- rprime
+        basalVec <- (Pool$Type == "Basal")
+        sizeVec <- Pool$Size * basalVec
+        sizeVecLen <- length(sizeVec)
+        rprime <- function(t, y, parms, ...) {
+          #TODO but sizes are in the pool, and we need only for this patch, and we need only basals.
+          # Automatically evaluated per patch (parms$Patch == i, unlist-lapply)
+          # RMTRCode2::PerCapitaDynamics_Type1, but the whole y is provided.
+          rprimeMax * (
+            1 - basalVec * sum(
+              y[1:sizeVecLen + sizeVecLen*(parms$Patch - 1)] * sizeVec
+            ) / logisticCarryingCapacity$Basal
+          )
+        }
+      }
+    } else if ("consumer" %in% tolower(names(logisticCarryingCapacity))) {
+      # Only Consumer
+      # NOTE: Not clear about implementation if r(prime) is negative.
+      #       Presumably, it would instead act on the consumption term.
+      stop("logisticCarryingCapacity term not implemented.")
+    } else if ("total" %in% tolower(names(logisticCarryingCapacity))) {
+      # Both Basal and Consumer, together.
+      # NOTE: Implementing the consumer side of this is not obvious.
+      #       For Basals, this is a sum over all species, not only Basals.
+      stop("logisticCarryingCapacity term not implemented.")
+    } else {
+      stop("logisticCarryingCapacity term not recognised.")
+    }
+  }
+
   if (is.function(rprime)) {
     # Calculate rprime using Parms$Patch
     if (is.function(InteractionMatrices$Mats[[1]])) {
@@ -498,7 +536,12 @@ simulationWrapper <- function(
       SpeciesAffinities = Affinities,
       PatchAffinities = PatchAffinities,
       EffectiveReproductionRate = rprime
-    )
+    )#,
+    # Can't not be passed through without a separate call that doesn't pass it.
+    # LogisticCarryingCapacity = logisticCarryingCapacity
+    # But it is implicitly stored by the function inside
+    # Ellipsis$Affinity$EffectiveReproductionRate, i.e.,
+    # environment(result$Ellipsis$Affinity$EffectiveReproductionRate)$logisticCarryingCapacity
   )
 
   # Save Simulation: ##########################################################
