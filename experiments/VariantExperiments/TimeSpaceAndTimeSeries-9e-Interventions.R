@@ -11,10 +11,10 @@ source(file.path(directory, "TimeSpaceAndTimeSeries-9b-SimulationFunction.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-9d-InterventionFunction.R"))
 
 dirTag <- "TSTS_Simulations"
-dirDate <- "2024-11-30"
+dirDate <- "2025-01-23"
 baseTag <-  "TSTS_Simulation" # Note the distinction ("s").
 # simulationsTargetIndex <- ... # Can set, or let default to most recent.
-cores <- 16
+cores <- 3 # 16
 
 runSimulations <- FALSE
 source(file.path(directory, "TimeSpaceAndTimeSeries-9c-Simulations.R"))
@@ -70,10 +70,10 @@ parameterChoices <- parameterChoices %>% dplyr::left_join(
 # nothing do in fact do nothing, we can eliminate those from the parameter
 # choices.
 # (Note: no need to prioritise since all pools are already made.)
-parameterChoices <- parameterChoices %>% dplyr::filter(
+parameterChoices <- parameterChoices %>% dplyr::ungroup() %>% dplyr::filter(
   affinityDictionaryOrigin$PatchAffinities[affinity] !=
     interventionPatchDictionaryOrigin$PatchAffinities[ip]
-) %>% dplyr::select(-priority)
+) %>% dplyr::select(-priority, -firsts)
 
 # Run across each row of parameterChoices: ####################################
 clust <- parallel::makeCluster(min(nrow(parameterChoices), cores))
