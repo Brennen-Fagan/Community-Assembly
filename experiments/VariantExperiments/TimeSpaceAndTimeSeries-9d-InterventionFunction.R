@@ -189,8 +189,8 @@ interventionWrapper <- function(
       dirname(datfile),
       paste0(datfile_properties[[1]][1],
              "_Intervention_",
-             datfile_properties[[1]][3],"_", datfile_properties[[1]][4],
-             "_", appendID,
+             datfile_properties[[1]][3],"_", datfile_properties[[1]][4], "_",
+             appendID,
              if (length(datfile_properties[[1]]) > 4)
                paste0("_", datfile_properties[[1]][
                  4:length(datfile_properties[[1]])
@@ -364,6 +364,20 @@ interventionWrapper <- function(
     pool = 1:nrow(poolMats$Pool), # Fastest Varying
     patch = 1:length(interventionPatchAffinities) # Slower Varying.
   )
+
+  # Obtain previous "maximal" rprimes, assuming this is true at abundance = 0.
+  rprimemaxOld <- loaded$Ellipsis$Affinity$EffectiveReproductionRate
+  if (is.function(rprimemaxOld)) {
+    rprimemaxOld <- unlist(lapply(
+      1:loaded$NumEnvironments,
+      function(i) rprimemaxOld(
+        t = 0,
+        y = rep(0, length(loaded$Ellipsis$Affinity$SpeciesAffinities)),
+        parms = list(Patch = i))
+    ))
+  }
+
+  # Convert to intervention rprime functions.
   rprime <- with(poolMats, {
     mapply(
       grid$pool, # Species
@@ -375,7 +389,7 @@ interventionWrapper <- function(
             loaded$Ellipsis$Affinity$SpeciesAffinities[i],
             interventionPatchAffinities[j, ] # Forced to be a matrix.
           )[1]^sign(Pool$ReproductionRate[i]),
-          loaded$Ellipsis$Affinity$EffectiveReproductionRate[ # else use old
+          rprimemaxOld[ # else use old
             (j - 1) * nrow(Pool) + i
             ]
         )
@@ -390,7 +404,7 @@ interventionWrapper <- function(
     rprimeSwitches <- lapply(1:NumberOfEnvironments, function(i) {
       if (i %in% interventionPatches) {
         switchMatrices(
-          loaded$Ellipsis$Affinity$EffectiveReproductionRate[
+          rprimemaxOld[
             (i - 1) * nrow(poolMats$Pool) + 1 : nrow(poolMats$Pool)
             ],
           rprime[
@@ -411,7 +425,7 @@ interventionWrapper <- function(
     rprimeSwitches <- lapply(1:NumberOfEnvironments, function(i) {
       if (i %in% interventionPatches) {
         interpolateMatrices(
-          loaded$Ellipsis$Affinity$EffectiveReproductionRate[
+          rprimemaxOld[
             (i - 1) * nrow(poolMats$Pool) + 1 : nrow(poolMats$Pool)
             ],
           rprime[
@@ -428,6 +442,52 @@ interventionWrapper <- function(
     })
     rprimef <- function(t, parms, ...) {
       return(rprimeSwitches[[parms$Patch]](t, parms, ...))
+    }
+  }
+
+  # If function, need to retrieve the logistic limit.
+  logisticCarryingCapacity <- as.list(environment(
+    loaded$Ellipsis$Affinity$EffectiveReproductionRate
+    ))$logisticCarryingCapacity
+  # NULL if not present.
+
+  # Reincorporate the logistic functional form as appropriate.
+  # Unclear as to how to do this more generally.
+  # (Might be able to hack the function environment???)
+  if (!is.null(logisticCarryingCapacity)) {
+    if ("basal" %in% tolower(names(logisticCarryingCapacity))) {
+      if ("consumer" %in% tolower(names(logisticCarryingCapacity))) {
+        # Both Basal and Consumer, but separately. See below for descriptions.
+        stop("logisticCarryingCapacity term not implemented.")
+      } else {
+        # Only Basal
+        rprimeMax <- rprimef
+        basalVec <- (Pool$Type == "Basal")
+        sizeVec <- Pool$Size * basalVec
+        sizeVecLen <- length(sizeVec)
+        rprimef <- function(t, y, parms, ...) {
+          #TODO but sizes are in the pool, and we need only for this patch, and we need only basals.
+          # Automatically evaluated per patch (parms$Patch == i, unlist-lapply)
+          # RMTRCode2::PerCapitaDynamics_Type1, but the whole y is provided.
+          rprimeMax * (
+            1 - basalVec * sum(
+              y[1:sizeVecLen + sizeVecLen*(parms$Patch - 1)] * sizeVec
+            ) / logisticCarryingCapacity$Basal
+          )
+        }
+      }
+    } else if ("consumer" %in% tolower(names(logisticCarryingCapacity))) {
+      # Only Consumer
+      # NOTE: Not clear about implementation if r(prime) is negative.
+      #       Presumably, it would instead act on the consumption term.
+      stop("logisticCarryingCapacity term not implemented.")
+    } else if ("total" %in% tolower(names(logisticCarryingCapacity))) {
+      # Both Basal and Consumer, together.
+      # NOTE: Implementing the consumer side of this is not obvious.
+      #       For Basals, this is a sum over all species, not only Basals.
+      stop("logisticCarryingCapacity term not implemented.")
+    } else {
+      stop("logisticCarryingCapacity term not recognised.")
     }
   }
 
