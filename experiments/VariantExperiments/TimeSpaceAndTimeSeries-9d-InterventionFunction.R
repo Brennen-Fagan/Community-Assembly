@@ -462,18 +462,31 @@ interventionWrapper <- function(
       } else {
         # Only Basal
         rprimeMax <- rprimef
-        basalVec <- (Pool$Type == "Basal")
-        sizeVec <- Pool$Size * basalVec
+        basalVec <- (poolMats$Pool$Type == "Basal")
+        sizeVec <- poolMats$Pool$Size * basalVec
         sizeVecLen <- length(sizeVec)
-        rprimef <- function(t, y, parms, ...) {
-          #TODO but sizes are in the pool, and we need only for this patch, and we need only basals.
-          # Automatically evaluated per patch (parms$Patch == i, unlist-lapply)
-          # RMTRCode2::PerCapitaDynamics_Type1, but the whole y is provided.
-          rprimeMax * (
-            1 - basalVec * sum(
-              y[1:sizeVecLen + sizeVecLen*(parms$Patch - 1)] * sizeVec
-            ) / logisticCarryingCapacity$Basal
-          )
+        if (is.function(rprimeMax)) {
+          rprimef <- function(t, y, parms, ...) {
+            #TODO but sizes are in the pool, and we need only for this patch, and we need only basals.
+            # Automatically evaluated per patch (parms$Patch == i, unlist-lapply)
+            # RMTRCode2::PerCapitaDynamics_Type1, but the whole y is provided.
+            rprimeMax(t = t, y = y, parms = parms, ...) * (
+              1 - basalVec * sum(
+                y[1:sizeVecLen + sizeVecLen*(parms$Patch - 1)] * sizeVec
+              ) / logisticCarryingCapacity$Basal
+            )
+          }
+        } else {
+          rprimef <- function(t, y, parms, ...) {
+            #TODO but sizes are in the pool, and we need only for this patch, and we need only basals.
+            # Automatically evaluated per patch (parms$Patch == i, unlist-lapply)
+            # RMTRCode2::PerCapitaDynamics_Type1, but the whole y is provided.
+            rprimeMax * (
+              1 - basalVec * sum(
+                y[1:sizeVecLen + sizeVecLen*(parms$Patch - 1)] * sizeVec
+              ) / logisticCarryingCapacity$Basal
+            )
+          }
         }
       }
     } else if ("consumer" %in% tolower(names(logisticCarryingCapacity))) {
