@@ -1,5 +1,8 @@
 # datfolders <- dir(pattern = "TSTS_Simulations_")
-datfolders <- dir(pattern = "TSTS_Simulations_.+2024-11-30$") # Regex
+# datfolders <- dir(pattern = "TSTS_Simulations_.+2024-11-30$") # Regex
+datfolders <- dir(path = ".",
+                  pattern = "TSTS_Simulations_.+2025-01-2[67]$",# Regex
+                  full.names = TRUE)
 
 # Problems with X11
 options(bitmapType = "cairo")

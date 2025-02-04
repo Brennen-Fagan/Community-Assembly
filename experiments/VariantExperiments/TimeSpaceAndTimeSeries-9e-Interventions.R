@@ -11,13 +11,15 @@ source(file.path(directory, "TimeSpaceAndTimeSeries-9b-SimulationFunction.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-9d-InterventionFunction.R"))
 
 dirTag <- "TSTS_Simulations"
-dirDate <- "2025-01-23"
+dirDate <- "2025-01-27"
 baseTag <-  "TSTS_Simulation" # Note the distinction ("s").
 # simulationsTargetIndex <- ... # Can set, or let default to most recent.
-cores <- 3 # 16
+if (!exists("simulationsTargetIndex"))
+  simulationsTargetIndex <- NULL # as.character(NUMBER)
+cores <- 4 # 16
+
 
 runSimulations <- FALSE
-simulationsTargetIndex <- NULL # as.character(NUMBER)
 source(file.path(directory, "TimeSpaceAndTimeSeries-9c-Simulations.R"))
 # For Side Effects, specifically parameterChoices.
 

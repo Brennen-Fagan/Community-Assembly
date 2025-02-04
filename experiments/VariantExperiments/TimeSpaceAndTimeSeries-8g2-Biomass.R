@@ -1,7 +1,10 @@
 # Biomass script for trying to determine sensible values for JP's logistic.
-
-datfolders <- dir(path = "Deprecated", 
-                  pattern = "TSTS_Simulations_.+2024-11-30$", 
+#
+# datfolders <- dir(path = "Deprecated",
+#                   pattern = "TSTS_Simulations_.+2024-11-30$",
+#                   full.names = TRUE) # Regex
+datfolders <- dir(path = ".",
+                  pattern = "TSTS_Simulations_.+2025-01-2[67]$",
                   full.names = TRUE) # Regex
 
 # Problems with X11
@@ -62,7 +65,7 @@ biomasses <- lapply(
   dir(datfolders, full.names = TRUE, pattern = "Diversity"), function(x) {
     names <- load(x)
     stopifnot(length(names) == 1)
-    
+
     div <- get(names)
     biomass <- div$Presence %>% dplyr::group_by(
       Time, Environment
@@ -73,8 +76,8 @@ biomasses <- lapply(
       richnessBasal = sum(Type == "Basal"),
       .groups = "drop"
     )
-    
-    return(list(biomass = biomass, Ellipsis = div$Ellipsis, 
+
+    return(list(biomass = biomass, Ellipsis = div$Ellipsis,
                 "Dir" = dirname(x), "File" = basename(x)))
   })
 
@@ -95,13 +98,13 @@ biomassesFlattened <- do.call(rbind, lapply(biomasses, function(d) {
       "-", fixed = TRUE # Separate out the id values.
     )
   }
-  
+
   if (length(id) < 3) {
     # I.e., no intervention.
     id[[3]] <- rep(NA, 4)
     id[[4]] <- rep(NA, 2)
   }
-  
+
   d$biomass %>% dplyr::mutate(
     PoolPatch = id[[1]][1],
     PoolPatchSeed = id[[2]][1],
@@ -145,15 +148,15 @@ biomassesFlattened <- biomassesFlattened %>% dplyr::mutate(
 )
 
 ggplot2::ggplot(
-  biomassesFlattened, 
+  biomassesFlattened,
   ggplot2::aes(
-    x = Time, y = biomass, 
+    x = Time, y = biomass,
     group = interaction(
-      PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, 
-      Events, EventsSeed, InitialConditions, InitialConditionsSeed, 
-      Dispersal, NicheDistance, Affinity, AffinitySeed, 
-      InterventionPatchType, InterventionPatchSeed, InterventionTimeType, 
-      InterventionDispersal, InterventionTimeType, InterventionDispersal, 
+      PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed,
+      Events, EventsSeed, InitialConditions, InitialConditionsSeed,
+      Dispersal, NicheDistance, Affinity, AffinitySeed,
+      InterventionPatchType, InterventionPatchSeed, InterventionTimeType,
+      InterventionDispersal, InterventionTimeType, InterventionDispersal,
       InterventionNicheDistance, Intervention, SpeciesAffinity),
     color = NicheDistance
   )
@@ -166,15 +169,15 @@ ggplot2::ggplot(
 )
 
 ggplot2::ggplot(
-  biomassesFlattened, 
+  biomassesFlattened,
   ggplot2::aes(
-    x = Time, y = biomassBasal, 
+    x = Time, y = biomassBasal,
     group = interaction(
-      PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, 
-      Events, EventsSeed, InitialConditions, InitialConditionsSeed, 
-      Dispersal, NicheDistance, Affinity, AffinitySeed, 
-      InterventionPatchType, InterventionPatchSeed, InterventionTimeType, 
-      InterventionDispersal, InterventionTimeType, InterventionDispersal, 
+      PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed,
+      Events, EventsSeed, InitialConditions, InitialConditionsSeed,
+      Dispersal, NicheDistance, Affinity, AffinitySeed,
+      InterventionPatchType, InterventionPatchSeed, InterventionTimeType,
+      InterventionDispersal, InterventionTimeType, InterventionDispersal,
       InterventionNicheDistance, Intervention, SpeciesAffinity),
     color = NicheDistance
   )
