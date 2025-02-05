@@ -15,7 +15,7 @@ dirDate <- "2025-01-27"
 baseTag <-  "TSTS_Simulation" # Note the distinction ("s").
 # simulationsTargetIndex <- ... # Can set, or let default to most recent.
 if (!exists("simulationsTargetIndex"))
-  simulationsTargetIndex <- NULL # as.character(NUMBER)
+  simulationsTargetIndex <- "NA" # as.character(NUMBER)
 cores <- 4 # 16
 
 
@@ -66,7 +66,8 @@ interventionChoices <- dplyr::bind_rows(lapply(
 parameterChoices <- parameterChoices %>% dplyr::left_join(
   interventionChoices,
   by = c("pp", "dyn", "events", "initconds",
-         "dispersal", "affinity", "distance")
+         "dispersal", "affinity", "distance"),
+  multiple = "all"
 )
 
 # Since we've had success with making sure that the interruptions that do
@@ -110,46 +111,48 @@ success <- foreach::foreach(
 ) %dopar% {
   # ) %do% {
   pc <- as.list(pc) # untibble so we are passing numerics and strings.
-  interventionWrapper(
-    # ID = list(
-    #   Tag = fileTags,
-    #   poolpatchDictionaryChoice = pc$pp, [1]
-    #   poolpatchSeedChoice = pc$ppSeed, [2]
-    #   dynamicsDictionaryChoice = pc$dyn, [3]
-    #   dynamicsSeedChoice = pc$dynSeed, [4]
-    #   eventsDictionaryChoice = pc$events, [5]
-    #   eventsSeedChoice = pc$eventsSeed, [6]
-    #   initialConditionsDictionaryChoice = pc$initconds, [7]
-    #   initialConditionsSeedChoice = pc$initcondsSeed, [8]
-    #   dispersalDictionaryChoice = pc$dispersal, [9]
-    #   distanceDictionaryChoice = pc$distance, [10]
-    #   affinityDictionaryChoice = pc$affinity, [11]
-    #   affinitySeedChoice = pc$affinitySeed, [12]
-    #   Date = fileDates
-    # ),
-    ID = file.path(
-      paste0(
-        dirTag, "_", pc[[1]], "-", pc[[3]],
-        "_", pc[[2]], "-", pc[[4]], "_", dirDate
-      ),
-      paste0(
-        baseTag,
-        "_", pc[[1]], "-", pc[[3]], "-", pc[[5]],
-        "-", pc[[7]], "-", pc[[9]], "-", pc[[10]], "-", pc[[11]],
-        "_", pc[[2]], "-", pc[[4]], "-", pc[[6]], "-", pc[[8]], "-", pc[[12]],
-        ".RData"
-      )
+  fileID <- file.path(
+    paste0(
+      dirTag, "_", pc[[1]], "-", pc[[3]],
+      "_", pc[[2]], "-", pc[[4]], "_", dirDate
     ),
-    interventionPatchDictionaryChoice = pc[[13]],
-    interventionPatchSeedChoice = pc[[14]],
-    interventionTimeDictionaryChoice = pc[[15]],
-    interventionTimeSeedChoice = pc[[16]],
-    interventionDispersalDictionaryChoice = pc[[17]],
-    interventionDistanceDictionaryChoice = pc[[18]],
-    returnResults = FALSE,
-    saveResults = TRUE,
-    skipIfSaveExists = TRUE
+    paste0(
+      baseTag,
+      "_", pc[[1]], "-", pc[[3]], "-", pc[[5]],
+      "-", pc[[7]], "-", pc[[9]], "-", pc[[10]], "-", pc[[11]],
+      "_", pc[[2]], "-", pc[[4]], "-", pc[[6]], "-", pc[[8]], "-", pc[[12]],
+      ".RData"
+    )
   )
+  if (file.exists(fileID))
+    interventionWrapper(
+      # ID = list(
+      #   Tag = fileTags,
+      #   poolpatchDictionaryChoice = pc$pp, [1]
+      #   poolpatchSeedChoice = pc$ppSeed, [2]
+      #   dynamicsDictionaryChoice = pc$dyn, [3]
+      #   dynamicsSeedChoice = pc$dynSeed, [4]
+      #   eventsDictionaryChoice = pc$events, [5]
+      #   eventsSeedChoice = pc$eventsSeed, [6]
+      #   initialConditionsDictionaryChoice = pc$initconds, [7]
+      #   initialConditionsSeedChoice = pc$initcondsSeed, [8]
+      #   dispersalDictionaryChoice = pc$dispersal, [9]
+      #   distanceDictionaryChoice = pc$distance, [10]
+      #   affinityDictionaryChoice = pc$affinity, [11]
+      #   affinitySeedChoice = pc$affinitySeed, [12]
+      #   Date = fileDates
+      # ),
+      ID = fileID,
+      interventionPatchDictionaryChoice = pc[[13]],
+      interventionPatchSeedChoice = pc[[14]],
+      interventionTimeDictionaryChoice = pc[[15]],
+      interventionTimeSeedChoice = pc[[16]],
+      interventionDispersalDictionaryChoice = pc[[17]],
+      interventionDistanceDictionaryChoice = pc[[18]],
+      returnResults = FALSE,
+      saveResults = TRUE,
+      skipIfSaveExists = TRUE
+    )
 }
 
 parallel::stopCluster(clust)

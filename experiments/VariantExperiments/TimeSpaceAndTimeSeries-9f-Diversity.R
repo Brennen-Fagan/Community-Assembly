@@ -5,6 +5,9 @@
 # have been additionally requested.
 
 # Parameters: #################################################################
+alsoload <- FALSE # if TRUE, try to load all diversity files encountered.
+# if FALSE, only try to create new diversity files (and return the outputs).
+
 #datfolders <- dir(pattern = "TSTS_Simulations_")#.+2024-11-19$")
 datfolders <- dir(pattern = "TSTS_Simulations_.+2025-01-2.$")
 # datfolders <- dir(pattern = "CompareEliminationThresholds$")
@@ -26,6 +29,7 @@ preferredTimestep <- 10 # Characteristic Time Scale Units
 # Libraries: ##################################################################
 library(dplyr)
 library(RMTRCode2)
+library(betapart) # Dependency for the diversity calculation
 
 source("TimeSpaceAndTimeSeries-0-Functions.R") # Abundance metrics.
 
@@ -95,7 +99,9 @@ Diversity <- foreach::foreach(
   )
 
   if(file.exists(filename)) {
-    load(filename)
+    if (alsoload) {
+      load(filename)
+    }
   } else {
     print(filename)
     x_dir <- dirname(x)
