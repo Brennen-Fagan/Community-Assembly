@@ -1,7 +1,7 @@
 # datfolders <- dir(pattern = "TSTS_Simulations_")
 # datfolders <- dir(pattern = "TSTS_Simulations_.+2024-11-30$") # Regex
 datfolders <- dir(path = ".",
-                  pattern = "TSTS_Simulations_.+2025-01-2[67]$",# Regex
+                  pattern = "TSTS_Simulations_.+2025-01-2[1234]$",# Regex
                   full.names = TRUE)
 
 # Problems with X11
@@ -179,7 +179,8 @@ diversitiesInterventionStrings <- diversitiesFlattened %>% dplyr::select(
 
 diversitiesFlattened <- diversitiesFlattened %>% dplyr::left_join(
   diversitiesInterventionStrings,
-  by = c("Affinity", "PoolPatch", "InterventionPatchType")
+  by = c("Affinity", "PoolPatch", "InterventionPatchType"),
+  multiple = "all"
 )
 
 diversitiesFlattened <- diversitiesFlattened %>% dplyr::mutate(
