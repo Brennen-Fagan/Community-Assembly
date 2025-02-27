@@ -10,20 +10,7 @@ alsoload <- FALSE # if TRUE, try to load all ColExt files encountered.
 #datfolders <- dir(pattern = "TSTS_Simulations_")#.+2024-11-19$")
 datfolders <- dir(pattern = "TSTS_Simulations_.+2025-01-2.$")
 # datfolders <- dir(pattern = "CompareEliminationThresholds$")
-cores <- 1 # Parallelization?
-preferredTimestep <- 10 # Characteristic Time Scale Units
-# Previously Event rate was ~1/CTU, now it's more like ~0.1/CTU in theory.
-# (This seems reasonably close in practice looking at 1 example and observing
-#  that we are talking about events of a single type at a time.)
-
-# Minimum number of rows per event is 2 (was 10).
-# Default timesteps per event is 5 (was 1) in Simulation Time Scale Units.
-# In the example I looked at, we've generally slowed things down so that the
-# default/maximum timestep of 5 is hit consistently, ~97% of steps.
-# In the example I looked at, the STU = 38 * CTU.
-#
-# The preferred Timestep should be larger than this number.
-# The current value is about 1 recording per 2 events (of ext. and/or imm.).
+cores <- 8 # Parallelization?
 
 # Libraries: ##################################################################
 library(dplyr)
@@ -154,6 +141,7 @@ ColExt <- foreach::foreach(
         by = "Species")
     }
 
+    ColExt <- list(Events = ColExt, Ellipsis = list())
     if ("ParentRun" %in% names(loaded$Ellipsis))
       ColExt$Ellipsis$GrandparentRun <- loaded$Ellipsis$ParentRun
     ColExt$Ellipsis$ParentRun <- x

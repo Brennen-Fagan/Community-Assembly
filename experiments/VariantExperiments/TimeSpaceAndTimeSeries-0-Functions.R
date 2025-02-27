@@ -1145,7 +1145,6 @@ calculateColExtMetrics <- function(sim) {
   ColExtMatrix <- cbind(sim$Abundance[1:(nrow(sim$Abundance) - 1), 1],
                         ColExtMatrix)
 
-
   allEvents <- lapply(1:nrow(ColExtMatrix), function(i, mat, events) {
     time <- mat[i, 1]
     changes <- which(mat[i, -1] != 0)
@@ -1158,7 +1157,7 @@ calculateColExtMetrics <- function(sim) {
 
     environments <- ((changes - 1) %/% nspecies) + 1 # 1:20 w/10 -> 10 1s, 10 2s
     species <- ((changes - 1) %% nspecies) + 1 # 1:20 w/10 -> c(1:10, 1:10)
-    stopifnot(environments <= result$NumEnvironments)
+    stopifnot(environments <= sim$NumEnvironments)
 
     if (nrow(event) == 1 && length(changes) == 1 &&
         event$Species == species && event$Environment == environments &&
@@ -1258,7 +1257,7 @@ calculateColExtMetrics <- function(sim) {
     return(event)
   },
   mat = ColExtMatrix,
-  events = result$Events)
+  events = sim$Events)
 
   allEvents <- dplyr::bind_rows(allEvents) %>% dplyr::arrange(Times)
   # Adding in typings is then dependent on how we are breaking up affinity
