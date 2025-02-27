@@ -383,13 +383,17 @@ lapply(unique(diversitiesAll$Metric), function(metric) {
   thePlot <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
     is.na(Subset), Metric == metric
   ))
+  if (! grepl(pattern = "Alpha", x = metric, fixed = TRUE)) {
+    # The alphas routinely escape [0, 1], but the Betas, Ratios, and Sizes don't
+    thePlot <- thePlot + ggplot2::coord_cartesian(ylim = c(0, 1))
+  }
   ggplot2::ggsave(
     thePlot,
     filename = paste0("FigureMetric_",
                       gsub(metric, pattern = "[ .:/]",
                            replacement = ""),
                       ".png"),
-    units = "px", height = 1600, width = 3200
+    units = "px", height = 2400, width = 3200
   )
 })
 
