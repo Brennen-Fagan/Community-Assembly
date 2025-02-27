@@ -350,8 +350,8 @@ plotMeanAndInner <- function(
         Time,
         Intervention, InterventionInitial, InterventionFinal, SpeciesAffinity
       ) %>% tidytable::summarise(
-        top = quantile(Value, probs = CI+(1-CI)/2),
-        bot = quantile(Value, probs = (1-CI)-(1-CI)/2)
+        top = quantile(Value, probs = CI+(1-CI)/2, na.rm = TRUE),
+        bot = quantile(Value, probs = (1-CI)-(1-CI)/2, na.rm = TRUE)
       ), mapping = ggplot2::aes(
         x = Time, ymin = bot, ymax = top,
         group = interaction(
@@ -368,9 +368,9 @@ plotMeanAndInner <- function(
     facets
   ) + ggplot2::scale_color_manual(
     values = colorPalette, aesthetics = c("color", "fill"),
-    name = "Species Preferences"
-  ) + ggplot2::scale_linetype(
     name = "Island Land-use"
+  ) + ggplot2::scale_linetype(
+    name = "Species Preferences"
   )
   return(baseplot)
 }
@@ -379,6 +379,19 @@ plotMeanAndInner(diversitiesAll %>% tidytable::filter(
   is.na(Subset), Metric == "Alpha Hill:0"
 ))
 
+lapply(unique(diversitiesAll$Metric), function(metric) {
+  thePlot <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
+    is.na(Subset), Metric == metric
+  ))
+  ggplot2::ggsave(
+    thePlot,
+    filename = paste0("FigureMetric_",
+                      gsub(metric, pattern = "[ .:/]",
+                           replacement = ""),
+                      ".png"),
+    units = "px", height = 1600, width = 3200
+  )
+})
 
 plot1 <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
   is.na(Subset), Metric == "Alpha Hill:0",
