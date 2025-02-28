@@ -357,9 +357,10 @@ plotMeanAndInner <- function(
         group = interaction(
           Intervention, InterventionInitial, InterventionFinal, SpeciesAffinity
           ),
-        fill = Intervention
+        fill = Intervention,
+        color = Intervention
       ), inherit.aes = FALSE,
-      alpha = 0.25, linetype = 0
+      alpha = 0.25, linewidth = 0.25 #, linetype = "dotted"
     )
   }
   baseplot <- baseplot + ggplot2::geom_smooth(
