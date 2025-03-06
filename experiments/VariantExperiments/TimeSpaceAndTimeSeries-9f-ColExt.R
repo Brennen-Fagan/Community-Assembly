@@ -91,7 +91,7 @@ ColExt <- foreach::foreach(
     print(filename)
     x_dir <- dirname(x)
     x_poolind <- which(unlist(lapply(poolmats, function(y) y$Dir == x_dir)))
-    if(any(x_poolind)) {
+    if(length(x_poolind) == 1) {
       x_pool <- poolmats[[x_poolind]]$Pool
     } else {
       x_pool <- NULL

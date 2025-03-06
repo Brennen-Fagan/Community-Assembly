@@ -1145,7 +1145,7 @@ calculateColExtMetrics <- function(sim) {
   ColExtMatrix <- cbind(sim$Abundance[1:(nrow(sim$Abundance) - 1), 1],
                         ColExtMatrix)
 
-  allEvents <- lapply(1:nrow(ColExtMatrix), function(i, mat, events) {
+  allEvents <- lapply(1:nrow(ColExtMatrix), function(i, mat, binmat, events) {
     time <- mat[i, 1]
     changes <- which(mat[i, -1] != 0)
     event <- events %>% dplyr::filter(Times == time, Success) # N.B. nrow can >1
@@ -1171,7 +1171,7 @@ calculateColExtMetrics <- function(sim) {
     # Bundle information together for easier processing.
     changesdf <- data.frame(
       change = changes,
-      type = mat[i, changes+1],
+      type = mat[i, changes+1], # +1 column for time
       species = species,
       environments = environments
     ) %>% dplyr::mutate(index = dplyr::row_number())
@@ -1192,25 +1192,38 @@ calculateColExtMetrics <- function(sim) {
         )
 
         if (nrow(thisChange) == 1 &&
-            ((thisChange$change == 1 && thisEvent$Type == "Arrival") ||
-             (thisChange$change == -1 && thisEvent$Type == "Extinct")
+            ((thisChange$type == 1 && thisEvent$Type == "Arrival") ||
+             (thisChange$type == -1 && thisEvent$Type == "Extinct")
             )) {
           # This change is already in event(s) as this event.
           # Remove it from the data.frame of event(s).
           changesdf <- changesdf %>% dplyr::filter(index != thisChange$index)
         } else if (
           nrow(thisChange) == 0 # then an event happened, but no change recorded.
+          # result depends on whether a population is there or not.
         ) {
+          speciesPresent <- with(
+            thisEvent,
+            binmat[i, Species + (Environment - 1) * nspecies] # No Time Col.
+          )
           event <- rbind(event, data.frame(
             Times = time,
             Species = thisEvent$Species,
             Environment = thisEvent$Environment,
-            Type = switch(thisEvent$Type,
-                          "Arrival" = "Dynamic Loss", # Should've come, but no
-                          "Extinct" = "Dispersal" # Should've gone, but here
-            ),
+            Type = if(thisEvent$Type == "Arrival" && speciesPresent) {
+              "Present"
+            } else if (thisEvent$Type == "Arrival" && !speciesPresent) {
+              "Dynamic Loss"
+            } else if (thisEvent$Type == "Extinct" && speciesPresent) {
+              "Dispersal"
+            } else if (thisEvent$Type == "Extinct" && !speciesPresent) {
+              "Dispersal2" # This shouldn't occur, Success should be FALSE.
+            } else {
+              "Oops"
+            },
             Success = TRUE
-          ))
+            )
+          )
         }
       }
     }
@@ -1249,7 +1262,26 @@ calculateColExtMetrics <- function(sim) {
           # Event recorded, but opposite of what is observed -- undone twice.
           # Assuming that events take place at distinct times, which should be
           # guaranteed from the code we are using, this shouldn't happen.
-          stop("Double-check assumptions: a 'triple event' occurred.")
+          # Discretisation means that it can happen though, and we can have
+          # something considered a false positive: arrival events are tracked as
+          # positive (because the species is added to the local population) even
+          # if the population is declining and about to be removed.
+          if (nrow(thisEvent) == 1 &&
+              thisEvent$Species == thisChange$species &&
+              thisEvent$Environment == thisChange$environments &&
+              (thisChange$type == -1 && thisEvent$Type == "Arrival")
+              ) {
+            # "Poorly Timed False Positive Arrival"
+            event <- rbind(event, data.frame(
+              Times = time,
+              Species = thisChange$species,
+              Environment = thisChange$environments,
+              Type = "Dynamic Loss",
+              Success = TRUE
+            ))
+          } else {
+            stop("Double-check assumptions: a 'triple event' occurred.")
+          }
         }
       }
     }
@@ -1257,6 +1289,7 @@ calculateColExtMetrics <- function(sim) {
     return(event)
   },
   mat = ColExtMatrix,
+  binmat = binaryMatrix,
   events = sim$Events)
 
   allEvents <- dplyr::bind_rows(allEvents) %>% dplyr::arrange(Times)
