@@ -62,3 +62,34 @@ for (row in 1:nrow(output)) {
 
 stopifnot(all(output$Doublecheck))
 
+output <- output %>% dplyr::mutate(Sign = dplyr::case_when(
+  Type == "Arrival" ~ 1,
+  Type == "Present" ~ 0,
+  Type %in% c("Extinct", "Dynamic Loss") ~ -1
+))
+
+temp <-
+  (result$Abundance[-1, -1] > result$Parameters$EliminationThreshold) -
+  (result$Abundance[-nrow(result$Abundance), -1] > result$Parameters$EliminationThreshold)
+
+changeCoords <- rbind(
+  data.frame(
+    Species = col(temp)[which(temp == 1)],
+    Environment = 1,
+    Times = result$Abundance[row(temp)[which(temp == 1)], 1],
+    Type = 1
+  ),data.frame(
+    Species = col(temp)[which(temp == -1)],
+    Environment = 1,
+    Times = result$Abundance[row(temp)[which(temp == -1)], 1],
+    Type = -1
+  )
+)
+
+output %>% dplyr::filter(Sign != 0) %>% dplyr::select(Species, Environment, Times, Sign)
+
+stopifnot(all(do.call(paste0, changeCoords) %in%
+                do.call(paste0, output %>% dplyr::filter(Sign != 0) %>% dplyr::select(Species, Environment, Times, Sign))))
+
+# To summarise: all events should be in output, and all changes should be in
+#          output, and all records in output should match the abundance changes.
