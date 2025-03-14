@@ -1196,7 +1196,7 @@ calculateColExtMetrics <- function(sim) {
              (thisChange$type == -1 && thisEvent$Type == "Extinct")
             )) {
           # This change is already in event(s) as this event.
-          # Remove it from the data.frame of event(s).
+          # Remove it from the data.frame of event(s) to add.
           changesdf <- changesdf %>% dplyr::filter(index != thisChange$index)
         } else if (
           nrow(thisChange) == 0 # then an event happened, but no change recorded.
@@ -1206,7 +1206,7 @@ calculateColExtMetrics <- function(sim) {
             thisEvent,
             binmat[i, Species + (Environment - 1) * nspecies] # No Time Col.
           )
-          event <- rbind(event, data.frame(
+          newEvent <- data.frame(
             Times = time,
             Species = thisEvent$Species,
             Environment = thisEvent$Environment,
@@ -1222,11 +1222,18 @@ calculateColExtMetrics <- function(sim) {
               "Oops"
             },
             Success = TRUE
-            )
           )
+          if (newEvent$Type == "Present") {
+            # Instead, just replace the current event to present.
+            # (Excess work, but clearer code!)
+            event[j, ]$Type <- "Present"
+          } else {
+            event <- rbind(event, newEvent)
+          }
         }
       }
     }
+
 
     # Proceed along changes, adding them to events.
     if (nrow(changesdf) > 0) {
@@ -1279,6 +1286,11 @@ calculateColExtMetrics <- function(sim) {
               Type = "Dynamic Loss",
               Success = TRUE
             ))
+            # We also should account for that the Arrival is actually a Present.
+            event[event$Times == thisEvent$Times &
+                    event$Species == thisEvent$Species &
+                    event$Environment == thisEvent$Environment &
+                    event$Type == thisEvent$Type ,]$Type <- "Present"
           } else {
             stop("Double-check assumptions: a 'triple event' occurred.")
           }
