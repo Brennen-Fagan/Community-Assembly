@@ -24,6 +24,49 @@ library(iterators)
 library(doParallel)
 library(foreach)
 
+# Functions: ##################################################################
+
+flattenCEs <- function(CE) {
+    id <- strsplit(
+      strsplit(
+        strsplit(basename(CE$Ellipsis$ParentRun), ".", fixed = TRUE)[[1]][1], # Remove .RData.
+        "_", fixed = TRUE)[[1]][-c(1:2)], # Remove TSTS_Type and split seeds off.
+      "-", fixed = TRUE # Separate out the id values.
+    )
+
+
+  if (length(id) < 3) {
+    # I.e., no intervention.
+    id[[3]] <- rep(NA, 4)
+    id[[4]] <- rep(NA, 2)
+  }
+
+  tidytable::data.table(CE$Events) %>% tidytable::rename(
+    EventType = Type.x,
+    SpeciesType = Type.y
+  ) %>% tidytable::mutate(
+    PostIntervention = Times > CE$Ellipsis$TimeIntervention,
+    PoolPatch = id[[1]][1],
+    PoolPatchSeed = id[[2]][1],
+    Interactions = id[[1]][2],
+    InteractionsSeed = id[[2]][2],
+    Events = id[[1]][3],
+    EventsSeed = id[[2]][3],
+    InitialConditions = id[[1]][4],
+    InitialConditionsSeed = id[[2]][4],
+    Dispersal = id[[1]][5],
+    NicheDistance = id[[1]][6],
+    Affinity = id[[1]][7],
+    AffinitySeed = id[[2]][5],
+    InterventionPatchType = id[[3]][1],
+    InterventionPatchSeed = id[[4]][1],
+    InterventionTimeType = id[[3]][2],
+    InterventionTimeSeed = id[[4]][2],
+    InterventionDispersal = id[[3]][3],
+    InterventionNicheDistance = id[[3]][4]
+  )
+}
+
 # Parallelization: ############################################################
 if (cores > 1) {
   clust <- parallel::makeCluster(cores, outfile = "")
@@ -259,6 +302,7 @@ ColExt <- c(ColExtBase, ColExtIntervention)
 save(ColExt, file = "ColExt9a9_full.RData")
 
 # Flatten the object to facilitate plotting.
+ColExt <- tidytable::bind_rows(lapply(ColExt, flattenCEs))
 
 # Save the flat object for combination with the flattened diversities.
 
