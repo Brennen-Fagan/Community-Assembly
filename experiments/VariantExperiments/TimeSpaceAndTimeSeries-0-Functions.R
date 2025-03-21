@@ -794,6 +794,61 @@ ConvertPreparedToBeta <- function(
   return(retval)
 }
 
+# Not a finished function!
+interventionNamingScheme <- function(aff, ppa, ipt) {
+  aDO <- affinityDictionaryOrigin[aff, ]
+  ppDO <- poolpatchDictionaryOrigin[ppa, ]
+
+  if (explicit <- grepl(pattern = "rep", aDO$PatchAffinities)) {
+    initState <-
+      paste0("(", paste( # NOT PRETTY FOR 10, MAY WANT TO JUST REPORT FUNC CALL
+        vals <- retrieveFunction(aDO$PatchAffinities)(ppDO$NumberEnvironments),
+        collapse = ", "), ")")
+  } else {
+    initState <-
+      paste0(aDO$PatchAffinities, "(", ppDO$NumberEnvironments, ")")
+  }
+
+  if(is.na(ipt)) {return(initState)}
+
+  ipDO <- interventionPatchDictionaryOrigin[ipt, ]
+
+  if (ppDO$NumberEnvironments == 1) {
+    finState <- paste0(
+      "(", retrieveFunction(ipDO$PatchAffinities)(ppDO$NumberEnvironments), ")"
+    )
+  } else if (is.na(ipDO$InterventionLocation) ||
+             !explicit ||
+             !grepl(pattern = "rep", ipDO$PatchAffinities)) {
+
+    finState <- # InterventionPercentage is a bit of a misnomer!
+      paste0(ipDO$InterventionPercentage * 100, "%", ipDO$PatchAffinities)
+
+  } else if (ipDO$InterventionLocation == 0) {# Left
+
+    valsnew <- retrieveFunction(ipDO$PatchAffinities)(ppDO$NumberEnvironments)
+
+    finState <- paste0("(", paste(
+      valsnew[1:(ppDO$NumberEnvironments*ipDO$InterventionPercentage)],
+      vals[
+        (ppDO$NumberEnvironments*ipDO$InterventionPercentage + 1):
+          ppDO$NumberEnvironments],
+      collapse = ", ", sep = ", "), ")")
+
+  } else if (ipDO$InterventionLocation == 1) {# Right
+
+    valsnew <- retrieveFunction(ipDO$PatchAffinities)(ppDO$NumberEnvironments)
+
+    finState <- paste0("(", paste(
+      vals[1:(ppDO$NumberEnvironments*(1 - ipDO$InterventionPercentage))],
+      valsnew[
+        (ppDO$NumberEnvironments*(1 - ipDO$InterventionPercentage) + 1):
+          ppDO$NumberEnvironments],
+      collapse = ", ", sep = ", "), ")")
+  }
+
+  return(paste0(initState, "->", finState))
+}
 
 ### Iterate ThinAndCalculate for non-binary: ##################################
 thinAbundance <- function(abundance, events, threshold,
@@ -1127,6 +1182,11 @@ calculateAbundanceMetrics <- function(abundance, nspecies, nenvironments) {
 }
 
 calculateColExtMetrics <- function(sim) {
+  #TODO: I forgot the case of Arrival but Already Present
+  #TODO: I seem to have some legitimate approximately triple events,
+  #      where the species is present, is about to drop out, and drops out
+  #      when an arrival event is supposed to happen.
+
   # Might be easier to take the binary matrix and to say
   # 0->1 and in the successful events ~ colonization
   # 0->1 and not in the successful events ~ dispersal
@@ -1146,6 +1206,11 @@ calculateColExtMetrics <- function(sim) {
                         ColExtMatrix)
 
   allEvents <- lapply(1:nrow(ColExtMatrix), function(i, mat, binmat, events) {
+    # print(i)
+    # if (i == 160) {
+    #   print("stop here")
+    # }
+
     time <- mat[i, 1]
     changes <- which(mat[i, -1] != 0)
     event <- events %>% dplyr::filter(Times == time, Success) # N.B. nrow can >1
