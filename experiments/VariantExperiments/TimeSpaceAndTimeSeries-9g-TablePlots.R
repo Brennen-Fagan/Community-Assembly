@@ -30,6 +30,12 @@ colorPalette <- c(#              Cyan, Magenta, Yellow, Black
   "(1)->(0.5)" = DescTools::CmykToRgb(0,   0.5, 1,   0.25)
 )
 
+linetypePalette <- c(
+  "100% 0" = "solid",
+  "50% 0, 50% 1" = "longdash",
+  "Uniform(0, 1)" = "dotted"
+)
+
 # functions: ##################################################################
 
 # Not a finished function!
@@ -115,9 +121,9 @@ flattenDiversity <- function(d) {
   pres <- tidytable::data.table(d$Presence) %>% tidytable::mutate(
     Environment1 = Environment,
     Environment2 = NA
-  ) %>% tidytable::group_by(
+  ) %>% tidytable::ungroup() %>% tidytable::group_by(
     Time, Environment1, Environment2
-  ) %>% tidytable::mutate(
+  ) %>% tidytable::summarise(
     `Average Size:0` = mean(Size),
     `Average Size:1` = sum(Size*Abundance)/sum(Abundance),
     `St.Dev. Size:0` = sqrt(var(Size)),
@@ -138,9 +144,9 @@ flattenDiversity <- function(d) {
     Environment1 = Environment,
     Environment2 = NA,
     Subset = paste0(Type, "_", Affinity)
-  ) %>% tidytable::group_by(
+  ) %>% tidytable::ungroup() %>% tidytable::group_by(
     Time, Environment1, Environment2, Subset
-  ) %>% tidytable::mutate(
+  ) %>% tidytable::summarise(
     `Average Size:0` = mean(Size),
     `Average Size:1` = sum(Size*Abundance)/sum(Abundance),
     `St.Dev. Size:0` = sqrt(var(Size)),
@@ -332,11 +338,13 @@ plotMeanAndInner <- function(
   data, CIs = c(0.5, 0.95),
   facets = as.formula(Intervention ~ SpeciesAffinity)
 ) {
+  data$Subset <- ifelse(is.na(data$Subset), "NA", data$Subset)
   baseplot <- ggplot2::ggplot(
     data,
     ggplot2::aes(
       x = Time, y = Value,
       group = interaction(
+        Subset,
         Intervention, InterventionInitial, InterventionFinal, SpeciesAffinity
       ),
       color = Intervention, fill = Intervention, linetype = SpeciesAffinity
@@ -347,7 +355,7 @@ plotMeanAndInner <- function(
       data = data %>% tidytable::mutate(
         Time = round(Time, digits = -2)
       ) %>% tidytable::group_by(
-        Time,
+        Time, Subset,
         Intervention, InterventionInitial, InterventionFinal, SpeciesAffinity
       ) %>% tidytable::summarise(
         top = quantile(Value, probs = CI+(1-CI)/2, na.rm = TRUE),
@@ -355,6 +363,7 @@ plotMeanAndInner <- function(
       ), mapping = ggplot2::aes(
         x = Time, ymin = bot, ymax = top,
         group = interaction(
+          Subset,
           Intervention, InterventionInitial, InterventionFinal, SpeciesAffinity
           ),
         fill = Intervention,
@@ -363,15 +372,30 @@ plotMeanAndInner <- function(
       alpha = 0.25, linewidth = 0.25 #, linetype = "dotted"
     )
   }
-  baseplot <- baseplot + ggplot2::geom_smooth(
+  baseplot <- (baseplot
+  # ) + ggplot2::geom_smooth(
     # color = "black"
+  ) + ggplot2::geom_line(
+    data = data %>% tidytable::mutate(
+      Time = round(Time, digits = -2)
+    ) %>% tidytable::group_by(
+      Time, Subset,
+      Intervention, InterventionInitial, InterventionFinal, SpeciesAffinity
+    ) %>% tidytable::summarise(
+      Value = median(Value, na.rm = TRUE)
+    )
   ) + ggplot2::facet_grid(
     facets
   ) + ggplot2::scale_color_manual(
     values = colorPalette, aesthetics = c("color", "fill"),
     name = "Island Land-use"
-  ) + ggplot2::scale_linetype(
-    name = "Species Preferences"
+  ) + ggplot2::scale_linetype_manual(
+    name = "Species Preferences",
+    values = linetypePalette
+  ) + ggplot2::theme_minimal(
+  ) + ggplot2::guides(
+    color = "none",
+    fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
   )
   return(baseplot)
 }
@@ -388,6 +412,10 @@ lapply(unique(diversitiesAll$Metric), function(metric) {
     # The alphas routinely escape [0, 1], but the Betas, Ratios, and Sizes don't
     thePlot <- thePlot + ggplot2::coord_cartesian(ylim = c(0, 1))
   }
+  if (grepl(pattern = "Ratio", x = metric, fixed = TRUE) ||
+      grepl(pattern = "Average Size", x = metric, fixed = TRUE)) {
+    thePlot <- thePlot + ggplot2::scale_y_log10()
+  }
   ggplot2::ggsave(
     thePlot,
     filename = paste0("FigureMetric_",
@@ -398,115 +426,225 @@ lapply(unique(diversitiesAll$Metric), function(metric) {
   )
 })
 
+# plot1 <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
+#   is.na(Subset), Metric == "Alpha Hill:0",
+#   SpeciesAffinity %in% c("100% 0", "50% 0, 50% 1", "Uniform(0, 1)"),
+#   Intervention %in% c("(0)", "(0.5)", "(1)")#, "(0)->(0.5)", "(0.5)->(0)")
+# ), facets = as.formula(. ~ SpeciesAffinity), CIs = c(0.75)
+# ) + ggplot2::theme_bw() + ggplot2::ylab("Richness") + ggplot2::labs(
+#   subtitle = "200 species, labels are species preferences, inner 75% intervals"
+# )
+# ggplot2::ggsave(
+#   plot1,
+#   filename = "Figure2_Prototype1.png",
+#   units = "px", height = 1600, width = 3200
+#   )
+#
+# plot2 <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
+#   is.na(Subset), Metric == "Alpha Hill:0",
+#   SpeciesAffinity %in% c("100% 0", "50% 0, 50% 1", "Uniform(0, 1)"),
+#   Intervention %in% c("(0)", "(0.5)", "(1)")#, "(0)->(0.5)", "(0.5)->(0)")
+# ), facets = as.formula(.~Intervention), CIs = c(0.75)
+# ) + ggplot2::theme_bw() + ggplot2::ylab("Richness") + ggplot2::labs(
+#   subtitle = "200 species, labels are patch type, inner 75% intervals"
+# )
+# ggplot2::ggsave(
+#   plot2,
+#   filename = "Figure2_Prototype2.png",
+#   units = "px", height = 1600, width = 3200
+# )
+
 plot1 <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
   is.na(Subset), Metric == "Alpha Hill:0",
-  SpeciesAffinity %in% c("100% 0", "50% 0, 50% 1", "Uniform(0, 1)"),
+  SpeciesAffinity %in% c("100% 0"),
   Intervention %in% c("(0)", "(0.5)", "(1)")#, "(0)->(0.5)", "(0.5)->(0)")
-), facets = as.formula(. ~ SpeciesAffinity), CIs = c(0.75)
+), facets = as.formula(.~.), CIs = c(0.75)
 ) + ggplot2::theme_bw() + ggplot2::ylab("Richness") + ggplot2::labs(
-  subtitle = "200 species, labels are species preferences, inner 75% intervals"
+  subtitle = "200 species, inner 75% intervals"
 )
 ggplot2::ggsave(
   plot1,
-  filename = "Figure2_Prototype1.png",
+  filename = "Figure2_Prototype3.png",
+  units = "px", height = 1600, width = 2000
+)
+
+plot1s1 <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
+  is.na(Subset), Metric == "Ratio Con/Bas:0",
+  SpeciesAffinity %in% c("100% 0"),
+  Intervention %in% c("(0)", "(0.5)", "(1)")#, "(0)->(0.5)", "(0.5)->(0)")
+), facets = as.formula(.~.), CIs = c(0.75)
+) + ggplot2::theme_bw() + ggplot2::ylab(
+  "No. of Consumer Species / No. of Basal Species"
+  ) + ggplot2::labs(
+  subtitle = "200 species, inner 75% intervals"
+)
+plot1s2 <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
+  is.na(Subset), Metric == "Average Size:0",
+  SpeciesAffinity %in% c("100% 0"),
+  Intervention %in% c("(0)", "(0.5)", "(1)")#, "(0)->(0.5)", "(0.5)->(0)")
+), facets = as.formula(.~.), CIs = c(0.75)
+) + ggplot2::theme_bw() + ggplot2::ylab(
+  "Average size of species present"
+) + ggplot2::labs(
+  subtitle = "200 species, inner 75% intervals"
+)
+ggplot2::ggsave(
+  ggpubr::ggarrange(plot1s1, plot1s2,
+                    common.legend = TRUE, legend = "right", ncol = 2),
+  filename = "Figure2s1_Prototype1.png",
   units = "px", height = 1600, width = 3200
-  )
+)
 
 plot2 <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
   is.na(Subset), Metric == "Alpha Hill:0",
-  SpeciesAffinity %in% c("100% 0", "50% 0, 50% 1", "Uniform(0, 1)"),
-  Intervention %in% c("(0)", "(0.5)", "(1)")#, "(0)->(0.5)", "(0.5)->(0)")
-), facets = as.formula(.~Intervention), CIs = c(0.75)
+  SpeciesAffinity %in% c("100% 0"),
+  Intervention %in% c("(0)", "(0)->(0.5)", "(0)->(1)")#, "(0)->(0.5)", "(0.5)->(0)")
+), facets = as.formula(.~.), CIs = c(0.75)
 ) + ggplot2::theme_bw() + ggplot2::ylab("Richness") + ggplot2::labs(
-  subtitle = "200 species, labels are patch type, inner 75% intervals"
+  subtitle = "200 species, inner 75% intervals"
+)
+plot2s1 <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
+  is.na(Subset), Metric == "Ratio Con/Bas:0",
+  SpeciesAffinity %in% c("100% 0"),
+  Intervention %in% c("(0)", "(0)->(0.5)", "(0)->(1)")#, "(0)->(0.5)", "(0.5)->(0)")
+), facets = as.formula(.~.), CIs = c(0.75)
+) + ggplot2::theme_bw() + ggplot2::ylab(
+  "No. of Consumer Species / No. of Basal Species"
+) + ggplot2::labs(
+  subtitle = "200 species, inner 75% intervals"
+)
+plot2s2 <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
+  is.na(Subset), Metric == "Average Size:0",
+  SpeciesAffinity %in% c("100% 0"),
+  Intervention %in% c("(0)", "(0)->(0.5)", "(0)->(1)")#, "(0)->(0.5)", "(0.5)->(0)")
+), facets = as.formula(.~.), CIs = c(0.75)
+) + ggplot2::theme_bw() + ggplot2::ylab(
+  "Average size of species present"
+) + ggplot2::labs(
+  subtitle = "200 species, inner 75% intervals"
 )
 ggplot2::ggsave(
-  plot2,
-  filename = "Figure2_Prototype2.png",
+  ggpubr::ggarrange(plot2, plot2s1, plot2s2,
+                    common.legend = TRUE, legend = "right", ncol = 3),
+  filename = "Figure3_Prototype2.png",
   units = "px", height = 1600, width = 3200
 )
 
-plot3 <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
-  is.na(Subset), Metric == "Alpha Hill:0",
-  SpeciesAffinity %in% c("100% 0", "50% 0, 50% 1", "Uniform(0, 1)"),
-  Intervention %in% c("(0)", "(0.5)", "(0)->(0.5)", "(0.5)->(0)")
-), facets = as.formula(.~InterventionInitial), CIs = c(0.75)
-) + ggplot2::theme_bw() + ggplot2::ylab("Richness") + ggplot2::labs(
-  subtitle = "200 species, labels are starting patch type, inner 75% intervals"
-)
-ggplot2::ggsave(
-  plot3,
-  filename = "Figure3_Prototype1.png",
-  units = "px", height = 1600, width = 3200
+
+# plot3 <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
+#   is.na(Subset), Metric == "Alpha Hill:0",
+#   SpeciesAffinity %in% c("100% 0", "50% 0, 50% 1", "Uniform(0, 1)"),
+#   Intervention %in% c("(0)", "(0.5)", "(0)->(0.5)", "(0.5)->(0)")
+# ), facets = as.formula(.~InterventionInitial), CIs = c(0.75)
+# ) + ggplot2::theme_bw() + ggplot2::ylab("Richness") + ggplot2::labs(
+#   subtitle = "200 species, labels are starting patch type, inner 75% intervals"
+# )
+# ggplot2::ggsave(
+#   plot3,
+#   filename = "Figure3_Prototype1.png",
+#   units = "px", height = 1600, width = 3200
+# )
+#
+# plot3s1 <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
+#   is.na(Subset), Metric == "Alpha Hill:0",
+#   SpeciesAffinity %in% c("100% 0", "50% 0, 50% 1", "Uniform(0, 1)"),
+#   Intervention %in% c("(0)", "(1)", "(0)->(1)", "(1)->(0)")
+# ), facets = as.formula(.~InterventionInitial), CIs = c(0.75)
+# ) + ggplot2::theme_bw() + ggplot2::ylab("Richness") + ggplot2::labs(
+#   subtitle = "200 species, labels are starting patch type, inner 75% intervals"
+# )
+# ggplot2::ggsave(
+#   plot3s1,
+#   filename = "Figure3s1_Prototype1.png",
+#   units = "px", height = 1600, width = 3200
+# )
+#
+# plot3s2 <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
+#   is.na(Subset), Metric == "Alpha Hill:0",
+#   SpeciesAffinity %in% c("50% 0, 50% 1")#,
+#   # Intervention %in% c("(0)", "(0.5)", "(1)", "(0)->(1)", "(1)->(0)")
+# ), facets = as.formula(.~InterventionInitial), CIs = c(0.75)
+# ) + ggplot2::theme_bw() + ggplot2::ylab("Richness") + ggplot2::labs(
+#   subtitle = "200 species, labels are starting patch type, inner 75% intervals"
+# )
+# ggplot2::ggsave(
+#   plot3s2,
+#   filename = "Figure3s2_Prototype1.png",
+#   units = "px", height = 1600, width = 3200
+# )
+#
+# plot3s4_1000 <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
+#   is.na(Subset), Metric == "Alpha Hill:0",
+#   SpeciesAffinity %in% c("100% 0")#,
+#   # Intervention %in% c("(0)", "(0.5)", "(1)", "(0)->(1)", "(1)->(0)")
+# ), facets = as.formula(.~InterventionFinal), CIs = c(0.75)
+# ) + ggplot2::theme_bw() + ggplot2::ylab("Richness") + ggplot2::labs(
+#   subtitle = "200 species, labels are ending patch type, inner 75% intervals"
+# )
+# ggplot2::ggsave(
+#   plot3s4_1000,
+#   filename = "Figure3s4_Prototype1_1000.png",
+#   units = "px", height = 1600, width = 3200
+# )
+#
+# plot3s4_5050 <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
+#   is.na(Subset), Metric == "Alpha Hill:0",
+#   SpeciesAffinity %in% c("50% 0, 50% 1")#,
+#   # Intervention %in% c("(0)", "(0.5)", "(1)", "(0)->(1)", "(1)->(0)")
+# ), facets = as.formula(.~InterventionFinal), CIs = c(0.75)
+# ) + ggplot2::theme_bw() + ggplot2::ylab("Richness") + ggplot2::labs(
+#   subtitle = "200 species, labels are ending patch type, inner 75% intervals"
+# )
+# ggplot2::ggsave(
+#   plot3s4_5050,
+#   filename = "Figure3s4_Prototype1_5050.png",
+#   units = "px", height = 1600, width = 3200
+# )
+#
+# plot3s4_unif <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
+#   is.na(Subset), Metric == "Alpha Hill:0",
+#   SpeciesAffinity %in% c("Uniform(0, 1)")#,
+#   # Intervention %in% c("(0)", "(0.5)", "(1)", "(0)->(1)", "(1)->(0)")
+# ), facets = as.formula(.~InterventionFinal), CIs = c(0.75)
+# ) + ggplot2::theme_bw() + ggplot2::ylab("Richness") + ggplot2::labs(
+#   subtitle = "200 species, labels are ending patch type, inner 75% intervals"
+# )
+# ggplot2::ggsave(
+#   plot3s4_unif,
+#   filename = "Figure3s4_Prototype1_Uniform.png",
+#   units = "px", height = 1600, width = 3200
+# )
+
+scatterBase <- ggplot2::ggplot(
+  diversitiesAll %>% dplyr::select(
+    -Species, -Abundance, -Environment, -Size, -Type
+  ) %>% dplyr::filter(
+    is.na(Subset),
+    Metric %in% c("Alpha Hill:0", "Average Aff.:0", "Average Size:0",
+                  "Ratio Con/Bas:0", "St.Dev. Size:0", "TimeJaccard")
+  ) %>% dplyr::distinct(
+  ) %>% dplyr::group_by(
+    Environment1, Environment2, Metric, Subset, PoolPatch, PoolPatchSeed,
+    Interactions, InteractionsSeed, Events, EventsSeed, InitialConditions,
+    InitialConditionsSeed, Dispersal, NicheDistance, AffinitySeed,
+    InterventionPatchType, InterventionTimeType, InterventionTimeSeed,
+    InterventionDispersal, InterventionNicheDistance,
+    Intervention, InterventionInitial, InterventionFinal, SpeciesAffinity
+  ) %>% dplyr::summarise(
+    Value = mean(Value),
+    .groups = "drop"
+  ) %>% tidyr::pivot_wider(names_from = Metric, values_from = Value),
+  ggplot2::aes(
+    color = Intervention, fill = Intervention, shape = SpeciesAffinity
+  )
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Island Land-use"
 )
 
-plot3s1 <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
-  is.na(Subset), Metric == "Alpha Hill:0",
-  SpeciesAffinity %in% c("100% 0", "50% 0, 50% 1", "Uniform(0, 1)"),
-  Intervention %in% c("(0)", "(1)", "(0)->(1)", "(1)->(0)")
-), facets = as.formula(.~InterventionInitial), CIs = c(0.75)
-) + ggplot2::theme_bw() + ggplot2::ylab("Richness") + ggplot2::labs(
-  subtitle = "200 species, labels are starting patch type, inner 75% intervals"
-)
-ggplot2::ggsave(
-  plot3s1,
-  filename = "Figure3s1_Prototype1.png",
-  units = "px", height = 1600, width = 3200
-)
-
-plot3s2 <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
-  is.na(Subset), Metric == "Alpha Hill:0",
-  SpeciesAffinity %in% c("50% 0, 50% 1")#,
-  # Intervention %in% c("(0)", "(0.5)", "(1)", "(0)->(1)", "(1)->(0)")
-), facets = as.formula(.~InterventionInitial), CIs = c(0.75)
-) + ggplot2::theme_bw() + ggplot2::ylab("Richness") + ggplot2::labs(
-  subtitle = "200 species, labels are starting patch type, inner 75% intervals"
-)
-ggplot2::ggsave(
-  plot3s2,
-  filename = "Figure3s2_Prototype1.png",
-  units = "px", height = 1600, width = 3200
-)
-
-plot3s4_1000 <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
-  is.na(Subset), Metric == "Alpha Hill:0",
-  SpeciesAffinity %in% c("100% 0")#,
-  # Intervention %in% c("(0)", "(0.5)", "(1)", "(0)->(1)", "(1)->(0)")
-), facets = as.formula(.~InterventionFinal), CIs = c(0.75)
-) + ggplot2::theme_bw() + ggplot2::ylab("Richness") + ggplot2::labs(
-  subtitle = "200 species, labels are ending patch type, inner 75% intervals"
-)
-ggplot2::ggsave(
-  plot3s4_1000,
-  filename = "Figure3s4_Prototype1_1000.png",
-  units = "px", height = 1600, width = 3200
-)
-
-plot3s4_5050 <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
-  is.na(Subset), Metric == "Alpha Hill:0",
-  SpeciesAffinity %in% c("50% 0, 50% 1")#,
-  # Intervention %in% c("(0)", "(0.5)", "(1)", "(0)->(1)", "(1)->(0)")
-), facets = as.formula(.~InterventionFinal), CIs = c(0.75)
-) + ggplot2::theme_bw() + ggplot2::ylab("Richness") + ggplot2::labs(
-  subtitle = "200 species, labels are ending patch type, inner 75% intervals"
-)
-ggplot2::ggsave(
-  plot3s4_5050,
-  filename = "Figure3s4_Prototype1_5050.png",
-  units = "px", height = 1600, width = 3200
-)
-
-plot3s4_unif <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
-  is.na(Subset), Metric == "Alpha Hill:0",
-  SpeciesAffinity %in% c("Uniform(0, 1)")#,
-  # Intervention %in% c("(0)", "(0.5)", "(1)", "(0)->(1)", "(1)->(0)")
-), facets = as.formula(.~InterventionFinal), CIs = c(0.75)
-) + ggplot2::theme_bw() + ggplot2::ylab("Richness") + ggplot2::labs(
-  subtitle = "200 species, labels are ending patch type, inner 75% intervals"
-)
-ggplot2::ggsave(
-  plot3s4_unif,
-  filename = "Figure3s4_Prototype1_Uniform.png",
-  units = "px", height = 1600, width = 3200
-)
+# "Alpha Hill:0", "Average Aff.:0", "Average Size:0",
+# "Ratio Con/Bas:0", "St.Dev. Size:0", "TimeJaccard"
+scatterBase + ggplot2::geom_point(
+  ggplot2::aes(x = `Alpha Hill:0`, y = `TimeJaccard`)
+) + ggplot2::facet_grid(Intervention ~ SpeciesAffinity)
 
