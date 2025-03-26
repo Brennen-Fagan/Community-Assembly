@@ -27,12 +27,12 @@ library(foreach)
 # Functions: ##################################################################
 
 flattenCEs <- function(CE) {
-    id <- strsplit(
-      strsplit(
-        strsplit(basename(CE$Ellipsis$ParentRun), ".", fixed = TRUE)[[1]][1], # Remove .RData.
-        "_", fixed = TRUE)[[1]][-c(1:2)], # Remove TSTS_Type and split seeds off.
-      "-", fixed = TRUE # Separate out the id values.
-    )
+  id <- strsplit(
+    strsplit(
+      strsplit(basename(CE$Ellipsis$ParentRun), ".", fixed = TRUE)[[1]][1], # Remove .RData.
+      "_", fixed = TRUE)[[1]][-c(1:2)], # Remove TSTS_Type and split seeds off.
+    "-", fixed = TRUE # Separate out the id values.
+  )
 
 
   if (length(id) < 3) {
@@ -45,7 +45,11 @@ flattenCEs <- function(CE) {
     EventType = Type.x,
     SpeciesType = Type.y
   ) %>% tidytable::mutate(
-    PostIntervention = Times > CE$Ellipsis$TimeIntervention,
+    PostIntervention = if("TimeIntervention" %in% names(CE$Ellipsis)) {
+      Times > CE$Ellipsis$TimeIntervention
+    } else {
+      NA
+    },
     PoolPatch = id[[1]][1],
     PoolPatchSeed = id[[2]][1],
     Interactions = id[[1]][2],
@@ -301,10 +305,11 @@ ColExt <- c(ColExtBase, ColExtIntervention)
 # Save this almost processed object so we don't miss out.
 save(ColExt, file = "ColExt9a9_full.RData")
 
-# Flatten the object to facilitate plotting.
+# Flatten the object to facilitate plotting. Fairly fast believe it or not.
 ColExt <- tidytable::bind_rows(lapply(ColExt, flattenCEs))
 
 # Save the flat object for combination with the flattened diversities.
+save(ColExt, file = "ColExt9a9_flat.RData")
 
 if (cores > 1)
   parallel::stopCluster(clust)
