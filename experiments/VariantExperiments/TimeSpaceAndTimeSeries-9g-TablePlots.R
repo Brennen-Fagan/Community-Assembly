@@ -6,6 +6,8 @@ datfolders <- dir(path = ".",
                   pattern = "TSTS_Simulations_.+2025-01-2[1-4]$",# Regex
                   full.names = TRUE)
 
+overwrite <- TRUE
+
 # Problems with X11
 options(bitmapType = "cairo")
 
@@ -72,6 +74,10 @@ flattenDiversity <- function(d) {
     `Average Size:1` = sum(Size*Abundance)/sum(Abundance),
     `St.Dev. Size:0` = sqrt(var(Size)),
     `St.Dev. Size:1` = sqrt(var(Size*Abundance/sum(Abundance))),
+    `Average LSize:0` = mean(log10(Size)),
+    `Average LSize:1` = sum(log10(Size)*Abundance)/sum(Abundance),
+    `St.Dev. LSize:0` = sqrt(var(log10(Size))),
+    `St.Dev. LSize:1` = sqrt(var(log10(Size)*Abundance/sum(Abundance))),
     `Ratio Con/Bas:0` = sum(Type == "Consumer")/sum(Type == "Basal"),
     `Ratio Con/Bas:1` = sum((Type == "Consumer") * Abundance) /
       sum((Type == "Basal") * Abundance),
@@ -94,9 +100,13 @@ flattenDiversity <- function(d) {
     `Average Size:0` = mean(Size),
     `Average Size:1` = sum(Size*Abundance)/sum(Abundance),
     `St.Dev. Size:0` = sqrt(var(Size)),
-    `St.Dev. Size:1` = sqrt(var(Size*Abundance/sum(Abundance)))
+    `St.Dev. Size:1` = sqrt(var(Size*Abundance/sum(Abundance))),
+    `Average LSize:0` = mean(log10(Size)),
+    `Average LSize:1` = sum(log10(Size)*Abundance)/sum(Abundance),
+    `St.Dev. LSize:0` = sqrt(var(log10(Size))),
+    `St.Dev. LSize:1` = sqrt(var(log10(Size)*Abundance/sum(Abundance)))
   ) %>% tidytable::pivot_longer(
-    cols = `Average Size:0`:`St.Dev. Size:1`,
+    cols = `Average Size:0`:`St.Dev. LSize:1`,
     names_to = "Metric", values_to = "Value"
   )
 
@@ -133,7 +143,7 @@ for (datfolder in datfolders) {
 
   filestring <- paste0("diversitiesFlattened9_",datfolderID,".RData")
 
-  if (file.exists(filestring)) {next()}
+  if (file.exists(filestring) && !overwrite) {next()}
 
   diversities <- lapply(
     dir(datfolder, full.names = TRUE, pattern = "Diversity"), function(x) {
@@ -349,15 +359,20 @@ plotMeanAndInner(diversitiesAll %>% tidytable::filter(
 ))
 
 lapply(unique(diversitiesAll$Metric), function(metric) {
+  print(metric)
   thePlot <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
     is.na(Subset), Metric == metric
   )) + ggplot2::labs(y = metric)
-  if (! grepl(pattern = "Alpha", x = metric, fixed = TRUE)) {
-    # The alphas routinely escape [0, 1], but the Betas, Ratios, and Sizes don't
+  if (! grepl(pattern = "Alpha", x = metric, fixed = TRUE) &&
+      ! grepl(pattern = "Size", x = metric, fixed = TRUE) &&
+      ! grepl(pattern = "Ratio", x = metric, fixed = TRUE)) {
+    # The alphas routinely escape [0, 1], but the Betas and Aff. don't
     thePlot <- thePlot + ggplot2::coord_cartesian(ylim = c(0, 1))
   }
   if (grepl(pattern = "Ratio", x = metric, fixed = TRUE) ||
-      grepl(pattern = "Average Size", x = metric, fixed = TRUE)) {
+      grepl(pattern = "Average Size", x = metric, fixed = TRUE) # ||
+      # grepl(pattern = "Average LSize", x = metric, fixed = TRUE)
+      ) {
     thePlot <- thePlot + ggplot2::scale_y_log10()
   }
   ggplot2::ggsave(
@@ -560,9 +575,7 @@ ggplot2::ggsave(
 # )
 
 scatterBase <- ggplot2::ggplot(
-  diversitiesAll %>% dplyr::select(
-    -Species, -Abundance, -Environment, -Size, -Type
-  ) %>% dplyr::filter(
+  diversitiesAll %>% dplyr::filter(
     is.na(Subset),
     Metric %in% c("Alpha Hill:0", "Average Aff.:0", "Average Size:0",
                   "Ratio Con/Bas:0", "St.Dev. Size:0", "TimeJaccard")
