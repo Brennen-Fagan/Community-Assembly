@@ -348,7 +348,7 @@ LawMorton1996_PlotAbundance <- function(
   }
 
   if (guides == FALSE) {
-    thePlot <- thePlot + ggplot2::guides(color = FALSE)
+    thePlot <- thePlot + ggplot2::guides(color = "none")
   }
 
   return(invisible(thePlot))
