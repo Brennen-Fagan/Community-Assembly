@@ -6,13 +6,24 @@
 # Parameters: #################################################################
 alsoload <- TRUE # if TRUE, try to load all ColExt files encountered.
 # if FALSE, only try to create new ColExt files (and return the outputs).
+overwrite <- TRUE # if TRUE, ignore whether a previous file exists.
 
 #datfolders <- dir(pattern = "TSTS_Simulations_")#.+2024-11-19$")
 datfolders <- dir(pattern = "TSTS_Simulations_.+2025-01-2.$")
 # datfolders <- dir(pattern = "CompareEliminationThresholds$")
-cores <- 8 # Parallelization?
+cores <- 12 # Parallelization?
+#cargs <- as.numeric(commandArgs(TRUE))
+#cores <- cargs[1]
 
 # Libraries: ##################################################################
+#librarypath <- file.path(".", "Rlibs")
+#if (!dir.exists(librarypath)) {
+#  dir.create(librarypath, showWarnings = FALSE)
+#}
+#.libPaths(c(librarypath, .libPaths()))
+#
+#allLibraryPaths <- .libPaths()
+
 library(dplyr)
 library(RMTRCode2)
 
@@ -110,6 +121,10 @@ ColExt <- foreach::foreach(
         pattern = "(Simulation|Result|Intervention)")
   ), .packages = c("dplyr", "RMTRCode2")
 ) %op% {
+  .libPaths(c(librarypath, .libPaths()))
+  library("dplyr")
+  library("RMTRCode2")
+  
   x_properties <- strsplit(basename(x), split = splitchar)
   stopifnot(length(x_properties) == 1#,
             #x_properties[[1]][1] == "TSTS",
@@ -131,7 +146,7 @@ ColExt <- foreach::foreach(
     }
   )
 
-  if(file.exists(filename)) {
+  if(!overwrite && file.exists(filename)) {
     if (alsoload) {
       loaded <- load(filename)
       stopifnot(length(loaded) == 1)
@@ -164,7 +179,6 @@ ColExt <- foreach::foreach(
         loaded$Abundance[, 1] / loaded$Ellipsis$ReactionTime
       loaded$Ellipsis$Timescale <- "Characteristic"
     }
-
 
     ColExt <- calculateColExtMetrics(loaded)
 
@@ -263,6 +277,8 @@ ColExtIntervention <- foreach::foreach(
 
   CE$Ellipsis$TimeIntervention <-
     loaded$Ellipsis$Affinity$TimeIntervention / loaded$ReactionTime
+  CE$Ellipsis$TimeStart <-
+    loaded$Abundance[1, 1] / loaded$ReactionTime
 
   CE
 }
@@ -292,7 +308,7 @@ ColExtIntervention <- foreach::foreach(
   CEBase <- ColExtBase[[CE$Ellipsis$GrandparentRun]]
   CE$Events <- rbind(
     CEBase$Events %>% dplyr::filter(
-      Times < CE$Ellipsis$TimeIntervention
+      Times < CE$Ellipsis$TimeStart
     ),
     CE$Events
   )
