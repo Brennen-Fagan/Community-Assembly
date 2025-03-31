@@ -124,7 +124,7 @@ ColExt <- foreach::foreach(
   .libPaths(c(librarypath, .libPaths()))
   library("dplyr")
   library("RMTRCode2")
-  
+
   x_properties <- strsplit(basename(x), split = splitchar)
   stopifnot(length(x_properties) == 1#,
             #x_properties[[1]][1] == "TSTS",
@@ -233,30 +233,6 @@ ColExt <- foreach::foreach(
 # The most correct solution is likely to load up the intervention run to check.
 # (Or else, re-run the entire evaluation while including this information.)
 
-# Might need parallel
-# Separate out and label, grabbing intervention times.
-# ColExtBase <- vector("list")
-# ColExtIntervention <- vector("list")
-# for (CE in ColExt) {
-#   if ("GrandparentRun" %in% names(CE$Ellipsis)) {
-#
-#     loaded <- load(CE$Ellipsis$ParentRun) # names
-#     stopifnot(length(loaded) == 1)
-#     loaded <- (get(loaded)) # objects
-#
-#     CE$Ellipsis$TimeIntervention <-
-#       loaded$Ellipsis$Affinity$TimeIntervention / loaded$ReactionTime
-#
-#     ColExt2$ColExtIntervention <- c(ColExt2$ColExtIntervention, list(CE))
-#
-#   } else {
-#     ColExt2$ColExtBase <- c(ColExt2$ColExtBase, list(CE))
-#     names(ColExt2$ColExtBase)[length(ColExt2$ColExtBase)] <-
-#       CE$Ellipsis$ParentRun
-#   }
-# }
-
-
 ColExtBase <- vector("list")
 ColExtIntervention <- vector("list")
 CEIs <- unlist(lapply(
@@ -287,19 +263,7 @@ ColExtBase <- ColExt[CEBs]
 names(ColExtBase) <-
   unlist(lapply(ColExtBase, function(CE) CE$Ellipsis$ParentRun))
 
-
-# ColExt <- vector("list")
 # Process Intervention CEs, deposit into the CE results.
-# for (CE in ColExtIntervention) {
-#   CEBase <- ColExtBase[CE$Ellipsis$GrandparentRun]
-#   CE$Events <- rbind(
-#     CEBase$Events %>% dplyr::filter(
-#       Times < CE$Ellipsis$TimeIntervention
-#     ),
-#     CE$Events
-#   )
-#   ColExt <- c(ColExt, list(CE))
-# }
 ColExtIntervention <- foreach::foreach(
   CE = iterators::iter(
     ColExtIntervention
