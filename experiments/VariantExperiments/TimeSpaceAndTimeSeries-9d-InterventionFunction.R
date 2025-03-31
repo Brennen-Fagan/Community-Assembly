@@ -610,7 +610,7 @@ interventionWrapper <- function(
       TimeIntervention = interventionTime,
       EffectiveReproductionRateOld =
         loaded$Ellipsis$Affinity$EffectiveReproductionRate,
-      EffectiveReproductionRateIntervention = rprime
+      EffectiveReproductionRateIntervention = rprime #TODO rprimef???
     )
   )
 
