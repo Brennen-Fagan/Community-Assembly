@@ -1,13 +1,17 @@
 # As in main package, but with the dependency changed. (RMTRCode2::toCheddar)
 CalculateTrophicStructure <- function(
   Pool,
-  EffectiveReproductionRate = NULL, # Probably easiest to make many calculators
+  ReproductionRate = NULL, # Probably easiest to make many calculators
   NumEnvironments,                  # rather than functionalise.
   InteractionMatrices,
   EliminationThreshold
 ) {
-  if (is.null(EffectiveReproductionRate)) {
-    EffectiveReproductionRate <- Pool$ReproductionRate
+  if (is.null(ReproductionRate)) {
+    EffectiveReproductionRate <- function(y) Pool$ReproductionRate
+  } else if (!is.function(ReproductionRate)) {
+    EffectiveReproductionRate <- function(y) ReproductionRate
+  } else { # !NULL & is.function
+    EffectiveReproductionRate <- ReproductionRate
   }
 
   # Borrowing from LM1996-NumPoolCom-FoodWebs-2021-07.Rmd
@@ -96,23 +100,24 @@ CalculateTrophicStructure <- function(
                                                 "Exploit-"))
         }
 
-        # the withs here should now be deprecated.
+        # the withs here should now be mostly deprecated. N, node inside.
+        reprate <- EffectiveReproductionRate(y)[redCom]
         IntriG <- with(redPool, data.frame(
           from = node, #resource = node,
           to = node, #consumer = node,
-          effectPerUnit = ifelse(EffectiveReproductionRate > 0,
-                                 EffectiveReproductionRate, 0),
-          effectActual = ifelse(EffectiveReproductionRate > 0,
-                                N * EffectiveReproductionRate, 0),
+          effectPerUnit = ifelse(reprate > 0,
+                                 reprate, 0),
+          effectActual = ifelse(reprate > 0,
+                                N * reprate, 0),
           Type = "Intrisc+",
           stringsAsFactors = FALSE))
         IntriL <- with(redPool, data.frame(
           from = node, #resource = node,
           to = node, #consumer = node,
-          effectPerUnit = ifelse(EffectiveReproductionRate < 0,
-                                 EffectiveReproductionRate, 0),
-          effectActual = ifelse(EffectiveReproductionRate < 0,
-                                N * EffectiveReproductionRate, 0),
+          effectPerUnit = ifelse(reprate < 0,
+                                 reprate, 0),
+          effectActual = ifelse(reprate < 0,
+                                N * reprate, 0),
           Type = "Intrisc-",
           stringsAsFactors = FALSE))
 
