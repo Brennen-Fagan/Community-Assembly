@@ -122,11 +122,12 @@ Trophic <- foreach::foreach(
   x = iterators::iter(
     dir(datfolders, full.names = TRUE,
         pattern = "(Simulation|Result|Intervention)")
-  ), .packages = c("dplyr", "RMTRCode2")
+  ), .packages = c("dplyr", "RMTRCode2")#,
+  # .export = "librarypath"
 ) %op% {
-  .libPaths(c(librarypath, .libPaths()))
-  library("dplyr")
-  library("RMTRCode2")
+  # .libPaths(c(librarypath, .libPaths()))
+  # library("dplyr")
+  # library("RMTRCode2")
 
   x_properties <- strsplit(basename(x), split = splitchar)
   stopifnot(length(x_properties) == 1#,
@@ -206,9 +207,9 @@ Trophic <- foreach::foreach(
         )
         calculator <- function(t, y) {
           if (t < loaded$Ellipsis$Affinity$TimeIntervention) {
-            calculatorBoth[[1]](y)
+            calculatorBoth[[1]](t, y)
           } else {
-            calculatorBoth[[2]](y)
+            calculatorBoth[[2]](t, y)
           }
         }
       } else {
@@ -227,7 +228,7 @@ Trophic <- foreach::foreach(
             InteractionMatrices = x_mats,
             EliminationThreshold = loaded$Parameters$EliminationThreshold
           )
-          return(engine(y))
+          return(engine(t, y))
         }
       }
     } else {
@@ -240,8 +241,8 @@ Trophic <- foreach::foreach(
         InteractionMatrices = x_mats,
         EliminationThreshold = loaded$Parameters$EliminationThreshold
       )
-      calculator <- function(t = NULL, y) {
-        calculatorBoth[[1]](y)
+      calculator <- function(t, y) {
+        calculatorBoth[[1]](t, y)
       }
     }
 
@@ -268,110 +269,110 @@ Trophic <- foreach::foreach(
 
 
 
-# Now to process into a compact whole.
-# We have two types: base and intervention.
-# A nice distinguishing feature is whether they have a GrandparentRun
-# listed in the Ellipsis argument. If they do, set them aside.
-# If they don't, set them to the other side and index them by ParentRun.
-# Then we can connect the ones with GrandparentRun attributes to the appropriate
-# ParentRun attributes.
-# This leaves a problem in the form of the intervention time, however.
-# The most correct solution is likely to load up the intervention run to check.
-# (Or else, re-run the entire evaluation while including this information.)
-
-# Might need parallel
-# Separate out and label, grabbing intervention times.
+# # Now to process into a compact whole.
+# # We have two types: base and intervention.
+# # A nice distinguishing feature is whether they have a GrandparentRun
+# # listed in the Ellipsis argument. If they do, set them aside.
+# # If they don't, set them to the other side and index them by ParentRun.
+# # Then we can connect the ones with GrandparentRun attributes to the appropriate
+# # ParentRun attributes.
+# # This leaves a problem in the form of the intervention time, however.
+# # The most correct solution is likely to load up the intervention run to check.
+# # (Or else, re-run the entire evaluation while including this information.)
+#
+# # Might need parallel
+# # Separate out and label, grabbing intervention times.
+# # ColExtBase <- vector("list")
+# # ColExtIntervention <- vector("list")
+# # for (CE in ColExt) {
+# #   if ("GrandparentRun" %in% names(CE$Ellipsis)) {
+# #
+# #     loaded <- load(CE$Ellipsis$ParentRun) # names
+# #     stopifnot(length(loaded) == 1)
+# #     loaded <- (get(loaded)) # objects
+# #
+# #     CE$Ellipsis$TimeIntervention <-
+# #       loaded$Ellipsis$Affinity$TimeIntervention / loaded$ReactionTime
+# #
+# #     ColExt2$ColExtIntervention <- c(ColExt2$ColExtIntervention, list(CE))
+# #
+# #   } else {
+# #     ColExt2$ColExtBase <- c(ColExt2$ColExtBase, list(CE))
+# #     names(ColExt2$ColExtBase)[length(ColExt2$ColExtBase)] <-
+# #       CE$Ellipsis$ParentRun
+# #   }
+# # }
+#
+#
 # ColExtBase <- vector("list")
 # ColExtIntervention <- vector("list")
-# for (CE in ColExt) {
-#   if ("GrandparentRun" %in% names(CE$Ellipsis)) {
+# CEIs <- unlist(lapply(
+#   ColExt, function(CE) "GrandparentRun" %in% names(CE$Ellipsis)
+# ))
+# CEBs <- which(!CEIs)
+# CEIs <- which(CEIs)
 #
-#     loaded <- load(CE$Ellipsis$ParentRun) # names
-#     stopifnot(length(loaded) == 1)
-#     loaded <- (get(loaded)) # objects
+# ColExtIntervention <- foreach::foreach(
+#   x = iterators::iter(
+#     CEIs
+#   ), .packages = c("dplyr", "RMTRCode2")
+# ) %op% {
+#   CE <- ColExt[[x]]
+#   loaded <- load(CE$Ellipsis$ParentRun) # names
+#   stopifnot(length(loaded) == 1)
+#   loaded <- (get(loaded)) # objects
 #
-#     CE$Ellipsis$TimeIntervention <-
-#       loaded$Ellipsis$Affinity$TimeIntervention / loaded$ReactionTime
+#   CE$Ellipsis$TimeIntervention <-
+#     loaded$Ellipsis$Affinity$TimeIntervention / loaded$ReactionTime
+#   CE$Ellipsis$TimeStart <-
+#     loaded$Abundance[1, 1] / loaded$ReactionTime
 #
-#     ColExt2$ColExtIntervention <- c(ColExt2$ColExtIntervention, list(CE))
-#
-#   } else {
-#     ColExt2$ColExtBase <- c(ColExt2$ColExtBase, list(CE))
-#     names(ColExt2$ColExtBase)[length(ColExt2$ColExtBase)] <-
-#       CE$Ellipsis$ParentRun
-#   }
+#   CE
 # }
-
-
-ColExtBase <- vector("list")
-ColExtIntervention <- vector("list")
-CEIs <- unlist(lapply(
-  ColExt, function(CE) "GrandparentRun" %in% names(CE$Ellipsis)
-))
-CEBs <- which(!CEIs)
-CEIs <- which(CEIs)
-
-ColExtIntervention <- foreach::foreach(
-  x = iterators::iter(
-    CEIs
-  ), .packages = c("dplyr", "RMTRCode2")
-) %op% {
-  CE <- ColExt[[x]]
-  loaded <- load(CE$Ellipsis$ParentRun) # names
-  stopifnot(length(loaded) == 1)
-  loaded <- (get(loaded)) # objects
-
-  CE$Ellipsis$TimeIntervention <-
-    loaded$Ellipsis$Affinity$TimeIntervention / loaded$ReactionTime
-  CE$Ellipsis$TimeStart <-
-    loaded$Abundance[1, 1] / loaded$ReactionTime
-
-  CE
-}
-
-ColExtBase <- ColExt[CEBs]
-names(ColExtBase) <-
-  unlist(lapply(ColExtBase, function(CE) CE$Ellipsis$ParentRun))
-
-
-# ColExt <- vector("list")
-# Process Intervention CEs, deposit into the CE results.
-# for (CE in ColExtIntervention) {
-#   CEBase <- ColExtBase[CE$Ellipsis$GrandparentRun]
+#
+# ColExtBase <- ColExt[CEBs]
+# names(ColExtBase) <-
+#   unlist(lapply(ColExtBase, function(CE) CE$Ellipsis$ParentRun))
+#
+#
+# # ColExt <- vector("list")
+# # Process Intervention CEs, deposit into the CE results.
+# # for (CE in ColExtIntervention) {
+# #   CEBase <- ColExtBase[CE$Ellipsis$GrandparentRun]
+# #   CE$Events <- rbind(
+# #     CEBase$Events %>% dplyr::filter(
+# #       Times < CE$Ellipsis$TimeIntervention
+# #     ),
+# #     CE$Events
+# #   )
+# #   ColExt <- c(ColExt, list(CE))
+# # }
+# ColExtIntervention <- foreach::foreach(
+#   CE = iterators::iter(
+#     ColExtIntervention
+#   ), .packages = c("dplyr", "RMTRCode2")
+# ) %op% {
+#   CEBase <- ColExtBase[[CE$Ellipsis$GrandparentRun]]
 #   CE$Events <- rbind(
 #     CEBase$Events %>% dplyr::filter(
-#       Times < CE$Ellipsis$TimeIntervention
+#       Times < CE$Ellipsis$TimeStart
 #     ),
 #     CE$Events
 #   )
-#   ColExt <- c(ColExt, list(CE))
+#   CE
 # }
-ColExtIntervention <- foreach::foreach(
-  CE = iterators::iter(
-    ColExtIntervention
-  ), .packages = c("dplyr", "RMTRCode2")
-) %op% {
-  CEBase <- ColExtBase[[CE$Ellipsis$GrandparentRun]]
-  CE$Events <- rbind(
-    CEBase$Events %>% dplyr::filter(
-      Times < CE$Ellipsis$TimeStart
-    ),
-    CE$Events
-  )
-  CE
-}
-
-# Recombine into a single set.
-ColExt <- c(ColExtBase, ColExtIntervention)
-
-# Save this almost processed object so we don't miss out.
-save(ColExt, file = "ColExt9a9_full.RData")
-
-# Flatten the object to facilitate plotting. Fairly fast believe it or not.
-ColExt <- tidytable::bind_rows(lapply(ColExt, flattenCEs))
-
-# Save the flat object for combination with the flattened diversities.
-save(ColExt, file = "ColExt9a9_flat.RData")
-
-if (cores > 1)
-  parallel::stopCluster(clust)
+#
+# # Recombine into a single set.
+# ColExt <- c(ColExtBase, ColExtIntervention)
+#
+# # Save this almost processed object so we don't miss out.
+# save(ColExt, file = "ColExt9a9_full.RData")
+#
+# # Flatten the object to facilitate plotting. Fairly fast believe it or not.
+# ColExt <- tidytable::bind_rows(lapply(ColExt, flattenCEs))
+#
+# # Save the flat object for combination with the flattened diversities.
+# save(ColExt, file = "ColExt9a9_flat.RData")
+#
+# if (cores > 1)
+#   parallel::stopCluster(clust)
