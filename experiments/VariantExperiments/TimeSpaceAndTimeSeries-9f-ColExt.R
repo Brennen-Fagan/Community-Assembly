@@ -206,8 +206,14 @@ ColExt <- foreach::foreach(
     }
 
     ColExt <- list(Events = ColExt, Ellipsis = list())
-    if ("ParentRun" %in% names(loaded$Ellipsis))
+    if ("ParentRun" %in% names(loaded$Ellipsis)) {
+      # Must be an Intervention Run
       ColExt$Ellipsis$GrandparentRun <- loaded$Ellipsis$ParentRun
+      ColExt$Ellipsis$TimeIntervention <-
+        loaded$Ellipsis$Affinity$TimeIntervention / loaded$ReactionTime
+      ColExt$Ellipsis$TimeStart <-
+        loaded$Abundance[1, 1] / loaded$ReactionTime
+    }
     ColExt$Ellipsis$ParentRun <- x
 
     # So now ColExt contains both neutral and dynamic observed events through
@@ -241,23 +247,23 @@ CEIs <- unlist(lapply(
 CEBs <- which(!CEIs)
 CEIs <- which(CEIs)
 
-ColExtIntervention <- foreach::foreach(
-  x = iterators::iter(
-    CEIs
-  ), .packages = c("dplyr", "RMTRCode2")
-) %op% {
-  CE <- ColExt[[x]]
-  loaded <- load(CE$Ellipsis$ParentRun) # names
-  stopifnot(length(loaded) == 1)
-  loaded <- (get(loaded)) # objects
-
-  CE$Ellipsis$TimeIntervention <-
-    loaded$Ellipsis$Affinity$TimeIntervention / loaded$ReactionTime
-  CE$Ellipsis$TimeStart <-
-    loaded$Abundance[1, 1] / loaded$ReactionTime
-
-  CE
-}
+# ColExtIntervention <- foreach::foreach(
+#   x = iterators::iter(
+#     CEIs
+#   ), .packages = c("dplyr", "RMTRCode2")
+# ) %op% {
+#   CE <- ColExt[[x]]
+#   loaded <- load(CE$Ellipsis$ParentRun) # names
+#   stopifnot(length(loaded) == 1)
+#   loaded <- (get(loaded)) # objects
+#
+#   CE$Ellipsis$TimeIntervention <-
+#     loaded$Ellipsis$Affinity$TimeIntervention / loaded$ReactionTime
+#   CE$Ellipsis$TimeStart <-
+#     loaded$Abundance[1, 1] / loaded$ReactionTime
+#
+#   CE
+# }
 
 ColExtBase <- ColExt[CEBs]
 names(ColExtBase) <-
