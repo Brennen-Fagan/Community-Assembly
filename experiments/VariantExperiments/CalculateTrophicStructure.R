@@ -4,12 +4,16 @@ CalculateTrophicStructure <- function(
   ReproductionRate = NULL, # Probably easiest to make many calculators
   NumEnvironments,                  # rather than functionalise.
   InteractionMatrices,
-  EliminationThreshold
+  EliminationThreshold,
+  LinkThreshold = 0.01 # Threshold below which an effectNormalised link is
+                       # removed when calculating the trophic levels.
 ) {
   if (is.null(ReproductionRate)) {
-    EffectiveReproductionRate <- function(y) Pool$ReproductionRate
+    EffectiveReproductionRate <-
+      function(t = NULL, y, ...) Pool$ReproductionRate
   } else if (!is.function(ReproductionRate)) {
-    EffectiveReproductionRate <- function(y) ReproductionRate
+    EffectiveReproductionRate <-
+      function(t = NULL, y, ...) ReproductionRate
   } else { # !NULL & is.function
     EffectiveReproductionRate <- ReproductionRate
   }
@@ -20,7 +24,7 @@ CalculateTrophicStructure <- function(
 
   # This function should be appliable row-wise to the results.
   # One does need to remove the time column, as usual.
-  function(y) {
+  function(t = NULL, y) {
     # Clean up anything not present.
     y <- ifelse(y <= EliminationThreshold, 0, y)
 
@@ -101,7 +105,8 @@ CalculateTrophicStructure <- function(
         }
 
         # the withs here should now be mostly deprecated. N, node inside.
-        reprate <- EffectiveReproductionRate(y)[redCom]
+        reprate <-
+          EffectiveReproductionRate(t, y, parms = list(Patch = i))[redCom]
         IntriG <- with(redPool, data.frame(
           from = node, #resource = node,
           to = node, #consumer = node,
@@ -168,7 +173,14 @@ CalculateTrophicStructure <- function(
       envY = EnvsY,
       mats = InteractionMatrices$Mats)
 
-    EnvsCheddar <- lapply(EnvsEdgeVertexLists, toCheddar)
+    EnvsCheddar <- lapply(EnvsEdgeVertexLists,
+                          function(evlist) {
+                            if (!is.null(LinkThreshold))
+                              evlist$Edges <- evlist$Edges %>% dplyr::filter(
+                                effectNormalised > LinkThreshold
+                              )
+                            toCheddar(evlist)
+                          })
 
     EnvsTrophic <- lapply(EnvsCheddar,
                           function(x, weight.by) {
