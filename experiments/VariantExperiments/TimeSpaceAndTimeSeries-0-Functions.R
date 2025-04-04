@@ -1299,7 +1299,6 @@ calculateColExtMetrics <- function(sim) {
       }
     }
 
-
     # Proceed along changes, adding them to events.
     if (nrow(changesdf) > 0) {
       for (j in 1:nrow(changesdf)) {
@@ -1369,7 +1368,25 @@ calculateColExtMetrics <- function(sim) {
   binmat = binaryMatrix,
   events = sim$Events)
 
-  allEvents <- dplyr::bind_rows(allEvents) %>% dplyr::arrange(Times)
+  allEvents <- dplyr::bind_rows(allEvents)
+
+  endState <- which(sim$Abundance[nrow(sim$Abundance), -1] >
+                      sim$Parameters$EliminationThreshold)
+
+  allEvents <- dplyr::bind_rows(
+    allEvents,
+    # Add in failed colonization events, as requested by CDT.
+    sim$Events %>% dplyr::filter(!Success, Type == "Arrival"),
+    # Add in faux out events corresponding to remaining in the simulation.
+    data.frame(
+      Times = sim$Abundance[nrow(sim$Abundance), 1],
+      Species = ((endState - 1) %% nspecies) + 1,
+      Environment = ((endState - 1) %/% nspecies) + 1,
+      Type = "EndOfSimulation",
+      Success = TRUE
+    )
+  ) %>% dplyr::arrange(Times)
+
   # Adding in typings is then dependent on how we are breaking up affinity
   # and what information from the pool is desired. I think it might make
   # more sense to do that outside of this function.
