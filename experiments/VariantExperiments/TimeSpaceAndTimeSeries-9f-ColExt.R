@@ -6,23 +6,23 @@
 # Parameters: #################################################################
 alsoload <- TRUE # if TRUE, try to load all ColExt files encountered.
 # if FALSE, only try to create new ColExt files (and return the outputs).
-overwrite <- TRUE # if TRUE, ignore whether a previous file exists.
+overwrite <- FALSE #TRUE # if TRUE, ignore whether a previous file exists.
 
 #datfolders <- dir(pattern = "TSTS_Simulations_")#.+2024-11-19$")
 datfolders <- dir(pattern = "TSTS_Simulations_.+2025-01-2.$")
 # datfolders <- dir(pattern = "CompareEliminationThresholds$")
-cores <- 12 # Parallelization?
-#cargs <- as.numeric(commandArgs(TRUE))
-#cores <- cargs[1]
+#cores <- 12 # Parallelization?
+cargs <- as.numeric(commandArgs(TRUE))
+cores <- cargs[1]
 
 # Libraries: ##################################################################
-#librarypath <- file.path(".", "Rlibs")
-#if (!dir.exists(librarypath)) {
-#  dir.create(librarypath, showWarnings = FALSE)
-#}
-#.libPaths(c(librarypath, .libPaths()))
-#
-#allLibraryPaths <- .libPaths()
+librarypath <- file.path(".", "Rlibs")
+if (!dir.exists(librarypath)) {
+  dir.create(librarypath, showWarnings = FALSE)
+}
+.libPaths(c(librarypath, .libPaths()))
+
+allLibraryPaths <- .libPaths()
 
 library(dplyr)
 library(RMTRCode2)
@@ -44,7 +44,6 @@ flattenCEs <- function(CE) {
       "_", fixed = TRUE)[[1]][-c(1:2)], # Remove TSTS_Type and split seeds off.
     "-", fixed = TRUE # Separate out the id values.
   )
-
 
   if (length(id) < 3) {
     # I.e., no intervention.
@@ -119,12 +118,12 @@ ColExt <- foreach::foreach(
   x = iterators::iter(
     dir(datfolders, full.names = TRUE,
         pattern = "(Simulation|Result|Intervention)")
-  ), .packages = c("dplyr", "RMTRCode2")
+  )#, .packages = c("dplyr", "RMTRCode2")
 ) %op% {
   .libPaths(c(librarypath, .libPaths()))
   library("dplyr")
   library("RMTRCode2")
-
+  
   x_properties <- strsplit(basename(x), split = splitchar)
   stopifnot(length(x_properties) == 1#,
             #x_properties[[1]][1] == "TSTS",
@@ -212,7 +211,7 @@ ColExt <- foreach::foreach(
       ColExt$Ellipsis$TimeIntervention <-
         loaded$Ellipsis$Affinity$TimeIntervention / loaded$ReactionTime
       ColExt$Ellipsis$TimeStart <-
-        loaded$Abundance[1, 1] / loaded$ReactionTime
+        loaded$Abundance[1, 1] # / loaded$ReactionTime # Already scaled above.
     }
     ColExt$Ellipsis$ParentRun <- x
 
@@ -271,10 +270,11 @@ names(ColExtBase) <-
 
 # Process Intervention CEs, deposit into the CE results.
 ColExtIntervention <- foreach::foreach(
-  CE = iterators::iter(
-    ColExtIntervention
+  CEindex = iterators::iter(
+    CEIs
   ), .packages = c("dplyr", "RMTRCode2")
 ) %op% {
+  CE <- ColExt[[CEindex]]
   CEBase <- ColExtBase[[CE$Ellipsis$GrandparentRun]]
   CE$Events <- rbind(
     CEBase$Events %>% dplyr::filter(
