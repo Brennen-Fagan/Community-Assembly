@@ -6,23 +6,23 @@
 # Parameters: #################################################################
 alsoload <- TRUE # if TRUE, try to load all ColExt files encountered.
 # if FALSE, only try to create new ColExt files (and return the outputs).
-overwrite <- TRUE # if TRUE, ignore whether a previous file exists.
+overwrite <- FALSE # if TRUE, ignore whether a previous file exists.
 
 #datfolders <- dir(pattern = "TSTS_Simulations_")#.+2024-11-19$")
 datfolders <- dir(pattern = "TSTS_Simulations_.+2025-01-2.$")
 # datfolders <- dir(pattern = "CompareEliminationThresholds$")
-cores <- 1 # Parallelization?
-#cargs <- as.numeric(commandArgs(TRUE))
-#cores <- cargs[1]
+# cores <- 1 # Parallelization?
+cargs <- as.numeric(commandArgs(TRUE))
+cores <- cargs[1]
 
 # Libraries: ##################################################################
-#librarypath <- file.path(".", "Rlibs")
-#if (!dir.exists(librarypath)) {
-#  dir.create(librarypath, showWarnings = FALSE)
-#}
-#.libPaths(c(librarypath, .libPaths()))
-#
-#allLibraryPaths <- .libPaths()
+librarypath <- file.path(".", "Rlibs")
+if (!dir.exists(librarypath)) {
+  dir.create(librarypath, showWarnings = FALSE)
+}
+.libPaths(c(librarypath, .libPaths()))
+
+allLibraryPaths <- .libPaths()
 
 library(dplyr)
 library(RMTRCode2)
@@ -122,12 +122,15 @@ Trophic <- foreach::foreach(
   x = iterators::iter(
     dir(datfolders, full.names = TRUE,
         pattern = "(Simulation|Result|Intervention)")
-  ), .packages = c("dplyr", "RMTRCode2")#,
-  # .export = "librarypath"
+  )#,# .packages = c("dplyr", "RMTRCode2"),
+   #.export = "librarypath" # claims already exported.
 ) %op% {
-  # .libPaths(c(librarypath, .libPaths()))
-  # library("dplyr")
-  # library("RMTRCode2")
+  .libPaths(c(librarypath, .libPaths()))
+  library("dplyr")
+  library("RMTRCode2")
+  # Make sure to call the new versions of these functions.
+  source("CalculateTrophicStructure.R") # Calculator creator.
+  source("toCheddar.R") # Updated function.
 
   x_properties <- strsplit(basename(x), split = splitchar)
   stopifnot(length(x_properties) == 1#,
@@ -249,8 +252,7 @@ Trophic <- foreach::foreach(
     # Apply the calculator to each time step and aggregate the results.
     # This is likely slow and might be space intensive.
     Trophic <- apply(loaded$Abundance, MARGIN = 1,
-                     function(ro) {calculator(ro[1], ro[-1])},
-                     simplify = FALSE)
+                     function(ro) {calculator(ro[1], ro[-1])})
 
     Trophic <- list(TrophicStructure = Trophic, Ellipsis = list())
     if ("ParentRun" %in% names(loaded$Ellipsis))
@@ -267,7 +269,7 @@ Trophic <- foreach::foreach(
   }
 }
 
-
+save(Trophic, file = "Trophic9a9_full.RData")
 
 # # Now to process into a compact whole.
 # # We have two types: base and intervention.
