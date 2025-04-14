@@ -5,6 +5,10 @@ load("diversitiesFlattened9a9_subset2.RData")
 # Problems with X11
 options(bitmapType = "cairo")
 
+# Grey interval that we compute over, usually after intervention (~50%)
+# If second number is less than 1, we lose persistent species.
+end <- c(0.6, 1)
+
 # Libraries: ##################################################################
 source("TimeSpaceAndTimeSeries-9-Dictionaries.R")
 source('TimeSpaceAndTimeSeries-0-Functions.R')
@@ -211,7 +215,9 @@ createOverviewFigure <- function(
         ) %>% dplyr::mutate( # Tidytable renders as character again!
           Intervention =
             factor(Intervention,
-                   levels = rev(c("(0)", "(0.5)", "(1)")),
+                   levels = rev(c("(0)", "(0)->(0.5)", "(0)->(1)",
+                                  "(0.5)",
+                                  "(1)")),
                    ordered = TRUE)
         ),
         .ces %>% tidytable::filter(
@@ -230,7 +236,9 @@ createOverviewFigure <- function(
         ) %>% dplyr::mutate( # Tidytable renders as character again!
           Intervention =
             factor(Intervention,
-                   levels = rev(c("(0)", "(0.5)", "(1)")),
+                   levels = rev(c("(0)", "(0)->(0.5)", "(0)->(1)",
+                                  "(0.5)",
+                                  "(1)")),
                    ordered = TRUE)
         )
       ),
@@ -303,8 +311,8 @@ endTimes <- ColExt %>% tidytable::rename(
   Times = max(Times),
   .groups = "drop"
 ) %>% tidytable::mutate( # In the plots:
-  Start = 0.55 * Times, # Neglect anything with an out time before this.
-  Stop = 1.00 * Times # Neglect anything with an in time after this.
+  Start = end[1] * Times, # Neglect anything with an out time before this.
+  Stop = end[2] * Times # Neglect anything with an in time after this.
 )
 
 Pers <- ColExt %>% tidytable::rename(
@@ -459,5 +467,24 @@ plot1 <- createOverviewFigure(
 ggplot2::ggsave(
   plot1,
   filename = "Figure2_Prototype5.png",
-  units = "px", height = 1600, width = 2400
+  units = "px", height = 3200, width = 4800 # Words are too small
+  # height = 1600, width = 2400 # Words over-run
+)
+
+plot2 <- createOverviewFigure(
+  .divs = diversitiesAll,
+  .ps = Pers,
+  .ces = ColExt,
+  .ets = endTimes,
+  SpeciesAffinity == "100% 0",
+  NicheDistance == "5",
+  Intervention %in% c("(0)", "(0)->(0.5)", "(0)->(1)"),
+  !(PoolPatchSeed %in% c("341", "342"))
+)
+
+ggplot2::ggsave(
+  plot2,
+  filename = "Figure3_Prototype3.png",
+  units = "px", height = 3200, width = 4800 # Words are too small
+  # height = 1600, width = 2400 # Words over-run
 )
