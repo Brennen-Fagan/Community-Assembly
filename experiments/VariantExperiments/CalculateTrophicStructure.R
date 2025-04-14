@@ -173,14 +173,18 @@ CalculateTrophicStructure <- function(
       envY = EnvsY,
       mats = InteractionMatrices$Mats)
 
-    EnvsCheddar <- lapply(EnvsEdgeVertexLists,
-                          function(evlist) {
-                            if (!is.null(LinkThreshold))
-                              evlist$Edges <- evlist$Edges %>% dplyr::filter(
-                                effectNormalised > LinkThreshold
-                              )
-                            toCheddar(evlist)
-                          })
+    EnvsEdgeVertexLists <- lapply(
+      EnvsEdgeVertexLists,
+      function(evlist) {
+        if (!is.null(LinkThreshold))
+          evlist$Edges <- evlist$Edges %>% dplyr::filter(
+            effectNormalised > LinkThreshold
+          )
+        return(evlist)
+      }
+    )
+
+    EnvsCheddar <- lapply(EnvsEdgeVertexLists, toCheddar)
 
     EnvsTrophic <- lapply(EnvsCheddar,
                           function(x, weight.by) {
@@ -195,9 +199,24 @@ CalculateTrophicStructure <- function(
     # the Trophic Levels, given the importance of intraspecific interactions.
     # These are what Cheddar does not capture.
 
+    # Clean up and combining.
+    EnvsEdgeVertexLists <- lapply(
+      seq_along(EnvsEdgeVertexLists), function(i, EV, TL) {
+        EV[[i]]$Vertices <- dplyr::left_join( # makes sure order is alright.
+          EV[[i]]$Vertices, TL[[i]] %>% dplyr::mutate(node = rownames(TL[[1]])),
+          by = "node"
+        )
+        EV <- lapply(EV, dplyr::ungroup)
+        return(EV)
+      },
+      EV = EnvsEdgeVertexLists,
+      TL = EnvsTrophic
+    )
+
     return(list(
-      EdgeVertexLists = EnvsEdgeVertexLists,
-      TrophicLevels = EnvsTrophic
+      Time = t,
+      EdgeVertexLists = EnvsEdgeVertexLists#,
+      # TrophicLevels = EnvsTrophic
     ))
   }
 
