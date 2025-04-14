@@ -2,9 +2,6 @@
 load("ColExt9a9_flat.RData")
 load("diversitiesFlattened9a9_subset2.RData")
 
-# Adjust for EndOfSimulation
-# Remove Dispersal
-
 # Problems with X11
 options(bitmapType = "cairo")
 
@@ -116,10 +113,12 @@ plotValueChart <- function(
 ) {
   ggplot2::ggplot(
     data,
-    ggplot2::aes(x = "",
+    ggplot2::aes(x = interaction(InType,
+                                 OutType,
+                                 sep = "/"),#"",
                  y = ChartValue,
-                 fill = interaction(DispersalOrArrival,
-                                    DynamicOrNeutral,
+                 fill = interaction(InType,
+                                    OutType,
                                     sep = "/"))
   ) + ggplot2::geom_col(
   ) + ggplot2::facet_grid(
@@ -141,6 +140,30 @@ diversitiesInterventionStrings <- ColExt %>% tidytable::select(
     FUN = interventionNamingScheme,
     Affinity, PoolPatch, InterventionPatchType
   ))
+)
+
+# Work out the end times so we can truncate the simulations
+# so that we are making sure our comparisons are equivalent.
+endTimes <- ColExt %>% tidytable::filter(
+  EventType == "EndOfSimulation"
+) %>% tidytable::select(
+  Times, PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, Events,
+  EventsSeed, InitialConditions, InitialConditionsSeed, Dispersal,
+  NicheDistance, Affinity, AffinitySeed
+) %>% tidytable::distinct(
+) %>% tidytable::group_by(
+  # One of these had an early stop. We "fix" it by going to its descendants.
+  PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, Events,
+  EventsSeed, InitialConditions, InitialConditionsSeed, Dispersal,
+  NicheDistance, Affinity, AffinitySeed
+) %>% tidytable::summarise(
+  Times = max(Times),
+  .groups = "drop"
+) %>% tidytable::mutate( # In the plots:
+  Start = 0.55 * Times, # Neglect anything with an out time before this.
+  Stop = 0.95 * Times # Neglect anything with an in time after this.
+) %>% tidytable::rename(
+  DispersalParam = Dispersal
 )
 
 Pers <- ColExt %>% tidytable::rename(
@@ -173,15 +196,20 @@ Pers <- ColExt %>% tidytable::rename(
     InNumber
   ),
   values_fill = NA
-  # values_fn = min # Shouldn't be necessary once we have dealt with the boundary.
 ) %>% tidytable::mutate(
-  Persistence =
-    ifelse(is.na(Extinct),
-           ifelse(is.na(`Dynamic Loss`),
-                  EndOfSimulation,
-                  `Dynamic Loss`),
-           Extinct) -
-    ifelse(is.na(Dispersal), Arrival, Dispersal),
+  In = ifelse(is.na(Dispersal), Arrival, Dispersal),
+  Out = ifelse(is.na(Extinct),
+               ifelse(is.na(`Dynamic Loss`),
+                      EndOfSimulation,
+                      `Dynamic Loss`),
+               Extinct),
+  InType = ifelse(is.na(Dispersal), "Arrival", "Dispersal"),
+  OutType = ifelse(is.na(Extinct),
+                   ifelse(is.na(`Dynamic Loss`),
+                          "EndOfSimulation",
+                          "Dynamic Loss"),
+                   "Extinct"),
+  Persistence = Out - In,
   # Enhance Readability:
   SpeciesAffinity =
     affinityDictionaryOrigin$SpeciesAffinities[as.numeric(Affinity)],
@@ -194,6 +222,8 @@ Pers <- ColExt %>% tidytable::rename(
   SpeciesAffinity = factor(SpeciesAffinity, levels = c(
     "100% 0", "50% 0, 50% 1", "Uniform(0, 1)"
   ), ordered = TRUE)
+) %>% tidytable::select(
+  -Dispersal, -Arrival, -Extinct, -`Dynamic Loss`, -EndOfSimulation
 ) %>% tidytable::left_join(
   diversitiesInterventionStrings,
   by = c("Affinity", "PoolPatch", "InterventionPatchType"),
@@ -207,6 +237,8 @@ Pers <- ColExt %>% tidytable::rename(
       "(1)->(0)", "(1)->(0.5)", "(1)"
     ), ordered = TRUE
   )
+) %>% tidytable::left_join(
+  endTimes
 )
 
 diversitiesAll <- diversitiesAll %>% tidytable::mutate(
@@ -253,6 +285,35 @@ diversitiesAll <- diversitiesAll %>% tidytable::mutate(
   )
 )
 
+ColExt <- ColExt %>% tidytable::mutate(
+  SpeciesAffinity =
+    affinityDictionaryOrigin$SpeciesAffinities[as.numeric(Affinity)],
+  SpeciesAffinity = tidytable::case_when(
+    SpeciesAffinity == "rep_0" ~ "100% 0",
+    SpeciesAffinity == "evensplit_01" ~ "50% 0, 50% 1",
+    SpeciesAffinity == "runif" ~ "Uniform(0, 1)",
+    TRUE ~ SpeciesAffinity
+  ),
+  SpeciesAffinity = factor(SpeciesAffinity, levels = c(
+    "100% 0", "50% 0, 50% 1", "Uniform(0, 1)"
+  ), ordered = TRUE)
+) %>% tidytable::left_join(
+  diversitiesInterventionStrings,
+  by = c("Affinity", "PoolPatch", "InterventionPatchType"),
+  multiple = "all"
+) %>% tidytable::mutate(
+  Intervention = factor(
+    Intervention,
+    levels = c(
+      "(0)", "(0)->(0.5)", "(0)->(1)",
+      "(0.5)->(0)", "(0.5)", "(0.5)->(1)",
+      "(1)->(0)", "(1)->(0.5)", "(1)"
+    ), ordered = TRUE
+  )
+) %>% tidytable::left_join(
+  endTimes
+)
+
 # Define Species Color Scale from AffinityBins: ##############################
 # Can't be done before hand because the affinity bins are calculated differently
 # for each of the runs.
@@ -273,7 +334,7 @@ SpeciesPaletteDF <- data.frame(
     colorRampPalette(colorPalette[c("(0)", "(0.5)", "(1)")])(length(Bins))[
       # Apply Color Palette judiciously, stackoverflow.com/a/35656396
       findInterval(ColorNumber, seq(0, 1, length.out = length(Bins)))
-    ]
+      ]
 ) %>% tidytable::arrange(
   Bins
 )
@@ -298,33 +359,53 @@ plot1 <- ggpubr::ggarrange(
     y = "Richness"
   ) + ggplot2::theme(
     legend.position = "bottom", legend.direction = "vertical"
-    ),
+  ),
   plotValueChart(
-    Pers %>% tidytable::filter(
-      SpeciesAffinity == "100% 0",
-      NicheDistance == "5",
-      Intervention %in% c("(0)", "(0.5)", "(1)"),
-      !(PoolPatchSeed %in% c("341", "342")),
-      Persistence > 0
-    ) %>% tidytable::mutate(
-      DispersalOrArrival = ifelse(is.na(Dispersal), "Arrival", "Dispersal"),
-      DynamicOrNeutral = ifelse(is.na(Extinct), "Dynamic Loss", "Extinct")
-    ) %>% tidytable::group_by(
-      SpeciesAffinity, DispersalOrArrival, DynamicOrNeutral, Intervention
-    ) %>% tidytable::summarise(
-      ChartValue = tidytable::n()
-    ) %>% dplyr::mutate( # Tidytable renders as character again!
-      Intervention =
-        factor(Intervention,
-               levels = rev(c("(0)", "(0.5)", "(1)")),
-               ordered = TRUE)
+    rbind(
+      Pers %>% tidytable::filter(
+        SpeciesAffinity == "100% 0",
+        NicheDistance == "5",
+        Intervention %in% c("(0)", "(0.5)", "(1)"),
+        !(PoolPatchSeed %in% c("341", "342")),
+        Persistence > 0,
+        is.na(Dispersal)
+      ) %>% tidytable::group_by(
+        SpeciesAffinity, InType, OutType, Intervention
+      ) %>% tidytable::summarise(
+        ChartValue = tidytable::n()
+      ) %>% dplyr::mutate( # Tidytable renders as character again!
+        Intervention =
+          factor(Intervention,
+                 levels = rev(c("(0)", "(0.5)", "(1)")),
+                 ordered = TRUE)
+      ),
+      ColExt %>% tidytable::filter(
+        !Success | EventType == "Present",
+        SpeciesAffinity == "100% 0",
+        NicheDistance == "5",
+        Intervention %in% c("(0)", "(0.5)", "(1)"),
+        !(PoolPatchSeed %in% c("341", "342"))
+      ) %>% tidytable::mutate(
+        InType =
+          ifelse(EventType == "Arrival", "Failed Arrival", "Present"),
+        OutType = "NA"
+      ) %>% tidytable::group_by(
+        SpeciesAffinity, InType, OutType, Intervention
+      ) %>% tidytable::summarise(
+        ChartValue = tidytable::n()
+      ) %>% dplyr::mutate( # Tidytable renders as character again!
+        Intervention =
+          factor(Intervention,
+                 levels = rev(c("(0)", "(0.5)", "(1)")),
+                 ordered = TRUE)
+      )
     ),
     facets = as.formula(Intervention ~ .)
   ) + ggplot2::theme(
     legend.position = "bottom"
-    ) + ggplot2::guides(
-      fill = ggplot2::guide_legend(nrow = 2)
-    ),
+  ) + ggplot2::guides(
+    fill = ggplot2::guide_legend(nrow = 2)
+  ),
   ggplot2::ggplot(
     Pers %>% tidytable::filter(
       SpeciesAffinity == "100% 0",
@@ -370,26 +451,58 @@ plot2 <- ggpubr::ggarrange(
     y = "Richness"
   ) + ggplot2::theme(
     legend.position = "bottom", legend.direction = "vertical"
+  ) + ggplot2::geom_rect(
+    data = data.frame(
+      1 # 1 rectangle per row, so dummy df to prevent overplotting
+    ),
+    xmin = min(endTimes$Start),
+    xmax = max(endTimes$Stop),
+    ymin = 0, ymax = 45,
+    fill = "grey",
+    alpha = 0.2,
+    inherit.aes = FALSE
   ),
   plotValueChart(
-    Pers %>% tidytable::filter(
-      SpeciesAffinity == "100% 0",
-      NicheDistance == "5",
-      Intervention %in% c("(0)", "(0.5)", "(1)"),
-      !(PoolPatchSeed %in% c("341", "342")),
-      Persistence > 0
-    ) %>% tidytable::mutate(
-      DispersalOrArrival = ifelse(is.na(Dispersal), "Arrival", "Dispersal"),
-      DynamicOrNeutral = ifelse(is.na(Extinct), "Dynamic Loss", "Extinct")
-    ) %>% tidytable::group_by(
-      SpeciesAffinity, DispersalOrArrival, DynamicOrNeutral, Intervention
-    ) %>% tidytable::summarise(
-      ChartValue = tidytable::n()
-    ) %>% dplyr::mutate( # Tidytable renders as character again!
-      Intervention =
-        factor(Intervention,
-               levels = rev(c("(0)", "(0.5)", "(1)")),
-               ordered = TRUE)
+    rbind(
+      Pers %>% tidytable::filter(
+        SpeciesAffinity == "100% 0",
+        NicheDistance == "5",
+        Intervention %in% c("(0)", "(0.5)", "(1)"),
+        !(PoolPatchSeed %in% c("341", "342")),
+        Persistence > 0,
+        is.na(Dispersal),
+        In > Stop, Out < Start
+      ) %>% tidytable::group_by(
+        SpeciesAffinity, InType, OutType, Intervention
+      ) %>% tidytable::summarise(
+        ChartValue = tidytable::n()
+      ) %>% dplyr::mutate( # Tidytable renders as character again!
+        Intervention =
+          factor(Intervention,
+                 levels = rev(c("(0)", "(0.5)", "(1)")),
+                 ordered = TRUE)
+      ),
+      ColExt %>% tidytable::filter(
+        !Success | EventType == "Present",
+        SpeciesAffinity == "100% 0",
+        NicheDistance == "5",
+        Intervention %in% c("(0)", "(0.5)", "(1)"),
+        !(PoolPatchSeed %in% c("341", "342")),
+        Times > Start, Times < Stop
+      ) %>% tidytable::mutate(
+        InType =
+          ifelse(EventType == "Arrival", "Failed Arrival", "Present"),
+        OutType = "NA"
+      ) %>% tidytable::group_by(
+        SpeciesAffinity, InType, OutType, Intervention
+      ) %>% tidytable::summarise(
+        ChartValue = tidytable::n()
+      ) %>% dplyr::mutate( # Tidytable renders as character again!
+        Intervention =
+          factor(Intervention,
+                 levels = rev(c("(0)", "(0.5)", "(1)")),
+                 ordered = TRUE)
+      )
     ),
     facets = as.formula(Intervention ~ .)
   ) + ggplot2::theme(
@@ -403,7 +516,8 @@ plot2 <- ggpubr::ggarrange(
       NicheDistance == "5",
       Intervention %in% c("(0)", "(0.5)", "(1)"),
       !(PoolPatchSeed %in% c("341", "342")),
-      Persistence > 0
+      Persistence > 0,
+      In > Stop, Out < Start
     ),
     ggplot2::aes(
       x = Size,
