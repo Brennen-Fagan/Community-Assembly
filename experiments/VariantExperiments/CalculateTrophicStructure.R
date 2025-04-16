@@ -203,10 +203,10 @@ CalculateTrophicStructure <- function(
     EnvsEdgeVertexLists <- lapply(
       seq_along(EnvsEdgeVertexLists), function(i, EV, TL) {
         EV[[i]]$Vertices <- dplyr::left_join( # makes sure order is alright.
-          EV[[i]]$Vertices, TL[[i]] %>% dplyr::mutate(node = rownames(TL[[1]])),
+          EV[[i]]$Vertices,
+          cbind(node = rownames(TL[[i]]), data.frame(TL[[i]])),
           by = "node"
         )
-        EV <- lapply(EV, dplyr::ungroup)
         return(EV)
       },
       EV = EnvsEdgeVertexLists,
