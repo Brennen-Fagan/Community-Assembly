@@ -10,12 +10,17 @@ options(bitmapType = "cairo")
 end <- c(0.6, 1)
 
 # Libraries: ##################################################################
-source("TimeSpaceAndTimeSeries-9-Dictionaries.R")
-source('TimeSpaceAndTimeSeries-0-Functions.R')
-
 library(ggplot2)
 library(ggpubr)
 library(tidytable)
+library(tidygraph)
+library(ggraph)
+
+source("TimeSpaceAndTimeSeries-9-Dictionaries.R")
+source('TimeSpaceAndTimeSeries-0-Functions.R')
+source("flattenDiversity.R")
+source("CalculateTrophicStructure.R") # Calculator creator.
+source("toCheddar.R") # Updated function.
 
 # colors: #####################################################################
 #                                (0),   (0.5),   (1)
@@ -71,9 +76,9 @@ changeInterventionLevels <- function(df) {
     Intervention = factor(
       Intervention,
       levels = c(
-        "(0)", "(0)->(0.5)", "(0)->(1)",
-        "(0.5)->(0)", "(0.5)", "(0.5)->(1)",
-        "(1)->(0)", "(1)->(0.5)", "(1)"
+        "(0)", "(0)->(0.25)", "(0)->(0.5)", "(0)->(0.75)", "(0)->(1)",
+        "(0.5)->(0)", "(0.5)->(0.25)", "(0.5)", "(0.5)->(0.75)", "(0.5)->(1)",
+        "(1)->(0)", "(1)->(0.25)", "(1)->(0.5)", "(1)->(0.75)", "(1)"
       ), ordered = TRUE
     )
   )
@@ -279,7 +284,7 @@ createOverviewFigure <- function(
 }
 
 # START HERE: ##################################################################
-
+### Strings: ###################################################################
 # Enhance readability, from 9g TablePlots
 diversitiesInterventionStrings <- ColExt %>% tidytable::select(
   Affinity, PoolPatch, InterventionPatchType
@@ -291,6 +296,7 @@ diversitiesInterventionStrings <- ColExt %>% tidytable::select(
   ))
 )
 
+### End times: #################################################################
 # Work out the end times so we can truncate the simulations
 # so that we are making sure our comparisons are equivalent.
 endTimes <- ColExt %>% tidytable::rename(
@@ -315,6 +321,7 @@ endTimes <- ColExt %>% tidytable::rename(
   Stop = end[2] * Times # Neglect anything with an in time after this.
 )
 
+# Persistences: ################################################################
 Pers <- ColExt %>% tidytable::rename(
   DispersalParam = Dispersal
 ) %>% tidytable::filter(
@@ -354,10 +361,10 @@ Pers <- ColExt %>% tidytable::rename(
                Extinct),
   InType = externalNames[ifelse(is.na(Dispersal), "Arrival", "Dispersal")],
   OutType = externalNames[ifelse(is.na(Extinct),
-                   ifelse(is.na(`Dynamic Loss`),
-                          "EndOfSimulation",
-                          "Dynamic Loss"),
-                   "Extinct")],
+                                 ifelse(is.na(`Dynamic Loss`),
+                                        "EndOfSimulation",
+                                        "Dynamic Loss"),
+                                 "Extinct")],
   Persistence = Out - In,
   # Enhance Readability:
   SpeciesAffinity =
@@ -374,6 +381,7 @@ Pers <- ColExt %>% tidytable::rename(
   endTimes
 )
 
+# Diversities: #################################################################
 diversitiesAll <- diversitiesAll %>% changeAffinityLevels(
 ) %>% changeInterventionLevels(
 ) %>% tidytable::mutate(
@@ -404,6 +412,7 @@ diversitiesAll <- diversitiesAll %>% changeAffinityLevels(
   )
 )
 
+# Colonisation/Extirpation: ####################################################
 ColExt <- ColExt %>% tidytable::rename(
   DispersalParam = Dispersal
 ) %>% tidytable::mutate(
@@ -424,7 +433,159 @@ ColExt <- ColExt %>% tidytable::rename(
   )
 )
 
-# Define Species Color Scale from AffinityBins: ##############################
+### Example Run: ###############################################################
+# We need something that runs without land-use effects and has richness of ~20.
+# We also need to show what happens when we vary the pool and land-use.
+# Most justified thing to do is probably another 2 re-runs, but with an
+# initial niche distance of 1 (no modifier) and two different pool
+# configurations (identical lines initially, say evensplit and runif) before
+# introducing a niche distance of 5 and a shift from 0.5 to 0.25 and 0.75.
+# I think that accomplishes our goals in a minimal set of runs (over quantity
+# and complexity for the reader).
+
+loadenvs <- list(
+  BaseU = new.env(),
+  BaseE = new.env(),
+  IntU = new.env(),
+  IntE = new.env(),
+  Pool = new.env()
+)
+oneoffDir <- dir(pattern = "2025-04-15", full.names = T)
+
+oneoffFilesDivs <- dir(oneoffDir, pattern = "Diversity", full.names = T)
+loadenvs$BaseU$fileDiv <- oneoffFilesDivs[2] # 20
+loadenvs$BaseE$fileDiv <- oneoffFilesDivs[4] # 21
+loadenvs$IntU$fileDiv <- oneoffFilesDivs[1] # 20 + extra
+loadenvs$IntE$fileDiv <- oneoffFilesDivs[3] # 21 + extra
+loadenvs <- c(lapply(loadenvs[1:4], function(env) {
+  load(env$fileDiv, envir = env)
+  env$Diversity <- flattenDiversity(env$Diversity) %>% dplyr::left_join(
+    diversitiesInterventionStrings,
+    by = c("Affinity", "PoolPatch", "InterventionPatchType"),
+    multiple = "all"
+  ) %>% dplyr::mutate(
+    SpeciesAffinity =
+      affinityDictionaryOrigin$SpeciesAffinities[as.numeric(Affinity)]
+  )
+  env
+}), loadenvs[5])
+
+oneoffFilesSims <- dir(oneoffDir, pattern = "Sim|Int", full.names = T)
+loadenvs$BaseU$fileSim <- oneoffFilesSims[3] # 20
+loadenvs$BaseE$fileSim <- oneoffFilesSims[4] # 21
+loadenvs$IntU$fileSim <- oneoffFilesSims[1] # 20 + extra
+loadenvs$IntE$fileSim <- oneoffFilesSims[2] # 21 + extra
+lapply(loadenvs[1:4], function(env) load(env$fileSim, envir = env)) # Side effect
+
+load(envir = loadenvs$Pool, dir(oneoffDir, pattern = "Pool", full.names = TRUE))
+
+# To plot, I'm thinking Richness over Time, two lines, then three vertical lines
+# indicating where we will be showing the different system configuration. As a
+# companion, the two sets of systems as food webs at each point in time, with
+# a red line to denote the difference in basal/consumer, size as the y-axis,
+# and an x-axis that is a jittered affinity. Color the nodes by their actual
+# affinity. Select the three time points so right after stabilisation,
+# a very short time after intervention/land-use-change, and far afterwards.
+# I should also add a marker of the land-use on the bottom of the graph plots.
+# We'll go with the richness over time as short and wide on the bottom.
+diversitiesExample <- tidytable::bind_rows(
+  lapply(loadenvs[1:4], function(env) env$Diversity)
+) %>% changeAffinityLevels(
+) %>% changeInterventionLevels(
+)
+
+targetTimes <- c(10000, 20000, 30000)
+
+loadenvs <- c(
+  lapply(loadenvs[1:4], function(env) {
+    intervention <- #T/F
+      !("EffectiveReproductionRate" %in% names(env$result$Ellipsis$Affinity))
+
+    env$calculator <- with(
+      env$result,
+      CalculateTrophicStructure(
+        Pool = loadenvs$Pool$Pool,
+        ReproductionRate =
+          if (!intervention) {
+            Ellipsis$Affinity$EffectiveReproductionRate
+          } else {
+            Ellipsis$Affinity$EffectiveReproductionRateIntervention
+          },
+        NumEnvironments = NumEnvironments,
+        InteractionMatrices = loadenvs$Pool$InteractionMatrices,
+        EliminationThreshold = Parameters$EliminationThreshold,
+        LinkThreshold = 0.01
+      )
+    )
+
+    env$trophics <- with(
+      env$result,
+      lapply(targetTimes, function(t) {
+        if (intervention)
+          if(t < Ellipsis$Affinity$TimeIntervention / ReactionTime)
+            return(NULL)
+        timerow <- which.max(Abundance[, 1] / ReactionTime > t) # first match
+        retval <- env$calculator(Abundance[timerow, 1], Abundance[timerow, -1])
+        retval$Time <- Abundance[timerow, 1] / ReactionTime
+        return(retval)
+      })
+    )
+
+    return(env)
+  }
+  ),
+  loadenvs[5]
+)
+
+# Conversion appears to be straightforward.
+graphs <- lapply(loadenvs[1:4], function(env) {
+  lapply(env$trophics, function(TandEV) {
+    time <- TandEV$Time
+    EVs <- TandEV$EdgeVertexLists[[1]] # Probably accidentally wrapped 1 extra.
+    lapply(EVs, function(patch) { # Keep one layer for the multi-patch case.
+      tidygraph::tbl_graph(
+        nodes = patch$Vertices, edges = patch$Edges
+      )
+    })
+  })
+})
+
+# Create layout by creating a supergraph of everything for each env.
+# (Can't be across envs; the x-axis we want to associate with trait value and
+# these differ between the two cases being considered here.)
+layout <- lapply(graphs, function(timelist) {
+  unweighted <- lapply(timelist, function(patchlist) {
+    lapply(patchlist, function(graph)
+      graph %N>% tidygraph::select(node) %E>% tidygraph::select(from, to)
+    )
+  })
+  # Flatten so that we only need to do one pass.
+  unweighted <- unlist(unweighted, recursive = FALSE)
+  # Create megagraph:
+  for (i in 2:length(unweighted)) {
+    if (i == 2) {
+      combined <- tidygraph::graph_join(unweighted[[1]], unweighted[[i]])
+    } else {
+      combined <- tidygraph::graph_join(combined, unweighted[[i]])
+    }
+  }
+  combined
+})
+
+# Not as diverse as I might like obviously, so maybe there are better choices.
+ggplot2::ggplot(diversitiesExample %>% tidytable::filter(
+  Metric == "Alpha Hill:0", is.na(Subset)
+), ggplot2::aes(
+  x = Time, y = Value, color = Intervention,
+  group = interaction(Intervention, SpeciesAffinity)
+)) + ggplot2::geom_line(
+) + ggplot2::geom_vline(
+  xintercept = targetTimes
+) + ggplot2::theme_minimal(
+)
+
+
+# Define Species Color Scale from AffinityBins: ################################
 # Can't be done before hand because the affinity bins are calculated differently
 # for each of the runs.
 SpeciesPaletteDF <- data.frame(
@@ -453,7 +614,7 @@ SpeciesPalette <- c(SpeciesPaletteDF$color)
 names(SpeciesPalette) <- SpeciesPaletteDF$Bins
 
 # Plots: #####################################################################
-plot1 <- createOverviewFigure(
+plot2 <- createOverviewFigure(
   .divs = diversitiesAll,
   .ps = Pers,
   .ces = ColExt,
@@ -465,13 +626,13 @@ plot1 <- createOverviewFigure(
 )
 
 ggplot2::ggsave(
-  plot1,
+  plot2,
   filename = "Figure2_Prototype5.png",
   units = "px", height = 3200, width = 4800 # Words are too small
   # height = 1600, width = 2400 # Words over-run
 )
 
-plot2 <- createOverviewFigure(
+plot3 <- createOverviewFigure(
   .divs = diversitiesAll,
   .ps = Pers,
   .ces = ColExt,
@@ -483,7 +644,7 @@ plot2 <- createOverviewFigure(
 )
 
 ggplot2::ggsave(
-  plot2,
+  plot3,
   filename = "Figure3_Prototype3.png",
   units = "px", height = 3200, width = 4800 # Words are too small
   # height = 1600, width = 2400 # Words over-run
