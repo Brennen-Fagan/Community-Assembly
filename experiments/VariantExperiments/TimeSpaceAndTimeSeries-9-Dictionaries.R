@@ -187,18 +187,21 @@ interventionTimeDictionaryOrigin <- data.frame(
   #               and "loaded" is the file that is loaded.
   Time1 = c(
     "median(loaded$Events$Times)",
-    "quantile(loaded$Events$Times, p = 0.25)"
+    "quantile(loaded$Events$Times, p = 0.25)",
+    "quantile(loaded$Events$Times, p = 0.05)" # for early/long run.
   ),
   Time2 = c(
     "1/2 * max(loaded$Events$Times)",
-    "quantile(loaded$Events$Times, p = 0.75)"
+    "quantile(loaded$Events$Times, p = 0.75)",
+    "quantile(loaded$Events$Times, p = 0.05)"
   ),
   Method = c(# each needs a custom implementation unfortunately!
     "mean",
-    "runif"
+    "runif",
+    "mean"
   ),
   InterventionTimespan = c(
-    0 # Instantaneous => Switch
+    0, 0, 0# Instantaneous => Switch
     # Else: Should be numeric > 0, determines timespan for interpolation.
   )
 ) %>% dplyr::mutate(ID = dplyr::row_number())
