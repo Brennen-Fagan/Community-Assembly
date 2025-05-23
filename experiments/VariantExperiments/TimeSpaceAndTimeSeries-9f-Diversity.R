@@ -7,11 +7,14 @@
 # Parameters: #################################################################
 alsoload <- FALSE # if TRUE, try to load all diversity files encountered.
 # if FALSE, only try to create new diversity files (and return the outputs).
+overwrite <- TRUE
 
-#datfolders <- dir(pattern = "TSTS_Simulations_")#.+2024-11-19$")
-datfolders <- dir(pattern = "TSTS_Simulations_.+2025-01-2.$")
+datfolders <- dir(pattern = "TSTS_Simulations_")#.+2024-11-19$")
+# datfolders <- dir(pattern = "TSTS_Simulations_.+2025-01-2.$")
+# datfolders <- dir(pattern = "TSTS_Simulations_.+2025-04-15$")
+# datfolders <- dir(pattern = "TSTS_Simulations_.+2025-05-12$")
 # datfolders <- dir(pattern = "CompareEliminationThresholds$")
-cores <- 4 # Parallelization?
+cores <- 12 # Parallelization?
 preferredTimestep <- 10 # Characteristic Time Scale Units
 # Previously Event rate was ~1/CTU, now it's more like ~0.1/CTU in theory.
 # (This seems reasonably close in practice looking at 1 example and observing
@@ -98,7 +101,7 @@ Diversity <- foreach::foreach(
     }
   )
 
-  if(file.exists(filename)) {
+  if(!overwrite && file.exists(filename)) {
     if (alsoload) {
       load(filename)
     }
@@ -187,8 +190,10 @@ Diversity <- foreach::foreach(
           loaded_subset$Abundance <- loaded_subset$Abundance[, idcolumns]
 
           Diversities <- calculateDiversityMetrics(
-            loaded_subset$Abundance,
-            length(idcolumns) - 1, loaded$NumEnvironments
+            abundance = loaded_subset$Abundance,
+            nspecies = length(idcolumns) - 1,
+            nenvironments = loaded$NumEnvironments,
+            sizes = if ("Size" %in% names(x_pool)) x_pool$Size
           )
 
           Diversities$Subset <- AffinityType
@@ -209,7 +214,10 @@ Diversity <- foreach::foreach(
     }
 
     DiversityAll <- calculateDiversityMetrics(
-      loaded$Abundance, numberOfSpecies, loaded$NumEnvironments
+      abundance = loaded$Abundance,
+      nspecies = numberOfSpecies,
+      nenvironments = loaded$NumEnvironments,
+      sizes = if ("Size" %in% names(x_pool)) x_pool$Size
     )
     DiversityAll$Subset <- NA
 

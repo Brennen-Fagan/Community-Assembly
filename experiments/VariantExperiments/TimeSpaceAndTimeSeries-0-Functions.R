@@ -929,7 +929,9 @@ hillWrapper <- function(env, i) {
 # Based on RMTRCode2::Calculate_Diversity and calculateAbundanceMetrics as well
 # as the betapart procedure.
 # The main difference is to try to provide a uniform layout from the beginning
-calculateDiversityMetrics <- function(abundance, nspecies, nenvironments) {
+calculateDiversityMetrics <- function(
+  abundance, nspecies, nenvironments, sizes
+) {
   stopifnot(nenvironments >= 1)
 
   envs <- lapply(
@@ -953,7 +955,29 @@ calculateDiversityMetrics <- function(abundance, nspecies, nenvironments) {
     1:nenvironments,
     function(i) {
       vals <- hillWrapper(env = envs[[i]], i = i)
-      cbind(Time = rep(time, each = nrow(vals)/length(time)), vals)
+      abundance <-
+        data.frame(
+          Environment1 = i,
+          Environment2 = NA,
+          Metric = "Abundance",
+          Value = apply(envs[[i]], MARGIN = 1, function(x) sum(x))
+        )
+      # ~ individuals, can get average abundance by abundance/hill:0
+      # similarly for biomass, can also get gamma by summing.
+      if (!is.null(sizes)) {
+        biomass <-
+          data.frame(
+            Environment1 = i,
+            Environment2 = NA,
+            Metric = "Biomass",
+            Value = apply(envs[[i]], MARGIN = 1, function(x) sum(x * sizes))
+          )
+        abundance <- rbind(abundance, biomass)
+      }
+      rbind(
+        cbind(Time = rep(time, each = nrow(vals)/length(time)), vals),
+        abundance
+      )
     }
   )) %>% dplyr::mutate(
     Metric = paste0("Alpha ", Metric)
