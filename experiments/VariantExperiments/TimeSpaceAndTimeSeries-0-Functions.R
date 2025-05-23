@@ -957,6 +957,7 @@ calculateDiversityMetrics <- function(
       vals <- hillWrapper(env = envs[[i]], i = i)
       abundance <-
         data.frame(
+          Time = time,
           Environment1 = i,
           Environment2 = NA,
           Metric = "Abundance",
@@ -967,6 +968,7 @@ calculateDiversityMetrics <- function(
       if (!is.null(sizes)) {
         biomass <-
           data.frame(
+            Time = time,
             Environment1 = i,
             Environment2 = NA,
             Metric = "Biomass",
