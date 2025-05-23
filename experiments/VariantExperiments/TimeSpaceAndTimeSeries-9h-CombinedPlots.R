@@ -542,20 +542,20 @@ graphs <- lapply(loadenvs[1:4], function(env) {
   lapply(env$trophics, function(TandEV) {
     time <- TandEV$Time
     EVs <- TandEV$EdgeVertexLists[[1]] # Probably accidentally wrapped 1 extra.
-    lapply(EVs, function(patch) { # Keep one layer for the multi-patch case.
+    list(graphs = lapply(EVs, function(patch) { # Keep one layer for the multi-patch case.
       tidygraph::tbl_graph(
         nodes = patch$Vertices, edges = patch$Edges
       )
-    })
+    }), Time = time)
   })
 })
 
 # Create layout by creating a supergraph of everything for each env.
 # (Can't be across envs; the x-axis we want to associate with trait value and
 # these differ between the two cases being considered here.)
-layout <- lapply(graphs, function(timelist) {
+layout_graph <- lapply(graphs, function(timelist) {
   unweighted <- lapply(timelist, function(patchlist) {
-    lapply(patchlist, function(graph)
+    lapply(patchlist$graphs, function(graph)
       graph %N>% tidygraph::select(node) %E>% tidygraph::select(from, to)
     )
   })
@@ -571,19 +571,89 @@ layout <- lapply(graphs, function(timelist) {
   }
   combined
 })
+layout <- lapply(layout_graph, function(g) ggraph::create_layout(
+  tidygraph::to_undirected(g) %>%
+    tidygraph::convert(tidygraph::to_simple),
+  "backbone")
+)
+layout <- lapply(seq_along(layout), function(i) {
+  l <- layout[[i]]
+  l_indices <- as.numeric(gsub("s", "", l$node))
+  affs <- loadenvs[[i]]$result$Ellipsis$Affinity$SpeciesAffinities
+  if (length(unique(affs)) < 4) {
+    # l$x <- affs[l_indices] + l$x/length(unique(affs)) # retain some structure
+    affs <- factor(affs, ordered = TRUE, levels = sort(unique(affs)))
+    shift <- seq_along(levels(affs)) - 1 # input aff returns number of set
+    l$x <- l$x - min(l$x) # shift so left side starts at 0.
+    l$x <- l$x / max(l$x) # scale so that it is over a unit interval.
+    l$x <- l$x + shift[affs[l_indices]] # add unit interval for each aff.
+    l$x <- l$x / max(l$x) # scale one more time so over unit interval again.
+  } else {
+    l$x <- affs[l_indices] # should be enough variation to enable visualisation
+  }
+  l$y <- log10(loadenvs$Pool$Pool$Size[l_indices])
+  return(l)
+})
 
 # Not as diverse as I might like obviously, so maybe there are better choices.
-ggplot2::ggplot(diversitiesExample %>% tidytable::filter(
-  Metric == "Alpha Hill:0", is.na(Subset)
-), ggplot2::aes(
-  x = Time, y = Value, color = Intervention,
-  group = interaction(Intervention, SpeciesAffinity)
-)) + ggplot2::geom_line(
+singletonRichness <- ggplot2::ggplot(
+  diversitiesExample %>% tidytable::filter(
+    Metric == "Alpha Hill:0", is.na(Subset)
+  ), ggplot2::aes(
+    x = Time, y = Value, color = Intervention,
+    group = interaction(Intervention, SpeciesAffinity)
+  )
+) + ggplot2::geom_line(
 ) + ggplot2::geom_vline(
   xintercept = targetTimes
 ) + ggplot2::theme_minimal(
 )
 
+plotGraph <- function(graph, mainLayout) {
+  ggraph::ggraph(
+    graph = graph,
+    layout = graph %N>% data.frame(
+    ) %>% select(node) %>% left_join(
+      mainLayout %>% select(x, y, node)
+    )
+  ) + ggraph::geom_node_point(
+    mapping = aes(
+      color = Type,
+      size = log10(N)
+    )
+  ) + ggraph::geom_edge_diagonal(
+    mapping = aes(
+      color = Type,
+      linetype = Type,
+      alpha = log10(effectNormalised)
+    ),
+    # linewidth = 2,
+    arrow = arrow(length = unit(2, 'mm')),
+    start_cap = circle(5, 'mm'),
+    end_cap = circle(5, 'mm')
+  ) + ggplot2::geom_hline(
+    yintercept = -1, linetype = "dashed", color = "black"
+  ) + theme_minimal(
+  ) + ylab(
+    "Log10(Size)"
+  ) + xlab(
+    "Land-use Preference"
+  ) + scale_color_manual(
+    values = c("limegreen", "goldenrod2")
+  ) + lims(
+    x = c(0, 1), y = c(-2, 0.5)
+  ) # EDIT THIS FOR BINARY AND SINGLE PREFERENCE CASES
+}
+
+singletonGraphs <- lapply(seq_along(graphs), function(i) {
+  timelist <- graphs[[i]]
+  lapply(timelist, function(patchlist) {
+    lapply(patchlist$graphs, plotGraph, mainLayout = layout[[i]])
+  })
+})
+
+# Would need to add in blanks for the missing (because nonintervention) plots.
+# ggpubr::ggarrange(plotlist = unlist(unlist(singletonGraphs, recursive = FALSE), recursive = FALSE), common.legend = TRUE)
 
 # Define Species Color Scale from AffinityBins: ################################
 # Can't be done before hand because the affinity bins are calculated differently
