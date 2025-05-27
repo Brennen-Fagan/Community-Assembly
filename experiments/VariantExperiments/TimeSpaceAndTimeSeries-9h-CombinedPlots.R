@@ -7,7 +7,7 @@ options(bitmapType = "cairo")
 
 # Grey interval that we compute over, usually after intervention (~50%)
 # If second number is less than 1, we lose persistent species.
-end <- c(0.6, 1)
+end <- c(0.6, 0.904) # Aiming for 20000 - 30000
 
 # Libraries: ##################################################################
 library(ggplot2)
@@ -139,7 +139,7 @@ plotMeanAndInner <- function(
     facets
   ) + ggplot2::scale_color_manual(
     values = colorPalette, aesthetics = c("color", "fill"),
-    name = "Island Land-use"
+    name = "Habitat Land-use"
   ) + ggplot2::scale_linetype_manual(
     name = "Species Preferences",
     values = linetypePalette
@@ -173,12 +173,59 @@ plotValueChart <- function(
   )
 }
 
+# Note: unlike the other plots, this one is called inside the environments.
+#       The other plots are called inside the createOverviewFigure function.
+plotGraph <- function(graph, mainLayout, legends = FALSE) {
+  obj <- ggraph::ggraph(
+    graph = graph,
+    layout = graph %N>% data.frame(
+    ) %>% select(node) %>% left_join(
+      mainLayout %>% select(x, y, node)
+    )
+  ) + ggraph::geom_node_point(
+    mapping = aes(
+      color = Type,
+      size = log10(N)
+    )
+  ) + ggraph::geom_edge_diagonal(
+    mapping = aes(
+      color = Type,
+      linetype = Type,
+      alpha = log10(effectNormalised)
+    ),
+    # linewidth = 2,
+    arrow = arrow(length = unit(2, 'mm')),
+    start_cap = circle(5, 'mm'),
+    end_cap = circle(5, 'mm')
+  ) + ggplot2::geom_hline(
+    yintercept = -1, linetype = "dashed", color = "black"
+  ) + theme_minimal(
+  ) + ylab(
+    "Log10(Size)"
+  ) + xlab(
+    "Land-use Preference"
+  ) + scale_color_manual(
+    values = c("limegreen", "goldenrod2")
+  ) + lims(
+    x = c(0, 1), y = c(-2, 0.25)
+  )
+
+  if (!legends) {
+    obj <- obj + ggplot2::theme(
+      legend.position = "none"
+    )
+  }
+
+  return(obj)
+}
+
 # Primary figure generator for Figures 2 and 3 currently.
 createOverviewFigure <- function(
   .divs, # diversitiesAll
   .ps, # Pers
   .ces, # ColExt
   .ets, # endTimes
+  .gs, # Singleton Graphs
   ... # commonfilters
 ) {
   ggpubr::ggarrange(
@@ -193,8 +240,14 @@ createOverviewFigure <- function(
       facets = as.formula(. ~ .)
     ) + ggplot2::labs(
       y = "Richness"
+    ) + ggplot2::guides(
+      linetype = "none",
+      color = ggplot2::guide_legend(ncol = 3),
+      fill = ggplot2::guide_legend(ncol = 3)
     ) + ggplot2::theme(
-      legend.position = "bottom", legend.direction = "vertical"
+      # legend.position = "bottom",
+      # legend.direction = "horizontal"
+      legend.position = c(0.4, 0.09)
     ) + ggplot2::geom_rect(
       data = data.frame(
         1 # 1 rectangle per row, so dummy df to prevent overplotting
@@ -206,55 +259,78 @@ createOverviewFigure <- function(
       alpha = 0.2,
       inherit.aes = FALSE
     ),
-    plotValueChart(
-      rbind(
-        .ps %>% tidytable::filter(
-          ...,
-          Persistence > 0,
-          InType != externalNames["Dispersal"],
-          In < Stop, Out > Start
-        ) %>% tidytable::group_by(
-          SpeciesAffinity, InType, OutType, Intervention
-        ) %>% tidytable::summarise(
-          ChartValue = tidytable::n() / tidytable::n_distinct(PoolPatchSeed)
-        ) %>% dplyr::mutate( # Tidytable renders as character again!
-          Intervention =
-            factor(Intervention,
-                   levels = rev(c("(0)", "(0)->(0.5)", "(0)->(1)",
-                                  "(0.5)",
-                                  "(1)")),
-                   ordered = TRUE)
-        ),
-        .ces %>% tidytable::filter(
-          ...,
-          !Success | EventType == "Present",
-          Times > Start, Times < Stop
-        ) %>% tidytable::mutate(
-          InType = externalNames[
-            ifelse(EventType == "Arrival", "Failed Arrival", "Present")
-            ],
-          OutType = externalNames["NA"]
-        ) %>% tidytable::group_by(
-          SpeciesAffinity, InType, OutType, Intervention
-        ) %>% tidytable::summarise(
-          ChartValue = tidytable::n() / tidytable::n_distinct(PoolPatchSeed)
-        ) %>% dplyr::mutate( # Tidytable renders as character again!
-          Intervention =
-            factor(Intervention,
-                   levels = rev(c("(0)", "(0)->(0.5)", "(0)->(1)",
-                                  "(0.5)",
-                                  "(1)")),
-                   ordered = TRUE)
-        )
+    # plotValueChart(
+    #   rbind(
+    #     .ps %>% tidytable::filter(
+    #       ...,
+    #       Persistence > 0,
+    #       InType != externalNames["Dispersal"],
+    #       In < Stop, Out > Start
+    #     ) %>% tidytable::group_by(
+    #       SpeciesAffinity, InType, OutType, Intervention
+    #     ) %>% tidytable::summarise(
+    #       ChartValue = tidytable::n() / tidytable::n_distinct(PoolPatchSeed)
+    #     ) %>% dplyr::mutate( # Tidytable renders as character again!
+    #       Intervention =
+    #         factor(Intervention,
+    #                levels = rev(c("(0)", "(0)->(0.5)", "(0)->(1)",
+    #                               "(0.5)",
+    #                               "(1)")),
+    #                ordered = TRUE)
+    #     ),
+    #     .ces %>% tidytable::filter(
+    #       ...,
+    #       !Success | EventType == "Present",
+    #       Times > Start, Times < Stop
+    #     ) %>% tidytable::mutate(
+    #       InType = externalNames[
+    #         ifelse(EventType == "Arrival", "Failed Arrival", "Present")
+    #         ],
+    #       OutType = externalNames["NA"]
+    #     ) %>% tidytable::group_by(
+    #       SpeciesAffinity, InType, OutType, Intervention
+    #     ) %>% tidytable::summarise(
+    #       ChartValue = tidytable::n() / tidytable::n_distinct(PoolPatchSeed)
+    #     ) %>% dplyr::mutate( # Tidytable renders as character again!
+    #       Intervention =
+    #         factor(Intervention,
+    #                levels = rev(c("(0)", "(0)->(0.5)", "(0)->(1)",
+    #                               "(0.5)",
+    #                               "(1)")),
+    #                ordered = TRUE)
+    #     )
+    #   ),
+    #   facets = as.formula(Intervention ~ .)
+    # ) + ggplot2::theme(
+    #   legend.position = "bottom"
+    # ) + ggplot2::guides(
+    #   fill = ggplot2::guide_legend(nrow = 2)
+    # ) + ggplot2::ylab(
+    #   "Average Count in a Simulation"
+    # ),
+    ggpubr::ggpar(
+      ggpubr::ggarrange(
+        plotlist = lapply(seq_along(.gs), function(i) {
+          g <- .gs[[i]]
+          if (i != length(.gs)) {
+            g <- g + ggplot2::labs(
+              x = NULL
+            )
+          }
+          if (i != round(length(.gs)/2)) {
+            g <- g + ggplot2::labs(
+              y = ""
+            )
+          # } else if (!length(.gs) %% 2) { # Even
+          #   g <- g + ggplot2::theme(
+          #     axis.title.y.left =
+          #   )
+          }
+          return(g)
+        }),
+        ncol = 1
       ),
-      facets = as.formula(Intervention ~ .)
-    ) + ggplot2::theme(
-      legend.position = "bottom"
-    ) + ggplot2::guides(
-      fill = ggplot2::guide_legend(nrow = 2)
-    ) + ggplot2::ylab(
-      "Average Count in a Simulation"
-    ),
+      legend = "none"),
     ggplot2::ggplot(
       .ps %>% tidytable::filter(
         ...,
@@ -279,7 +355,8 @@ createOverviewFigure <- function(
     ) + ggplot2::geom_vline(
       xintercept = 0.10, color = "red"
     ),
-    nrow = 1, widths = c(1, 0.6, 0.6)#, common.legend = TRUE
+    nrow = 1, widths = c(1, 0.6, 0.6), #common.legend = TRUE
+    labels = "auto"
   )
 }
 
@@ -434,7 +511,7 @@ ColExt <- ColExt %>% tidytable::rename(
 )
 
 ### Example Networks: #########################################################
-
+#### Load:
 targetDir <- dir(pattern = "TSTS_Simulations_142486-4929_343-343_2025-01-21",
                  full.names = T)
 stopifnot(length(targetDir) == 1)
@@ -484,6 +561,7 @@ e = targetEnvs, d = targetDivs, s = targetFiles)
 targetEnvsPool <- new.env()
 load(targetPool, envir = targetEnvsPool)
 
+#### Handle
 targetTimes <- 30000
 
 targetEnvs <- lapply(targetEnvs, function(env) {
@@ -523,6 +601,7 @@ targetEnvs <- lapply(targetEnvs, function(env) {
   return(env)
 })
 
+#### Graph
 targetEnvs <- lapply(targetEnvs, function(env) {
   env$graphs <- lapply(env$trophics, function(TandEV) {
     time <- TandEV$Time
@@ -566,42 +645,7 @@ targetEnvs <- lapply(targetEnvs, function(env) {
   return(env)
 })
 
-plotGraph <- function(graph, mainLayout) {
-  ggraph::ggraph(
-    graph = graph,
-    layout = graph %N>% data.frame(
-    ) %>% select(node) %>% left_join(
-      mainLayout %>% select(x, y, node)
-    )
-  ) + ggraph::geom_node_point(
-    mapping = aes(
-      color = Type,
-      size = log10(N)
-    )
-  ) + ggraph::geom_edge_diagonal(
-    mapping = aes(
-      color = Type,
-      linetype = Type,
-      alpha = log10(effectNormalised)
-    ),
-    # linewidth = 2,
-    arrow = arrow(length = unit(2, 'mm')),
-    start_cap = circle(5, 'mm'),
-    end_cap = circle(5, 'mm')
-  ) + ggplot2::geom_hline(
-    yintercept = -1, linetype = "dashed", color = "black"
-  ) + theme_minimal(
-  ) + ylab(
-    "Log10(Size)"
-  ) + xlab(
-    "Land-use Preference"
-  ) + scale_color_manual(
-    values = c("limegreen", "goldenrod2")
-  ) + lims(
-    x = c(0, 1), y = c(-2, 0.25)
-  )
-}
-
+#### Plot
 targetEnvs <- lapply(targetEnvs, function(env) {
   timelist <- env$graphs
   env$singletonGraphs <- lapply(timelist, function(patchlist) {
@@ -639,11 +683,30 @@ SpeciesPalette <- c(SpeciesPaletteDF$color)
 names(SpeciesPalette) <- SpeciesPaletteDF$Bins
 
 # Plots: #####################################################################
+targetEnvsIndex <- do.call(
+  rbind,
+  lapply(
+    targetEnvs,
+    function(env)
+      env$Diversity[1, c("SpeciesAffinity", "NicheDistance", "Intervention")]
+  )
+)
+targetEnvsIndex <- cbind(ID = 1:nrow(targetEnvsIndex), targetEnvsIndex)
+
 plot2 <- createOverviewFigure(
   .divs = diversitiesAll,
   .ps = Pers,
   .ces = ColExt,
   .ets = endTimes,
+  .gs = rev(lapply(
+    targetEnvs[targetEnvsIndex %>% dplyr::filter(
+      SpeciesAffinity == "rep_0",
+      NicheDistance == "5",
+      Intervention %in% c("(0)", "(0.5)", "(1)")
+    ) %>% dplyr::pull(ID)
+    ],
+    function(env) env$singletonGraphs[[1]][[1]]
+  )),
   SpeciesAffinity == "100% 0",
   NicheDistance == "5",
   Intervention %in% c("(0)", "(0.5)", "(1)"),
