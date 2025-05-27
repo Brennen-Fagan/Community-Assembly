@@ -433,227 +433,182 @@ ColExt <- ColExt %>% tidytable::rename(
   )
 )
 
-### Example Run: ###############################################################
-# We need something that runs without land-use effects and has richness of ~20.
-# We also need to show what happens when we vary the pool and land-use.
-# Most justified thing to do is probably another 2 re-runs, but with an
-# initial niche distance of 1 (no modifier) and two different pool
-# configurations (identical lines initially, say evensplit and runif) before
-# introducing a niche distance of 5 and a shift from 0.5 to 0.25 and 0.75.
-# I think that accomplishes our goals in a minimal set of runs (over quantity
-# and complexity for the reader).
+### Example Networks: #########################################################
 
-# loadenvs <- list(
-#   BaseU = new.env(),
-#   BaseE = new.env(),
-#   IntU = new.env(),
-#   IntE = new.env(),
-#   Pool = new.env()
-# )
-# oneoffDir <- dir(pattern = "2025-04-15", full.names = T)
-#
-# oneoffFilesDivs <- dir(oneoffDir, pattern = "Diversity", full.names = T)
-# loadenvs$BaseU$fileDiv <- oneoffFilesDivs[2] # 20
-# loadenvs$BaseE$fileDiv <- oneoffFilesDivs[4] # 21
-# loadenvs$IntU$fileDiv <- oneoffFilesDivs[1] # 20 + extra
-# loadenvs$IntE$fileDiv <- oneoffFilesDivs[3] # 21 + extra
-# loadenvs <- c(lapply(loadenvs[1:4], function(env) {
-#   load(env$fileDiv, envir = env)
-#   env$Diversity <- flattenDiversity(env$Diversity) %>% dplyr::left_join(
-#     diversitiesInterventionStrings,
-#     by = c("Affinity", "PoolPatch", "InterventionPatchType"),
-#     multiple = "all"
-#   ) %>% dplyr::mutate(
-#     SpeciesAffinity =
-#       affinityDictionaryOrigin$SpeciesAffinities[as.numeric(Affinity)]
-#   )
-#   env
-# }), loadenvs[5])
-#
-# oneoffFilesSims <- dir(oneoffDir, pattern = "Sim|Int", full.names = T)
-# loadenvs$BaseU$fileSim <- oneoffFilesSims[3] # 20
-# loadenvs$BaseE$fileSim <- oneoffFilesSims[4] # 21
-# loadenvs$IntU$fileSim <- oneoffFilesSims[1] # 20 + extra
-# loadenvs$IntE$fileSim <- oneoffFilesSims[2] # 21 + extra
-# lapply(loadenvs[1:4], function(env) load(env$fileSim, envir = env)) # Side effect
-#
-# load(envir = loadenvs$Pool, dir(oneoffDir, pattern = "Pool", full.names = TRUE))
-#
-# # To plot, I'm thinking Richness over Time, two lines, then three vertical lines
-# # indicating where we will be showing the different system configuration. As a
-# # companion, the two sets of systems as food webs at each point in time, with
-# # a red line to denote the difference in basal/consumer, size as the y-axis,
-# # and an x-axis that is a jittered affinity. Color the nodes by their actual
-# # affinity. Select the three time points so right after stabilisation,
-# # a very short time after intervention/land-use-change, and far afterwards.
-# # I should also add a marker of the land-use on the bottom of the graph plots.
-# # We'll go with the richness over time as short and wide on the bottom.
-# diversitiesExample <- tidytable::bind_rows(
-#   lapply(loadenvs[1:4], function(env) env$Diversity)
-# ) %>% changeAffinityLevels(
-# ) %>% changeInterventionLevels(
-# )
-#
-# targetTimes <- c(10000, 20000, 30000)
-#
-# loadenvs <- c(
-#   lapply(loadenvs[1:4], function(env) {
-#     intervention <- #T/F
-#       !("EffectiveReproductionRate" %in% names(env$result$Ellipsis$Affinity))
-#
-#     env$calculator <- with(
-#       env$result,
-#       CalculateTrophicStructure(
-#         Pool = loadenvs$Pool$Pool,
-#         ReproductionRate =
-#           if (!intervention) {
-#             Ellipsis$Affinity$EffectiveReproductionRate
-#           } else {
-#             Ellipsis$Affinity$EffectiveReproductionRateIntervention
-#           },
-#         NumEnvironments = NumEnvironments,
-#         InteractionMatrices = loadenvs$Pool$InteractionMatrices,
-#         EliminationThreshold = Parameters$EliminationThreshold,
-#         LinkThreshold = 0.01
-#       )
-#     )
-#
-#     env$trophics <- with(
-#       env$result,
-#       lapply(targetTimes, function(t) {
-#         if (intervention)
-#           if(t < Ellipsis$Affinity$TimeIntervention / ReactionTime)
-#             return(NULL)
-#         timerow <- which.max(Abundance[, 1] / ReactionTime > t) # first match
-#         retval <- env$calculator(Abundance[timerow, 1], Abundance[timerow, -1])
-#         retval$Time <- Abundance[timerow, 1] / ReactionTime
-#         return(retval)
-#       })
-#     )
-#
-#     return(env)
-#   }
-#   ),
-#   loadenvs[5]
-# )
-#
-# # Conversion appears to be straightforward.
-# graphs <- lapply(loadenvs[1:4], function(env) {
-#   lapply(env$trophics, function(TandEV) {
-#     time <- TandEV$Time
-#     EVs <- TandEV$EdgeVertexLists[[1]] # Probably accidentally wrapped 1 extra.
-#     list(graphs = lapply(EVs, function(patch) { # Keep one layer for the multi-patch case.
-#       tidygraph::tbl_graph(
-#         nodes = patch$Vertices, edges = patch$Edges
-#       )
-#     }), Time = time)
-#   })
-# })
-#
-# # Create layout by creating a supergraph of everything for each env.
-# # (Can't be across envs; the x-axis we want to associate with trait value and
-# # these differ between the two cases being considered here.)
-# layout_graph <- lapply(graphs, function(timelist) {
-#   unweighted <- lapply(timelist, function(patchlist) {
-#     lapply(patchlist$graphs, function(graph)
-#       graph %N>% tidygraph::select(node) %E>% tidygraph::select(from, to)
-#     )
-#   })
-#   # Flatten so that we only need to do one pass.
-#   unweighted <- unlist(unweighted, recursive = FALSE)
-#   # Create megagraph:
-#   for (i in 2:length(unweighted)) {
-#     if (i == 2) {
-#       combined <- tidygraph::graph_join(unweighted[[1]], unweighted[[i]])
-#     } else {
-#       combined <- tidygraph::graph_join(combined, unweighted[[i]])
-#     }
-#   }
-#   combined
-# })
-# layout <- lapply(layout_graph, function(g) ggraph::create_layout(
-#   tidygraph::to_undirected(g) %>%
-#     tidygraph::convert(tidygraph::to_simple),
-#   "backbone")
-# )
-# layout <- lapply(seq_along(layout), function(i) {
-#   l <- layout[[i]]
-#   l_indices <- as.numeric(gsub("s", "", l$node))
-#   affs <- loadenvs[[i]]$result$Ellipsis$Affinity$SpeciesAffinities
-#   if (length(unique(affs)) < 4) {
-#     # l$x <- affs[l_indices] + l$x/length(unique(affs)) # retain some structure
-#     affs <- factor(affs, ordered = TRUE, levels = sort(unique(affs)))
-#     shift <- seq_along(levels(affs)) - 1 # input aff returns number of set
-#     l$x <- l$x - min(l$x) # shift so left side starts at 0.
-#     l$x <- l$x / max(l$x) # scale so that it is over a unit interval.
-#     l$x <- l$x + shift[affs[l_indices]] # add unit interval for each aff.
-#     l$x <- l$x / max(l$x) # scale one more time so over unit interval again.
-#   } else {
-#     l$x <- affs[l_indices] # should be enough variation to enable visualisation
-#   }
-#   l$y <- log10(loadenvs$Pool$Pool$Size[l_indices])
-#   return(l)
-# })
-#
-# # Not as diverse as I might like obviously, so maybe there are better choices.
-# singletonRichness <- ggplot2::ggplot(
-#   diversitiesExample %>% tidytable::filter(
-#     Metric == "Alpha Hill:0", is.na(Subset)
-#   ), ggplot2::aes(
-#     x = Time, y = Value, color = Intervention,
-#     group = interaction(Intervention, SpeciesAffinity)
-#   )
-# ) + ggplot2::geom_line(
-# ) + ggplot2::geom_vline(
-#   xintercept = targetTimes
-# ) + ggplot2::theme_minimal(
-# )
-#
-# plotGraph <- function(graph, mainLayout) {
-#   ggraph::ggraph(
-#     graph = graph,
-#     layout = graph %N>% data.frame(
-#     ) %>% select(node) %>% left_join(
-#       mainLayout %>% select(x, y, node)
-#     )
-#   ) + ggraph::geom_node_point(
-#     mapping = aes(
-#       color = Type,
-#       size = log10(N)
-#     )
-#   ) + ggraph::geom_edge_diagonal(
-#     mapping = aes(
-#       color = Type,
-#       linetype = Type,
-#       alpha = log10(effectNormalised)
-#     ),
-#     # linewidth = 2,
-#     arrow = arrow(length = unit(2, 'mm')),
-#     start_cap = circle(5, 'mm'),
-#     end_cap = circle(5, 'mm')
-#   ) + ggplot2::geom_hline(
-#     yintercept = -1, linetype = "dashed", color = "black"
-#   ) + theme_minimal(
-#   ) + ylab(
-#     "Log10(Size)"
-#   ) + xlab(
-#     "Land-use Preference"
-#   ) + scale_color_manual(
-#     values = c("limegreen", "goldenrod2")
-#   ) + lims(
-#     x = c(0, 1), y = c(-2, 0.5)
-#   ) # EDIT THIS FOR BINARY AND SINGLE PREFERENCE CASES
-# }
-#
-# singletonGraphs <- lapply(seq_along(graphs), function(i) {
-#   timelist <- graphs[[i]]
-#   lapply(timelist, function(patchlist) {
-#     lapply(patchlist$graphs, plotGraph, mainLayout = layout[[i]])
-#   })
-# })
+targetDir <- dir(pattern = "TSTS_Simulations_142486-4929_343-343_2025-01-21",
+                 full.names = T)
+stopifnot(length(targetDir) == 1)
 
-# Would need to add in blanks for the missing (because nonintervention) plots.
-# ggpubr::ggarrange(plotlist = unlist(unlist(singletonGraphs, recursive = FALSE), recursive = FALSE), common.legend = TRUE)
+targetFiles <- dir(targetDir, pattern = "(Sim|Int)",
+                   full.names = T)
+# Restrict to source simulations with affinities 0, 0.5, or 1
+targetFiles <- grep(x = targetFiles,
+                    pattern = "142486-4929-28-1-NA-5-(1|6|7|15|20|21|29|34|35)_",
+                    value = TRUE)
+targetFilesSim <- grep(x = targetFiles,
+                       pattern = "_Simulation_",
+                       fixed = TRUE,
+                       value = TRUE)
+targetFilesInt <- grep(x = targetFiles,
+                       pattern = "Int",
+                       fixed = TRUE,
+                       value = TRUE)
+# Restrict interventions to the same
+targetFilesInt <- grep(x = targetFilesInt,
+                       pattern = "_11(1|3|5)-",
+                       fixed = FALSE,
+                       value = TRUE)
+
+targetFiles <- c(targetFilesSim, targetFilesInt)
+targetDivs <- gsub(x = targetFiles,
+                   pattern = "_(Simulation|Intervention)_",
+                   replacement = "_Diversity_")
+targetPool <- dir(targetDir, pattern = "Pool",
+                  full.names = T)
+
+targetEnvs <- lapply(targetFiles, new.env)
+targetEnvs <- lapply(seq_along(targetEnvs), function(i, e, s, d) {
+  load(d[[i]], envir = e[[i]])
+  load(s[[i]], envir = e[[i]])
+  e[[i]]$Diversity <- flattenDiversity(e[[i]]$Diversity) %>% dplyr::left_join(
+    diversitiesInterventionStrings,
+    by = c("Affinity", "PoolPatch", "InterventionPatchType"),
+    multiple = "all"
+  ) %>% dplyr::mutate(
+    SpeciesAffinity =
+      affinityDictionaryOrigin$SpeciesAffinities[as.numeric(Affinity)]
+  )
+  e[[i]]
+},
+e = targetEnvs, d = targetDivs, s = targetFiles)
+targetEnvsPool <- new.env()
+load(targetPool, envir = targetEnvsPool)
+
+targetTimes <- 30000
+
+targetEnvs <- lapply(targetEnvs, function(env) {
+  intervention <- #T/F
+    !("EffectiveReproductionRate" %in% names(env$result$Ellipsis$Affinity))
+
+  env$calculator <- with(
+    env$result,
+    CalculateTrophicStructure(
+      Pool = targetEnvsPool$Pool,
+      ReproductionRate =
+        if (!intervention) {
+          Ellipsis$Affinity$EffectiveReproductionRate
+        } else {
+          Ellipsis$Affinity$EffectiveReproductionRateIntervention
+        },
+      NumEnvironments = NumEnvironments,
+      InteractionMatrices = targetEnvsPool$InteractionMatrices,
+      EliminationThreshold = Parameters$EliminationThreshold,
+      LinkThreshold = 0.01
+    )
+  )
+
+  env$trophics <- with(
+    env$result,
+    lapply(targetTimes, function(t) {
+      if (intervention)
+        if(t < Ellipsis$Affinity$TimeIntervention / ReactionTime)
+          return(NULL)
+      timerow <- which.max(Abundance[, 1] / ReactionTime > t) # first match
+      retval <- env$calculator(Abundance[timerow, 1], Abundance[timerow, -1])
+      retval$Time <- Abundance[timerow, 1] / ReactionTime
+      return(retval)
+    })
+  )
+
+  return(env)
+})
+
+targetEnvs <- lapply(targetEnvs, function(env) {
+  env$graphs <- lapply(env$trophics, function(TandEV) {
+    time <- TandEV$Time
+    EVs <- TandEV$EdgeVertexLists[[1]] # Probably accidentally wrapped 1 extra.
+    list(graphs = lapply(EVs, function(patch) { # Keep one layer for the multi-patch case.
+      tidygraph::tbl_graph(
+        nodes = patch$Vertices, edges = patch$Edges
+      )
+    }), Time = time)
+  })
+  return(env)
+})
+
+targetEnvs <- lapply(targetEnvs, function(env) {
+  env$layout <- ggraph::create_layout(
+    tidygraph::to_undirected(
+      env$graphs[[length(env$graphs)]]$graphs[[1]]
+    ) %>% tidygraph::convert(tidygraph::to_simple),
+    "backbone"
+  )
+  return(env)
+})
+
+targetEnvs <- lapply(targetEnvs, function(env) {
+  l <- env$layout
+  l_indices <- as.numeric(gsub("s", "", l$node))
+  affs <- env$result$Ellipsis$Affinity$SpeciesAffinities
+  if (length(unique(affs)) < 4) {
+    # l$x <- affs[l_indices] + l$x/length(unique(affs)) # retain some structure
+    affs <- factor(affs, ordered = TRUE, levels = sort(unique(affs)))
+    shift <- seq_along(levels(affs)) - 1 # input aff returns number of set
+    l$x <- l$x - min(l$x) # shift so left side starts at 0.
+    l$x <- l$x / max(l$x) # scale so that it is over a unit interval.
+    l$x <- l$x + shift[affs[l_indices]] # add unit interval for each aff.
+    l$x <- l$x / max(l$x) # scale one more time so over unit interval again.
+  } else {
+    l$x <- affs[l_indices] # should be enough variation to enable visualisation
+  }
+  l$y <- log10(targetEnvsPool$Pool$Size[l_indices])
+  env$layout <- l
+  return(env)
+})
+
+plotGraph <- function(graph, mainLayout) {
+  ggraph::ggraph(
+    graph = graph,
+    layout = graph %N>% data.frame(
+    ) %>% select(node) %>% left_join(
+      mainLayout %>% select(x, y, node)
+    )
+  ) + ggraph::geom_node_point(
+    mapping = aes(
+      color = Type,
+      size = log10(N)
+    )
+  ) + ggraph::geom_edge_diagonal(
+    mapping = aes(
+      color = Type,
+      linetype = Type,
+      alpha = log10(effectNormalised)
+    ),
+    # linewidth = 2,
+    arrow = arrow(length = unit(2, 'mm')),
+    start_cap = circle(5, 'mm'),
+    end_cap = circle(5, 'mm')
+  ) + ggplot2::geom_hline(
+    yintercept = -1, linetype = "dashed", color = "black"
+  ) + theme_minimal(
+  ) + ylab(
+    "Log10(Size)"
+  ) + xlab(
+    "Land-use Preference"
+  ) + scale_color_manual(
+    values = c("limegreen", "goldenrod2")
+  ) + lims(
+    x = c(0, 1), y = c(-2, 0.25)
+  )
+}
+
+targetEnvs <- lapply(targetEnvs, function(env) {
+  timelist <- env$graphs
+  env$singletonGraphs <- lapply(timelist, function(patchlist) {
+    lapply(patchlist$graphs, plotGraph, mainLayout = env$layout)
+  })
+  return(env)
+})
 
 # Define Species Color Scale from AffinityBins: ################################
 # Can't be done before hand because the affinity bins are calculated differently
