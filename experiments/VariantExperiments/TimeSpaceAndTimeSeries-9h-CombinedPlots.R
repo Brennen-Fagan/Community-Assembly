@@ -1,6 +1,6 @@
 # Plotting with both ColExt and Divs
 load("ColExt9a9_flat.RData")
-load("diversitiesFlattened9a9_subset2.RData")
+load("diversitiesFlattened9a9_subset3.RData")
 
 # Problems with X11
 options(bitmapType = "cairo")
@@ -737,3 +737,53 @@ ggplot2::ggsave(
   units = "px", height = 3200, width = 4800 # Words are too small
   # height = 1600, width = 2400 # Words over-run
 )
+
+
+# Should make proper by using a left_join with endtimes
+# This is also an expensive operation to do on everything so should be
+# filtered down to a small subset if possible.
+diversitiesAll %>% dplyr::filter(
+  Time > 20000, Time < 30000,
+  Metric == "Alpha Hill:0", !is.na(Subset), NicheDistance == 5
+) %>% tidyr::separate(
+  Subset, into = c("Type", "Preference"), sep = "_"
+) %>% group_by(
+  Time, Environment1, Environment2, Metric, Type,
+  PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, Events, EventsSeed,
+  InitialConditions, InitialConditionsSeed, Dispersal, NicheDistance,
+  Affinity, AffinitySeed, InterventionPatchType, InterventionPatchSeed,
+  InterventionTimeType, InterventionTimeSeed, InterventionDispersal,
+  InterventionNicheDistance, Intervention, SpeciesAffinity,
+  InterventionInitial, InterventionFinal
+) %>% summarise(
+  # Collapse over preferences
+  Value = sum(ifelse(is.na(Value), 0, Value)),
+  .groups = "drop"
+) %>% dplyr::group_by(
+  Environment1, Environment2, Metric, Type,
+  PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, Events, EventsSeed,
+  InitialConditions, InitialConditionsSeed, Dispersal, NicheDistance,
+  Affinity, AffinitySeed, InterventionPatchType, InterventionPatchSeed,
+  InterventionTimeType, InterventionTimeSeed, InterventionDispersal,
+  InterventionNicheDistance, Intervention, SpeciesAffinity,
+  InterventionInitial, InterventionFinal
+  ) %>% dplyr::summarise(
+    q0025 = quantile(Value, 0.025, na.rm = TRUE),
+    q025 = quantile(Value, 0.25, na.rm = TRUE),
+    q050 = median(Value, na.rm = TRUE),
+    q075 = quantile(Value, 0.75, na.rm = TRUE),
+    q0975 = quantile(Value, 0.975, na.rm = TRUE)
+) %>% tidyr::pivot_wider(
+  names_from = Type, values_from = q0025:q0975
+)
+
+.Last.value -> temp
+plot4 <- temp %>% ggplot2::ggplot(
+  ggplot2::aes(x = q050_Basal, y = q050_Consumer, color = Intervention)
+) + ggplot2::geom_point(alpha = 5/44) + ggplot2::facet_wrap(
+  .~SpeciesAffinity
+) + ggplot2::scale_color_manual(
+values = colorPalette, aesthetics = c("color", "fill"),
+name = "Habitat Land-use"
+) + ggplot2::stat_ellipse() + ggplot2::theme_minimal()
+
