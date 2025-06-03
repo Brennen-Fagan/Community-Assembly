@@ -90,6 +90,7 @@ plotMeanAndInner <- function(
   facets = as.formula(Intervention ~ SpeciesAffinity)
 ) {
   data$Subset <- ifelse(is.na(data$Subset), "NA", data$Subset)
+
   baseplot <- ggplot2::ggplot(
     data,
     ggplot2::aes(
@@ -124,8 +125,11 @@ plotMeanAndInner <- function(
     )
   }
   baseplot <- (baseplot
-               # ) + ggplot2::geom_smooth(
-               # color = "black"
+  # ) + ggplot2::geom_smooth(
+  #   se = FALSE,
+  #   # method = "loess", span = 0.5
+  #   method = "gam", formula =
+  #     y ~ s(x, bs = "tp", k = 20) + s(PoolPatchSeed, bs = "re")
   ) + ggplot2::geom_line(
     data = data %>% tidytable::mutate(
       Time = round(Time, digits = -2)
@@ -133,7 +137,7 @@ plotMeanAndInner <- function(
       Time, Subset,
       Intervention, InterventionInitial, InterventionFinal, SpeciesAffinity
     ) %>% tidytable::summarise(
-      Value = median(Value, na.rm = TRUE)
+      Value = mean(Value, na.rm = TRUE)
     )
   ) + ggplot2::facet_grid(
     facets
@@ -148,6 +152,7 @@ plotMeanAndInner <- function(
     color = "none",
     fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
   )
+
   return(baseplot)
 }
 
@@ -177,26 +182,29 @@ plotValueChart <- function(
 #       The other plots are called inside the createOverviewFigure function.
 plotGraph <- function(graph, mainLayout, legends = FALSE) {
   obj <- ggraph::ggraph(
-    graph = graph,
+    graph = graph %N>% mutate(
+      nodesize = (log10(N)+5)/10+1
+    ),
     layout = graph %N>% data.frame(
     ) %>% select(node) %>% left_join(
       mainLayout %>% select(x, y, node)
-    )
-  ) + ggraph::geom_node_point(
-    mapping = aes(
-      color = Type,
-      size = log10(N)
     )
   ) + ggraph::geom_edge_diagonal(
     mapping = aes(
       color = Type,
       linetype = Type,
-      alpha = log10(effectNormalised)
+      alpha = log10(effectNormalised),
+      end_cap = circle(node2.nodesize+2, 'pt')
     ),
     # linewidth = 2,
-    arrow = arrow(length = unit(2, 'mm')),
-    start_cap = circle(5, 'mm'),
-    end_cap = circle(5, 'mm')
+    arrow = arrow(length = unit(2, 'mm'))#,
+    # start_cap = circle(1, 'mm'),
+    # end_cap = circle(5, 'mm')
+  ) + ggraph::geom_node_point(
+    mapping = aes(
+      color = Type,
+      size = nodesize
+    )
   ) + ggplot2::geom_hline(
     yintercept = -1, linetype = "dashed", color = "black"
   ) + theme_minimal(
@@ -206,6 +214,11 @@ plotGraph <- function(graph, mainLayout, legends = FALSE) {
     "Land-use Preference"
   ) + scale_color_manual(
     values = c("limegreen", "goldenrod2")
+  ) + ggraph::scale_edge_color_manual(
+    values = rev(c("limegreen", "goldenrod2"))
+  ) + scale_size(
+    range = c(0.5, 4)
+    # limits = c(10^-5, 10^5)#, trans = "log10"
   ) + lims(
     x = c(0, 1), y = c(-2, 0.25)
   )
@@ -512,8 +525,11 @@ ColExt <- ColExt %>% tidytable::rename(
 
 ### Example Networks: #########################################################
 #### Load:
-targetDir <- dir(pattern = "TSTS_Simulations_142486-4929_343-343_2025-01-21",
-                 full.names = T)
+targetSeed <- 343
+targetDir <- dir(pattern = paste0(
+  "TSTS_Simulations_142486-4929_", targetSeed, "-", targetSeed, "_2025-01-21"
+),
+full.names = T)
 stopifnot(length(targetDir) == 1)
 
 targetFiles <- dir(targetDir, pattern = "(Sim|Int)",
@@ -552,9 +568,10 @@ targetEnvs <- lapply(seq_along(targetEnvs), function(i, e, s, d) {
     by = c("Affinity", "PoolPatch", "InterventionPatchType"),
     multiple = "all"
   ) %>% dplyr::mutate(
+    PoolPatchSeed = targetSeed,
     SpeciesAffinity =
       affinityDictionaryOrigin$SpeciesAffinities[as.numeric(Affinity)]
-  )
+  ) %>% changeAffinityLevels()
   e[[i]]
 },
 e = targetEnvs, d = targetDivs, s = targetFiles)
@@ -688,7 +705,9 @@ targetEnvsIndex <- do.call(
   lapply(
     targetEnvs,
     function(env)
-      env$Diversity[1, c("SpeciesAffinity", "NicheDistance", "Intervention")]
+      env$Diversity[
+        1, c("PoolPatchSeed", "SpeciesAffinity",
+             "NicheDistance", "Intervention")]
   )
 )
 targetEnvsIndex <- cbind(ID = 1:nrow(targetEnvsIndex), targetEnvsIndex)
@@ -710,7 +729,7 @@ plot2 <- createOverviewFigure(
   SpeciesAffinity == "100% 0",
   NicheDistance == "5",
   Intervention %in% c("(0)", "(0.5)", "(1)"),
-  !(PoolPatchSeed %in% c("341", "342"))
+  (PoolPatchSeed %in% as.character(343:386))
 )
 
 ggplot2::ggsave(
@@ -775,9 +794,7 @@ diversitiesAll %>% dplyr::filter(
     q0975 = quantile(Value, 0.975, na.rm = TRUE)
 ) %>% tidyr::pivot_wider(
   names_from = Type, values_from = q0025:q0975
-)
-
-.Last.value -> temp
+) -> temp
 plot4 <- temp %>% ggplot2::ggplot(
   ggplot2::aes(x = q050_Basal, y = q050_Consumer, color = Intervention)
 ) + ggplot2::geom_point(alpha = 5/44) + ggplot2::facet_wrap(
@@ -787,3 +804,146 @@ values = colorPalette, aesthetics = c("color", "fill"),
 name = "Habitat Land-use"
 ) + ggplot2::stat_ellipse() + ggplot2::theme_minimal()
 
+
+
+# Panels:
+newplot2_filtration <- function(.) {tidytable::filter(
+  .,
+  SpeciesAffinity == "100% 0",
+  NicheDistance == "5",
+  Intervention %in% c("(0)", "(0.5)", "(1)"),
+  (PoolPatchSeed %in% as.character(343:386))
+)}
+
+newplot2_dataA <- diversitiesAll %>% newplot2_filtration() %>% tidytable::filter(
+  Metric == "Alpha Hill:0",
+  is.na(Subset)
+) %>% tidytable::left_join(endTimes %>% dplyr::select(-Times))
+
+newplot2_dataB <- diversitiesAll %>% newplot2_filtration(
+) %>% tidytable::left_join(
+  endTimes %>% dplyr::select(-Times)
+) %>% tidytable::filter(
+  Time > Start, Time < Stop,
+  Metric == "Alpha Abundance",
+  !is.na(Subset)
+) %>% tidytable::separate_wider_delim(
+  cols = Subset, names = c("Guild", "AffinityBin"), delim = "_"
+) %>% tidytable::group_by(
+  Environment1, Environment2, Metric, PoolPatch, PoolPatchSeed,
+  Interactions, InteractionsSeed, Events, EventsSeed,
+  InitialConditions, InitialConditionsSeed, Dispersal, NicheDistance,
+  Affinity, AffinitySeed, InterventionPatchType, InterventionPatchSeed,
+  InterventionTimeType, InterventionTimeSeed, InterventionDispersal,
+  InterventionNicheDistance, Intervention, SpeciesAffinity,
+  InterventionInitial, InterventionFinal, Guild, Time
+) %>% tidytable::summarise(# Across Affinity Bins
+  Value = sum(Value, na.rm = TRUE), .groups = "drop_last"
+) %>% tidytable::summarise(# Across Time
+  Mean = mean(Value),
+  q025 = quantile(Value, probs = 0.25),
+  q075 = quantile(Value, probs = 0.75)
+) %>% tidytable::pivot_wider(
+  names_from = Guild, values_from = c(Mean, q025, q075)
+)
+
+newplot2_a <- plotMeanAndInner(
+  newplot2_dataA, CIs = 0.75, facets = as.formula(. ~ .)
+) + ggplot2::geom_point(
+  data = newplot2_dataA %>% tidytable::filter(
+    PoolPatchSeed == targetSeed,
+    abs(Time - targetTimes) == min(abs(Time - targetTimes))
+  )
+) + ggplot2::labs(
+  y = "Richness"
+) + ggplot2::guides(
+  linetype = "none",
+  color = ggplot2::guide_legend(ncol = 3),
+  fill = ggplot2::guide_legend(ncol = 3)
+) + ggplot2::theme(
+  legend.position = c(0.2, 0.09)
+) + ggplot2::coord_cartesian(
+  xlim = c(0, 40000), expand = FALSE
+) + ggplot2::annotation_custom(
+  ggplot2::ggplotGrob(
+    targetEnvs[[
+      (targetEnvsIndex %>% newplot2_filtration %>% dplyr::pull(ID))[1]
+      ]]$singletonGraphs[[1]][[1]] + ggplot2::theme(
+        plot.background = ggplot2::element_rect(fill = "white"),
+        axis.title.x = ggplot2::element_blank(),
+        axis.text.x = ggplot2::element_blank(),
+        axis.ticks.x = ggplot2::element_blank()
+        )
+    ),
+  xmin = 30500, xmax = 40000, ymin = 7, ymax = 17
+) + ggplot2::annotation_custom(
+  ggplot2::ggplotGrob(
+    targetEnvs[[
+      (targetEnvsIndex %>% newplot2_filtration %>% dplyr::pull(ID))[2]
+      ]]$singletonGraphs[[1]][[1]] + ggplot2::theme(
+        plot.background = ggplot2::element_rect(fill = "white"),
+        axis.title.x = ggplot2::element_blank(),
+        axis.text.x = ggplot2::element_blank(),
+        axis.ticks.x = ggplot2::element_blank()
+      )
+  ),
+  xmin = 30500, xmax = 40000, ymin = 18, ymax = 28
+) + ggplot2::annotation_custom(
+  ggplot2::ggplotGrob(
+    targetEnvs[[
+      (targetEnvsIndex %>% newplot2_filtration %>% dplyr::pull(ID))[3]
+      ]]$singletonGraphs[[1]][[1]] + ggplot2::theme(
+        plot.background = ggplot2::element_rect(fill = "white"),
+        axis.title.x = ggplot2::element_blank(),
+        axis.text.x = ggplot2::element_blank(),
+        axis.ticks.x = ggplot2::element_blank()
+      )
+  ),
+  xmin = 30500, xmax = 40000, ymin = 29, ymax = 39
+) + ggplot2::geom_rect(
+  data = data.frame(
+    1 # 1 rectangle per row, so dummy df to prevent overplotting
+  ),
+  xmin = min(newplot2_dataA$Start),
+  xmax = max(newplot2_dataA$Stop),
+  ymin = 0, ymax = max(newplot2_dataA$Value),
+  fill = "grey",
+  alpha = 0.2,
+  inherit.aes = FALSE
+)
+
+newplot2_b <- ggplot2::ggplot(
+  newplot2_dataB,
+  ggplot2::aes(
+    x = Mean_Basal,
+    y = Mean_Consumer,
+    color = Intervention)
+  ) + ggplot2::geom_point(
+  # ) + ggplot2::geom_errorbar(
+  #   inherit.aes = FALSE,
+  #   mapping = ggplot2::aes(
+  #     x = Mean_Basal, ymin = q025_Consumer, ymax = q075_Consumer,
+  #     color = Intervention
+  #   )
+  # ) + ggplot2::geom_errorbarh(
+  #   inherit.aes = FALSE,
+  #   mapping = ggplot2::aes(
+  #     y = Mean_Consumer, xmin = q025_Basal, xmax = q075_Basal,
+  #     color = Intervention
+  #   )
+  ) + ggplot2::scale_x_log10(
+  ) + ggplot2::scale_y_log10(
+  ) + ggplot2::coord_fixed(
+  ) + ggplot2::labs(
+    x = "Avg. Total Basal Abundance",
+    y = "Avg. Total Consumer Abundance"
+  ) + ggplot2::theme_minimal(
+  ) + ggplot2::scale_color_manual(
+    values = colorPalette, aesthetics = c("color", "fill"),
+    name = "Habitat Land-use"
+  )
+
+# Size as a function of Total amount of time spent in simulation
+# Color is intervention type.
+
+# Average Temporal Beta as a function of Intervention Type.
