@@ -7,7 +7,7 @@ options(bitmapType = "cairo")
 
 # Grey interval that we compute over, usually after intervention (~50%)
 # If second number is less than 1, we lose persistent species.
-end <- c(0.6, 0.904) # Aiming for 20000 - 30000
+end <- c(0.602, 0.9045) # Aiming for 20000 - 30000. These go ~0.0003% away.
 
 # Libraries: ##################################################################
 library(ggplot2)
@@ -125,11 +125,11 @@ plotMeanAndInner <- function(
     )
   }
   baseplot <- (baseplot
-  # ) + ggplot2::geom_smooth(
-  #   se = FALSE,
-  #   # method = "loess", span = 0.5
-  #   method = "gam", formula =
-  #     y ~ s(x, bs = "tp", k = 20) + s(PoolPatchSeed, bs = "re")
+               # ) + ggplot2::geom_smooth(
+               #   se = FALSE,
+               #   # method = "loess", span = 0.5
+               #   method = "gam", formula =
+               #     y ~ s(x, bs = "tp", k = 20) + s(PoolPatchSeed, bs = "re")
   ) + ggplot2::geom_line(
     data = data %>% tidytable::mutate(
       Time = round(Time, digits = -2)
@@ -334,10 +334,10 @@ createOverviewFigure <- function(
             g <- g + ggplot2::labs(
               y = ""
             )
-          # } else if (!length(.gs) %% 2) { # Even
-          #   g <- g + ggplot2::theme(
-          #     axis.title.y.left =
-          #   )
+            # } else if (!length(.gs) %% 2) { # Even
+            #   g <- g + ggplot2::theme(
+            #     axis.title.y.left =
+            #   )
           }
           return(g)
         }),
@@ -786,12 +786,12 @@ diversitiesAll %>% dplyr::filter(
   InterventionTimeType, InterventionTimeSeed, InterventionDispersal,
   InterventionNicheDistance, Intervention, SpeciesAffinity,
   InterventionInitial, InterventionFinal
-  ) %>% dplyr::summarise(
-    q0025 = quantile(Value, 0.025, na.rm = TRUE),
-    q025 = quantile(Value, 0.25, na.rm = TRUE),
-    q050 = median(Value, na.rm = TRUE),
-    q075 = quantile(Value, 0.75, na.rm = TRUE),
-    q0975 = quantile(Value, 0.975, na.rm = TRUE)
+) %>% dplyr::summarise(
+  q0025 = quantile(Value, 0.025, na.rm = TRUE),
+  q025 = quantile(Value, 0.25, na.rm = TRUE),
+  q050 = median(Value, na.rm = TRUE),
+  q075 = quantile(Value, 0.75, na.rm = TRUE),
+  q0975 = quantile(Value, 0.975, na.rm = TRUE)
 ) %>% tidyr::pivot_wider(
   names_from = Type, values_from = q0025:q0975
 ) -> temp
@@ -800,13 +800,13 @@ plot4 <- temp %>% ggplot2::ggplot(
 ) + ggplot2::geom_point(alpha = 5/44) + ggplot2::facet_wrap(
   .~SpeciesAffinity
 ) + ggplot2::scale_color_manual(
-values = colorPalette, aesthetics = c("color", "fill"),
-name = "Habitat Land-use"
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat Land-use"
 ) + ggplot2::stat_ellipse() + ggplot2::theme_minimal()
 
 
 
-# Panels:
+# New Plot 2:##################################################################
 newplot2_filtration <- function(.) {tidytable::filter(
   .,
   SpeciesAffinity == "100% 0",
@@ -815,7 +815,8 @@ newplot2_filtration <- function(.) {tidytable::filter(
   (PoolPatchSeed %in% as.character(343:386))
 )}
 
-newplot2_dataA <- diversitiesAll %>% newplot2_filtration() %>% tidytable::filter(
+newplot2_dataA <- diversitiesAll %>% newplot2_filtration(
+) %>% tidytable::filter(
   Metric == "Alpha Hill:0",
   is.na(Subset)
 ) %>% tidytable::left_join(endTimes %>% dplyr::select(-Times))
@@ -847,6 +848,45 @@ newplot2_dataB <- diversitiesAll %>% newplot2_filtration(
   names_from = Guild, values_from = c(Mean, q025, q075)
 )
 
+newplot2_dataC <- Pers %>% newplot2_filtration(
+) %>% tidytable::filter(
+  In < Stop, Out > Start # Not things outside of [Start, Stop]
+) %>% tidytable::mutate(
+  # Shorten intervals for equivalent comparisons.
+  In = ifelse(In < Start, Start, In),
+  Out = ifelse(Out > Stop, Stop, Out),
+  Persistence = Out - In
+) %>% tidytable::group_by(
+  Species, Environment, SpeciesType, Size, ReproductionRate, Speed, AffinityBins,
+  PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, Events, EventsSeed,
+  InitialConditions, InitialConditionsSeed, DispersalParam, NicheDistance,
+  Affinity, AffinitySeed, InterventionPatchType, InterventionPatchSeed,
+  InterventionTimeType, InterventionTimeSeed, InterventionDispersal,
+  InterventionNicheDistance, Intervention, SpeciesAffinity, Start, Stop
+) %>% tidytable::summarise( # Sum over Appearances.
+  Persistence = sum(Persistence),
+  .groups = "drop"
+)
+
+newplot2_dataD <- diversitiesAll %>% newplot2_filtration(
+) %>% tidytable::left_join(
+  endTimes %>% dplyr::select(-Times)
+) %>% tidytable::filter(
+  Time > Start, Time < Stop,
+  Metric == "TimeJaccard",
+  is.na(Subset)
+) %>% tidytable::group_by(
+  Environment1, Environment2, Metric, PoolPatch, PoolPatchSeed,
+  Interactions, InteractionsSeed, Events, EventsSeed,
+  InitialConditions, InitialConditionsSeed, Dispersal, NicheDistance,
+  Affinity, AffinitySeed, InterventionPatchType, InterventionPatchSeed,
+  InterventionTimeType, InterventionTimeSeed, InterventionDispersal,
+  InterventionNicheDistance, Intervention, SpeciesAffinity,
+  InterventionInitial, InterventionFinal, Start, Stop
+) %>% tidytable::summarise(# Across Time
+  Value = mean(Value, na.rm = TRUE), .groups = "drop"
+)
+
 newplot2_a <- plotMeanAndInner(
   newplot2_dataA, CIs = 0.75, facets = as.formula(. ~ .)
 ) + ggplot2::geom_point(
@@ -860,8 +900,6 @@ newplot2_a <- plotMeanAndInner(
   linetype = "none",
   color = ggplot2::guide_legend(ncol = 3),
   fill = ggplot2::guide_legend(ncol = 3)
-) + ggplot2::theme(
-  legend.position = c(0.2, 0.09)
 ) + ggplot2::coord_cartesian(
   xlim = c(0, 40000), expand = FALSE
 ) + ggplot2::annotation_custom(
@@ -872,9 +910,12 @@ newplot2_a <- plotMeanAndInner(
         plot.background = ggplot2::element_rect(fill = "white"),
         axis.title.x = ggplot2::element_blank(),
         axis.text.x = ggplot2::element_blank(),
-        axis.ticks.x = ggplot2::element_blank()
-        )
-    ),
+        axis.ticks.x = ggplot2::element_blank(),
+        axis.title.y = ggplot2::element_blank(),
+        axis.text.y = ggplot2::element_blank(),
+        axis.ticks.y = ggplot2::element_blank()
+      )
+  ),
   xmin = 30500, xmax = 40000, ymin = 7, ymax = 17
 ) + ggplot2::annotation_custom(
   ggplot2::ggplotGrob(
@@ -884,7 +925,10 @@ newplot2_a <- plotMeanAndInner(
         plot.background = ggplot2::element_rect(fill = "white"),
         axis.title.x = ggplot2::element_blank(),
         axis.text.x = ggplot2::element_blank(),
-        axis.ticks.x = ggplot2::element_blank()
+        axis.ticks.x = ggplot2::element_blank(),
+        axis.title.y = ggplot2::element_blank(),
+        axis.text.y = ggplot2::element_blank(),
+        axis.ticks.y = ggplot2::element_blank()
       )
   ),
   xmin = 30500, xmax = 40000, ymin = 18, ymax = 28
@@ -896,7 +940,10 @@ newplot2_a <- plotMeanAndInner(
         plot.background = ggplot2::element_rect(fill = "white"),
         axis.title.x = ggplot2::element_blank(),
         axis.text.x = ggplot2::element_blank(),
-        axis.ticks.x = ggplot2::element_blank()
+        axis.ticks.x = ggplot2::element_blank(),
+        axis.title.y = ggplot2::element_blank(),
+        axis.text.y = ggplot2::element_blank(),
+        axis.ticks.y = ggplot2::element_blank()
       )
   ),
   xmin = 30500, xmax = 40000, ymin = 29, ymax = 39
@@ -910,6 +957,11 @@ newplot2_a <- plotMeanAndInner(
   fill = "grey",
   alpha = 0.2,
   inherit.aes = FALSE
+) + ggplot2::labs(
+  tag = "a)"
+) + ggplot2::theme(
+  legend.position = c(0.25, 0.09),
+  plot.tag.position = c(0.05, 1)
 )
 
 newplot2_b <- ggplot2::ggplot(
@@ -918,7 +970,8 @@ newplot2_b <- ggplot2::ggplot(
     x = Mean_Basal,
     y = Mean_Consumer,
     color = Intervention)
-  ) + ggplot2::geom_point(
+) + ggplot2::geom_point(
+  show.legend = FALSE
   # ) + ggplot2::geom_errorbar(
   #   inherit.aes = FALSE,
   #   mapping = ggplot2::aes(
@@ -931,19 +984,89 @@ newplot2_b <- ggplot2::ggplot(
   #     y = Mean_Consumer, xmin = q025_Basal, xmax = q075_Basal,
   #     color = Intervention
   #   )
-  ) + ggplot2::scale_x_log10(
-  ) + ggplot2::scale_y_log10(
-  ) + ggplot2::coord_fixed(
-  ) + ggplot2::labs(
-    x = "Avg. Total Basal Abundance",
-    y = "Avg. Total Consumer Abundance"
-  ) + ggplot2::theme_minimal(
-  ) + ggplot2::scale_color_manual(
-    values = colorPalette, aesthetics = c("color", "fill"),
-    name = "Habitat Land-use"
-  )
+) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+) + ggplot2::coord_fixed(
+) + ggplot2::labs(
+  x = "Basal\nAbundance",
+  y = "Consumer Abundance"
+) + ggplot2::theme_minimal(
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat Land-use"
+) + ggplot2::labs(
+  tag = "b)"
+) + ggplot2::theme(
+  plot.tag.position = c(0.05, 1)
+)
 
 # Size as a function of Total amount of time spent in simulation
 # Color is intervention type.
+newplot2_c <- ggplot2::ggplot(
+  newplot2_dataC,
+  ggplot2::aes(
+    # x = Persistence,
+    y = Size,
+    x = Intervention,
+    # color = Intervention,
+    fill = SpeciesType
+  )
+) + ggplot2::geom_hline(
+  yintercept = 0.10, linetype = "dashed"
+) + ggplot2::geom_violin(
+  position = "identity",
+  scale = "count", adjust = 1/10,
+  show.legend = FALSE
+) + ggplot2::scale_y_log10(
+  # ) + ggplot2::scale_color_manual(
+  #   values = colorPalette, #aesthetics = c("color", "fill"),
+  #   name = "Habitat Land-use"
+) + ggplot2::scale_fill_manual(
+  values = c("limegreen", "goldenrod2")
+) + ggplot2::theme_minimal(
+# ) + ggplot2::guides(
+#   color = "none",
+#   fill = ggplot2::guide_legend(
+#     title = ggplot2::element_blank(),
+#     reverse = TRUE
+#   )
+# ) + ggplot2::theme(
+#   legend.position = c(.84, .93)
+) + ggplot2::labs(
+  tag = "c)", x = "Habitat"
+) + ggplot2::theme(
+  plot.tag.position = c(0.05, 1)
+)
 
 # Average Temporal Beta as a function of Intervention Type.
+newplot2_d <- ggplot2::ggplot(
+  newplot2_dataD,
+  ggplot2::aes(
+    x = Intervention,
+    y = Value,
+    fill = Intervention
+  )
+) + ggplot2::geom_boxplot(
+  notch = TRUE,
+  # Double-checking, but no outliers it seems
+  outlier.colour = "black", outlier.size = 200,
+  show.legend = FALSE
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat Land-use"
+) + ggplot2::theme_minimal(
+) + ggplot2::labs(
+  tag = "d)", x = "Habitat", y = "Time-Jaccard"
+) + ggplot2::theme(
+  plot.tag.position = c(0.05, 1)
+)
+
+newplot2 <- ggpubr::ggarrange(
+  plotlist = list(
+    newplot2_a,
+    newplot2_b,
+    ggpubr::ggarrange(newplot2_c, newplot2_d, ncol = 1)
+  ), nrow = 1, widths = c(0.55, 0.25, 0.2)
+)
+ggplot2::ggsave(plot = newplot2, filename = "aplot2.png",
+                units = "cm", width = 6.5*3, height = 6.5*2)
