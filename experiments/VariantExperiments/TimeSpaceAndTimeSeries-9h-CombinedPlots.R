@@ -219,8 +219,9 @@ plotGraph <- function(graph, mainLayout, legends = FALSE) {
   ) + scale_size(
     range = c(0.5, 4)
     # limits = c(10^-5, 10^5)#, trans = "log10"
-  ) + lims(
-    x = c(0, 1), y = c(-2, 0.25)
+  ) + coord_cartesian(
+    x = c(0, 1), y = c(-2, 0.25),
+    clip = "off"
   )
 
   if (!legends) {
@@ -1024,14 +1025,14 @@ newplot2_c <- ggplot2::ggplot(
 ) + ggplot2::scale_fill_manual(
   values = c("limegreen", "goldenrod2")
 ) + ggplot2::theme_minimal(
-# ) + ggplot2::guides(
-#   color = "none",
-#   fill = ggplot2::guide_legend(
-#     title = ggplot2::element_blank(),
-#     reverse = TRUE
-#   )
-# ) + ggplot2::theme(
-#   legend.position = c(.84, .93)
+  # ) + ggplot2::guides(
+  #   color = "none",
+  #   fill = ggplot2::guide_legend(
+  #     title = ggplot2::element_blank(),
+  #     reverse = TRUE
+  #   )
+  # ) + ggplot2::theme(
+  #   legend.position = c(.84, .93)
 ) + ggplot2::labs(
   tag = "c)", x = "Habitat"
 ) + ggplot2::theme(
@@ -1070,3 +1071,214 @@ newplot2 <- ggpubr::ggarrange(
 )
 ggplot2::ggsave(plot = newplot2, filename = "aplot2.png",
                 units = "cm", width = 6.5*3, height = 6.5*2)
+
+# New Plot 3:##################################################################
+newplot3_filtration <- function(.) {tidytable::filter(
+  .,
+  SpeciesAffinity == "50% 0, 50% 1",
+  NicheDistance == "5",
+  Intervention %in% c("(0)", "(0.5)", "(1)"),
+  (PoolPatchSeed %in% as.character(343:386))
+)}
+
+newplot3_dataA <- diversitiesAll %>% newplot3_filtration(
+) %>% tidytable::filter(
+  Metric == "Alpha Hill:0",
+  is.na(Subset)
+) %>% tidytable::left_join(endTimes %>% dplyr::select(-Times))
+
+newplot3_dataB <- diversitiesAll %>% newplot3_filtration(
+) %>% tidytable::left_join(
+  endTimes %>% dplyr::select(-Times)
+) %>% tidytable::filter(
+  Time > Start, Time < Stop,
+  Metric == "Alpha Biomass",
+  !is.na(Subset)
+) %>% tidytable::separate_wider_delim(
+  cols = Subset, names = c("Guild", "AffinityBin"), delim = "_"
+) %>% tidytable::group_by(
+  Environment1, Environment2, Metric, PoolPatch, PoolPatchSeed,
+  Interactions, InteractionsSeed, Events, EventsSeed,
+  InitialConditions, InitialConditionsSeed, Dispersal, NicheDistance,
+  Affinity, AffinitySeed, InterventionPatchType, InterventionPatchSeed,
+  InterventionTimeType, InterventionTimeSeed, InterventionDispersal,
+  InterventionNicheDistance, Intervention, SpeciesAffinity,
+  InterventionInitial, InterventionFinal, Guild, AffinityBin
+) %>% tidytable::summarise(# Across Time
+  Mean = mean(Value)
+) %>% tidytable::pivot_wider(
+  names_from = "Guild", values_from = "Mean"
+)
+
+newplot3_dataC <- Pers %>% newplot3_filtration(
+) %>% tidytable::filter(
+  In < Stop, Out > Start # Not things outside of [Start, Stop]
+) %>% tidytable::mutate(
+  # Shorten intervals for equivalent comparisons.
+  In = ifelse(In < Start, Start, In),
+  Out = ifelse(Out > Stop, Stop, Out),
+  Persistence = Out - In
+) %>% tidytable::group_by(
+  Species, Environment, SpeciesType, Size, ReproductionRate, Speed, AffinityBins,
+  PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, Events, EventsSeed,
+  InitialConditions, InitialConditionsSeed, DispersalParam, NicheDistance,
+  Affinity, AffinitySeed, InterventionPatchType, InterventionPatchSeed,
+  InterventionTimeType, InterventionTimeSeed, InterventionDispersal,
+  InterventionNicheDistance, Intervention, SpeciesAffinity, Start, Stop
+) %>% tidytable::summarise( # Sum over Appearances.
+  Persistence = sum(Persistence),
+  .groups = "drop"
+) %>% tidytable::group_by(
+  Environment, SpeciesType, AffinityBins,
+  PoolPatch, Interactions, Events,
+  InitialConditions, DispersalParam, NicheDistance,
+  Affinity, InterventionPatchType,
+  InterventionTimeType, InterventionDispersal,
+  InterventionNicheDistance, Intervention, SpeciesAffinity, Start, Stop
+) %>% tidytable::summarise( # Sum over Appearances.
+  Persistence = mean(Persistence),
+  Size = 10^(mean(log10(Size))),
+  .groups = "drop"
+)
+
+newplot3_a <- plotMeanAndInner(
+  newplot3_dataA, CIs = 0.75, facets = as.formula(. ~ .)
+) + ggplot2::geom_point(
+  data = newplot3_dataA %>% tidytable::filter(
+    PoolPatchSeed == targetSeed,
+    abs(Time - targetTimes) == min(abs(Time - targetTimes))
+  )
+) + ggplot2::labs(
+  y = "Richness"
+) + ggplot2::guides(
+  linetype = "none",
+  color = ggplot2::guide_legend(ncol = 3),
+  fill = ggplot2::guide_legend(ncol = 3)
+) + ggplot2::coord_cartesian(
+  xlim = c(0, 40000), expand = FALSE
+) + ggplot2::annotation_custom(
+  ggplot2::ggplotGrob(
+    targetEnvs[[
+      (targetEnvsIndex %>% newplot3_filtration %>% dplyr::pull(ID))[1]
+      ]]$singletonGraphs[[1]][[1]] + ggplot2::theme(
+        plot.background = ggplot2::element_rect(fill = "white"),
+        axis.title.x = ggplot2::element_blank(),
+        axis.text.x = ggplot2::element_blank(),
+        axis.ticks.x = ggplot2::element_blank(),
+        axis.title.y = ggplot2::element_blank(),
+        axis.text.y = ggplot2::element_blank(),
+        axis.ticks.y = ggplot2::element_blank()
+      )
+  ),
+  xmin = 30500, xmax = 40000, ymin = 21, ymax = 30
+) + ggplot2::annotation_custom(
+  ggplot2::ggplotGrob(
+    targetEnvs[[
+      (targetEnvsIndex %>% newplot3_filtration %>% dplyr::pull(ID))[2]
+      ]]$singletonGraphs[[1]][[1]] + ggplot2::theme(
+        plot.background = ggplot2::element_rect(fill = "white"),
+        axis.title.x = ggplot2::element_blank(),
+        axis.text.x = ggplot2::element_blank(),
+        axis.ticks.x = ggplot2::element_blank(),
+        axis.title.y = ggplot2::element_blank(),
+        axis.text.y = ggplot2::element_blank(),
+        axis.ticks.y = ggplot2::element_blank()
+      )
+  ),
+  xmin = 30500, xmax = 40000, ymin = 11, ymax = 20
+) + ggplot2::annotation_custom(
+  ggplot2::ggplotGrob(
+    targetEnvs[[
+      (targetEnvsIndex %>% newplot3_filtration %>% dplyr::pull(ID))[3]
+      ]]$singletonGraphs[[1]][[1]] + ggplot2::theme(
+        plot.background = ggplot2::element_rect(fill = "white"),
+        axis.title.x = ggplot2::element_blank(),
+        axis.text.x = ggplot2::element_blank(),
+        axis.ticks.x = ggplot2::element_blank(),
+        axis.title.y = ggplot2::element_blank(),
+        axis.text.y = ggplot2::element_blank(),
+        axis.ticks.y = ggplot2::element_blank()
+      )
+  ),
+  xmin = 30500, xmax = 40000, ymin = 1, ymax = 10
+) + ggplot2::geom_rect(
+  data = data.frame(
+    1 # 1 rectangle per row, so dummy df to prevent overplotting
+  ),
+  xmin = min(newplot3_dataA$Start),
+  xmax = max(newplot3_dataA$Stop),
+  ymin = 0, ymax = max(newplot3_dataA$Value),
+  fill = "grey",
+  alpha = 0.2,
+  inherit.aes = FALSE
+) + ggplot2::labs(
+  tag = "a)"
+) + ggplot2::theme(
+  legend.position = c(0.25, 0.09),
+  plot.tag.position = c(0.02, 1)
+)
+
+# Trying to support a breakdown of richness and abundance to show what is
+# happening to, and because of, the species that have the wrong land-use
+# preference for the given habitat.
+
+newplot3_b <- ggplot2::ggplot(
+  newplot3_dataB ,
+  ggplot2::aes(
+    x = Basal,
+    y = Consumer,
+    color = Intervention,
+    shape = AffinityBin
+  )
+) + ggplot2::geom_point(
+  show.legend = FALSE
+) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+) + ggplot2::coord_fixed(
+) + ggplot2::labs(
+  x = "Basal Abundance",
+  y = "Consumer Abundance"
+) + ggplot2::theme_minimal(
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat Land-use"
+) + ggplot2::labs(
+  tag = "b)"
+) + ggplot2::theme(
+  plot.tag.position = c(0.05, 1)
+)
+
+newplot3_c <- ggplot2::ggplot(
+  newplot3_dataC,
+  ggplot2::aes(
+    x = Persistence,
+    y = Size,
+    shape = AffinityBins,
+    color = Intervention
+  )
+) + ggplot2::geom_point(
+  show.legend = FALSE
+) + ggplot2::geom_hline(
+  yintercept = 10^-1,
+  linetype = "dashed"
+) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+) + ggplot2::theme_minimal(
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat Land-use"
+) + ggplot2::labs(
+  tag = "c)"
+) + ggplot2::theme(
+  plot.tag.position = c(0.05, 1)
+)
+
+newplot3 <- ggpubr::ggarrange(
+  plotlist = list(
+    newplot3_a,
+    ggpubr::ggarrange(newplot3_b, newplot3_c, ncol = 1)
+  ), nrow = 1, widths = c(0.55, 0.45)
+)
+ggplot2::ggsave(plot = newplot3, filename = "aplot3.png",
+                units = "cm", width = 6.5*3, height = 6.5*2)
+
