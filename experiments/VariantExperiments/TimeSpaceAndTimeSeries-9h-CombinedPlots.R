@@ -1282,3 +1282,200 @@ newplot3 <- ggpubr::ggarrange(
 ggplot2::ggsave(plot = newplot3, filename = "aplot3.png",
                 units = "cm", width = 6.5*3, height = 6.5*2)
 
+# New Plot 4: #################################################################
+newplot4_filtration <- function(.) {tidytable::filter(
+  .,
+  SpeciesAffinity == "Uniform(0, 1)",
+  NicheDistance == "5",
+  Intervention %in% c("(0)", "(0.5)", "(1)"),
+  (PoolPatchSeed %in% as.character(343:386))
+)}
+
+newplot4_dataA <- diversitiesAll %>% newplot4_filtration(
+) %>% tidytable::filter(
+  Metric == "Alpha Hill:0",
+  is.na(Subset)
+) %>% tidytable::left_join(endTimes %>% dplyr::select(-Times))
+
+newplot4_dataB <- diversitiesAll %>% newplot4_filtration(
+) %>% tidytable::left_join(
+  endTimes %>% dplyr::select(-Times)
+) %>% tidytable::filter(
+  Time > Start, Time < Stop,
+  Metric == "Alpha Biomass",
+  !is.na(Subset)
+) %>% tidytable::separate_wider_delim(
+  cols = Subset, names = c("Guild", "AffinityBin"), delim = "_"
+) %>% tidytable::group_by(
+  Environment1, Environment2, Metric, PoolPatch, PoolPatchSeed,
+  Interactions, InteractionsSeed, Events, EventsSeed,
+  InitialConditions, InitialConditionsSeed, Dispersal, NicheDistance,
+  Affinity, AffinitySeed, InterventionPatchType, InterventionPatchSeed,
+  InterventionTimeType, InterventionTimeSeed, InterventionDispersal,
+  InterventionNicheDistance, Intervention, SpeciesAffinity,
+  InterventionInitial, InterventionFinal, Guild, AffinityBin
+) %>% tidytable::summarise(# Across Time
+  Mean = mean(Value)
+) %>% tidytable::pivot_wider(
+  names_from = "Guild", values_from = "Mean"
+) %>% tidytable::separate(
+  col = "AffinityBin", into = c("Left", "Right"), sep = ","
+) %>% tidytable::mutate(
+  Left = round(as.numeric(gsub(pattern = "^.", replacement = "", x = Left))*5)/5,
+  Right = round(as.numeric(gsub(pattern = ".$", replacement = "", x = Right))*5)/5,
+  AffinityBin = paste0("(", Left, ", ", Right, "]")
+)
+
+newplot4_dataC <- Pers %>% newplot4_filtration(
+) %>% tidytable::filter(
+  In < Stop, Out > Start # Not things outside of [Start, Stop]
+) %>% tidytable::mutate(
+  # Shorten intervals for equivalent comparisons.
+  In = ifelse(In < Start, Start, In),
+  Out = ifelse(Out > Stop, Stop, Out),
+  Persistence = Out - In
+) %>% tidytable::group_by(
+  Species, Environment, SpeciesType, Size, ReproductionRate, Speed, AffinityBins,
+  PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, Events, EventsSeed,
+  InitialConditions, InitialConditionsSeed, DispersalParam, NicheDistance,
+  Affinity, AffinitySeed, InterventionPatchType, InterventionPatchSeed,
+  InterventionTimeType, InterventionTimeSeed, InterventionDispersal,
+  InterventionNicheDistance, Intervention, SpeciesAffinity, Start, Stop
+) %>% tidytable::summarise( # Sum over Appearances.
+  Persistence = sum(Persistence),
+  .groups = "drop"
+) %>% tidytable::group_by(
+  Environment, SpeciesType, AffinityBins,
+  PoolPatch, Interactions, Events,
+  InitialConditions, DispersalParam, NicheDistance,
+  Affinity, InterventionPatchType,
+  InterventionTimeType, InterventionDispersal,
+  InterventionNicheDistance, Intervention, SpeciesAffinity, Start, Stop
+) %>% tidytable::summarise( # Sum over Appearances.
+  Persistence = mean(Persistence),
+  Size = 10^(mean(log10(Size))),
+  .groups = "drop"
+) %>% tidytable::separate(
+  col = "AffinityBins", into = c("Left", "Right"), sep = ","
+) %>% tidytable::mutate(
+  Left = round(as.numeric(gsub(pattern = "^.", replacement = "", x = Left))*5)/5,
+  Right = round(as.numeric(gsub(pattern = ".$", replacement = "", x = Right))*5)/5,
+  AffinityBins = paste0("(", Left, ", ", Right, "]")
+)
+
+newplot4_a <- plotMeanAndInner(
+  newplot4_dataA, CIs = 0.75, facets = as.formula(. ~ .)
+) + ggplot2::geom_point(
+  data = newplot4_dataA %>% tidytable::filter(
+    PoolPatchSeed == targetSeed,
+    abs(Time - targetTimes) == min(abs(Time - targetTimes)),
+    Intervention == "(0)"
+  )
+) + ggplot2::labs(
+  y = "Richness"
+) + ggplot2::guides(
+  linetype = "none",
+  color = ggplot2::guide_legend(ncol = 3),
+  fill = ggplot2::guide_legend(ncol = 3)
+) + ggplot2::coord_cartesian(
+  xlim = c(0, 40000), expand = FALSE
+) + ggplot2::annotation_custom(
+  ggplot2::ggplotGrob(
+    targetEnvs[[
+      (targetEnvsIndex %>% newplot4_filtration %>% dplyr::pull(ID))[3]
+      ]]$singletonGraphs[[1]][[1]] + ggplot2::theme(
+        plot.background = ggplot2::element_rect(fill = "white"),
+        axis.title.x = ggplot2::element_blank(),
+        axis.text.x = ggplot2::element_blank(),
+        axis.ticks.x = ggplot2::element_blank(),
+        axis.title.y = ggplot2::element_blank(),
+        axis.text.y = ggplot2::element_blank(),
+        axis.ticks.y = ggplot2::element_blank()
+      )
+  ),
+  xmin = 30500, xmax = 40000, ymin = 6, ymax = 13
+) + ggplot2::geom_rect(
+  data = data.frame(
+    1 # 1 rectangle per row, so dummy df to prevent overplotting
+  ),
+  xmin = min(newplot4_dataA$Start),
+  xmax = max(newplot4_dataA$Stop),
+  ymin = 0, ymax = max(newplot4_dataA$Value),
+  fill = "grey",
+  alpha = 0.2,
+  inherit.aes = FALSE
+) + ggplot2::labs(
+  tag = "a)"
+) + ggplot2::theme(
+  legend.position = c(0.25, 0.09),
+  plot.tag.position = c(0.02, 1)
+)
+
+# Trying to support a breakdown of richness and abundance to show what is
+# happening to, and because of, the species that have the wrong land-use
+# preference for the given habitat.
+
+newplot4_b <- ggplot2::ggplot(
+  newplot4_dataB ,
+  ggplot2::aes(
+    x = Basal,
+    y = Consumer,
+    color = Intervention,
+    shape = AffinityBin
+  )
+) + ggplot2::geom_point(
+  show.legend = TRUE
+) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+) + ggplot2::coord_fixed(
+) + ggplot2::labs(
+  x = "Basal Abundance",
+  y = "Consumer Abundance"
+) + ggplot2::theme_minimal(
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat Land-use"
+) + ggplot2::labs(
+  tag = "b)"
+) + ggplot2::theme(
+  plot.tag.position = c(0.02, 1)
+) + ggplot2::guides(
+  color = "none", fill = "none"
+) + ggplot2::labs(
+  shape = "Land-use\nPreference"
+)
+
+newplot4_c <- ggplot2::ggplot(
+  newplot4_dataC,
+  ggplot2::aes(
+    x = Persistence,
+    y = Size,
+    shape = AffinityBins,
+    color = Intervention
+  )
+) + ggplot2::geom_point(
+  show.legend = FALSE
+) + ggplot2::geom_hline(
+  yintercept = 10^-1,
+  linetype = "dashed"
+) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+) + ggplot2::theme_minimal(
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat Land-use"
+) + ggplot2::labs(
+  tag = "c)"
+) + ggplot2::theme(
+  plot.tag.position = c(0.02, 1)
+)
+
+newplot4 <- ggpubr::ggarrange(
+  plotlist = list(
+    newplot4_a,
+    ggpubr::ggarrange(newplot4_b, newplot4_c, ncol = 1)
+  ), nrow = 1, widths = c(0.55, 0.45)
+)
+ggplot2::ggsave(plot = newplot4, filename = "aplot4.png",
+                units = "cm", width = 6.5*3, height = 6.5*2)
+
