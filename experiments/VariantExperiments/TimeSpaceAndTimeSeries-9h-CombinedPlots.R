@@ -1479,3 +1479,170 @@ newplot4 <- ggpubr::ggarrange(
 ggplot2::ggsave(plot = newplot4, filename = "aplot4.png",
                 units = "cm", width = 6.5*3, height = 6.5*2)
 
+# New Plot 5: #################################################################
+newplot5_filtration <- function(.) {tidytable::filter(
+  .,
+  SpeciesAffinity == "100% 0",
+  NicheDistance == "5",
+  Intervention %in% c("(0)", "(0)->(0.5)", "(0)->(1)"),
+  (PoolPatchSeed %in% as.character(343:386))
+)}
+
+newplot5_dataA <- diversitiesAll %>% newplot5_filtration(
+) %>% tidytable::filter(
+  Metric == "Alpha Hill:0",
+  is.na(Subset)
+) %>% tidytable::left_join(endTimes %>% dplyr::select(-Times))
+
+newplot5_dataB <- diversitiesAll %>% newplot5_filtration(
+) %>% tidytable::filter(
+  Metric == "TimeJaccard",
+  is.na(Subset)
+) %>% tidytable::left_join(endTimes %>% dplyr::select(-Times))
+
+newplot5_dataC <- tidytable::bind_rows(
+  Pers %>% newplot2_filtration(),
+  Pers %>% newplot5_filtration() %>% tidytable::filter(Intervention != "(0)")
+) %>% tidytable::filter(
+  In < Stop, Out > Start # Not things outside of [Start, Stop]
+) %>% tidytable::mutate(
+  # Shorten intervals for equivalent comparisons.
+  InType = ifelse(In < Start, "Persistent", InType),
+  OutType = ifelse(Out > Stop, "Persistent", OutType),
+  In = ifelse(In < Start, Start, In),
+  Out = ifelse(Out > Stop, Stop, Out),
+  Persistence = Out - In
+)
+
+
+newplot5_a <- plotMeanAndInner(
+  newplot5_dataA, CIs = 0.75, facets = as.formula(. ~ .)
+) + ggplot2::geom_point(
+  data = newplot5_dataA %>% tidytable::filter(
+    PoolPatchSeed == targetSeed
+    ) %>% tidytable::group_by(
+    Intervention
+    ) %>% tidytable::mutate(
+      TimeDist = abs(Time + 1e-6 - targetTimes), # Preference a side.
+      IsMin = TimeDist == min(TimeDist)
+    ) %>% tidytable::filter(
+      IsMin
+    )
+) + ggplot2::labs(
+  y = "Richness"
+) + ggplot2::guides(
+  linetype = "none",
+  color = ggplot2::guide_legend(ncol = 3),
+  fill = ggplot2::guide_legend(ncol = 3)
+) + ggplot2::coord_cartesian(
+  xlim = c(0, 40000), expand = FALSE
+) + ggplot2::annotation_custom(
+  ggplot2::ggplotGrob(
+    targetEnvs[[
+      (targetEnvsIndex %>% newplot5_filtration %>% dplyr::pull(ID))[1]
+      ]]$singletonGraphs[[1]][[1]] + ggplot2::theme(
+        plot.background = ggplot2::element_rect(fill = "white"),
+        axis.title.x = ggplot2::element_blank(),
+        axis.text.x = ggplot2::element_blank(),
+        axis.ticks.x = ggplot2::element_blank(),
+        axis.title.y = ggplot2::element_blank(),
+        axis.text.y = ggplot2::element_blank(),
+        axis.ticks.y = ggplot2::element_blank()
+      )
+  ),
+  xmin = 30500, xmax = 40000, ymin = 7, ymax = 17
+) + ggplot2::annotation_custom(
+  ggplot2::ggplotGrob(
+    targetEnvs[[
+      (targetEnvsIndex %>% newplot5_filtration %>% dplyr::pull(ID))[2]
+      ]]$singletonGraphs[[1]][[1]] + ggplot2::theme(
+        plot.background = ggplot2::element_rect(fill = "white"),
+        axis.title.x = ggplot2::element_blank(),
+        axis.text.x = ggplot2::element_blank(),
+        axis.ticks.x = ggplot2::element_blank(),
+        axis.title.y = ggplot2::element_blank(),
+        axis.text.y = ggplot2::element_blank(),
+        axis.ticks.y = ggplot2::element_blank()
+      )
+  ),
+  xmin = 30500, xmax = 40000, ymin = 18, ymax = 28
+) + ggplot2::annotation_custom(
+  ggplot2::ggplotGrob(
+    targetEnvs[[
+      (targetEnvsIndex %>% newplot5_filtration %>% dplyr::pull(ID))[3]
+      ]]$singletonGraphs[[1]][[1]] + ggplot2::theme(
+        plot.background = ggplot2::element_rect(fill = "white"),
+        axis.title.x = ggplot2::element_blank(),
+        axis.text.x = ggplot2::element_blank(),
+        axis.ticks.x = ggplot2::element_blank(),
+        axis.title.y = ggplot2::element_blank(),
+        axis.text.y = ggplot2::element_blank(),
+        axis.ticks.y = ggplot2::element_blank()
+      )
+  ),
+  xmin = 30500, xmax = 40000, ymin = 29, ymax = 39
+) + ggplot2::geom_rect(
+  data = data.frame(
+    1 # 1 rectangle per row, so dummy df to prevent overplotting
+  ),
+  xmin = min(newplot5_dataA$Start),
+  xmax = max(newplot5_dataA$Stop),
+  ymin = 0, ymax = max(newplot5_dataA$Value),
+  fill = "grey",
+  alpha = 0.2,
+  inherit.aes = FALSE
+) + ggplot2::labs(
+  tag = "a)"
+) + ggplot2::theme(
+  legend.position = c(0.25, 0.09),
+  plot.tag.position = c(0.05, 1)
+)
+
+newplot5_ba <- plotMeanAndInner(
+  newplot5_dataB, CIs = 0.75, facets = as.formula(. ~ .)
+) + ggplot2::geom_rect(
+  data = data.frame(
+    1 # 1 rectangle per row, so dummy df to prevent overplotting
+  ),
+  xmin = min(newplot5_dataB$Start),
+  xmax = max(newplot5_dataB$Stop),
+  ymin = 0, ymax = max(newplot5_dataB$Value, na.rm = TRUE),
+  fill = "grey",
+  alpha = 0.2,
+  inherit.aes = FALSE
+) + ggplot2::labs(
+  y = "Time-Jaccard",
+  tag = "b)"
+) + ggplot2::theme(
+  legend.position = "none",
+  plot.tag.position = c(0.05, 1)
+) + ggplot2::coord_cartesian(
+  xlim = c(0, 30000), ylim = c(0, 0.5), expand = FALSE
+)
+newplot5_bb <- ggplot2::ggplot(
+  newplot5_dataB %>% tidytable::filter(
+    Time > Start, Time < Stop
+  ),
+  ggplot2::aes(
+    y = Value, color = Intervention
+  )
+) + ggplot2::geom_density(
+  adjust = 1/2, show.legend = FALSE
+) + ggplot2::coord_cartesian(
+  ylim = c(0, 0.5), expand = FALSE
+) + ggplot2::theme_minimal(
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat Land-use"
+) + ggplot2::scale_x_continuous(
+  name = "", labels = function(x) rep("", length(x))
+) + ggplot2::theme(
+  axis.title.y = ggplot2::element_blank(),
+  axis.text.y = ggplot2::element_blank(),
+  axis.ticks.y = ggplot2::element_blank()#,
+  # axis.text.x = ggplot2::element_blank()
+)
+newplot5_b <- ggpubr::ggarrange(
+  newplot5_ba, newplot5_bb,
+  nrow = 1, widths = c(0.9, 0.1), align = "h"
+)
