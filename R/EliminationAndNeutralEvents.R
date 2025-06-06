@@ -40,7 +40,7 @@ EliminationAndNeutralEvents <- function(
         # <=> PerCapitaDynamics > 0.
         if (
           y[abundanceIndex] > 0 ||
-          PerCapitaDynams(t, y, NULL)[abundanceIndex] > 0
+          PerCapitaDynams(t, y, parms)[abundanceIndex] > 0
         ) {
           y[abundanceIndex] <- y[abundanceIndex] + ArrivalDens
           EventDF$Success[event] <<- TRUE
