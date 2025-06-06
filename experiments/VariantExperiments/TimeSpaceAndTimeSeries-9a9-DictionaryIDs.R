@@ -24,7 +24,7 @@ experiments <- list(list(
       # Standard, and only implemented, LM1996 Function and Parameters,
       PoolDispersalSpeed == 1,
       NumberEnvironments == 1,
-      
+
       apply(dplyr::across(# deprecated, but if_all doesn't permit cur_column
         #             (despite documentation saying otherwise)
         .cols = dplyr::any_of(names(modifiedcase)),
@@ -34,7 +34,7 @@ experiments <- list(list(
         }
       ), 1, all)
     ),
-  
+
   dynDO =
     dynamicsDictionaryOrigin %>% dplyr::filter(
       apply(dplyr::across(# deprecated, but if_all doesn't permit cur_column
@@ -46,7 +46,7 @@ experiments <- list(list(
         }
       ), 1, all)
     ),
-  
+
   eDO =
     eventsDictionaryOrigin %>% dplyr::filter(
       EventsNumberMultiplier == 20, # Longer simulation. Keep number same while
@@ -62,30 +62,30 @@ experiments <- list(list(
         }
       ), 1, all)
     ),
-  
+
   icDO = initialConditionsDictionaryOrigin %>% dplyr::filter(
     Species == "None"
   ),
-  
+
   dispDO =
     dispersalDictionaryOrigin %>% dplyr::filter(
       Configuration == "None" # Doesn't make sense for 1 patch systems.
     ),
-  
+
   distDO =
     distanceDictionaryOrigin %>% dplyr::filter(
       rhofunction %in% c("rho.2.1.2.euclidean",
                          "rho.5.1.2.euclidean",
                          "rho.10.1.2.euclidean")
     ),
-  
+
   aDO =
     affinityDictionaryOrigin %>% dplyr::filter(
       SpeciesAffinities %in% c("rep_0", "runif", "evensplit_01"),
       PatchAffinities %in% c("rep_0", "rep_0.25", "rep_0.5",
                              "rep_0.75", "rep_1")
     ),
-  
+
   iPDO =
     # Note: Every combination of iPDO with ppDO.
     interventionPatchDictionaryOrigin %>% dplyr::filter(
@@ -93,12 +93,12 @@ experiments <- list(list(
       InterventionLocation == 1,
       InterventionPercentage == 1
     ),
-  
+
   iTDO =
     interventionTimeDictionaryOrigin %>% dplyr::filter(
-      Method == "mean"
+      ID == 1 # averaged central tendency.
     ),
-  
+
   # interventionDispersalDictionaryChoice
   iDispChoice = "p",
   # interventionDistanceDictionaryChoice
