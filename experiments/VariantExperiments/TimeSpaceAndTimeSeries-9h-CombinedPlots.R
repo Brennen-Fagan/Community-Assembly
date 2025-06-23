@@ -1946,3 +1946,193 @@ diff_unif_to0  %>% dplyr::group_by(Intervention1) %>% dplyr::group_map(
     ) %>% summary())
 )
 
+# MIGHT REQUIRE VIKING: ########################################################
+# Can we look for clusters? We remove transient species since they don't have
+# time to change the ecosystem generally.
+# %>% tidytable::pull(Persistence) %>% sort() %>% plot()
+temp <- Pers %>% tidytable::filter(
+  SpeciesAffinity %in% c("100% 0", "50% 0, 50% 1", "Uniform(0, 1)"),
+  NicheDistance == "5",
+  Intervention %in% c("(0)", "(0.5)", "(1)",
+                      "(0)->(0.5)", "(0)->(1)",
+                      "(0.5)->(0)", "(0.5)->(1)",
+                      "(1)->(0)", "(1)->(0.5)"),
+  (PoolPatchSeed %in% as.character(343:386)),
+  In < Stop, Out > Start, Persistence >= 100
+) %>% tidytable::separate(
+  col = "AffinityBins", into = c("Left", "Right"), sep = ","
+) %>% tidytable::mutate(
+  Left = round(as.numeric(gsub(pattern = "^.", replacement = "", x = Left))*5)/5,
+  Right = round(as.numeric(gsub(pattern = ".$", replacement = "", x = Right))*5)/5,
+  AffinityBins = paste0("(", Left, ", ", Right, "]")
+)
+# Then we use something like the ECDF over sizes to characterise the ecosystems.
+# (Size because this characterises the food chain. Abundance is also possibly
+#  reasonable because it relates to size, but its also affected by preference.)
+# The trick is to do this through time and Pers doesn't have direct access.
+temp2 <- temp %>% dplyr::group_by(
+  Environment,
+  dplyr::across(PoolPatchSeed:InterventionNicheDistance),
+  SpeciesAffinity, Intervention
+) %>% dplyr::group_map(
+  .f = function(values, key) {
+    times <- range(values$Start, values$Stop)
+    # print(times)
+    times <- seq(times[1], times[2], by = 1000) # Reduce by for accuracy.
+    ecdfs <- vector("list", length = length(times))
+    for (i in seq_along(times)) {
+      time <- times[i]
+      vals <- values %>% tidytable::filter(
+        In < time, time < Out
+      ) %>% tidytable::pull(
+        Size
+      )
+      if (length(vals) > 0) {
+        ecdfs[[i]] <- ecdf(vals)
+      } else {
+        ecdfs[[i]] <- function(x) {rep(NA, length(x))}
+      }
+    }
+    return(list(
+      Key = key, Times = times, ECDFs = ecdfs
+    ))
+  }
+)
+
+# Spot Check
+with(list(pick = 10),
+     expand.grid(
+       Index = 1:length(temp2[[pick]]$Times),
+       Sizes = 10^(seq(-2.1, 0.6, by = 0.1))
+     ) %>% mutate(
+       Times = temp2[[1]]$Times[Index],
+       ECDF = unlist(mapply(
+         function(i, s) temp2[[pick]]$ECDFs[[i]](s),
+         i = Index, s = Sizes
+       ))
+     ) %>% ggplot2::ggplot(
+       ggplot2::aes(
+         x = Times,
+         y = Sizes,
+         color = ECDF,
+         group = Times)
+     ) + ggplot2::geom_line(
+     ) + ggplot2::scale_color_viridis_c(
+     ) + ggplot2::scale_y_log10(
+     ) + ggplot2::coord_cartesian(
+       ylim = 10^c(-2, 0.5),
+       xlim = c(20000, 30000)
+     )
+)
+
+
+# We need to assign indices to all of the ECDFS, then take their distances
+# and then attempt to cluster them to see if we get any signal.
+# We'll start with ks-metric.
+index_ecdf <- 0
+index_coords <- data.frame()
+for (index_group in seq_along(temp2)) {
+  temp2[[index_group]]$Index <-
+    1:length(temp2[[index_group]]$Times) + index_ecdf
+  index_ecdf <- temp2[[index_group]]$Index[length(temp2[[index_group]]$Index)]
+  index_coords <- rbind(
+    index_coords,
+    data.frame(
+      Index = temp2[[index_group]]$Index,
+      First = index_group,
+      Second = 1:length(temp2[[index_group]]$Times)
+    ))
+}
+
+# Can't directly call ks.test without recomputing things a lot.
+matrix_ecdf_dist <- outer(
+  X = 1:index_ecdf, Y = 1:index_ecdf,
+  FUN = Vectorize(function(i, j) {
+    if (i <= j) {return(0)} # Save work, and diag should be 0.
+    it <- temp2[[index_coords[i,]$First]]$ECDFs[[index_coords[i,]$Second]]
+    jt <- temp2[[index_coords[j,]$First]]$ECDFs[[index_coords[j,]$Second]]
+    # KS - Maximal CDF Difference
+    # testvals <- unique(
+    #   environment(it)$x,
+    #   environment(jt)$x
+    # )
+    # return(max(abs(it(testvals) - jt(testvals))))
+    # Earth Mover - Rearrange PDF
+    return(emdist::emdw(A = environment(it)$x,
+                        B = environment(jt)$x,
+                        wA = diff(c(0, it(environment(it)$x))),
+                        wB = diff(c(0, jt(environment(jt)$x)))
+           ))
+  }))
+matrix_ecdf_dist <- matrix_ecdf_dist + t(matrix_ecdf_dist)
+# Not sure about best storage method.
+# matrix_ecdf_dist <- Matrix::sparseMatrix(
+#   dims = c(index_ecdf, index_ecdf),
+#   symmetric = TRUE
+#   )
+
+color_codes <- do.call(rbind, lapply(
+  seq_along(temp2),
+  function(i) with(temp2[[i]]$Key,
+                   data.frame(
+                     First = i,
+                     Key = paste(Intervention, SpeciesAffinity, sep = ", ")))
+  )) %>% dplyr::mutate(
+    KeyIndex = as.numeric(factor(Key)),
+    Color = colorspace::qualitative_hcl(length(unique(Key)))[KeyIndex]
+  )
+index_coords <- index_coords %>% dplyr::left_join(color_codes)
+
+matrix_ecdf_dist_nona <- matrix_ecdf_dist
+matrix_ecdf_dist_nona[is.na(matrix_ecdf_dist_nona)] <- Inf
+  # 1e3 * max(matrix_ecdf_dist, na.rm = T)
+matrix_ecdf_dist_omitna <- matrix_ecdf_dist[
+  rowSums(is.na(matrix_ecdf_dist)) != ncol(matrix_ecdf_dist) - 1,
+  colSums(is.na(matrix_ecdf_dist)) != nrow(matrix_ecdf_dist) - 1
+  ] # stackoverflow.com/a/6437778
+
+dianaout <- cluster::diana(matrix_ecdf_dist_omitna, diss = TRUE, keep.diss = TRUE)
+agnesout <- cluster::agnes(matrix_ecdf_dist_omitna, diss = TRUE, keep.diss = TRUE)
+lapply(1:20, function(i) cluster::pam(matrix_ecdf_dist_nona, diss = TRUE, k = i)$silinfo$avg.width) %>% do.call(what = rbind) %>% plot
+lapply(2:20, function(i) data.frame(index = i, value = mean((cluster::silhouette(cutree(dianaout, k = i), dianaout$diss))[, 3]))) %>% do.call(what = rbind) %>% points(col = "blue")
+lapply(2:20, function(i) data.frame(index = i, value = mean((cluster::silhouette(cutree(agnesout, k = i), agnesout$diss))[, 3]))) %>% do.call(what = rbind) %>% points(col = "red")
+
+plot(cluster::silhouette(cutree(dianaout, k = 4), dianaout$diss))
+plot(cluster::silhouette(cutree(agnesout, k = 4), agnesout$diss))
+
+ggplot2::ggplot(
+  ggplot2::aes(y = Group, x = Key, color = Key),
+  data = cbind(
+    index_coords[-which(rowSums(is.na(matrix_ecdf_dist)) == ncol(matrix_ecdf_dist) - 1),],
+    Group = factor(cutree(agnesout, k = 7))
+  )
+) + ggplot2::geom_point(position = "jitter")
+# Suggests that I probably need to be swapping my statistics.
+# I expected something with all basals to be quite distinct from a mixed
+# basal-consumer system. Meanwhile the Uniform(0, 1) seem to enter multiple
+# states from this depiction (which might be true if there is a build-up or
+# some form of cycle) but it seems odd it would have an something similar to an
+# all basal state!
+# The problem is how to capture this difference.
+# The obvious answer is to explicitly consider the two separately
+# (which necessitates thinking about how to combine the two together again).
+# Maybe functional diversity literature has an answer (for when a function is
+# entirely missing)?
+# If we're comparing ecdfs, setting all of the mass of the missing bit at -Inf
+# or 0 makes sense; this makes a system with one small consumer more like the
+# no consumer system than one with a variety of consumers or large consumers.
+# These aren't realisations of a joint distribution. They are possibly
+# realisation from a Dirichlet Process, for which the parameters change between
+# simulations (and the question is how many DPs would we need, and do we need
+# more than one for a single set of parameters).
+
+# Probably should switch to silhouette widths, and compare with cluster::diana.
+
+# plot(cluster::pam(matrix_ecdf_dist_nona, diss = TRUE, k = 7, keep.diss = TRUE, pamonce = 6), which.plots = 1,
+#      col.p = index_coords$Color)
+# # KS - Probably not good enough to detect differences.
+# # Clustering algorithm or the distance metric?
+# # Hard to say, we can see the 3 main clusters emerging as we might expect
+# # (red is 0.5, green is 0, blue is 1), 0.5 and 0 are closer to each other than
+# # to 1. But we're not seeing separation within these main clusters when we
+# # suspect there might be.
