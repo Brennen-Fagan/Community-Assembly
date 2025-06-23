@@ -1651,3 +1651,298 @@ newplot5_b <- ggpubr::ggarrange(
   newplot5_ba, newplot5_bb,
   nrow = 1, widths = c(0.9, 0.1), align = "h"
 )
+
+ggplot2::ggplot(
+  newplot5_dataC,
+  ggplot2::aes(
+    x = Intervention,
+    fill = interaction(InType, OutType)
+  )) + ggplot2::geom_bar(
+  )
+
+# Statistics: #################################################################
+# SI FIGURE?
+# Pers %>% newplot2_filtration(
+# ) %>% tidytable::filter(
+#   In < Stop, Out > Start # Not things outside of [Start, Stop]
+# ) %>% tidytable::mutate(
+#   # Shorten intervals for equivalent comparisons.
+#   InType = ifelse(In < Start, "Persistent", InType),
+#   OutType = ifelse(Out > Stop, "Persistent", OutType),
+#   In = ifelse(In < Start, Start, In),
+#   Out = ifelse(Out > Stop, Stop, Out),
+#   Persistence = Out - In
+# ) %>% ggplot2::ggplot(
+#   ggplot2::aes(x = PoolPatchSeed, fill = OutType)
+# ) + ggplot2::geom_bar(
+# ) + ggplot2::facet_grid(
+#   . ~ Intervention
+# )
+# Change in outtypes for Figure 2.
+Pers %>% newplot2_filtration(
+) %>% tidytable::filter(
+  In < Stop, Out > Start # Not things outside of [Start, Stop]
+) %>% tidytable::mutate(
+  # Shorten intervals for equivalent comparisons.
+  InType = ifelse(In < Start, "Persistent", InType),
+  OutType = ifelse(Out > Stop, "Persistent", OutType),
+  In = ifelse(In < Start, Start, In),
+  Out = ifelse(Out > Stop, Stop, Out),
+  Persistence = Out - In
+) %>% with(table(OutType, Intervention))
+
+# Change in amount of abundance between basals.
+# Note we are pairing time-averages of simulations, then dividing, then
+# averaging, but this ignores the internal (averaged-out) time dynamics, which
+# judging by the inner 50% of values over time, appears to be quite variable.
+newplot2_dataB %>% tidytable::select(
+  -Affinity, -AffinitySeed, -InterventionInitial, -InterventionFinal
+) %>% tidytable::ungroup()  %>% tidytable::pivot_wider(
+  values_from = c(q025_Basal, Mean_Basal, q075_Basal,
+                  q025_Consumer, Mean_Consumer, q075_Consumer),
+  names_from = Intervention
+) %>% tidytable::distinct(
+) %>% tidytable::mutate(
+  RatioB_1_05 = `Mean_Basal_(1)` / `Mean_Basal_(0.5)`,
+  RatioB_0_1 = `Mean_Basal_(0)` / `Mean_Basal_(1)`,
+  RatioC_05_1 = `Mean_Consumer_(0.5)` / `Mean_Consumer_(1)`,
+  RatioC_0_1 = `Mean_Consumer_(0)` / `Mean_Consumer_(1)`
+) %>% tidytable::summarise(
+  MinB_1_05 = min(RatioB_1_05),
+  RatioB_1_05 = mean(RatioB_1_05),
+  MaxB_1_05 = max(RatioB_1_05),
+  MinB_0_1 = min(RatioB_0_1),
+  RatioB_0_1 = mean(RatioB_0_1),
+  MaxB_0_1 = max(RatioB_0_1),
+  MinC_05_1 = min(RatioC_05_1),
+  RatioC_05_1 = mean(RatioC_05_1),
+  MaxC_05_1 = max(RatioC_05_1),
+  MinC_0_1 = min(RatioC_0_1),
+  RatioC_0_1 = mean(RatioC_0_1),
+  MaxC_0_1 = max(RatioC_0_1)
+)
+
+# Show that the Fig3,4 persistences are fairly transient in comparison.
+ggplot2::ggplot(
+  Pers %>% newplot2_filtration(
+  ) %>% tidytable::filter(
+    In < Stop, Out > Start # Not things outside of [Start, Stop]
+  ) %>% tidytable::mutate(
+    # Shorten intervals for equivalent comparisons.
+    InType = ifelse(In < Start, "Persistent", InType),
+    OutType = ifelse(Out > Stop, "Persistent", OutType),
+    In = ifelse(In < Start, Start, In),
+    Out = ifelse(Out > Stop, Stop, Out),
+    Persistence = Out - In
+  ) %>% tidytable::group_by(
+    Species, Environment, SpeciesType, Size, ReproductionRate, Speed, AffinityBins,
+    PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, Events, EventsSeed,
+    InitialConditions, InitialConditionsSeed, DispersalParam, NicheDistance,
+    Affinity, AffinitySeed, InterventionPatchType, InterventionPatchSeed,
+    InterventionTimeType, InterventionTimeSeed, InterventionDispersal,
+    InterventionNicheDistance, Intervention, SpeciesAffinity, Start, Stop
+  ) %>% tidytable::summarise( # Sum over Appearances.
+    Persistence = sum(Persistence),
+    .groups = "drop"
+  ) %>% tidytable::group_by(
+    Environment, SpeciesType, AffinityBins,
+    PoolPatch, Interactions, Events,
+    InitialConditions, DispersalParam, NicheDistance,
+    Affinity, InterventionPatchType,
+    InterventionTimeType, InterventionDispersal,
+    InterventionNicheDistance, Intervention, SpeciesAffinity, Start, Stop
+  ) %>% tidytable::summarise( # Sum over Appearances.
+    Persistence = mean(Persistence),
+    Size = 10^(mean(log10(Size))),
+    .groups = "drop"
+  ) -> temp,
+  ggplot2::aes(
+    x = Persistence,
+    y = Size,
+    shape = AffinityBins,
+    color = Intervention
+  )
+) + ggplot2::geom_point(
+  show.legend = FALSE
+) + ggplot2::geom_hline(
+  yintercept = 10^-1,
+  linetype = "dashed"
+) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+) + ggplot2::theme_minimal(
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat Land-use"
+)
+
+temp %>% group_by(
+  SpeciesType, Intervention, AffinityBins
+) %>% summarise(
+  min(Persistence), max(Persistence)
+)
+
+newplot3_dataC %>% group_by(
+  SpeciesType, Intervention, AffinityBins
+) %>% summarise(
+  min(Persistence), max(Persistence)
+)
+
+# Decide how to statistically test the data.
+# diversitiesAll %>% tidytable::filter(
+#   NicheDistance == "5",
+#   Intervention %in% c("(0)", "(0.5)", "(1)"),
+#   (PoolPatchSeed %in% as.character(343:386)),
+#   Metric == "Alpha Hill:0"
+# ) %>% ari
+
+diff_1000_5050 <- diversitiesAll %>% tidytable::filter(
+  NicheDistance == "5",
+  Intervention %in% c("(0)"),
+  SpeciesAffinity %in% c("100% 0", "50% 0, 50% 1"),
+  (PoolPatchSeed %in% as.character(343:386)),
+  Metric == "Alpha Hill:0",
+  is.na(Subset)
+) %>% tidytable::group_by(Time, PoolPatchSeed) %>% tidytable::mutate(
+  Value = ifelse(SpeciesAffinity == "100% 0", # Reference
+                 -Value, Value)
+) %>% tidytable::summarise(
+  Value = sum(Value)
+)
+ggplot2::ggplot(
+  diff_1000_5050,
+  ggplot2::aes(
+    x = Time, y = Value#, group = PoolPatchSeed
+  )
+) + ggplot2::geom_hex()
+nlme::gls(
+  Value ~ 1,
+  data = diff_1000_5050,
+  correlation = nlme::corAR1(0,form = ~ Time|PoolPatchSeed)
+) %>% summary
+
+diff_nopref_unif <- tidytable::left_join(
+  diversitiesAll %>% tidytable::filter(
+    NicheDistance == "5",
+    Intervention %in% c("(0)", "(0.5)", "(1)"),
+    SpeciesAffinity %in% c("Uniform(0, 1)"),
+    (PoolPatchSeed %in% as.character(343:386)),
+    Metric == "Alpha Hill:0",
+    is.na(Subset)
+  ) %>% tidytable::rename(
+    Value1 = Value,
+    Affinity1 = SpeciesAffinity,
+    Intervention1 = Intervention
+  ),
+  diversitiesAll %>% tidytable::filter(
+    NicheDistance == "5",
+    Intervention %in% c("(0.5)"),
+    SpeciesAffinity %in% c("100% 0"),
+    (PoolPatchSeed %in% as.character(343:386)),
+    Metric == "Alpha Hill:0",
+    is.na(Subset)
+  ) %>% tidytable::rename(
+    Value2 = Value,
+    Affinity2 = SpeciesAffinity
+  ) %>% tidytable::select(
+    -tidytable::starts_with("Intervention"),
+    -Affinity, -AffinitySeed
+  )
+) %>% tidytable::mutate(
+  Value = Value2 - Value1,
+  Group = paste(Intervention1, PoolPatchSeed)
+)
+diff_nopref_unif %>% dplyr::group_by(Intervention1) %>% dplyr::group_map(
+  function(x, y) nlme::gls(
+    Value ~ 1,
+    data = x,
+    correlation = nlme::corAR1(0, form = ~ Time|Group)
+  ) %>% summary()
+)
+
+diff_unif_5v0 <- tidytable::left_join(
+  diversitiesAll %>% tidytable::filter(
+    NicheDistance == "5",
+    Intervention %in% c("(0)", "(1)"),
+    SpeciesAffinity %in% c("Uniform(0, 1)"),
+    (PoolPatchSeed %in% as.character(343:386)),
+    Metric == "Alpha Hill:0",
+    is.na(Subset)
+  ) %>% tidytable::rename(
+    Value1 = Value,
+    Affinity1 = SpeciesAffinity,
+    Intervention1 = Intervention
+  ),
+  diversitiesAll %>% tidytable::filter(
+    NicheDistance == "5",
+    Intervention %in% c("(0.5)"),
+    SpeciesAffinity %in% c("Uniform(0, 1)"),
+    (PoolPatchSeed %in% as.character(343:386)),
+    Metric == "Alpha Hill:0",
+    is.na(Subset)
+  ) %>% tidytable::rename(
+    Value2 = Value,
+    Affinity2 = SpeciesAffinity
+  ) %>% tidytable::select(
+    -tidytable::starts_with("Intervention"),
+    -Affinity, -AffinitySeed
+  )
+) %>% tidytable::mutate(
+  Value = Value2 - Value1,
+  Group = paste(Intervention1, PoolPatchSeed)
+)
+diff_unif_5v0 %>% dplyr::group_by(Intervention1) %>% dplyr::group_map(
+  function(x, y)
+    list(y, nlme::gls(
+      Value ~ 1,
+      data = x,
+      correlation = nlme::corAR1(0, form = ~ Time|Group)
+    ) %>% summary())
+)
+
+diff_unif_to0 <- tidytable::left_join(
+  diversitiesAll %>% tidytable::filter(
+    NicheDistance == "5",
+    Intervention %in% c("(0.5)->(0)", "(1)->(0)"),
+    SpeciesAffinity %in% c("Uniform(0, 1)"),
+    (PoolPatchSeed %in% as.character(343:386)),
+    Metric == "Alpha Hill:0",
+    is.na(Subset)
+  ) %>% tidytable::rename(
+    Value1 = Value,
+    Affinity1 = SpeciesAffinity,
+    Intervention1 = Intervention
+  ) %>% tidytable::mutate(
+    Time1 = round(Time, -1)
+  ),
+  diversitiesAll %>% tidytable::filter(
+    NicheDistance == "5",
+    Intervention %in% c("(0)"),
+    SpeciesAffinity %in% c("Uniform(0, 1)"),
+    (PoolPatchSeed %in% as.character(343:386)),
+    Metric == "Alpha Hill:0",
+    is.na(Subset)
+  ) %>% tidytable::mutate(
+    Time = round(Time, -1)
+  ) %>% tidytable::rename(
+    Time1 = Time, # So that they match up when there are multiple times in left.
+    Value2 = Value,
+    Affinity2 = SpeciesAffinity
+  ) %>% tidytable::select(
+    -tidytable::starts_with("Intervention"),
+    -Affinity, -AffinitySeed
+  )
+) %>% tidytable::mutate(
+  Value =  Value1 - Value2,
+  Group = paste(Intervention1, PoolPatchSeed)
+) %>% tidytable::filter(
+  Time >= 20000, Time <= 30000
+)
+diff_unif_to0  %>% dplyr::group_by(Intervention1) %>% dplyr::group_map(
+  function(x, y)
+    list(y, nlme::gls(
+      Value ~ 1,
+      data = x,
+      correlation = nlme::corAR1(0, form = ~ Time|Group)
+    ) %>% summary())
+)
+
