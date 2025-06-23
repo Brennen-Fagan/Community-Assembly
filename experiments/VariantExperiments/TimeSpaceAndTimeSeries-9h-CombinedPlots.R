@@ -1,6 +1,6 @@
 # Plotting with both ColExt and Divs
 load("ColExt9a9_flat.RData")
-load("diversitiesFlattened9a9_subset3.RData")
+load("diversitiesFlattened9a9_subset4.RData")
 
 # Problems with X11
 options(bitmapType = "cairo")
@@ -39,7 +39,7 @@ colorPalette <- c(#              Cyan, Magenta, Yellow, Black
 linetypePalette <- c(
   "100% 0" = "solid",
   "50% 0, 50% 1" = "longdash",
-  "Uniform(0, 1)" = "dotted"
+  "Uniform(0, 1)" = "dotdash"
 )
 
 # renames: ####################################################################
@@ -149,7 +149,7 @@ plotMeanAndInner <- function(
     values = linetypePalette
   ) + ggplot2::theme_minimal(
   ) + ggplot2::guides(
-    color = "none",
+    color = if (length(CIs)>0) {"none"} else {"legend"},
     fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
   )
 
@@ -854,6 +854,8 @@ newplot2_dataC <- Pers %>% newplot2_filtration(
   In < Stop, Out > Start # Not things outside of [Start, Stop]
 ) %>% tidytable::mutate(
   # Shorten intervals for equivalent comparisons.
+  InType = ifelse(In < Start, "Persistent", InType),
+  OutType = ifelse(Out > Stop, "Persistent", OutType),
   In = ifelse(In < Start, Start, In),
   Out = ifelse(Out > Stop, Stop, Out),
   Persistence = Out - In
@@ -1115,6 +1117,8 @@ newplot3_dataC <- Pers %>% newplot3_filtration(
   In < Stop, Out > Start # Not things outside of [Start, Stop]
 ) %>% tidytable::mutate(
   # Shorten intervals for equivalent comparisons.
+  InType = ifelse(In < Start, "Persistent", InType),
+  OutType = ifelse(Out > Stop, "Persistent", OutType),
   In = ifelse(In < Start, Start, In),
   Out = ifelse(Out > Stop, Stop, Out),
   Persistence = Out - In
@@ -1331,6 +1335,8 @@ newplot4_dataC <- Pers %>% newplot4_filtration(
   In < Stop, Out > Start # Not things outside of [Start, Stop]
 ) %>% tidytable::mutate(
   # Shorten intervals for equivalent comparisons.
+  InType = ifelse(In < Start, "Persistent", InType),
+  OutType = ifelse(Out > Stop, "Persistent", OutType),
   In = ifelse(In < Start, Start, In),
   Out = ifelse(Out > Stop, Stop, Out),
   Persistence = Out - In
@@ -1514,20 +1520,19 @@ newplot5_dataC <- tidytable::bind_rows(
   Persistence = Out - In
 )
 
-
 newplot5_a <- plotMeanAndInner(
   newplot5_dataA, CIs = 0.75, facets = as.formula(. ~ .)
 ) + ggplot2::geom_point(
   data = newplot5_dataA %>% tidytable::filter(
     PoolPatchSeed == targetSeed
-    ) %>% tidytable::group_by(
+  ) %>% tidytable::group_by(
     Intervention
-    ) %>% tidytable::mutate(
-      TimeDist = abs(Time + 1e-6 - targetTimes), # Preference a side.
-      IsMin = TimeDist == min(TimeDist)
-    ) %>% tidytable::filter(
-      IsMin
-    )
+  ) %>% tidytable::mutate(
+    TimeDist = abs(Time + 1e-6 - targetTimes), # Preference a side.
+    IsMin = TimeDist == min(TimeDist)
+  ) %>% tidytable::filter(
+    IsMin
+  )
 ) + ggplot2::labs(
   y = "Richness"
 ) + ggplot2::guides(

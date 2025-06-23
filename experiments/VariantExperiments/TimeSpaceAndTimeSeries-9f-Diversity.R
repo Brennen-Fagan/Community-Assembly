@@ -14,7 +14,8 @@ datfolders <- dir(pattern = "TSTS_Simulations_")#.+2024-11-19$")
 # datfolders <- dir(pattern = "TSTS_Simulations_.+2025-04-15$")
 # datfolders <- dir(pattern = "TSTS_Simulations_.+2025-05-12$")
 # datfolders <- dir(pattern = "CompareEliminationThresholds$")
-cores <- 12 # Parallelization?
+# cores <- 15 # Parallelization?
+cores <- commandArgs()[1]
 preferredTimestep <- 10 # Characteristic Time Scale Units
 # Previously Event rate was ~1/CTU, now it's more like ~0.1/CTU in theory.
 # (This seems reasonably close in practice looking at 1 example and observing
@@ -138,7 +139,9 @@ Diversity <- foreach::foreach(
       # events = loaded$Events, # unnecessary here.
       threshold = loaded$Parameters$EliminationThreshold,
       preferredTimeStep = preferredTimestep, # Abusing the characteristic t scale.
-      preferredStart = ceiling(loaded$Abundance[1, 1]) # Must be at or after.
+      preferredStart = # Must be at or after.
+        ceiling(loaded$Abundance[1, 1]/preferredTimestep)*preferredTimestep,
+      includeMinTime = TRUE
     )
 
     if (exists("x_pool") && !is.null(x_pool)) {

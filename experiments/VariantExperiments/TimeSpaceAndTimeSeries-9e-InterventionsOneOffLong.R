@@ -120,3 +120,6 @@ success <- foreach::foreach(
       skipIfSaveExists = TRUE
     )
 }
+
+if (cores > 1)
+  parallel::stopCluster(clust)

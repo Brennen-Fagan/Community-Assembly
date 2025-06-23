@@ -35,7 +35,7 @@ colorPalette <- c(#              Cyan, Magenta, Yellow, Black
 linetypePalette <- c(
   "100% 0" = "solid",
   "50% 0, 50% 1" = "longdash",
-  "Uniform(0, 1)" = "dotted"
+  "Uniform(0, 1)" = "dotdash"
 )
 
 # functions: ##################################################################
@@ -148,7 +148,7 @@ for (datfolder in datfolders) {
   gc()
 }
 
-save(diversitiesAll, file = "diversitiesFlattened9a9_subset2.RData")
+save(diversitiesAll, file = "diversitiesFlattened9a9_subset4.RData")
 
 # START HERE: ##################################################################
 
@@ -263,13 +263,14 @@ plotMeanAndInner <- function(
 }
 
 plotMeanAndInner(diversitiesAll %>% tidytable::filter(
-  is.na(Subset), Metric == "Alpha Hill:0"
+  is.na(Subset), Metric == "Alpha Hill:0",
+  PoolPatchSeed %in% as.character(343:386)
 ))
 
 lapply(unique(diversitiesAll$Metric), function(metric) {
   print(metric)
   thePlot <- plotMeanAndInner(diversitiesAll %>% tidytable::filter(
-    is.na(Subset), Metric == metric
+    is.na(Subset), Metric == metric, PoolPatchSeed %in% as.character(343:386)
   )) + ggplot2::labs(y = metric)
   if (! grepl(pattern = "Alpha", x = metric, fixed = TRUE) &&
       ! grepl(pattern = "Size", x = metric, fixed = TRUE) &&
