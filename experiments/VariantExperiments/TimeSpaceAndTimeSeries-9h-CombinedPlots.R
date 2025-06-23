@@ -1988,9 +1988,27 @@ temp2 <- temp %>% dplyr::group_by(
         Size
       )
       if (length(vals) > 0) {
-        ecdfs[[i]] <- ecdf(vals)
+        # Why consumer ecdf(0) if there isn't anything?
+        # log(0) = -Inf, so it makes some sense on the natural scale,
+        # and it also means that we penalise more heavily the difference
+        # between no consumers and large consumers than no and small.
+        ecdfs[[i]] <- list(
+          Basals = if (sum(vals < 10^-1) > 0) {
+            ecdf(vals[vals < 10^-1])
+          } else {
+            function(x) {rep(NA, length(x))}
+          },
+          Consumers = if (sum(vals >= 10^-1) > 0) {
+            ecdf(vals[vals >= 10^-1])
+          } else {
+            ecdf(0)
+          }
+        )
       } else {
-        ecdfs[[i]] <- function(x) {rep(NA, length(x))}
+        ecdfs[[i]] <- list(
+          Basals = function(x) {rep(NA, length(x))},
+          Consumers = ecdf(0)
+        )
       }
     }
     return(list(
@@ -2007,7 +2025,10 @@ with(list(pick = 10),
      ) %>% mutate(
        Times = temp2[[1]]$Times[Index],
        ECDF = unlist(mapply(
-         function(i, s) temp2[[pick]]$ECDFs[[i]](s),
+         function(i, s) (
+           temp2[[pick]]$ECDFs[[i]]$Basal(s) +
+             temp2[[pick]]$ECDFs[[i]]$Consumers(s)
+           ),
          i = Index, s = Sizes
        ))
      ) %>% ggplot2::ggplot(
@@ -2017,7 +2038,8 @@ with(list(pick = 10),
          color = ECDF,
          group = Times)
      ) + ggplot2::geom_line(
-     ) + ggplot2::scale_color_viridis_c(
+     ) + ggplot2::scale_color_steps2(
+       midpoint = 1
      ) + ggplot2::scale_y_log10(
      ) + ggplot2::coord_cartesian(
        ylim = 10^c(-2, 0.5),
@@ -2051,6 +2073,32 @@ matrix_ecdf_dist <- outer(
     if (i <= j) {return(0)} # Save work, and diag should be 0.
     it <- temp2[[index_coords[i,]$First]]$ECDFs[[index_coords[i,]$Second]]
     jt <- temp2[[index_coords[j,]$First]]$ECDFs[[index_coords[j,]$Second]]
+
+    # Logs help respect the different scales that basals and consumers are on.
+    # Note: this might be sufficient with emdw, but splitting Bs and Cs means
+    # we have to pay equal attention to both sides.
+    emdB <- if (length(environment(it$Basal)$x) == 0 ||
+                length(environment(jt$Basal)$x) == 0) {
+      NaN
+    } else {
+      emdist::emdw(
+        A = log10(environment(it$Basal)$x),
+        B = log10(environment(jt$Basal)$x),
+        wA = diff(c(0, it$Basal(environment(it$Basal)$x))),
+        wB = diff(c(0, jt$Basal(environment(jt$Basal)$x)))
+      )
+    }
+    emdC <-  if (length(environment(it$Consumer)$x) == 0 ||
+                 length(environment(jt$Consumer)$x) == 0) {
+      NaN
+    } else {
+      emdist::emdw(
+        A = log10(environment(it$Consumer)$x),
+        B = log10(environment(jt$Consumer)$x),
+        wA = diff(c(0, it$Consumer(environment(it$Consumer)$x))),
+        wB = diff(c(0, jt$Consumer(environment(jt$Consumer)$x)))
+      )
+    }
     # KS - Maximal CDF Difference
     # testvals <- unique(
     #   environment(it)$x,
@@ -2058,11 +2106,7 @@ matrix_ecdf_dist <- outer(
     # )
     # return(max(abs(it(testvals) - jt(testvals))))
     # Earth Mover - Rearrange PDF
-    return(emdist::emdw(A = environment(it)$x,
-                        B = environment(jt)$x,
-                        wA = diff(c(0, it(environment(it)$x))),
-                        wB = diff(c(0, jt(environment(jt)$x)))
-           ))
+    return(emdB + emdC)
   }))
 matrix_ecdf_dist <- matrix_ecdf_dist + t(matrix_ecdf_dist)
 # Not sure about best storage method.
