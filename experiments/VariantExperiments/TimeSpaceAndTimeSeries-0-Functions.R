@@ -869,7 +869,8 @@ thinAbundance <- function(abundance, events, threshold,
 }
 
 thinAbundanceEqualTimeSteps <- function(
-  abundance, threshold, preferredTimeStep, preferredStart = NULL
+  abundance, threshold, preferredTimeStep, preferredStart = NULL,
+  includeMinTime = FALSE
 ) {
   time <- abundance[, 1]
   consistentDistance <- max(diff(time), preferredTimeStep)
@@ -880,6 +881,8 @@ thinAbundanceEqualTimeSteps <- function(
   if (is.null(preferredStart)) preferredStart <- min(time)
   targets <- seq(from = preferredStart,
                  to = max(time), by = consistentDistance)
+  if (includeMinTime && preferredStart != min(time))
+    targets <- c(min(time), targets)
   rows <- unique( # Just In Case?
     sapply(targets, function(x, y) {which.max(y >= x)}, y = time)
   )
