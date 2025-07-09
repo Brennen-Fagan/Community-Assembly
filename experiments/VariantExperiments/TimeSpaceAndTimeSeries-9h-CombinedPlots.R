@@ -2194,3 +2194,82 @@ ggplot2::ggplot(
 # # (red is 0.5, green is 0, blue is 1), 0.5 and 0 are closer to each other than
 # # to 1. But we're not seeing separation within these main clusters when we
 # # suspect there might be.
+
+with(
+  list(dat = diversitiesAll %>% tidytable::filter(
+    NicheDistance == "5",
+    (PoolPatchSeed %in% as.character(343:386)),
+    Metric == "Alpha Hill:0",
+    is.na(Subset),
+    Time != round(Time) | lag(Time) != round(lag(Time))
+  )),
+  dat %>% group_by(
+    PoolPatchSeed, Intervention, SpeciesAffinity
+  ) %>% summarise(
+    Value = diff(Value),
+    Time = diff(Time)
+  ) %>% ggplot2::ggplot(
+    ggplot2::aes(
+      x = Time,
+      y = Value,
+      color = Intervention,
+      shape = SpeciesAffinity,
+      linetype = SpeciesAffinity
+    )
+  ) + ggplot2::geom_point(
+  ) + ggplot2::geom_smooth(
+  ) + ggplot2::facet_wrap(
+    . ~ SpeciesAffinity
+  )
+)
+
+with(
+  diversitiesRichness %>% tidytable::filter(
+    NicheDistance == "5",
+    (PoolPatchSeed %in% as.character(343:386)),
+    Metric == "Alpha Hill:0",
+    is.na(Subset),
+    Time != round(Time) | lag(Time) != round(lag(Time))
+  ) %>% changeAffinityLevels() %>% changeInterventionLevels(
+  ) %>% tidytable::mutate(
+    #TODO consider moving this into changeInterventionLevels.
+    InterventionInitial = tidytable::case_when(
+      Intervention %in% interventionMatrix[1, ] ~ diag(interventionMatrix)[1],
+      Intervention %in% interventionMatrix[2, ] ~ diag(interventionMatrix)[2],
+      Intervention %in% interventionMatrix[3, ] ~ diag(interventionMatrix)[3],
+      Intervention %in% interventionMatrix[4, ] ~ diag(interventionMatrix)[4],
+      Intervention %in% interventionMatrix[5, ] ~ diag(interventionMatrix)[5],
+      TRUE ~ NA_character_
+    ),
+    InterventionInitial = factor(
+      InterventionInitial,
+      levels = c(
+        diag(interventionMatrix)
+      ), ordered = TRUE
+    ),
+    InterventionFinal = tidytable::case_when(
+      Intervention %in% interventionMatrix[, 1] ~ diag(interventionMatrix)[1],
+      Intervention %in% interventionMatrix[, 2] ~ diag(interventionMatrix)[2],
+      Intervention %in% interventionMatrix[, 3] ~ diag(interventionMatrix)[3],
+      Intervention %in% interventionMatrix[, 4] ~ diag(interventionMatrix)[4],
+      Intervention %in% interventionMatrix[, 5] ~ diag(interventionMatrix)[5],
+      TRUE ~ NA_character_
+    ),
+    InterventionFinal = factor(
+      InterventionFinal,
+      levels = c(
+        diag(interventionMatrix)
+      ), ordered = TRUE
+    ),
+    InterventionDist = abs(
+      as.numeric(gsub(InterventionFinal, pattern = "[(|)]", replacement = "")) -
+        as.numeric(gsub(InterventionInitial, pattern = "[(|)]", replacement = ""))
+      )
+  ) %>% group_by(
+      PoolPatchSeed, Intervention, InterventionDist, SpeciesAffinity
+    ) %>% summarise(
+      Value = round(diff(Value)),
+      Time = diff(Time)
+    ),
+    table(InterventionDist, SpeciesAffinity, sign(Value))
+  )
