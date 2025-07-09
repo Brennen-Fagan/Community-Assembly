@@ -2,9 +2,17 @@
 
 # datfolders <- dir(pattern = "TSTS_Simulations_")
 # datfolders <- dir(pattern = "TSTS_Simulations_.+2024-11-30$") # Regex
-datfolders <- dir(path = ".",
-                  pattern = "TSTS_Simulations_.+2025-01-2[1-4]$",# Regex
-                  full.names = TRUE)
+# datfolders <- dir(pattern = "TSTS_Simulations_.+2025-05-12$") # Regex
+# datfolders <- dir(path = ".",
+#                   pattern = "TSTS_Simulations_.+2025-01-2[1-4]$",# Regex
+#                   full.names = TRUE)
+datfolders <-
+  c(
+  dir(pattern = "TSTS_Simulations_.+2025-01-2[(1-4|6|7)]")
+  ,
+  dir(pattern = "TSTS_Simulations_.+2025-05-12$")
+)
+# datfolders <- dir(pattern = "TSTS_Simulations_.+2025-01-24")
 
 overwrite <- TRUE
 
@@ -130,7 +138,7 @@ for (datfolder in datfolders) {
   # We just can't get past the memory barrier, so we'll need to reduce the
   # amount of data we are looking at.
   obj <- obj %>% tidytable::filter(
-    (round(Time, digits = -1) %% 100) == 0,
+    (round(Time, digits = -1) %% 100) == 0 | (Time > 15000 & Time < 20000),
     Intervention %in% c(
       "(0)",   "(0)->(0.5)", "(0)->(1)",
       "(0.5)", "(0.5)->(0)", "(0.5)->(1)",
