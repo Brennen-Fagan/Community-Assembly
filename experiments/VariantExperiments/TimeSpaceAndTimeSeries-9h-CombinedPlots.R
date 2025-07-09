@@ -77,7 +77,9 @@ changeInterventionLevels <- function(df) {
       Intervention,
       levels = c(
         "(0)", "(0)->(0.25)", "(0)->(0.5)", "(0)->(0.75)", "(0)->(1)",
+        "(0.25)->(0)", "(0.25)", "(0.25)->(0.5)", "(0.25)->(0.75)", "(0.25)->(1)",
         "(0.5)->(0)", "(0.5)->(0.25)", "(0.5)", "(0.5)->(0.75)", "(0.5)->(1)",
+        "(0.75)->(0)", "(0.75)->(0.25)", "(0.75)->(0.5)", "(0.75)", "(0.75)->(1)",
         "(1)->(0)", "(1)->(0.25)", "(1)->(0.5)", "(1)->(0.75)", "(1)"
       ), ordered = TRUE
     )
@@ -473,32 +475,44 @@ Pers <- ColExt %>% tidytable::rename(
 )
 
 # Diversities: #################################################################
+interventionMatrix <- matrix(
+  c("(0)", "(0)->(0.25)", "(0)->(0.5)", "(0)->(0.75)", "(0)->(1)",
+    "(0.25)->(0)", "(0.25)", "(0.25)->(0.5)", "(0.25)->(0.75)", "(0.25)->(1)",
+    "(0.5)->(0)", "(0.5)->(0.25)", "(0.5)", "(0.5)->(0.75)", "(0.5)->(1)",
+    "(0.75)->(0)", "(0.75)->(0.25)", "(0.75)->(0.5)", "(0.75)", "(0.75)->(1)",
+    "(1)->(0)", "(1)->(0.25)", "(1)->(0.5)", "(1)->(0.75)", "(1)"),
+  byrow = TRUE, nrow = 5)
+
 diversitiesAll <- diversitiesAll %>% changeAffinityLevels(
 ) %>% changeInterventionLevels(
 ) %>% tidytable::mutate(
   #TODO consider moving this into changeInterventionLevels.
   InterventionInitial = tidytable::case_when(
-    Intervention %in% c("(0)", "(0)->(0.5)", "(0)->(1)") ~ "(0)",
-    Intervention %in% c("(0.5)->(0)", "(0.5)", "(0.5)->(1)") ~ "(0.5)",
-    Intervention %in% c("(1)->(0)", "(1)->(0.5)", "(1)") ~ "(1)",
+    Intervention %in% interventionMatrix[1, ] ~ diag(interventionMatrix)[1],
+    Intervention %in% interventionMatrix[2, ] ~ diag(interventionMatrix)[2],
+    Intervention %in% interventionMatrix[3, ] ~ diag(interventionMatrix)[3],
+    Intervention %in% interventionMatrix[4, ] ~ diag(interventionMatrix)[4],
+    Intervention %in% interventionMatrix[5, ] ~ diag(interventionMatrix)[5],
     TRUE ~ NA_character_
   ),
   InterventionInitial = factor(
     InterventionInitial,
     levels = c(
-      "(0)", "(0.5)",  "(1)"
+      diag(interventionMatrix)
     ), ordered = TRUE
   ),
   InterventionFinal = tidytable::case_when(
-    Intervention %in% c("(0)", "(0.5)->(0)", "(1)->(0)") ~ "(0)",
-    Intervention %in% c("(0)->(0.5)", "(0.5)",  "(1)->(0.5)") ~ "(0.5)",
-    Intervention %in% c("(0)->(1)", "(0.5)->(1)", "(1)") ~ "(1)",
+    Intervention %in% interventionMatrix[, 1] ~ diag(interventionMatrix)[1],
+    Intervention %in% interventionMatrix[, 2] ~ diag(interventionMatrix)[2],
+    Intervention %in% interventionMatrix[, 3] ~ diag(interventionMatrix)[3],
+    Intervention %in% interventionMatrix[, 4] ~ diag(interventionMatrix)[4],
+    Intervention %in% interventionMatrix[, 5] ~ diag(interventionMatrix)[5],
     TRUE ~ NA_character_
   ),
   InterventionFinal = factor(
     InterventionFinal,
     levels = c(
-      "(0)", "(0.5)",  "(1)"
+      diag(interventionMatrix)
     ), ordered = TRUE
   )
 )
