@@ -1,4 +1,5 @@
 load("diversitiesFlattened9a9_subset4Richness.RData")
+load("ColExt9a9_flat.RData")
 
 # Problems with X11
 options(bitmapType = "cairo")
@@ -16,6 +17,7 @@ library(ggraph)
 
 source("TimeSpaceAndTimeSeries-9-Dictionaries.R")
 source('TimeSpaceAndTimeSeries-0-Functions.R')
+source("flattenDiversity.R") # Flatten the data for the networks.
 source("CalculateTrophicStructure.R") # Calculator creator.
 source("toCheddar.R") # Updated function.
 
@@ -27,6 +29,50 @@ interventionMatrix <- matrix(
     "(0.75)->(0)", "(0.75)->(0.25)", "(0.75)->(0.5)", "(0.75)", "(0.75)->(1)",
     "(1)->(0)", "(1)->(0.25)", "(1)->(0.5)", "(1)->(0.75)", "(1)"),
   byrow = TRUE, nrow = 5)
+
+### colors: ###################################################################
+# Algorithmic: first index = 100%, second index = 50%
+#              (0) => 1,0,0, (0.5) => 0,1,0, (1) => 0,0,1
+#              (0.25) => 0.5,0.5,0, (0.75) => 0,0.5,0.5
+colorPaletteAlg <- function(intervention) {
+  intervention <- as.numeric(strsplit(
+    gsub(intervention, pattern = "[(|)]", replacement = ""), 
+    split = "->")[[1]])
+  x <- intervention[1]
+  y <- if(length(intervention) == 2) {
+    intervention[2] 
+  } else {
+    intervention[1]
+  }
+  DescTools::CmykToRgb(
+    min(max(0, (0.5-x)/0.5) + 0.5*max(0, (0.5-y)/0.5), 1), 
+    min(max(0, (0.5 - abs(x - 0.5))/0.5) 
+                + 0.5*max(0, (0.5 - abs(y - 0.5))/0.5), 1), 
+    min(max(0, (x-0.5)/0.5)+ 0.5*max(0, (y-0.5)/0.5), 1),
+    0.25
+  )
+}
+
+colorPalette <- sapply(interventionMatrix, colorPaletteAlg)
+
+linetypePalette <- c(
+  "100% 0" = "solid",
+  "50% 0, 50% 1" = "longdash",
+  "Uniform(0, 1)" = "dotdash"
+)
+
+### renames: ##################################################################
+# For presentation (i.e., "Arrival" is a working term, but not 100% accurate.)
+externalNames <- c(
+  "Arrival"         = "Colonisation",
+  "Failed Arrival"  = "Failure",
+  "Present"         = "Present",
+  "Dispersal"       = "Adjacent",
+  "Extinct"         = "Neutral Ext.",
+  "Dynamic Loss"    = "Dynamic Ext.",
+  "EndOfSimulation" = "Persistent",
+  "NA"              = "NA"
+)
 
 # Functions: ##################################################################
 ### Manipulation: #############################################################
@@ -82,38 +128,131 @@ changeInterventionLevels <- function(df) {
   )
 }
 
-# colors: #####################################################################
-#                                (0),   (0.5),   (1)
-colorPalette <- c(#              Cyan, Magenta, Yellow, Black
-  "(0)" =        DescTools::CmykToRgb(1,   0,   0,   0.25),
-  "(0)->(0.5)" = DescTools::CmykToRgb(1,   0.5, 0,   0.25),
-  "(0)->(1)" =   DescTools::CmykToRgb(1,   0,   0.75, 0.25),
-  "(0.5)" =      DescTools::CmykToRgb(0,   1,   0,   0.25),
-  "(0.5)->(0)" = DescTools::CmykToRgb(0.5, 1,   0,   0.25),
-  "(0.5)->(1)" = DescTools::CmykToRgb(0,   1,   0.75, 0.25),
-  "(1)" =        DescTools::CmykToRgb(0,   0,   1,   0.25),
-  "(1)->(0)" =   DescTools::CmykToRgb(0.5, 0,   1,   0.25),
-  "(1)->(0.5)" = DescTools::CmykToRgb(0,   0.5, 1,   0.25)
-)
+### Plotting: #################################################################
+plotMeanAndInner <- function(
+  data, CIs = c(0.5, 0.95),
+  facets = as.formula(Intervention ~ SpeciesAffinity)
+) {
+  # Correct for a problem with how to handle NAs by converting to strings
+  data$Subset <- ifelse(is.na(data$Subset), "NA", data$Subset)
+  
+  # Create base with particular attention to grouping structure.
+  baseplot <- ggplot2::ggplot(
+    data,
+    ggplot2::aes(
+      x = Time, y = Value,
+      group = interaction(
+        Subset,
+        Intervention, InterventionInitial, InterventionFinal, SpeciesAffinity
+      ),
+      color = Intervention, fill = Intervention, linetype = SpeciesAffinity
+    )
+  )
+  
+  # Plot each CI overlaid. Overlaying => the innermost have the darkest alpha.
+  for (CI in CIs) {
+    baseplot <- baseplot + ggplot2::geom_ribbon(
+      data = data %>% tidytable::mutate(
+        Time = round(Time, digits = -2)
+      ) %>% tidytable::group_by(
+        Time, Subset,
+        Intervention, InterventionInitial, InterventionFinal, SpeciesAffinity
+      ) %>% tidytable::summarise(
+        top = quantile(Value, probs = CI+(1-CI)/2, na.rm = TRUE),
+        bot = quantile(Value, probs = (1-CI)-(1-CI)/2, na.rm = TRUE)
+      ), mapping = ggplot2::aes(
+        x = Time, ymin = bot, ymax = top,
+        group = interaction(
+          Subset,
+          Intervention, InterventionInitial, InterventionFinal, SpeciesAffinity
+        ),
+        fill = Intervention,
+        color = Intervention
+      ), inherit.aes = FALSE,
+      alpha = 0.25, linewidth = 0.25 #, linetype = "dotted"
+    )
+  }
+  
+  # Add an average line and handle the meta-details.
+  baseplot <- baseplot + ggplot2::geom_line(
+    data = data %>% tidytable::mutate(
+      Time = round(Time, digits = -2)
+    ) %>% tidytable::group_by(
+      Time, Subset,
+      Intervention, InterventionInitial, InterventionFinal, SpeciesAffinity
+    ) %>% tidytable::summarise(
+      Value = mean(Value, na.rm = TRUE)
+    )
+  ) + ggplot2::facet_grid(
+    facets
+  ) + ggplot2::scale_color_manual(
+    values = colorPalette, aesthetics = c("color", "fill"),
+    name = "Habitat Land-use"
+  ) + ggplot2::scale_linetype_manual(
+    name = "Species Preferences",
+    values = linetypePalette
+  ) + ggplot2::theme_minimal(
+  ) + ggplot2::guides(
+    color = if (length(CIs)>0) {"none"} else {"legend"},
+    fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
+  )
+  
+  return(baseplot)
+}
 
-linetypePalette <- c(
-  "100% 0" = "solid",
-  "50% 0, 50% 1" = "longdash",
-  "Uniform(0, 1)" = "dotdash"
-)
-
-# renames: ####################################################################
-# For presentation (i.e., "Arrival" is a working term, but not 100% accurate.)
-externalNames <- c(
-  "Arrival"         = "Colonisation",
-  "Failed Arrival"  = "Failure",
-  "Present"         = "Present",
-  "Dispersal"       = "Adjacent",
-  "Extinct"         = "Neutral Ext.",
-  "Dynamic Loss"    = "Dynamic Ext.",
-  "EndOfSimulation" = "Persistent",
-  "NA"              = "NA"
-)
+# Note: unlike the other plots, this one is called inside the environments.
+#       The other plots are called inside the createOverviewFigure function.
+plotGraph <- function(graph, mainLayout, legends = FALSE) {
+  obj <- ggraph::ggraph(
+    graph = graph %N>% mutate(
+      nodesize = (log10(N)+5)/10+1
+    ),
+    layout = graph %N>% data.frame(
+    ) %>% select(node) %>% left_join(
+      mainLayout %>% select(x, y, node)
+    )
+  ) + ggraph::geom_edge_diagonal(
+    mapping = aes(
+      color = Type,
+      linetype = Type,
+      alpha = log10(effectNormalised),
+      end_cap = circle(node2.nodesize+2, 'pt')
+    ),
+    arrow = arrow(length = unit(2, 'mm')), 
+    show.legend = legends
+  ) + ggraph::geom_node_point(
+    mapping = aes(
+      color = Type,
+      size = nodesize
+    ), 
+    show.legend = legends
+  # ) + ggplot2::geom_hline(
+  #   yintercept = -1, linetype = "dashed", color = "black"
+  ) + theme_minimal(
+  ) + ylab(
+    "Log10(Size)"
+  ) + xlab(
+    "Land-use Preference"
+  ) + scale_color_manual(
+    values = c("limegreen", "goldenrod2")
+  ) + ggraph::scale_edge_color_manual(
+    values = rev(c("limegreen", "goldenrod2"))
+  ) + scale_size(
+    range = c(0.5, 4)
+    # limits = c(10^-5, 10^5)#, trans = "log10"
+  ) + coord_cartesian(
+    x = c(0, 1), y = c(-2, 0.25),
+    clip = "off"
+  )
+  
+  # if (!legends) {
+  #   obj <- obj + ggplot2::theme(
+  #     legend.position = "none"
+  #   )
+  # }
+  
+  return(obj)
+}
 
 # START HERE: ##################################################################
 ### Strings: ###################################################################
