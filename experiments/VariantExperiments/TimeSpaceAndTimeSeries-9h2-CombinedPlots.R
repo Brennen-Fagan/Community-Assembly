@@ -719,12 +719,13 @@ newplot2_c <- ggplot2::ggplot(
   alpha = 0.2,
   inherit.aes = FALSE
 ) + ggplot2::geom_violin(
-  position = ggplot2::position_dodge(0.9), show.legend = FALSE
-) + ggplot2::geom_boxplot(
-  notch = TRUE, outlier.size = 0,
-  position = ggplot2::position_dodge(0.9),
-  width = 0.28, show.legend = FALSE,
-  color = "black"
+  position = ggplot2::position_dodge(0.9), show.legend = FALSE, 
+  scale = "count", draw_quantiles = 0.5
+  # ) + ggplot2::geom_boxplot(
+  #   notch = TRUE, outlier.size = 0,
+  #   position = ggplot2::position_dodge(0.9),
+  #   width = 0.28, show.legend = FALSE,
+  #   color = "black"
 ) + ggplot2::scale_color_manual(
   values = colorPalette,
   name = "Habitat Land-use"
@@ -816,7 +817,7 @@ newplot3_a <- ggplot2::ggplot(
   alpha = 0.2,
   inherit.aes = FALSE
 ) + ggplot2::geom_violin(
-  position = ggplot2::position_dodge(0.9)
+  position = ggplot2::position_dodge(0.9), scale = "count"
 ) + ggplot2::geom_boxplot(
   notch = TRUE, outlier.size = 0,
   position = ggplot2::position_dodge(0.9),
@@ -830,7 +831,7 @@ newplot3_a <- ggplot2::ggplot(
   tag = "a)"
 ) + ggplot2::theme_minimal(
 ) + ggplot2::theme(
-  plot.tag.position = c(0.02, 1)
+  plot.tag.position = c(0.01, 1)
 ) + ggplot2::labs(
   y = "Avg. Richness",
   x = "Local Land-use"
@@ -841,7 +842,7 @@ newplot3_a <- ggplot2::ggplot(
   ylim = c(0, 42), expand = FALSE
 # ) + ggplot2::annotate(
 #   "text", x = c(1.5, 4.5), y = 5, label = c("High\nMatch", "Low\nMatch")
-) + ggplot2::facet_grid(
+) + ggplot2::facet_wrap(
   SpeciesAffinity ~ .
 )
 
@@ -866,12 +867,13 @@ newplot3_b <- ggplot2::ggplot(
   alpha = 0.2,
   inherit.aes = FALSE
 ) + ggplot2::geom_violin(
-  position = ggplot2::position_dodge(0.9), show.legend = FALSE
-) + ggplot2::geom_boxplot(
-  notch = TRUE, outlier.size = 0,
-  position = ggplot2::position_dodge(0.9),
-  width = 0.28, show.legend = FALSE,
-  color = "black"
+  position = ggplot2::position_dodge(0.9), show.legend = FALSE, 
+  scale = "count", draw_quantiles = 0.5
+# ) + ggplot2::geom_boxplot(
+#   notch = TRUE, outlier.size = 0,
+#   position = ggplot2::position_dodge(0.9),
+#   width = 0.28, show.legend = FALSE,
+#   color = "black"
 ) + ggplot2::scale_color_manual(
   values = colorPalette,
   name = "Habitat Land-use"
@@ -880,23 +882,37 @@ newplot3_b <- ggplot2::ggplot(
 ) + ggplot2::scale_y_log10(
 ) + ggplot2::theme_minimal(
 ) + ggplot2::labs(
-  tag = "c)", x = "Habitat"
+  tag = "b)", x = "Habitat"
 ) + ggplot2::theme(
-  plot.tag.position = c(0.05, 1)
+  plot.tag.position = c(0.01, 1),
+  strip.text.x = ggplot2::element_blank()
 ) + ggplot2::facet_grid(
-  SpeciesAffinity ~ SpeciesType
-) + ggplot2::scale_x_discrete(
-  breaks = c("(0)", "(0.5)", "(1)")
+  SpeciesType ~ SpeciesAffinity
+# ) + ggplot2::scale_x_discrete(
+#   breaks = c("(0)", "(0.5)", "(1)")
 ) + ggplot2::labs(
-  x = "Local Land-use"
+  x = "Local Land-use\n(Binned and Ordered by Preference)"
 )
 
 newplot3 <- ggpubr::ggarrange(
   plotlist = list(
     newplot3_a,
     newplot3_b
-  ), nrow = 1, widths = c(0.5, 0.5)
+  ), nrow = 2, widths = c(0.5, 0.5)
 )
 
 ggplot2::ggsave(plot = newplot3, filename = "Figure3_Prototype4.png",
                 units = "cm", width = 6.5*3, height = 6.5*2)
+
+### Plot 4:####################################################################
+# Need to contrast with 2a (Richness). Long and short time scales.
+# We'll use ggforce to for high resolution around the transition (facet_zoom).
+# We'll want to compare the counterfactual differences to establish long term
+# differences (b), and short term extinction/colonisation debts (c).
+# a => b 
+# a => c
+
+##### a: ######################################################################
+
+##### b: ######################################################################
+##### c: ######################################################################
