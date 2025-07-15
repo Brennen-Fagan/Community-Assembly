@@ -721,11 +721,6 @@ newplot2_c <- ggplot2::ggplot(
 ) + ggplot2::geom_violin(
   position = ggplot2::position_dodge(0.9), show.legend = FALSE, 
   scale = "count", draw_quantiles = 0.5
-  # ) + ggplot2::geom_boxplot(
-  #   notch = TRUE, outlier.size = 0,
-  #   position = ggplot2::position_dodge(0.9),
-  #   width = 0.28, show.legend = FALSE,
-  #   color = "black"
 ) + ggplot2::scale_color_manual(
   values = colorPalette,
   name = "Habitat Land-use"
@@ -840,8 +835,6 @@ newplot3_a <- ggplot2::ggplot(
   fill = "none"
 ) + ggplot2::coord_cartesian(
   ylim = c(0, 42), expand = FALSE
-# ) + ggplot2::annotate(
-#   "text", x = c(1.5, 4.5), y = 5, label = c("High\nMatch", "Low\nMatch")
 ) + ggplot2::facet_wrap(
   SpeciesAffinity ~ .
 )
@@ -869,11 +862,6 @@ newplot3_b <- ggplot2::ggplot(
 ) + ggplot2::geom_violin(
   position = ggplot2::position_dodge(0.9), show.legend = FALSE, 
   scale = "count", draw_quantiles = 0.5
-# ) + ggplot2::geom_boxplot(
-#   notch = TRUE, outlier.size = 0,
-#   position = ggplot2::position_dodge(0.9),
-#   width = 0.28, show.legend = FALSE,
-#   color = "black"
 ) + ggplot2::scale_color_manual(
   values = colorPalette,
   name = "Habitat Land-use"
@@ -888,8 +876,6 @@ newplot3_b <- ggplot2::ggplot(
   strip.text.x = ggplot2::element_blank()
 ) + ggplot2::facet_grid(
   SpeciesType ~ SpeciesAffinity
-# ) + ggplot2::scale_x_discrete(
-#   breaks = c("(0)", "(0.5)", "(1)")
 ) + ggplot2::labs(
   x = "Local Land-use\n(Binned and Ordered by Preference)"
 )
