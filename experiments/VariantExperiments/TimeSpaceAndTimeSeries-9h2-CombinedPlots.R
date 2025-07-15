@@ -14,6 +14,7 @@ library(ggpubr)
 library(tidytable)
 library(tidygraph)
 library(ggraph)
+library(ggforce)
 
 source("TimeSpaceAndTimeSeries-9-Dictionaries.R")
 source('TimeSpaceAndTimeSeries-0-Functions.R')
@@ -897,8 +898,86 @@ ggplot2::ggsave(plot = newplot3, filename = "Figure3_Prototype4.png",
 # differences (b), and short term extinction/colonisation debts (c).
 # a => b 
 # a => c
+# In practice, we need to make a choice: we can show the individual, slightly
+# stochastic transitions or we can rescale the timings a second time so that
+# all of the transitions happen at the same time. The former is more "real" and
+# straightforward intellectually, but might be more complicated in practice
+# as it doesn't work nicely with facet_zoom. The latter probably gives cleaner
+# and more accurate summary statistics for the time series though, but
+# obfuscates how the different recording times might change things.
+
+# At this point, I suspect I should "do both", sensu time series rescaled and 
+# then panels b and c not rescaled (although not sure if barcharts, 
+# trajectories or somethings else entirely, are better for b and c).
+
+# In the event of trying to hand make the zoom panel regardless, I should be 
+# able to put (sizeable) arrows pointing down (for the zoom) and to the 
+# corresponding panels.
+
+# One problem with rescaling is that everything is already computed, albeit on
+# fairly similar time lengths. That is to say, if I force intervention to be,
+# say, 0.5 then I need to accept that all of my recordings after that are at
+# weird time intervals (eg 0.501 and +0.001, vs 0.5013 and +0.001 on another).
+
+# One other thought of note is that we were discussing possibly trying to keep 
+# only two points to make for really simple statistics. As has been pointed out
+# we can get whatever significant p-value we want by just increasing the number
+# of simulations we conduct, so we're much more interested in estimating the
+# effect sizes of things.
+
+# So starting from the top again, we want to construct the image to lead 
+# naturally to the comparison of the two different time spans for the same
+# statistic, which probably looks more like differences of various sorts.
+# Leaning on some of what we had originally set off to do, we might be able
+# to characterise it as 
+#     time before-after short term, 
+#     counterfactual before-after short term,
+#     time before-after long term (slope 0),
+#     counterfactual before-after long term.
+# Regardless, we probably need to re-run things so we have consistent 
+# comparisons that we are making, specifically for the time before-after short.
+
+newplot4_dataA <- diversitiesRichness |> tidytable::filter(
+  SpeciesAffinity == "100% 0",
+  NicheDistance == "5",
+  Intervention %in% c("(0)", "(0)->(0.5)", "(0.5)", "(0)->(1)", "(1)"),
+  (PoolPatchSeed %in% as.character(343:386)),
+  Metric == "Alpha Hill:0",
+  is.na(Subset)
+) |> tidytable::left_join(endTimes |> dplyr::select(-Times))
 
 ##### a: ######################################################################
+plotMeanAndInner(
+  newplot4_dataA, CIs = 0.75, facets = as.formula(. ~ .)
+) + ggplot2::labs(
+  y = "Richness"
+) + ggplot2::guides(
+  linetype = "none",
+  color = ggplot2::guide_legend(ncol = 3),
+  fill = ggplot2::guide_legend(ncol = 3)
+) + ggplot2::coord_cartesian(
+  xlim = c(0, 31000), ylim = c(0, 42), expand = FALSE
+) + ggplot2::geom_rect(
+  data = data.frame(
+    1 # 1 rectangle per row, so dummy df to prevent overplotting
+  ),
+  xmin = min(newplot4_dataA$Start),
+  xmax = max(newplot4_dataA$Stop),
+  ymin = 0, ymax = max(newplot4_dataA$Value),
+  fill = "grey",
+  alpha = 0.2,
+  inherit.aes = FALSE
+) + ggplot2::labs(
+  tag = "a)"
+) + ggplot2::theme(
+  legend.position = c(0.3, 0.09),
+  plot.tag.position = c(0.025, 1)
+) + ggplot2::scale_x_continuous(
+  breaks = (0:3)*10000
+# ) + ggforce::facet_zoom(
+#   xlim = c(16000, 17000),
+#   shrink = FALSE
+# )
 
 ##### b: ######################################################################
 ##### c: ######################################################################

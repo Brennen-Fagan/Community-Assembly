@@ -141,7 +141,7 @@ Diversity <- foreach::foreach(
       preferredTimeStep = preferredTimestep, # Abusing the characteristic t scale.
       preferredStart = # Must be at or after.
         ceiling(loaded$Abundance[1, 1]/preferredTimestep)*preferredTimestep,
-      includeMinTime = TRUE
+      includeMinTime = TRUE, minTimePlus = c(1, 2, 5, 10)
     )
 
     if (exists("x_pool") && !is.null(x_pool)) {
