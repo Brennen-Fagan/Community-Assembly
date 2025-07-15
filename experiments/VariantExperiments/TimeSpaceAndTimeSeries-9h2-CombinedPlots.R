@@ -936,19 +936,25 @@ ggplot2::ggsave(plot = newplot3, filename = "Figure3_Prototype4.png",
 #     counterfactual before-after long term.
 # Regardless, we probably need to re-run things so we have consistent 
 # comparisons that we are making, specifically for the time before-after short.
+# So:
+#  a => b + c, with d "contained within" a
+#  d => e + f
+# a: regular time; b: temporal comparison, long time; c: counterfactual compare
+# d: rescaled time; e: temporal compare, short time; f: counterfactual compare
 
 newplot4_dataA <- diversitiesRichness |> tidytable::filter(
   SpeciesAffinity == "100% 0",
   NicheDistance == "5",
-  Intervention %in% c("(0)", "(0)->(0.5)", "(0.5)", "(0)->(1)", "(1)"),
   (PoolPatchSeed %in% as.character(343:386)),
   Metric == "Alpha Hill:0",
   is.na(Subset)
 ) |> tidytable::left_join(endTimes |> dplyr::select(-Times))
 
 ##### a: ######################################################################
-plotMeanAndInner(
-  newplot4_dataA, CIs = 0.75, facets = as.formula(. ~ .)
+newplot4_a <- plotMeanAndInner(
+  newplot4_dataA |> tidytable::filter(
+    Intervention %in% c("(0)", "(0)->(0.5)", "(0.5)", "(0)->(1)", "(1)")
+  ), CIs = 0.75, facets = as.formula(. ~ .)
 ) + ggplot2::labs(
   y = "Richness"
 ) + ggplot2::guides(
@@ -957,16 +963,16 @@ plotMeanAndInner(
   fill = ggplot2::guide_legend(ncol = 3)
 ) + ggplot2::coord_cartesian(
   xlim = c(0, 31000), ylim = c(0, 42), expand = FALSE
-) + ggplot2::geom_rect(
-  data = data.frame(
-    1 # 1 rectangle per row, so dummy df to prevent overplotting
-  ),
-  xmin = min(newplot4_dataA$Start),
-  xmax = max(newplot4_dataA$Stop),
-  ymin = 0, ymax = max(newplot4_dataA$Value),
-  fill = "grey",
-  alpha = 0.2,
-  inherit.aes = FALSE
+# ) + ggplot2::geom_rect(
+#   data = data.frame(
+#     1 # 1 rectangle per row, so dummy df to prevent overplotting
+#   ),
+#   xmin = min(newplot4_dataA$Start),
+#   xmax = max(newplot4_dataA$Stop),
+#   ymin = 0, ymax = max(newplot4_dataA$Value),
+#   fill = "grey",
+#   alpha = 0.2,
+#   inherit.aes = FALSE
 ) + ggplot2::labs(
   tag = "a)"
 ) + ggplot2::theme(
@@ -977,7 +983,45 @@ plotMeanAndInner(
 # ) + ggforce::facet_zoom(
 #   xlim = c(16000, 17000),
 #   shrink = FALSE
-# )
+)
 
 ##### b: ######################################################################
+# Careful with 16300; obtained by checking the table of times to see what was a
+# safe largest value before intervention.
+rbind(
+  # Temporal Substitution
+  newplot4_dataA |> tidytable::group_by(
+    SpeciesAffinity, Intervention, PoolPatchSeed
+  ) |> tidytable::filter(
+    Time == max(16300, min(Time)) | Time == 30000
+  ) |> tidytable::group_by(
+    SpeciesAffinity, PoolPatchSeed, 
+    Intervention, InterventionInitial, InterventionFinal
+  ) |> tidytable::arrange(
+    Time
+  ) |> tidytable::summarise(
+    Value = Value[2] - Value[1]
+  ),
+  # Counterfactual comparison TODO, ONLY 100% VALID AFTER RE-RUNS WITH FIXED 
+  #                                 POOL PREFERENCE ASSIGNMENTS.
+  newplot4_dataA |> tidytable::group_by(
+    SpeciesAffinity, Intervention, PoolPatchSeed
+  ) |> tidytable::filter(
+    Time == 30000
+  ) |> tidytable::group_by(
+    SpeciesAffinity, PoolPatchSeed, 
+    Intervention, InterventionInitial, InterventionFinal
+  ) |> tidytable::arrange(
+    Time
+  ) |> tidytable::summarise(
+    Value = Value[2] - Value[1]
+  )
+) |> ggplot2::ggplot(
+  ggplot2::aes(x = InterventionInitial, y = Value)
+) + ggplot2::geom_violin(
+) + ggplot2::facet_grid(
+  InterventionFinal ~ .,
+  scales = "free_x"
+)
+
 ##### c: ######################################################################
