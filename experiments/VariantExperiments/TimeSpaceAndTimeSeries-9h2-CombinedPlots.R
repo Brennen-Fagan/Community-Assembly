@@ -48,7 +48,7 @@ colorPaletteAlg <- function(intervention) {
   DescTools::CmykToRgb(
     min(max(0, (0.5-x)/0.5) + 0.5*max(0, (0.5-y)/0.5), 1), 
     min(max(0, (0.5 - abs(x - 0.5))/0.5) 
-                + 0.5*max(0, (0.5 - abs(y - 0.5))/0.5), 1), 
+        + 0.5*max(0, (0.5 - abs(y - 0.5))/0.5), 1), 
     min(max(0, (x-0.5)/0.5)+ 0.5*max(0, (y-0.5)/0.5), 1),
     0.25
   )
@@ -243,8 +243,8 @@ plotGraph <- function(graph, mainLayout, legends = FALSE) {
       size = nodesize
     ), 
     show.legend = legends
-  # ) + ggplot2::geom_hline(
-  #   yintercept = -1, linetype = "dashed", color = "black"
+    # ) + ggplot2::geom_hline(
+    #   yintercept = -1, linetype = "dashed", color = "black"
   ) + theme_minimal(
   ) + ylab(
     "Log10(Size)"
@@ -893,38 +893,6 @@ ggplot2::ggsave(plot = newplot3, filename = "Figure3_Prototype4.png",
 
 ### Plot 4:####################################################################
 # Need to contrast with 2a (Richness). Long and short time scales.
-# We'll use ggforce to for high resolution around the transition (facet_zoom).
-# We'll want to compare the counterfactual differences to establish long term
-# differences (b), and short term extinction/colonisation debts (c).
-# a => b 
-# a => c
-# In practice, we need to make a choice: we can show the individual, slightly
-# stochastic transitions or we can rescale the timings a second time so that
-# all of the transitions happen at the same time. The former is more "real" and
-# straightforward intellectually, but might be more complicated in practice
-# as it doesn't work nicely with facet_zoom. The latter probably gives cleaner
-# and more accurate summary statistics for the time series though, but
-# obfuscates how the different recording times might change things.
-
-# At this point, I suspect I should "do both", sensu time series rescaled and 
-# then panels b and c not rescaled (although not sure if barcharts, 
-# trajectories or somethings else entirely, are better for b and c).
-
-# In the event of trying to hand make the zoom panel regardless, I should be 
-# able to put (sizeable) arrows pointing down (for the zoom) and to the 
-# corresponding panels.
-
-# One problem with rescaling is that everything is already computed, albeit on
-# fairly similar time lengths. That is to say, if I force intervention to be,
-# say, 0.5 then I need to accept that all of my recordings after that are at
-# weird time intervals (eg 0.501 and +0.001, vs 0.5013 and +0.001 on another).
-
-# One other thought of note is that we were discussing possibly trying to keep 
-# only two points to make for really simple statistics. As has been pointed out
-# we can get whatever significant p-value we want by just increasing the number
-# of simulations we conduct, so we're much more interested in estimating the
-# effect sizes of things.
-
 # So starting from the top again, we want to construct the image to lead 
 # naturally to the comparison of the two different time spans for the same
 # statistic, which probably looks more like differences of various sorts.
@@ -939,8 +907,11 @@ ggplot2::ggsave(plot = newplot3, filename = "Figure3_Prototype4.png",
 # So:
 #  a => b + c, with d "contained within" a
 #  d => e + f
-# a: regular time; b: temporal comparison, long time; c: counterfactual compare
-# d: rescaled time; e: temporal compare, short time; f: counterfactual compare
+# long time a: regular time; b: temporal comparison; c: counterfactual compare
+# short time d: rescaled time; e: temporal compare; f: counterfactual compare
+#
+# Then it might be a good idea to summarise the b vs c and e vs f in the text
+# via the differences.
 
 newplot4_dataA <- diversitiesRichness |> tidytable::filter(
   SpeciesAffinity == "100% 0",
@@ -949,6 +920,17 @@ newplot4_dataA <- diversitiesRichness |> tidytable::filter(
   Metric == "Alpha Hill:0",
   is.na(Subset)
 ) |> tidytable::left_join(endTimes |> dplyr::select(-Times))
+
+newplot4_dataC <- newplot4_dataA |> tidytable::group_by(
+  PoolPatch:AffinitySeed
+) |> tidytable::mutate(
+  Time = Time - Time[which.min(Time[!is.na(InterventionPatchSeed)])]
+) |> tidytable::...(
+  # Time 0 since intervention is not "observed" in the original runs, but
+  # we have a workaround, since it should have been observed identically
+  # across the different intervention runs!
+)
+
 
 ##### a: ######################################################################
 newplot4_a <- plotMeanAndInner(
@@ -963,16 +945,16 @@ newplot4_a <- plotMeanAndInner(
   fill = ggplot2::guide_legend(ncol = 3)
 ) + ggplot2::coord_cartesian(
   xlim = c(0, 31000), ylim = c(0, 42), expand = FALSE
-# ) + ggplot2::geom_rect(
-#   data = data.frame(
-#     1 # 1 rectangle per row, so dummy df to prevent overplotting
-#   ),
-#   xmin = min(newplot4_dataA$Start),
-#   xmax = max(newplot4_dataA$Stop),
-#   ymin = 0, ymax = max(newplot4_dataA$Value),
-#   fill = "grey",
-#   alpha = 0.2,
-#   inherit.aes = FALSE
+) + ggplot2::geom_rect(
+  data = data.frame(
+    1 # 1 rectangle per row, so dummy df to prevent overplotting
+  ),
+  xmin = 16300,
+  xmax = 16400,
+  ymin = 0, ymax = 31,
+  fill = "grey",
+  alpha = 0.4,
+  inherit.aes = FALSE
 ) + ggplot2::labs(
   tag = "a)"
 ) + ggplot2::theme(
@@ -980,15 +962,18 @@ newplot4_a <- plotMeanAndInner(
   plot.tag.position = c(0.025, 1)
 ) + ggplot2::scale_x_continuous(
   breaks = (0:3)*10000
-# ) + ggforce::facet_zoom(
-#   xlim = c(16000, 17000),
-#   shrink = FALSE
+  # ) + ggforce::facet_zoom(
+  #   xlim = c(16000, 17000),
+  #   shrink = FALSE
+) + ggplot2::geom_vline(
+  xintercept = c(16300, 30000), color = "black", linetype = "dashed"
 )
+
 
 ##### b: ######################################################################
 # Careful with 16300; obtained by checking the table of times to see what was a
 # safe largest value before intervention.
-rbind(
+newplot4_b <- rbind(
   # Temporal Substitution
   newplot4_dataA |> tidytable::group_by(
     SpeciesAffinity, Intervention, PoolPatchSeed
@@ -1000,7 +985,8 @@ rbind(
   ) |> tidytable::arrange(
     Time
   ) |> tidytable::summarise(
-    Value = Value[2] - Value[1]
+    Value = Value[2] - Value[1],
+    Method = "Temporal"
   ),
   # Counterfactual comparison TODO, ONLY 100% VALID AFTER RE-RUNS WITH FIXED 
   #                                 POOL PREFERENCE ASSIGNMENTS.
@@ -1010,18 +996,186 @@ rbind(
     Time == 30000
   ) |> tidytable::group_by(
     SpeciesAffinity, PoolPatchSeed, 
+    # InterventionFinal # What if you had always been in your final state?
+    InterventionInitial # What if you had stayed in your initial state?
+  ) |> tidytable::mutate(
+    Value = Value - Value[InterventionInitial == InterventionFinal],
+    Method = "Counterfactual"
+  ) |> tidytable::select(
+    SpeciesAffinity, PoolPatchSeed,
+    Intervention, InterventionInitial, InterventionFinal,
+    Value, Method
+  )
+) |> tidytable::filter(
+  InterventionInitial == "(0)"
+) |> ggplot2::ggplot(
+  ggplot2::aes(y = Value, 
+               # x = InterventionInitial, 
+               # group = interaction(Method, InterventionInitial),
+               # color = InterventionInitial
+               x = InterventionFinal,
+               group = interaction(Method, InterventionFinal),
+               color = InterventionFinal
+  )
+) + ggplot2::geom_violin(
+  scale = "count", show.legend = FALSE
+  # ) + ggplot2::geom_boxplot(
+) + ggplot2::facet_grid(
+  InterventionInitial ~ .,#Method,
+  scales = "free_x"
+) + ggplot2::theme_minimal(
+) + ggplot2::labs(
+  tag = "b)", 
+  x = "Final Local Land-Use",
+  y = "Impact - Control (Richness)"
+) + ggplot2::theme(
+  plot.tag.position = c(0.01, 1),
+  strip.text.x = ggplot2::element_blank(),
+  panel.border = ggplot2::element_rect(
+    linetype = "dashed", color = "black", fill = NA
+  )
+) + ggplot2::scale_color_manual(
+  values = colorPalette,
+  name = "Habitat Land-use"
+) + ggplot2::scale_y_continuous(
+  sec.axis = ggplot2::sec_axis(
+    trans = function(x) x, name = "Initial Local Land-Use", 
+    breaks = NULL, labels = NA
+  )
+)
+
+##### c: ######################################################################
+
+newplot4_c <- ggplot2::ggplot(
+  # Mutate the data to start at the time of intervention, which is unique
+  # for each PoolPatchSeed (since it is defined from the Events which are
+  # paired precisely with each PoolPatchSeed).
+  # The trick is that the intervention time isn't in the non-intervention case.
+  newplot4_dataC |> tidytable::filter(
+    Intervention %in% c(
+      "(0)", 
+      "(0)->(0.5)", 
+      "(0)->(1)"
+    )
+  ) |> tidytable::group_by(
+    PoolPatch:AffinitySeed
+  ) |> tidytable::mutate(
+    Time = Time - Time[which.min(Time[!is.na(InterventionPatchSeed)])]
+  ), 
+  ggplot2::aes(x = Time, y = Value, color = Intervention, 
+               group = interaction(PoolPatchSeed, Intervention))
+) + ggplot2::geom_line(
+  show.legend = FALSE
+) + ggplot2::labs(
+  y = "Richness",
+  x = "Time since Intervention"
+) + ggplot2::guides(
+  linetype = "none",
+  color = ggplot2::guide_legend(ncol = 3),
+  fill = ggplot2::guide_legend(ncol = 3)
+) + ggplot2::coord_cartesian(
+  xlim = c(-3, 23), ylim = c(0, 31), expand = FALSE
+) + ggplot2::geom_rect(
+  data = data.frame(
+    1 # 1 rectangle per row, so dummy df to prevent overplotting
+  ),
+  xmin = 0,
+  xmax = 20,
+  ymin = 0, ymax = 31,
+  fill = "grey",
+  alpha = 0.2,
+  inherit.aes = FALSE
+) + ggplot2::labs(
+  tag = "c)"
+) + ggplot2::theme(
+  plot.tag.position = c(0.025, 1)
+) + ggplot2::scale_color_manual(
+  values = colorPalette,
+  name = "Habitat Land-use"
+) + ggplot2::geom_vline(
+  xintercept = c(0, 20),
+  linetype = "dotted"
+)
+
+##### d: ######################################################################
+
+newplot4_d <- rbind(
+  # Temporal Substitution
+  newplot4_dataC |> tidytable::group_by(
+    SpeciesAffinity, Intervention, PoolPatchSeed
+  ) |> tidytable::filter(
+    Time >= 0, Time < 20 # Prevent 3 from the same run.
+  ) |> tidytable::group_by(
+    SpeciesAffinity, PoolPatchSeed,
     Intervention, InterventionInitial, InterventionFinal
   ) |> tidytable::arrange(
     Time
   ) |> tidytable::summarise(
-    Value = Value[2] - Value[1]
+    Value = Value - Value[1],
+    Method = "Temporal"
+  ),
+  # Counterfactual comparison TODO, ONLY 100% VALID AFTER RE-RUNS WITH FIXED
+  #                                 POOL PREFERENCE ASSIGNMENTS.
+  newplot4_dataC |> tidytable::group_by(
+    SpeciesAffinity, Intervention, PoolPatchSeed
+  ) |> tidytable::filter(
+    Time >= 0, Time < 20 # Prevent 3 from the same run.
+  ) |> tidytable::group_by(
+    SpeciesAffinity, PoolPatchSeed, # Time, if times were matched up perfectly.
+    # InterventionFinal # What if you had always been in your final state?
+    InterventionInitial # What if you had stayed in your initial state?
+  ) |> tidytable::mutate(
+    Value = Value - Value[InterventionInitial == InterventionFinal],
+    Method = "Counterfactual"
+  ) |> tidytable::select(
+    SpeciesAffinity, PoolPatchSeed,
+    Intervention, InterventionInitial, InterventionFinal,
+    Value, Method
   )
+) |> tidytable::filter(
+  InterventionInitial == "(0)"
 ) |> ggplot2::ggplot(
-  ggplot2::aes(x = InterventionInitial, y = Value)
+  ggplot2::aes(y = Value,
+               # x = InterventionInitial,
+               # group = interaction(Method, InterventionInitial),
+               # color = InterventionInitial
+               x = InterventionFinal,
+               group = interaction(Method, InterventionFinal),
+               color = InterventionFinal
+  )
 ) + ggplot2::geom_violin(
+  scale = "count", show.legend = FALSE
+  # ) + ggplot2::geom_boxplot(
 ) + ggplot2::facet_grid(
-  InterventionFinal ~ .,
+  InterventionInitial ~ .,#Method,
   scales = "free_x"
+) + ggplot2::theme_minimal(
+) + ggplot2::labs(
+  tag = "b)",
+  x = "Final Local Land-Use",
+  y = "Impact - Control (Richness)"
+) + ggplot2::theme(
+  plot.tag.position = c(0.01, 1),
+  strip.text.x = ggplot2::element_blank(),
+  panel.border = ggplot2::element_rect(
+    linetype = "dashed", color = "black", fill = NA
+  )
+) + ggplot2::scale_color_manual(
+  values = colorPalette,
+  name = "Habitat Land-use"
+) + ggplot2::scale_y_continuous(
+  sec.axis = ggplot2::sec_axis(
+    trans = function(x) x, name = "Initial Local Land-Use",
+    breaks = NULL, labels = NA
+  )
 )
 
-##### c: ######################################################################
+
+### Plot 5: ###################################################################
+# Pseudo-relaxation time of the system from the intervention to its new final
+# state, characterised as the difference between counterfactual always in final
+# state and the intervention to the final state.
+# Because of the rescalings, if we index it by the original time of intervention
+# and then compare, we should be able to observe roughly the same relaxation
+# time (so long as we don't perform the second rescaling to have interventions
+# fixed at 0.5?).
