@@ -37,18 +37,18 @@ interventionMatrix <- matrix(
 #              (0.25) => 0.5,0.5,0, (0.75) => 0,0.5,0.5
 colorPaletteAlg <- function(intervention) {
   intervention <- as.numeric(strsplit(
-    gsub(intervention, pattern = "[(|)]", replacement = ""), 
+    gsub(intervention, pattern = "[(|)]", replacement = ""),
     split = "->")[[1]])
   x <- intervention[1]
   y <- if(length(intervention) == 2) {
-    intervention[2] 
+    intervention[2]
   } else {
     intervention[1]
   }
   DescTools::CmykToRgb(
-    min(max(0, (0.5-x)/0.5) + 0.5*max(0, (0.5-y)/0.5), 1), 
-    min(max(0, (0.5 - abs(x - 0.5))/0.5) 
-        + 0.5*max(0, (0.5 - abs(y - 0.5))/0.5), 1), 
+    min(max(0, (0.5-x)/0.5) + 0.5*max(0, (0.5-y)/0.5), 1),
+    min(max(0, (0.5 - abs(x - 0.5))/0.5)
+        + 0.5*max(0, (0.5 - abs(y - 0.5))/0.5), 1),
     min(max(0, (x-0.5)/0.5)+ 0.5*max(0, (y-0.5)/0.5), 1),
     0.25
   )
@@ -95,9 +95,9 @@ changeInterventionLevels <- function(df) {
   df |> tidytable::mutate(
     Intervention = factor(
       Intervention,
-      levels = t(interventionMatrix)[1:prod(dim(interventionMatrix))], 
+      levels = t(interventionMatrix)[1:prod(dim(interventionMatrix))],
       ordered = TRUE
-    ), 
+    ),
     InterventionInitial = tidytable::case_when(
       Intervention %in% interventionMatrix[1, ] ~ diag(interventionMatrix)[1],
       Intervention %in% interventionMatrix[2, ] ~ diag(interventionMatrix)[2],
@@ -134,9 +134,9 @@ unifyAffinityBins <- function(., n = 5) {
     .,
     col = "AffinityBins", names = c("Left", "Right"), delim = ","
   ) |> tidytable::mutate(
-    Left = 
+    Left =
       round(as.numeric(gsub(pattern = "^[(]", replacement = "", x = Left))*n)/n,
-    Right = 
+    Right =
       round(as.numeric(gsub(pattern = "\\]$", replacement = "", x = Right))*n)/n,
     AffinityBins = ifelse(
       is.na(Right), as.character(Left),
@@ -152,7 +152,7 @@ plotMeanAndInner <- function(
 ) {
   # Correct for a problem with how to handle NAs by converting to strings
   data$Subset <- ifelse(is.na(data$Subset), "NA", data$Subset)
-  
+
   # Create base with particular attention to grouping structure.
   baseplot <- ggplot2::ggplot(
     data,
@@ -165,7 +165,7 @@ plotMeanAndInner <- function(
       color = Intervention, fill = Intervention, linetype = SpeciesAffinity
     )
   )
-  
+
   # Plot each CI overlaid. Overlaying => the innermost have the darkest alpha.
   for (CI in CIs) {
     baseplot <- baseplot + ggplot2::geom_ribbon(
@@ -189,7 +189,7 @@ plotMeanAndInner <- function(
       alpha = 0.25, linewidth = 0.25 #, linetype = "dotted"
     )
   }
-  
+
   # Add an average line and handle the meta-details.
   baseplot <- baseplot + ggplot2::geom_line(
     data = data |> tidytable::mutate(
@@ -213,7 +213,7 @@ plotMeanAndInner <- function(
     color = if (length(CIs)>0) {"none"} else {"legend"},
     fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
   )
-  
+
   return(baseplot)
 }
 
@@ -235,13 +235,13 @@ plotGraph <- function(graph, mainLayout, legends = FALSE) {
       alpha = log10(effectNormalised),
       end_cap = circle(node2.nodesize+2, 'pt')
     ),
-    arrow = arrow(length = unit(2, 'mm')), 
+    arrow = arrow(length = unit(2, 'mm')),
     show.legend = legends
   ) + ggraph::geom_node_point(
     mapping = aes(
       color = Type,
       size = nodesize
-    ), 
+    ),
     show.legend = legends
     # ) + ggplot2::geom_hline(
     #   yintercept = -1, linetype = "dashed", color = "black"
@@ -261,13 +261,13 @@ plotGraph <- function(graph, mainLayout, legends = FALSE) {
     x = c(0, 1), y = c(-2, 0.25),
     clip = "off"
   )
-  
+
   # if (!legends) {
   #   obj <- obj + ggplot2::theme(
   #     legend.position = "none"
   #   )
   # }
-  
+
   return(obj)
 }
 
@@ -387,7 +387,7 @@ targetFiles <- dir(targetDir, pattern = "(Sim|Int)",
                    full.names = T)
 # Restrict to source simulations with affinities 0, 0.5, or 1
 targetFiles <- grep(x = targetFiles,
-                    pattern = "142486-4929-28-1-NA-5-(1|6|7|15|20|21|29|34|35)_",
+                    pattern = "142486-4929-28-1-NA-(3|5|7)-(1|6|7|15|20|21|29|34|35)_",
                     value = TRUE)
 targetFilesSim <- grep(x = targetFiles,
                        pattern = "_Simulation_",
@@ -435,7 +435,7 @@ targetTimes <- 30000
 targetEnvs <- lapply(targetEnvs, function(env) {
   intervention <- #T/F
     !("EffectiveReproductionRate" %in% names(env$result$Ellipsis$Affinity))
-  
+
   env$calculator <- with(
     env$result,
     CalculateTrophicStructure(
@@ -452,7 +452,7 @@ targetEnvs <- lapply(targetEnvs, function(env) {
       LinkThreshold = 0.01
     )
   )
-  
+
   env$trophics <- with(
     env$result,
     lapply(targetTimes, function(t) {
@@ -465,7 +465,7 @@ targetEnvs <- lapply(targetEnvs, function(env) {
       return(retval)
     })
   )
-  
+
   return(env)
 })
 
@@ -484,12 +484,21 @@ targetEnvs <- lapply(targetEnvs, function(env) {
 })
 
 targetEnvs <- lapply(targetEnvs, function(env) {
-  env$layout <- ggraph::create_layout(
-    tidygraph::to_undirected(
-      env$graphs[[length(env$graphs)]]$graphs[[1]]
-    ) |> tidygraph::convert(tidygraph::to_simple),
-    "backbone"
+  # print(env$graphs[[1]]$graphs[[1]])
+  env_undirected <- tidygraph::to_undirected(
+    env$graphs[[length(env$graphs)]]$graphs[[1]]
   )
+  if ((env_undirected %>% mutate(
+    Components = tidygraph::graph_component_count(),
+    Nodes = tidygraph::graph_order(),
+    NotSingletons = Components != Nodes
+    ) %>% pull(NotSingletons))[1]
+  ) {
+    env_undirected <- env_undirected |> tidygraph::convert(tidygraph::to_simple)
+    env$layout <- ggraph::create_layout(env_undirected, "backbone")
+  } else {
+    env$layout <- ggraph::create_layout(env_undirected, "auto")
+  }
   return(env)
 })
 
@@ -720,7 +729,7 @@ newplot2_c <- ggplot2::ggplot(
   alpha = 0.2,
   inherit.aes = FALSE
 ) + ggplot2::geom_violin(
-  position = ggplot2::position_dodge(0.9), show.legend = FALSE, 
+  position = ggplot2::position_dodge(0.9), show.legend = FALSE,
   scale = "count", draw_quantiles = 0.5
 ) + ggplot2::scale_color_manual(
   values = colorPalette,
@@ -861,7 +870,7 @@ newplot3_b <- ggplot2::ggplot(
   alpha = 0.2,
   inherit.aes = FALSE
 ) + ggplot2::geom_violin(
-  position = ggplot2::position_dodge(0.9), show.legend = FALSE, 
+  position = ggplot2::position_dodge(0.9), show.legend = FALSE,
   scale = "count", draw_quantiles = 0.5
 ) + ggplot2::scale_color_manual(
   values = colorPalette,
@@ -893,16 +902,16 @@ ggplot2::ggsave(plot = newplot3, filename = "Figure3_Prototype4.png",
 
 ### Plot 4:####################################################################
 # Need to contrast with 2a (Richness). Long and short time scales.
-# So starting from the top again, we want to construct the image to lead 
+# So starting from the top again, we want to construct the image to lead
 # naturally to the comparison of the two different time spans for the same
 # statistic, which probably looks more like differences of various sorts.
 # Leaning on some of what we had originally set off to do, we might be able
-# to characterise it as 
-#     time before-after short term, 
+# to characterise it as
+#     time before-after short term,
 #     counterfactual before-after short term,
 #     time before-after long term (slope 0),
 #     counterfactual before-after long term.
-# Regardless, we probably need to re-run things so we have consistent 
+# Regardless, we probably need to re-run things so we have consistent
 # comparisons that we are making, specifically for the time before-after short.
 # So:
 #  a => b + c, with d "contained within" a
@@ -915,22 +924,54 @@ ggplot2::ggsave(plot = newplot3, filename = "Figure3_Prototype4.png",
 
 newplot4_dataA <- diversitiesRichness |> tidytable::filter(
   SpeciesAffinity == "100% 0",
+  # SpeciesAffinity == "50% 0, 50% 1",
+  # SpeciesAffinity == "Uniform(0, 1)",
   NicheDistance == "5",
   (PoolPatchSeed %in% as.character(343:386)),
   Metric == "Alpha Hill:0",
   is.na(Subset)
 ) |> tidytable::left_join(endTimes |> dplyr::select(-Times))
 
+# Mutate the data to start at the time of intervention, which is unique
+# for each PoolPatchSeed (since it is defined from the Events which are
+# paired precisely with each PoolPatchSeed).
+# The trick is that the intervention time isn't in the non-intervention case.
 newplot4_dataC <- newplot4_dataA |> tidytable::group_by(
   PoolPatch:AffinitySeed
 ) |> tidytable::mutate(
   Time = Time - Time[which.min(Time[!is.na(InterventionPatchSeed)])]
-) |> tidytable::...(
-  # Time 0 since intervention is not "observed" in the original runs, but
-  # we have a workaround, since it should have been observed identically
-  # across the different intervention runs!
+# ) |> tidytable::group_by(
+#   PoolPatch:AffinitySeed
+# ) |> tidytable::complete(
+#   # Time 0 since intervention is not "observed" in the original runs, but
+#   # we have a workaround, since it should have been observed identically
+#   # across the different intervention runs!
+#   Time, InterventionPatchType
+# ) |> tidytable::filter(
+#   Time >= 0 | !is.na(Value)
+# ) |> tidytable::group_by(
+#   Time, PoolPatch:AffinitySeed
+# ) |> tidytable::mutate(
+#   # Now to fill in from the grouped data.
+#   Value = ifelse(
+#     is.na(Value),
+#     if(length(unique(na.omit(Value))) == 1) {unique(na.omit(Value))} else NA,
+#     Value
+#   ),
+#   Intervention = ifelse(
+#     is.na(Intervention),
+#     ifelse(!is.na(InterventionPatchType), NA, # Shouldn't happen.
+#            tidytable::case_when( # Abusing PatchAffinities (will need a redo.)
+#              Affinity <= 7 ~ "(0)",
+#              Affinity <= 14 ~ "(0.25)",
+#              Affinity <= 21 ~ "(0.5)",
+#              Affinity <= 28 ~ "(0.75)",
+#              Affinity <= 35 ~ "(1)",
+#              TRUE ~ NA
+#            )),
+#     Intervention
+#   )
 )
-
 
 ##### a: ######################################################################
 newplot4_a <- plotMeanAndInner(
@@ -958,7 +999,7 @@ newplot4_a <- plotMeanAndInner(
 ) + ggplot2::labs(
   tag = "a)"
 ) + ggplot2::theme(
-  legend.position = c(0.3, 0.09),
+  legend.position = c(0.35, 0.09),
   plot.tag.position = c(0.025, 1)
 ) + ggplot2::scale_x_continuous(
   breaks = (0:3)*10000
@@ -980,7 +1021,7 @@ newplot4_b <- rbind(
   ) |> tidytable::filter(
     Time == max(16300, min(Time)) | Time == 30000
   ) |> tidytable::group_by(
-    SpeciesAffinity, PoolPatchSeed, 
+    SpeciesAffinity, PoolPatchSeed,
     Intervention, InterventionInitial, InterventionFinal
   ) |> tidytable::arrange(
     Time
@@ -988,140 +1029,14 @@ newplot4_b <- rbind(
     Value = Value[2] - Value[1],
     Method = "Temporal"
   ),
-  # Counterfactual comparison TODO, ONLY 100% VALID AFTER RE-RUNS WITH FIXED 
+  # Counterfactual comparison TODO, ONLY 100% VALID AFTER RE-RUNS WITH FIXED
   #                                 POOL PREFERENCE ASSIGNMENTS.
   newplot4_dataA |> tidytable::group_by(
     SpeciesAffinity, Intervention, PoolPatchSeed
   ) |> tidytable::filter(
     Time == 30000
   ) |> tidytable::group_by(
-    SpeciesAffinity, PoolPatchSeed, 
-    # InterventionFinal # What if you had always been in your final state?
-    InterventionInitial # What if you had stayed in your initial state?
-  ) |> tidytable::mutate(
-    Value = Value - Value[InterventionInitial == InterventionFinal],
-    Method = "Counterfactual"
-  ) |> tidytable::select(
     SpeciesAffinity, PoolPatchSeed,
-    Intervention, InterventionInitial, InterventionFinal,
-    Value, Method
-  )
-) |> tidytable::filter(
-  InterventionInitial == "(0)"
-) |> ggplot2::ggplot(
-  ggplot2::aes(y = Value, 
-               # x = InterventionInitial, 
-               # group = interaction(Method, InterventionInitial),
-               # color = InterventionInitial
-               x = InterventionFinal,
-               group = interaction(Method, InterventionFinal),
-               color = InterventionFinal
-  )
-) + ggplot2::geom_violin(
-  scale = "count", show.legend = FALSE
-  # ) + ggplot2::geom_boxplot(
-) + ggplot2::facet_grid(
-  InterventionInitial ~ .,#Method,
-  scales = "free_x"
-) + ggplot2::theme_minimal(
-) + ggplot2::labs(
-  tag = "b)", 
-  x = "Final Local Land-Use",
-  y = "Impact - Control (Richness)"
-) + ggplot2::theme(
-  plot.tag.position = c(0.01, 1),
-  strip.text.x = ggplot2::element_blank(),
-  panel.border = ggplot2::element_rect(
-    linetype = "dashed", color = "black", fill = NA
-  )
-) + ggplot2::scale_color_manual(
-  values = colorPalette,
-  name = "Habitat Land-use"
-) + ggplot2::scale_y_continuous(
-  sec.axis = ggplot2::sec_axis(
-    trans = function(x) x, name = "Initial Local Land-Use", 
-    breaks = NULL, labels = NA
-  )
-)
-
-##### c: ######################################################################
-
-newplot4_c <- ggplot2::ggplot(
-  # Mutate the data to start at the time of intervention, which is unique
-  # for each PoolPatchSeed (since it is defined from the Events which are
-  # paired precisely with each PoolPatchSeed).
-  # The trick is that the intervention time isn't in the non-intervention case.
-  newplot4_dataC |> tidytable::filter(
-    Intervention %in% c(
-      "(0)", 
-      "(0)->(0.5)", 
-      "(0)->(1)"
-    )
-  ) |> tidytable::group_by(
-    PoolPatch:AffinitySeed
-  ) |> tidytable::mutate(
-    Time = Time - Time[which.min(Time[!is.na(InterventionPatchSeed)])]
-  ), 
-  ggplot2::aes(x = Time, y = Value, color = Intervention, 
-               group = interaction(PoolPatchSeed, Intervention))
-) + ggplot2::geom_line(
-  show.legend = FALSE
-) + ggplot2::labs(
-  y = "Richness",
-  x = "Time since Intervention"
-) + ggplot2::guides(
-  linetype = "none",
-  color = ggplot2::guide_legend(ncol = 3),
-  fill = ggplot2::guide_legend(ncol = 3)
-) + ggplot2::coord_cartesian(
-  xlim = c(-3, 23), ylim = c(0, 31), expand = FALSE
-) + ggplot2::geom_rect(
-  data = data.frame(
-    1 # 1 rectangle per row, so dummy df to prevent overplotting
-  ),
-  xmin = 0,
-  xmax = 20,
-  ymin = 0, ymax = 31,
-  fill = "grey",
-  alpha = 0.2,
-  inherit.aes = FALSE
-) + ggplot2::labs(
-  tag = "c)"
-) + ggplot2::theme(
-  plot.tag.position = c(0.025, 1)
-) + ggplot2::scale_color_manual(
-  values = colorPalette,
-  name = "Habitat Land-use"
-) + ggplot2::geom_vline(
-  xintercept = c(0, 20),
-  linetype = "dotted"
-)
-
-##### d: ######################################################################
-
-newplot4_d <- rbind(
-  # Temporal Substitution
-  newplot4_dataC |> tidytable::group_by(
-    SpeciesAffinity, Intervention, PoolPatchSeed
-  ) |> tidytable::filter(
-    Time >= 0, Time < 20 # Prevent 3 from the same run.
-  ) |> tidytable::group_by(
-    SpeciesAffinity, PoolPatchSeed,
-    Intervention, InterventionInitial, InterventionFinal
-  ) |> tidytable::arrange(
-    Time
-  ) |> tidytable::summarise(
-    Value = Value - Value[1],
-    Method = "Temporal"
-  ),
-  # Counterfactual comparison TODO, ONLY 100% VALID AFTER RE-RUNS WITH FIXED
-  #                                 POOL PREFERENCE ASSIGNMENTS.
-  newplot4_dataC |> tidytable::group_by(
-    SpeciesAffinity, Intervention, PoolPatchSeed
-  ) |> tidytable::filter(
-    Time >= 0, Time < 20 # Prevent 3 from the same run.
-  ) |> tidytable::group_by(
-    SpeciesAffinity, PoolPatchSeed, # Time, if times were matched up perfectly.
     # InterventionFinal # What if you had always been in your final state?
     InterventionInitial # What if you had stayed in your initial state?
   ) |> tidytable::mutate(
@@ -1146,12 +1061,16 @@ newplot4_d <- rbind(
 ) + ggplot2::geom_violin(
   scale = "count", show.legend = FALSE
   # ) + ggplot2::geom_boxplot(
+  #   notch = TRUE
 ) + ggplot2::facet_grid(
+  # InterventionFinal ~ .,
   InterventionInitial ~ .,#Method,
   scales = "free_x"
 ) + ggplot2::theme_minimal(
 ) + ggplot2::labs(
+  title = "Long Time Scales",
   tag = "b)",
+  # x = "Initial Local Land-Use",
   x = "Final Local Land-Use",
   y = "Impact - Control (Richness)"
 ) + ggplot2::theme(
@@ -1165,13 +1084,330 @@ newplot4_d <- rbind(
   name = "Habitat Land-use"
 ) + ggplot2::scale_y_continuous(
   sec.axis = ggplot2::sec_axis(
-    trans = function(x) x, name = "Initial Local Land-Use",
+    trans = function(x) x,
+    # name = "Final Local Land-Use",
+    name = "Initial Local Land-Use",
     breaks = NULL, labels = NA
   )
 )
 
+##### Temporal Vs. Counterfactual Statistics: #################################
+temporalVCounterfactualStats <- rbind(
+  # Temporal Substitution
+  diversitiesRichness |> tidytable::filter(
+    NicheDistance == "5",
+    (PoolPatchSeed %in% as.character(343:386)),
+    Metric == "Alpha Hill:0",
+    is.na(Subset)
+  ) |> tidytable::left_join(endTimes |> dplyr::select(-Times)) |> tidytable::group_by(
+    SpeciesAffinity, Intervention, PoolPatchSeed
+  ) |> tidytable::filter(
+    Time == max(16300, min(Time)) | Time == 30000
+  ) |> tidytable::group_by(
+    SpeciesAffinity, PoolPatchSeed,
+    Intervention, InterventionInitial, InterventionFinal
+  ) |> tidytable::arrange(
+    Time
+  ) |> tidytable::summarise(
+    Value = Value[2] - Value[1],
+    Method = "Temporal"
+  ),
+  # Counterfactual comparison TODO, ONLY 100% VALID AFTER RE-RUNS WITH FIXED
+  #                                 POOL PREFERENCE ASSIGNMENTS.
+  diversitiesRichness |> tidytable::filter(
+    NicheDistance == "5",
+    (PoolPatchSeed %in% as.character(343:386)),
+    Metric == "Alpha Hill:0",
+    is.na(Subset)
+  ) |> tidytable::left_join(endTimes |> dplyr::select(-Times)) |> tidytable::group_by(
+    SpeciesAffinity, Intervention, PoolPatchSeed
+  ) |> tidytable::filter(
+    Time == 30000
+  ) |> tidytable::group_by(
+    SpeciesAffinity, PoolPatchSeed,
+    # InterventionFinal # What if you had always been in your final state?
+    InterventionInitial # What if you had stayed in your initial state?
+  ) |> tidytable::mutate(
+    Value = Value - Value[InterventionInitial == InterventionFinal],
+    Method = "Counterfactual"
+  ) |> tidytable::select(
+    SpeciesAffinity, PoolPatchSeed,
+    Intervention, InterventionInitial, InterventionFinal,
+    Value, Method
+  )
+  # ) |> tidytable::filter(
+  #   InterventionFinal == "(0)"
+) |> tidytable::group_by(
+  SpeciesAffinity:InterventionFinal
+) |> tidytable::mutate(
+  Deviation = Value - Value[Method=="Counterfactual"]
+) |> tidytable::group_by(
+  SpeciesAffinity, Intervention:InterventionFinal, Method
+) |> tidytable::summarise(
+  Mean = mean(Value),
+  StDev = sd(Value),
+  Bias = mean(Deviation),
+  MeanAbsDev = mean(abs(Deviation)),
+  PADGT1 = sum(abs(Deviation) > 1)/tidytable::n(),
+  PADGT3 = sum(abs(Deviation) > 3)/tidytable::n(),
+  PADGT5 = sum(abs(Deviation) > 5)/tidytable::n()
+)
+
+temporalVCounterfactualStats |> pivot_wider(
+  names_from = Method, values_from = StDev,
+  id_cols = c(SpeciesAffinity,
+              Intervention, InterventionInitial, InterventionFinal)
+) |> filter(
+  Counterfactual != 0
+) |> mutate(
+  out = (Temporal - Counterfactual)
+) |> pull(out) |> quantile(probs = (seq(from = 0.05, by = 0.05, to = 0.95)))
+
+temporalVCounterfactualStats |> filter(
+  Method != "Counterfactual"
+) |> pull(Bias) |> summary()
+temporalVCounterfactualStats |> filter(
+  Method != "Counterfactual"
+) |> pull(Bias) |> quantile(probs = (seq(from = 0.05, by = 0.05, to = 0.95)))
+##### c: ######################################################################
+
+# newplot4_c <- ggplot2::ggplot(
+#   newplot4_dataC |> tidytable::filter(
+#     Intervention %in% c(
+#       "(0)",
+#       "(0)->(0.5)",
+#       "(0)->(1)"
+#     )
+#   ),
+#   ggplot2::aes(x = Time, y = Value, color = Intervention,
+#                group = interaction(PoolPatchSeed, Intervention))
+# ) + ggplot2::geom_line(
+#   show.legend = FALSE
+# ) + ggplot2::labs(
+#   y = "Richness",
+#   x = "Time since Intervention"
+# ) + ggplot2::guides(
+#   linetype = "none",
+#   color = ggplot2::guide_legend(ncol = 3),
+#   fill = ggplot2::guide_legend(ncol = 3)
+# ) + ggplot2::coord_cartesian(
+#   xlim = c(-3, 23), ylim = c(0, 31), expand = FALSE
+# ) + ggplot2::geom_rect(
+#   data = data.frame(
+#     1 # 1 rectangle per row, so dummy df to prevent overplotting
+#   ),
+#   xmin = 0,
+#   xmax = 20,
+#   ymin = 0, ymax = 31,
+#   fill = "grey",
+#   alpha = 0.2,
+#   inherit.aes = FALSE
+# ) + ggplot2::labs(
+#   tag = "c)"
+# ) + ggplot2::theme(
+#   plot.tag.position = c(0.025, 1)
+# ) + ggplot2::scale_color_manual(
+#   values = colorPalette,
+#   name = "Habitat Land-use"
+# ) + ggplot2::geom_vline(
+#   xintercept = c(0, 20),
+#   linetype = "dotted"
+# )
+#
+# ##### d: ######################################################################
+#
+# newplot4_d <- rbind(
+#   # Temporal Substitution
+#   newplot4_dataC |> tidytable::group_by(
+#     SpeciesAffinity, Intervention, PoolPatchSeed
+#   ) |> tidytable::filter(
+#     Time >= 0, Time < 20 # Prevent 3 from the same run.
+#   ) |> tidytable::group_by(
+#     SpeciesAffinity, PoolPatchSeed,
+#     Intervention, InterventionInitial, InterventionFinal
+#   ) |> tidytable::arrange(
+#     Time
+#   ) |> tidytable::summarise(
+#     Value = Value - Value[1],
+#     Method = "Temporal"
+#   ),
+#   # Counterfactual comparison TODO, ONLY 100% VALID AFTER RE-RUNS WITH FIXED
+#   #                                 POOL PREFERENCE ASSIGNMENTS.
+#   newplot4_dataC |> tidytable::group_by(
+#     SpeciesAffinity, Intervention, PoolPatchSeed
+#   ) |> tidytable::filter(
+#     Time >= 0, Time < 20 # Prevent 3 from the same run.
+#   ) |> tidytable::group_by(
+#     SpeciesAffinity, PoolPatchSeed, # Time, if times were matched up perfectly.
+#     # InterventionFinal # What if you had always been in your final state?
+#     InterventionInitial # What if you had stayed in your initial state?
+#   ) |> tidytable::mutate(
+#     Value = Value - Value[InterventionInitial == InterventionFinal],
+#     Method = "Counterfactual"
+#   ) |> tidytable::select(
+#     SpeciesAffinity, PoolPatchSeed,
+#     Intervention, InterventionInitial, InterventionFinal,
+#     Value, Method
+#   )
+# ) |> tidytable::filter(
+#   InterventionInitial == "(0)"
+# ) |> ggplot2::ggplot(
+#   ggplot2::aes(y = Value,
+#                # x = InterventionInitial,
+#                # group = interaction(Method, InterventionInitial),
+#                # color = InterventionInitial
+#                x = InterventionFinal,
+#                group = interaction(Method, InterventionFinal),
+#                color = InterventionFinal
+#   )
+# ) + ggplot2::geom_violin(
+#   scale = "count", show.legend = FALSE
+#   # ) + ggplot2::geom_boxplot(
+# ) + ggplot2::facet_grid(
+#   InterventionInitial ~ .,#Method,
+#   scales = "free_x"
+# ) + ggplot2::theme_minimal(
+# ) + ggplot2::labs(
+#   tag = "b)",
+#   x = "Final Local Land-Use",
+#   y = "Impact - Control (Richness)"
+# ) + ggplot2::theme(
+#   plot.tag.position = c(0.01, 1),
+#   strip.text.x = ggplot2::element_blank(),
+#   panel.border = ggplot2::element_rect(
+#     linetype = "dashed", color = "black", fill = NA
+#   )
+# ) + ggplot2::scale_color_manual(
+#   values = colorPalette,
+#   name = "Habitat Land-use"
+# ) + ggplot2::scale_y_continuous(
+#   sec.axis = ggplot2::sec_axis(
+#     trans = function(x) x, name = "Initial Local Land-Use",
+#     breaks = NULL, labels = NA
+#   )
+# )
+
+# Could probably add in the counterfactual as well, but might be too messy?
+newplot4_c <- diversitiesRichness |> tidytable::filter(
+  NicheDistance == "5",
+  (PoolPatchSeed %in% as.character(343:386)),
+  Metric == "Alpha Hill:0",
+  InterventionInitial == "(0)",
+  SpeciesAffinity == "100% 0",
+  is.na(Subset)
+) |> tidytable::left_join(
+  endTimes |> dplyr::select(-Times)
+) |> tidytable::group_by(
+  SpeciesAffinity, Intervention, PoolPatchSeed,
+  InterventionInitial, InterventionFinal
+) |> tidytable::arrange(
+  Time
+) |> tidytable::filter(
+  InterventionInitial != InterventionFinal,
+  Time == Time[1] | Time == Time[2]
+) |> tidytable::summarise(
+  Time = Time[2] - Time[1],
+  Value = Value[2] - Value[1],
+  Method = "Temporal",
+  Weight = 1, # for loess in geom_smooth
+  .groups = "drop"
+) |> tidytable::right_join(
+  tidytable::expand(
+    diversitiesRichness,
+    tidytable::nesting(
+      SpeciesAffinity, Intervention, # SpeciesAffinity not working???
+      InterventionInitial, InterventionFinal
+    )
+  )
+) |> tidytable::mutate(
+  Time = ifelse(is.na(Time), 0, Time),
+  Value = ifelse(is.na(Value), 0, Value),
+  Weight = ifelse(is.na(Weight), 10000, Weight),
+  SpeciesAffinity = ifelse(is.na(SpeciesAffinity), "100% 0", SpeciesAffinity)
+) |> tidytable::filter(
+  InterventionInitial == "(0)"
+) |> ggplot2::ggplot(
+  aes(x = Time, y = Value,
+      group = interaction(SpeciesAffinity, Intervention),
+      # color = InterventionInitial
+      color = InterventionFinal
+      )
+) + ggplot2::geom_point(
+  show.legend = FALSE
+) + ggplot2::geom_smooth(
+  show.legend = FALSE,
+  ggplot2::aes(weight = Weight),
+  method = "loess",
+  formula = "y~x"
+) + ggplot2::facet_grid(
+  # InterventionFinal ~ .,
+  InterventionInitial ~ .,#Method,
+  scales = "free_x"
+) + ggplot2::theme_minimal(
+) + ggplot2::labs(
+  title = "Short Time Scales",
+  tag = "c)",
+  x = "Time since Land-use Change",
+  y = "Impact - Control (Richness)"
+) + ggplot2::theme(
+  plot.tag.position = c(0.01, 1),
+  strip.text.x = ggplot2::element_blank()
+) + ggplot2::scale_color_manual(
+  values = colorPalette,
+  name = "Habitat Land-use"
+) + ggplot2::scale_y_continuous(
+  sec.axis = ggplot2::sec_axis(
+    trans = function(x) x,
+    # name = "Final Local Land-Use",
+    name = "Initial Local Land-Use",
+    breaks = NULL, labels = NA
+  )
+)
+
+diversitiesRichness |> tidytable::filter(
+  NicheDistance == "5",
+  (PoolPatchSeed %in% as.character(343:386)),
+  Metric == "Alpha Hill:0",
+  is.na(Subset)
+) |> tidytable::left_join(endTimes |> dplyr::select(-Times)) |> tidytable::group_by(
+  SpeciesAffinity, Intervention, PoolPatchSeed
+) |> tidytable::arrange(
+  Time
+) |> tidytable::filter(
+  InterventionInitial != InterventionFinal,
+  Time == Time[1] | Time == Time[2]
+) |> tidytable::summarise(
+  InterventionChange = abs(
+    as.numeric(gsub(InterventionInitial, pattern = "[(]|[)]", replacement = ""))
+    - as.numeric(gsub(InterventionFinal, pattern = "[(]|[)]", replacement = ""))
+  ),
+  Time = Time[2] - Time[1],
+  Value = Value[2] - Value[1],
+  Method = "Temporal",
+  .groups = "drop"
+) |> with(table(Intervention, sign(Value), SpeciesAffinity))
+
+
+newplot4 <- ggpubr::ggarrange(
+    plotlist = list(
+      newplot4_a,
+      ggpubr::ggarrange(
+        plotlist = list(
+          newplot4_b,
+          newplot4_c
+        ),
+        ncol = 1
+      )
+    ), nrow = 1 #, widths = c(0.5, 0.27, 0.23)
+  )
+
+ggplot2::ggsave(plot = newplot4, filename = "Figure4_Prototype1.png",
+                units = "cm", width = 6.5*3, height = 6.5*2)
 
 ### Plot 5: ###################################################################
+
+
+### Plot 6: ###################################################################
 # Pseudo-relaxation time of the system from the intervention to its new final
 # state, characterised as the difference between counterfactual always in final
 # state and the intervention to the final state.
