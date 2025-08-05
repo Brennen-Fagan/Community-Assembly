@@ -6,8 +6,7 @@ generateNetworks <- function(
   # Goal: Pass data.frame, return list of networks where a network corresponds
   #       to a row of the data.frame.
   # NOTE: This will need to be updated for Version 10. Currently Version 9.
-  # Singleton version appears to be working fine. Need to deal with > 1.
-  # TODO: TEST.
+  # Tested singleton and multiple versions; appears to be working fine.
   columns <- c(
     # Which network:
     "Time", "Environment1",
@@ -46,7 +45,7 @@ generateNetworks <- function(
       PoolPatch, "-", Interactions, "-", Events, "-",
       InitialConditions, "-", Dispersal, "-", NicheDistance, "-", Affinity, "_",
       PoolPatchSeed, "-", InteractionsSeed, "-", EventsSeed, "-",
-      InitialConditionsSeed, "-", AffinitySeed, "_"
+      InitialConditionsSeed, "-", AffinitySeed# , "_"
     )),
     function(pat, ...) unique(grep(pat, ...)),
     x = targetFiles,
@@ -55,21 +54,20 @@ generateNetworks <- function(
 
   targetFiles <- lapply(
     seq_along(targetFiles), function(i, f, s) {
-      if (!is.na(s[i, ]$InterventionPatchType)) {
-        sapply(
-          with(s[i, ], paste0(
-            InterventionPatchType, "-", InterventionTimeType, "-",
-            InterventionDispersal, "-", InterventionNicheDistance, "_",
-            InterventionPatchSeed, "-", InterventionTimeSeed
-          )),
-          grep, # within S$Row grep.
+        grep(
+          if (!is.na(s[i, ]$InterventionPatchType)) {
+            with(s[i, ], paste0(
+              InterventionPatchType, "-", InterventionTimeType, "-",
+              InterventionDispersal, "-", InterventionNicheDistance, "_",
+              InterventionPatchSeed, "-", InterventionTimeSeed
+            ))
+            } else {
+              "_Simulation_"
+            },
           x = f[[i]],
           fixed = TRUE,
           value = TRUE
         )
-      } else {
-        f[[i]]
-      }
     },
     f = targetFiles, s = Specification
   )
@@ -99,8 +97,11 @@ generateNetworks <- function(
       by = c("Affinity", "PoolPatch", "InterventionPatchType"),
       multiple = "all"
     ) |> dplyr::mutate(# First Number in the Second Group (split = _)
-      PoolPatchSeed = grep(div$Ellipsis$ID,
-                           pattern = "(?<=_)[0-9]+", value = TRUE, perl = TRUE),
+      PoolPatchSeed =
+        gsub(div$Ellipsis$ID,
+             pattern = ".*?((?<=_)[0-9]+).*", # Capture a group, and everything.
+             replacement = "\\1", # Replace it with just the captured group.
+             perl = TRUE),
       SpeciesAffinity = aDO$SpeciesAffinities[as.numeric(Affinity)]
     ) |> changeAffinityLevels()
   })
@@ -114,6 +115,10 @@ generateNetworks <- function(
     return(pool)
   })
   names(targetPoolsU) <- targetPoolsUN
+  targetPoolGroups <- apply(
+    outer(targetPoolsUN, targetPools, FUN = function(x, y) x==y),
+    2, which
+  )
 
   # Implement Associations
   # Can make more memory efficient by reducing at this step just to the needed
@@ -189,30 +194,58 @@ generateNetworks <- function(
     return(env)
   })
 
-
-  targetEnvs <- lapply(targetEnvs, function(env) {
-    # print(env$graphs[[1]]$graphs[[1]])
-    env_undirected <- lapply(env$graphs, tidygraph::to_undirected)
-    if (length(env_undirected) > 1) {
-      for (i in 2:length(env_undirected)) {
-        env_undirected[[1]] <- tidygraph::graph_join(
-          env_undirected[[1]], env_undirected[[i]]
-        )
+  # Use the target pool groups to create layouts.
+  targetEnvsLayouts <- lapply(
+    unique(targetPoolGroups),
+    function(i) {
+      indices <- which(i == targetPoolGroups)
+      # Within patches.
+      env_undirecteds <- lapply(targetEnvs[indices], function(env) {
+        env_undirected <- lapply(env$graphs, tidygraph::to_undirected)
+        env_undirected <- lapply(env$graphs, tidygraph::select, "node")
+        if (length(env_undirected) > 1) {
+          for (i in 2:length(env_undirected)) {
+            env_undirected[[1]] <- tidygraph::graph_join(
+              env_undirected[[1]], env_undirected[[i]], by = "node"
+            )
+          }
+        }
+        return(env_undirected)
+      })
+      # Repeat across targets.
+      env_undirected <- env_undirecteds[[1]][[1]]
+      if (length(env_undirecteds) > 1) {
+        for (i in 2:length(env_undirecteds)) {
+          env_undirected <- tidygraph::graph_join(
+            env_undirected, env_undirecteds[[i]][[1]], by = "node"
+          )
+        }
       }
+
+      if ((env_undirected %>% mutate(
+        Components = tidygraph::graph_component_count(),
+        Nodes = tidygraph::graph_order(),
+        NotSingletons = Components != Nodes
+      ) %>% pull(NotSingletons))[1]
+      ) {
+        # need to undirect again (because recording can be either direction?)
+        env_undirected <- tidygraph::to_undirected(env_undirected)
+        env_undirected <- env_undirected |> tidygraph::convert(tidygraph::to_simple)
+        layout <- ggraph::create_layout(env_undirected, "backbone")
+      } else {
+        layout <- ggraph::create_layout(env_undirected, "auto")
+      }
+
+      return(layout)
     }
-    if ((env_undirected[[1]] %>% mutate(
-      Components = tidygraph::graph_component_count(),
-      Nodes = tidygraph::graph_order(),
-      NotSingletons = Components != Nodes
-    ) %>% pull(NotSingletons))[1]
-    ) {
-      env_undirected[[1]] <- env_undirected[[1]] |> tidygraph::convert(tidygraph::to_simple)
-      env$layout <- ggraph::create_layout(env_undirected[[1]], "backbone")
-    } else {
-      env$layout <- ggraph::create_layout(env_undirected[[1]], "auto")
-    }
-    return(env)
-  })
+  )
+
+  targetEnvs <- lapply(seq_along(targetEnvs), function(i, envs, grps, layouts) {
+    envs[[i]]$layout <- layouts[[grps[i]]]
+    return(envs[[i]])
+  },
+  envs = targetEnvs, grps = targetPoolGroups, layouts = targetEnvsLayouts
+  )
 
   # Adjust for meaningful x and y instead if possible.
   targetEnvs <- lapply(targetEnvs, function(env) {
@@ -249,9 +282,12 @@ generateNetworks <- function(
     lapply(
       targetEnvs,
       function(env)
-        env$Diversity[
+        cbind(
+          Time = env$Row$Time,
+          env$Diversity[
           1, c("PoolPatchSeed", "SpeciesAffinity",
                "NicheDistance", "Intervention")]
+        )
     )
   )
   targetEnvsIndex <- cbind(ID = 1:nrow(targetEnvsIndex), targetEnvsIndex)
