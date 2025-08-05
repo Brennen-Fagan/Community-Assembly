@@ -6,6 +6,7 @@ generateNetworks <- function(
   # Goal: Pass data.frame, return list of networks where a network corresponds
   #       to a row of the data.frame.
   # NOTE: This will need to be updated for Version 10. Currently Version 9.
+  # Singleton version appears to be working fine. Need to deal with > 1.
   # TODO: TEST.
   columns <- c(
     # Which network:
@@ -26,14 +27,14 @@ generateNetworks <- function(
   )
 
   ## Load Targets: #############################################################
-  targetDirs <- unique(with(Specification, dir(
+  targetDirs <- with(Specification, dir(
     pattern = paste0(
       "TSTS_Simulations_",
-      PoolPatch, "-", Iteractions, "_",
+      PoolPatch, "-", Interactions, "_",
       PoolPatchSeed, "-", InteractionsSeed, "_"
     ),
     full.names = TRUE
-  )))
+  ))
 
   targetFiles <- dir(targetDirs, pattern = "(Sim|Int)", full.names = T)
 
@@ -41,7 +42,7 @@ generateNetworks <- function(
   targetFiles <- with(Specification, grep(
     x = targetFiles,
     pattern = paste0(
-      PoolPatch, "-", Iteractions, "-", Events, "-",
+      PoolPatch, "-", Interactions, "-", Events, "-",
       InitialConditions, "-", Dispersal, "-", NicheDistance, "-", Affinity, "_",
       PoolPatchSeed, "-", InteractionsSeed, "-", EventsSeed, "-",
       InitialConditionsSeed, "-", AffinitySeed, "_"
@@ -65,11 +66,11 @@ generateNetworks <- function(
 
   targetFilesInt <- grep(
     x = targetFilesInt,
-    pattern = paste0(
+    pattern = with(Specification, paste0(
       InterventionPatchType, "-", InterventionTimeType, "-",
       InterventionDispersal, "-", InterventionNicheDistance, "_",
       InterventionPatchSeed, "-", InterventionTimeSeed
-    ),
+    )),
     fixed = TRUE,
     value = TRUE
   )
@@ -94,7 +95,7 @@ generateNetworks <- function(
       multiple = "all"
     ) |> dplyr::mutate(# First Number in the Second Group (split = _)
       PoolPatchSeed = grep(div$Ellipsis$ID,
-                           pattern = "(?<=_)[0-9]+", value = TRUE),
+                           pattern = "(?<=_)[0-9]+", value = TRUE, perl = TRUE),
       SpeciesAffinity = aDO$SpeciesAffinities[as.numeric(Affinity)]
     ) |> changeAffinityLevels()
     })
@@ -103,8 +104,8 @@ generateNetworks <- function(
   # Repeat for Pools
   targetPoolsUN <- unique(targetPools)
   targetPoolsU <- lapply(targetPoolsUN, function(d) {
-    pool <- load(d)
-    pool <- get(pool)
+    pool <- new.env()
+    load(d, envir = pool)
     return(pool)
   })
   names(targetPoolsU) <- targetPoolsUN
@@ -112,11 +113,11 @@ generateNetworks <- function(
   # Implement Associations
   # Can make more memory efficient by reducing at this step just to the needed
   # temporal slices.
-  targetEnvs <- lapply(targetFiles, new.env)
+  targetEnvs <- replicate(length(targetFiles), new.env())
   targetEnvs <- lapply(
     seq_along(targetEnvs), function(i, e, s, d, p, r) {
       # load(d[[i]], envir = e[[i]])
-      load(s[[i]], envir = e[[i]])
+      load(s[[i]], envir = e[[i]]) # loads results.
       e[[i]]$Diversity <- targetDivsU[[d[i]]] # string/name indexing.
       e[[i]]$Pool <- targetPoolsU[[p[i]]]
       e[[i]]$Row <- r[i, ]
@@ -137,7 +138,7 @@ generateNetworks <- function(
     env$calculator <- with(
       env$result,
       CalculateTrophicStructure(
-        Pool = env$Pool,
+        Pool = env$Pool$Pool,
         ReproductionRate =
           if (!intervention) {
             Ellipsis$Affinity$EffectiveReproductionRate
@@ -153,15 +154,16 @@ generateNetworks <- function(
 
     env$trophics <- with(
       env$result,
-      lapply(targetTimes, function(t) { # <- #TODO times from Spec here
-        if (intervention)
-          if(t < Ellipsis$Affinity$TimeIntervention / ReactionTime)
-            return(NULL)
-        timerow <- which.max(Abundance[, 1] / ReactionTime > t) # first match
+      if (intervention &&
+          env$Row$Time < Abundance[1, 1] / ReactionTime) {
+        NULL
+      } else {
+        timerow <-
+          which.max(Abundance[, 1] / ReactionTime > env$Row$Time) # first match
         retval <- env$calculator(Abundance[timerow, 1], Abundance[timerow, -1])
         retval$Time <- Abundance[timerow, 1] / ReactionTime
-        return(retval)
-      })
+        retval
+      }
     )
 
     return(env)
@@ -172,97 +174,83 @@ generateNetworks <- function(
   # May need to handle rearrangement at the end to make sure promise above kept.
 
   targetEnvs <- lapply(targetEnvs, function(env) {
-    env$graphs <- lapply(env$trophics, function(TandEV) {
-      time <- TandEV$Time
-      EVs <- TandEV$EdgeVertexLists[[1]] # Probably accidentally wrapped 1 extra.
-      list(graphs = lapply(EVs, function(patch) { # Keep one layer for the multi-patch case.
-        tidygraph::tbl_graph(
-          nodes = patch$Vertices, edges = patch$Edges
-        )
-      }), Time = time)
-    })
-    return(env)
-  })
-}
-### Example Networks: #########################################################
-
-
-
-
-#### Handle
-targetTimes <- 30000
-
-
-#### Graph
-targetEnvs <- lapply(targetEnvs, function(env) {
-  env$graphs <- lapply(env$trophics, function(TandEV) {
-    time <- TandEV$Time
-    EVs <- TandEV$EdgeVertexLists[[1]] # Probably accidentally wrapped 1 extra.
-    list(graphs = lapply(EVs, function(patch) { # Keep one layer for the multi-patch case.
+    env$graphs <- lapply(env$trophics$EdgeVertexLists[[1]], function(patch) {
       tidygraph::tbl_graph(
         nodes = patch$Vertices, edges = patch$Edges
       )
-    }), Time = time)
+    })
+    return(env)
   })
-  return(env)
-})
 
-targetEnvs <- lapply(targetEnvs, function(env) {
-  # print(env$graphs[[1]]$graphs[[1]])
-  env_undirected <- tidygraph::to_undirected(
-    env$graphs[[length(env$graphs)]]$graphs[[1]]
-  )
-  if ((env_undirected %>% mutate(
-    Components = tidygraph::graph_component_count(),
-    Nodes = tidygraph::graph_order(),
-    NotSingletons = Components != Nodes
-  ) %>% pull(NotSingletons))[1]
-  ) {
-    env_undirected <- env_undirected |> tidygraph::convert(tidygraph::to_simple)
-    env$layout <- ggraph::create_layout(env_undirected, "backbone")
-  } else {
-    env$layout <- ggraph::create_layout(env_undirected, "auto")
-  }
-  return(env)
-})
 
-targetEnvs <- lapply(targetEnvs, function(env) {
-  l <- env$layout
-  l_indices <- as.numeric(gsub("s", "", l$node))
-  affs <- env$result$Ellipsis$Affinity$SpeciesAffinities
-  if (length(unique(affs)) < 4) {
-    # l$x <- affs[l_indices] + l$x/length(unique(affs)) # retain some structure
-    affs <- factor(affs, ordered = TRUE, levels = sort(unique(affs)))
-    shift <- seq_along(levels(affs)) - 1 # input aff returns number of set
-    l$x <- l$x - min(l$x) # shift so left side starts at 0.
-    l$x <- l$x / max(l$x) # scale so that it is over a unit interval.
-    l$x <- l$x + shift[affs[l_indices]] # add unit interval for each aff.
-    l$x <- l$x / max(l$x) # scale one more time so over unit interval again.
-  } else {
-    l$x <- affs[l_indices] # should be enough variation to enable visualisation
-  }
-  l$y <- log10(targetEnvsPool$Pool$Size[l_indices])
-  env$layout <- l
-  return(env)
-})
-
-#### Plot
-targetEnvs <- lapply(targetEnvs, function(env) {
-  timelist <- env$graphs
-  env$singletonGraphs <- lapply(timelist, function(patchlist) {
-    lapply(patchlist$graphs, plotGraph, mainLayout = env$layout)
+  targetEnvs <- lapply(targetEnvs, function(env) {
+    # print(env$graphs[[1]]$graphs[[1]])
+    env_undirected <- lapply(env$graphs, tidygraph::to_undirected)
+    if (length(env_undirected) > 1) {
+      for (i in 2:length(env_undirected)) {
+        env_undirected[[1]] <- tidygraph::graph_join(
+          env_undirected[[1]], env_undirected[[i]]
+        )
+      }
+    }
+    if ((env_undirected[[1]] %>% mutate(
+      Components = tidygraph::graph_component_count(),
+      Nodes = tidygraph::graph_order(),
+      NotSingletons = Components != Nodes
+    ) %>% pull(NotSingletons))[1]
+    ) {
+      env_undirected[[1]] <- env_undirected[[1]] |> tidygraph::convert(tidygraph::to_simple)
+      env$layout <- ggraph::create_layout(env_undirected[[1]], "backbone")
+    } else {
+      env$layout <- ggraph::create_layout(env_undirected[[1]], "auto")
+    }
+    return(env)
   })
-  return(env)
-})
 
-targetEnvsIndex <- do.call(
-  rbind,
-  lapply(
-    targetEnvs,
-    function(env)
-      env$Diversity[
-        1, c("PoolPatchSeed", "SpeciesAffinity",
-             "NicheDistance", "Intervention")]
+  # Adjust for meaningful x and y instead if possible.
+  targetEnvs <- lapply(targetEnvs, function(env) {
+    l <- env$layout
+    l_indices <- as.numeric(gsub("s", "", l$node))
+    affs <- env$result$Ellipsis$Affinity$SpeciesAffinities
+    if (length(unique(affs)) < 4) {
+      # l$x <- affs[l_indices] + l$x/length(unique(affs)) # retain some structure
+      affs <- factor(affs, ordered = TRUE, levels = sort(unique(affs)))
+      shift <- seq_along(levels(affs)) - 1 # input aff returns number of set
+      l$x <- l$x - min(l$x) # shift so left side starts at 0.
+      l$x <- l$x / max(l$x) # scale so that it is over a unit interval.
+      l$x <- l$x + shift[affs[l_indices]] # add unit interval for each aff.
+      l$x <- l$x / max(l$x) # scale one more time so over unit interval again.
+    } else {
+      l$x <- affs[l_indices] # should be enough variation to enable visualisation
+    }
+    l$y <- log10(env$Pool$Pool$Size[l_indices])
+    env$layout <- l
+    return(env)
+  })
+
+  #### Plot
+  targetEnvs <- lapply(targetEnvs, function(env) {
+    timelist <- env$graphs
+    env$singletonGraphs <- lapply(env$graphs, function(patchgraph) {
+      plotGraph(patchgraph, mainLayout = env$layout)
+    })
+    return(env)
+  })
+
+  targetEnvsIndex <- do.call(
+    rbind,
+    lapply(
+      targetEnvs,
+      function(env)
+        env$Diversity[
+          1, c("PoolPatchSeed", "SpeciesAffinity",
+               "NicheDistance", "Intervention")]
+    )
   )
-)
-targetEnvsIndex <- cbind(ID = 1:nrow(targetEnvsIndex), targetEnvsIndex)
+  targetEnvsIndex <- cbind(ID = 1:nrow(targetEnvsIndex), targetEnvsIndex)
+
+  return(list(
+    Index = targetEnvsIndex,
+    Envs = targetEnvs
+  ))
+}
