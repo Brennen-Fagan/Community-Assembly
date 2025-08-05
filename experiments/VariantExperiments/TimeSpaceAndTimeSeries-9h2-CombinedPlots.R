@@ -258,7 +258,7 @@ plotGraph <- function(graph, mainLayout, legends = FALSE) {
     range = c(0.5, 4)
     # limits = c(10^-5, 10^5)#, trans = "log10"
   ) + coord_cartesian(
-    x = c(0, 1), y = c(-2, 0.25),
+    x = c(0, 1), y = c(-2, 0.5),
     clip = "off"
   )
 
@@ -375,173 +375,41 @@ diversitiesRichness <- diversitiesRichness |> changeAffinityLevels(
 )
 
 ### Example Networks: #########################################################
-#### Load:
-targetSeed <- 343
-targetDir <- dir(pattern = paste0(
-  "TSTS_Simulations_142486-4929_", targetSeed, "-", targetSeed, "_2025-01-21"
-),
-full.names = T)
-stopifnot(length(targetDir) == 1)
 
-targetFiles <- dir(targetDir, pattern = "(Sim|Int)",
-                   full.names = T)
-# Restrict to source simulations with affinities 0, 0.5, or 1
-targetFiles <- grep(x = targetFiles,
-                    pattern = "142486-4929-28-1-NA-(3|5|7)-(1|6|7|15|20|21|29|34|35)_",
-                    value = TRUE)
-targetFilesSim <- grep(x = targetFiles,
-                       pattern = "_Simulation_",
-                       fixed = TRUE,
-                       value = TRUE)
-targetFilesInt <- grep(x = targetFiles,
-                       pattern = "Int",
-                       fixed = TRUE,
-                       value = TRUE)
-# Restrict interventions to the same
-targetFilesInt <- grep(x = targetFilesInt,
-                       pattern = "_11(1|3|5)-",
-                       fixed = FALSE,
-                       value = TRUE)
+# Most efficient to call the function this creates only once!
+# This way we can perform (closer to) the bare minimum number of loads.
+# This function takes in a specification (essentially, the information from
+# the diversities objects, but not the measurements in those objects).
+# The specification can be of multiple rows.
+source("generateNetworks.R")
+newplot2_a_seed <- "343"; newplot2_a_time <- 30000
+specification <- diversitiesRichness |> tidytable::select(c(
+  # Which network:
+  "Time", "Environment1",
+  # Which File (Base):
+  "PoolPatch", "PoolPatchSeed", "Interactions", "InteractionsSeed",
+  "Events", "EventsSeed", "InitialConditions", "InitialConditionsSeed",
+  "Dispersal", "NicheDistance", "Affinity", "AffinitySeed",
+  # Which File (Intervention):
+  "InterventionPatchType", "InterventionPatchSeed", "InterventionTimeType",
+  "InterventionTimeSeed", "InterventionDispersal", "InterventionNicheDistance",
+  # Ease of Use
+  "SpeciesAffinity", "Intervention"
+)) |> tidytable::filter(
+  # 2A
+  (
+    SpeciesAffinity == "100% 0" &
+      NicheDistance == "5" &
+      Intervention %in% c("(0)", "(0.5)", "(1)") &
+      PoolPatchSeed %in% as.character(newplot2_a_seed) &
+      Time == newplot2_a_time
+  # ) | (
 
-targetFiles <- c(targetFilesSim, targetFilesInt)
-targetDivs <- gsub(x = targetFiles,
-                   pattern = "_(Simulation|Intervention)_",
-                   replacement = "_Diversity_")
-targetPool <- dir(targetDir, pattern = "Pool",
-                  full.names = T)
-
-targetEnvs <- lapply(targetFiles, new.env)
-targetEnvs <- lapply(seq_along(targetEnvs), function(i, e, s, d) {
-  load(d[[i]], envir = e[[i]])
-  load(s[[i]], envir = e[[i]])
-  e[[i]]$Diversity <- flattenDiversity(e[[i]]$Diversity) |> dplyr::left_join(
-    diversitiesInterventionStrings,
-    by = c("Affinity", "PoolPatch", "InterventionPatchType"),
-    multiple = "all"
-  ) |> dplyr::mutate(
-    PoolPatchSeed = targetSeed,
-    SpeciesAffinity =
-      affinityDictionaryOrigin$SpeciesAffinities[as.numeric(Affinity)]
-  ) |> changeAffinityLevels()
-  e[[i]]
-},
-e = targetEnvs, d = targetDivs, s = targetFiles)
-targetEnvsPool <- new.env()
-load(targetPool, envir = targetEnvsPool)
-
-#### Handle
-targetTimes <- 30000
-
-targetEnvs <- lapply(targetEnvs, function(env) {
-  intervention <- #T/F
-    !("EffectiveReproductionRate" %in% names(env$result$Ellipsis$Affinity))
-
-  env$calculator <- with(
-    env$result,
-    CalculateTrophicStructure(
-      Pool = targetEnvsPool$Pool,
-      ReproductionRate =
-        if (!intervention) {
-          Ellipsis$Affinity$EffectiveReproductionRate
-        } else {
-          Ellipsis$Affinity$EffectiveReproductionRateIntervention
-        },
-      NumEnvironments = NumEnvironments,
-      InteractionMatrices = targetEnvsPool$InteractionMatrices,
-      EliminationThreshold = Parameters$EliminationThreshold,
-      LinkThreshold = 0.01
-    )
   )
-
-  env$trophics <- with(
-    env$result,
-    lapply(targetTimes, function(t) {
-      if (intervention)
-        if(t < Ellipsis$Affinity$TimeIntervention / ReactionTime)
-          return(NULL)
-      timerow <- which.max(Abundance[, 1] / ReactionTime > t) # first match
-      retval <- env$calculator(Abundance[timerow, 1], Abundance[timerow, -1])
-      retval$Time <- Abundance[timerow, 1] / ReactionTime
-      return(retval)
-    })
-  )
-
-  return(env)
-})
-
-#### Graph
-targetEnvs <- lapply(targetEnvs, function(env) {
-  env$graphs <- lapply(env$trophics, function(TandEV) {
-    time <- TandEV$Time
-    EVs <- TandEV$EdgeVertexLists[[1]] # Probably accidentally wrapped 1 extra.
-    list(graphs = lapply(EVs, function(patch) { # Keep one layer for the multi-patch case.
-      tidygraph::tbl_graph(
-        nodes = patch$Vertices, edges = patch$Edges
-      )
-    }), Time = time)
-  })
-  return(env)
-})
-
-targetEnvs <- lapply(targetEnvs, function(env) {
-  # print(env$graphs[[1]]$graphs[[1]])
-  env_undirected <- tidygraph::to_undirected(
-    env$graphs[[length(env$graphs)]]$graphs[[1]]
-  )
-  if ((env_undirected %>% mutate(
-    Components = tidygraph::graph_component_count(),
-    Nodes = tidygraph::graph_order(),
-    NotSingletons = Components != Nodes
-    ) %>% pull(NotSingletons))[1]
-  ) {
-    env_undirected <- env_undirected |> tidygraph::convert(tidygraph::to_simple)
-    env$layout <- ggraph::create_layout(env_undirected, "backbone")
-  } else {
-    env$layout <- ggraph::create_layout(env_undirected, "auto")
-  }
-  return(env)
-})
-
-targetEnvs <- lapply(targetEnvs, function(env) {
-  l <- env$layout
-  l_indices <- as.numeric(gsub("s", "", l$node))
-  affs <- env$result$Ellipsis$Affinity$SpeciesAffinities
-  if (length(unique(affs)) < 4) {
-    # l$x <- affs[l_indices] + l$x/length(unique(affs)) # retain some structure
-    affs <- factor(affs, ordered = TRUE, levels = sort(unique(affs)))
-    shift <- seq_along(levels(affs)) - 1 # input aff returns number of set
-    l$x <- l$x - min(l$x) # shift so left side starts at 0.
-    l$x <- l$x / max(l$x) # scale so that it is over a unit interval.
-    l$x <- l$x + shift[affs[l_indices]] # add unit interval for each aff.
-    l$x <- l$x / max(l$x) # scale one more time so over unit interval again.
-  } else {
-    l$x <- affs[l_indices] # should be enough variation to enable visualisation
-  }
-  l$y <- log10(targetEnvsPool$Pool$Size[l_indices])
-  env$layout <- l
-  return(env)
-})
-
-#### Plot
-targetEnvs <- lapply(targetEnvs, function(env) {
-  timelist <- env$graphs
-  env$singletonGraphs <- lapply(timelist, function(patchlist) {
-    lapply(patchlist$graphs, plotGraph, mainLayout = env$layout)
-  })
-  return(env)
-})
-
-targetEnvsIndex <- do.call(
-  rbind,
-  lapply(
-    targetEnvs,
-    function(env)
-      env$Diversity[
-        1, c("PoolPatchSeed", "SpeciesAffinity",
-             "NicheDistance", "Intervention")]
-  )
+) |> tidytable::distinct(
 )
-targetEnvsIndex <- cbind(ID = 1:nrow(targetEnvsIndex), targetEnvsIndex)
+
+exampleNetworks <- generateNetworks(specification)
 
 # Main Plots: #################################################################
 ### Plot 2:####################################################################
@@ -555,7 +423,7 @@ newplot2_dataA <- diversitiesRichness |> tidytable::filter(
   is.na(Subset)
 ) |> tidytable::left_join(endTimes |> dplyr::select(-Times))
 
-newplot2_indices <- targetEnvsIndex |> tidytable::filter(
+newplot2_indices <- exampleNetworks$Index |> tidytable::filter(
   SpeciesAffinity == "100% 0",
   NicheDistance == "5",
   Intervention %in% c("(0)", "(0.5)", "(1)"),
@@ -595,9 +463,9 @@ newplot2_a <- plotMeanAndInner(
   ), CIs = 0.75, facets = as.formula(. ~ .)
 ) + ggplot2::geom_point(
   data = newplot2_dataA |> tidytable::filter(
-    PoolPatchSeed == targetSeed,
+    PoolPatchSeed == newplot2_a_seed,
     Intervention %in% c("(0)", "(0.5)", "(1)"),
-    abs(Time - targetTimes) == min(abs(Time - targetTimes))
+    abs(Time - newplot2_a_time) == min(abs(Time - newplot2_a_time))
   )
 ) + ggplot2::labs(
   y = "Richness"
@@ -609,9 +477,8 @@ newplot2_a <- plotMeanAndInner(
   xlim = c(0, 40000), ylim = c(0, 42), expand = FALSE
 ) + ggplot2::annotation_custom(
   ggplot2::ggplotGrob(
-    targetEnvs[[
-      newplot2_indices$ID[1]
-      ]]$singletonGraphs[[1]][[1]] + ggplot2::theme_void(
+    exampleNetworks$Envs[[newplot2_indices$ID[1]]]$singletonGraphs[[1]] +
+      ggplot2::theme_void(
       ) + ggplot2::theme(
         plot.background = ggplot2::element_rect(fill = "white")
       )
@@ -619,9 +486,8 @@ newplot2_a <- plotMeanAndInner(
   xmin = 30500, xmax = 40000, ymin = 7, ymax = 17
 ) + ggplot2::annotation_custom(
   ggplot2::ggplotGrob(
-    targetEnvs[[
-      newplot2_indices$ID[2]
-      ]]$singletonGraphs[[1]][[1]] + ggplot2::theme_void(
+    exampleNetworks$Envs[[newplot2_indices$ID[2]]]$singletonGraphs[[1]] +
+      ggplot2::theme_void(
       ) + ggplot2::theme(
         plot.background = ggplot2::element_rect(fill = "white")
       )
@@ -629,9 +495,8 @@ newplot2_a <- plotMeanAndInner(
   xmin = 30500, xmax = 40000, ymin = 18, ymax = 28
 ) + ggplot2::annotation_custom(
   ggplot2::ggplotGrob(
-    targetEnvs[[
-      newplot2_indices$ID[3]
-      ]]$singletonGraphs[[1]][[1]] + ggplot2::theme_void(
+    exampleNetworks$Envs[[newplot2_indices$ID[3]]]$singletonGraphs[[1]] +
+      ggplot2::theme_void(
       ) + ggplot2::theme(
         plot.background = ggplot2::element_rect(fill = "white")
       )
@@ -899,6 +764,10 @@ newplot3 <- ggpubr::ggarrange(
 
 ggplot2::ggsave(plot = newplot3, filename = "Figure3_Prototype4.png",
                 units = "cm", width = 6.5*3, height = 6.5*2)
+
+##### Why the losses: #########################################################
+# Turnover amongst different groups?
+diversitiesTimeBC
 
 ### Plot 4:####################################################################
 # Need to contrast with 2a (Richness). Long and short time scales.
@@ -1405,7 +1274,108 @@ ggplot2::ggsave(plot = newplot4, filename = "Figure4_Prototype1.png",
                 units = "cm", width = 6.5*3, height = 6.5*2)
 
 ### Plot 5: ###################################################################
+# Progression of network change as we undergo intervention. As a base plot
+# we use the richness changes of two experiments that are trading places.
+# Both of these should probably be 100% 0. Maybe (0) -> (0.5) and (0.5) -> (0).
+# Because of the size of the plots, we can't actually show them along the
+# richness plots directly. We could potentially put labeled points instead,
+# and then time staggered facets. I think we'll need higher resolution evals
+# in order to capture the level of detail we're describing in the main text.
+# We also need to convert the existing code for creating the networks into
+# more general code, since we'll need to make a few here as well...
 
+# Try something like the below to identify a good option:
+# diversitiesRichness |> tidytable::filter(
+#   NicheDistance == "5",
+#   (PoolPatchSeed %in% as.character(383)),#:386)),
+#   Metric == "Alpha Hill:0",
+#   SpeciesAffinity == "100% 0",
+#   Intervention %in% c("(0)->(0.5)", "(0.5)->(0)", "(0)", "(0.5)"),
+#   Time > 16000, Time < 18000,
+#   is.na(Subset)
+# ) |> ggplot(
+#   aes(x = Time, y = Value, color = Intervention)
+# ) + ggplot2::geom_line(
+# ) + ggplot2::facet_wrap(
+#   PoolPatchSeed ~ .
+# ) + coord_cartesian(
+#   xlim = c(16600, 17300)
+# )
+
+newplot5_a_Specification <- rbind(diversitiesRichness |> tidytable::filter(
+  NicheDistance == "5",
+  (PoolPatchSeed %in% as.character(383)),#:386)),
+  Metric == "Alpha Hill:0",
+  SpeciesAffinity == "100% 0",
+  Intervention %in% c("(0)", "(0.5)"),
+  Time %in% c(16700),
+  is.na(Subset)
+), diversitiesRichness |> tidytable::filter(
+  NicheDistance == "5",
+  (PoolPatchSeed %in% as.character(383)),#:386)),
+  Metric == "Alpha Hill:0",
+  SpeciesAffinity == "100% 0",
+  Intervention %in% c("(0)->(0.5)", "(0.5)->(0)"),
+  Time %in% c(16720, 16800, 16900, 17100),
+  is.na(Subset)
+))
+
+newplot5_a_Networks <- generateNetworks(newplot5_a_Specification)
+
+newplot5_a <- diversitiesRichness |> tidytable::filter(
+  NicheDistance == "5",
+  (PoolPatchSeed %in% as.character(383)),#:386)),
+  Metric == "Alpha Hill:0",
+  SpeciesAffinity == "100% 0",
+  Intervention %in% c("(0)->(0.5)", "(0.5)->(0)", "(0)", "(0.5)"),
+  Time > 16000, Time < 18000,
+  is.na(Subset)
+) |> ggplot(
+  aes(x = Time, y = Value, color = Intervention)
+) + ggplot2::geom_line(
+  show.legend = FALSE
+) + coord_cartesian(
+  xlim = c(16600, 17300)
+) + ggplot2::geom_point(
+  show.legend = FALSE,
+  data = newplot5_a_Specification
+) + ggplot2::labs(
+  y = "Richness"
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Local Land-use"
+) + ggplot2::guides(
+  linetype = "none",
+  color = ggplot2::guide_legend(ncol = 3),
+  fill = ggplot2::guide_legend(ncol = 3)
+) + ggplot2::labs(
+  tag = "a)"
+) + ggplot2::theme_minimal(
+) + ggplot2::theme(
+  legend.position = c(0.3, 0.09),
+  plot.tag.position = c(0.025, 1)
+)
+
+# For some reason, this is returning a list of two plots rather than a single
+# plot when used with ncol or nrow.
+newplot5_b <- ggarrange(plotlist = ggarrange(
+  plotlist = lapply(
+    newplot5_a_Networks$Envs[c(1, 3:6, 2, 7:10)],
+    function(e) e$singletonGraphs[[1]] + ggplot2::theme_void()
+  ),
+  ncol = 5
+), nrow = 2, labels = list("b)", "c)"))
+
+
+newplot5 <- ggpubr::ggarrange(
+  plotlist = list(
+    newplot5_a,
+    newplot5_b
+  ), nrow = 1 #, widths = c(0.5, 0.27, 0.23)
+)
+
+ggplot2::ggsave(plot = newplot5, filename = "Figure5_Prototype1.png",
+                units = "cm", width = 6.5*3, height = 6.5*2)
 
 ### Plot 6: ###################################################################
 # Pseudo-relaxation time of the system from the intervention to its new final
