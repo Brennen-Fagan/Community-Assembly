@@ -1,5 +1,5 @@
 generateNetworks <- function(
-  Specification, 
+  Specification,
   dIS = diversitiesInterventionStrings,
   aDO = affinityDictionaryOrigin
 ) {
@@ -9,13 +9,13 @@ generateNetworks <- function(
   # TODO: TEST.
   columns <- c(
     # Which network:
-    "Time", "Environment1", 
+    "Time", "Environment1",
     # Which File (Base):
-    "PoolPatch", "PoolPatchSeed", "Interactions", "InteractionsSeed", 
+    "PoolPatch", "PoolPatchSeed", "Interactions", "InteractionsSeed",
     "Events", "EventsSeed", "InitialConditions", "InitialConditionsSeed",
     "Dispersal", "NicheDistance", "Affinity", "AffinitySeed",
     # Which File (Intervention):
-    "InterventionPatchType", "InterventionPatchSeed", "InterventionTimeType", 
+    "InterventionPatchType", "InterventionPatchSeed", "InterventionTimeType",
     "InterventionTimeSeed", "InterventionDispersal", "InterventionNicheDistance"
   )
   stopifnot(
@@ -24,26 +24,26 @@ generateNetworks <- function(
       unlist(lapply(columns, function(clm) length(Specification[[clm]])))
     )) == 1
   )
-  
+
   ## Load Targets: #############################################################
   targetDirs <- unique(with(Specification, dir(
     pattern = paste0(
-      "TSTS_Simulations_", 
+      "TSTS_Simulations_",
       PoolPatch, "-", Iteractions, "_",
       PoolPatchSeed, "-", InteractionsSeed, "_"
     ),
     full.names = TRUE
   )))
-  
+
   targetFiles <- dir(targetDirs, pattern = "(Sim|Int)", full.names = T)
-  
+
   ### Retrieval Base: ##########################################################
   targetFiles <- with(Specification, grep(
     x = targetFiles,
     pattern = paste0(
-      PoolPatch, "-", Iteractions, "-", Events, "-", 
+      PoolPatch, "-", Iteractions, "-", Events, "-",
       InitialConditions, "-", Dispersal, "-", NicheDistance, "-", Affinity, "_",
-      PoolPatchSeed, "-", InteractionsSeed, "-", EventsSeed, "-", 
+      PoolPatchSeed, "-", InteractionsSeed, "-", EventsSeed, "-",
       InitialConditionsSeed, "-", AffinitySeed, "_"
     ),
     value = TRUE
@@ -54,7 +54,7 @@ generateNetworks <- function(
     fixed = TRUE,
     value = TRUE
   ) # Done.
-  
+
   ### Retrieval Intervention: ##################################################
   targetFilesInt <- grep(
     x = targetFiles,
@@ -62,18 +62,18 @@ generateNetworks <- function(
     fixed = TRUE,
     value = TRUE
   ) # Check the right intervention asked for.
-  
+
   targetFilesInt <- grep(
     x = targetFilesInt,
     pattern = paste0(
-      InterventionPatchType, "-", InterventionTimeType, "-", 
+      InterventionPatchType, "-", InterventionTimeType, "-",
       InterventionDispersal, "-", InterventionNicheDistance, "_",
       InterventionPatchSeed, "-", InterventionTimeSeed
     ),
     fixed = TRUE,
     value = TRUE
   )
-  
+
   # Families of targets:
   targetFiles <- c(targetFilesSim, targetFilesInt)
   targetDivs <- gsub(x = targetFiles,
@@ -81,38 +81,63 @@ generateNetworks <- function(
                      replacement = "_Diversity_")
   targetPools <- dir(targetDirs, pattern = "Pool",
                      full.names = T)
-  
+
   ### Perform Load: ############################################################
-  #TODO NEED TO PERFORM FLATTENNING ONCE PER DIVERSITY IF POSSIBLE; EXPENSIVE.
-  
-  targetEnvs <- lapply(targetFiles, new.env)
-  targetEnvs <- lapply(seq_along(targetEnvs), function(i, e, s, d) {
-    load(d[[i]], envir = e[[i]])
-    load(s[[i]], envir = e[[i]])
-    e[[i]]$Diversity <- flattenDiversity(e[[i]]$Diversity) |> dplyr::left_join(
+  # Load Diversities and prepare associations.
+  targetDivsUN <- unique(targetDivs)
+  targetDivsU <- lapply(targetDivsUN, function(d) {
+    div <- load(d)
+    div <- get(div)
+    flattenDiversity(div) |> dplyr::left_join(
       dIS,
       by = c("Affinity", "PoolPatch", "InterventionPatchType"),
       multiple = "all"
-    ) |> dplyr::mutate(
-      PoolPatchSeed = targetSeed,
+    ) |> dplyr::mutate(# First Number in the Second Group (split = _)
+      PoolPatchSeed = grep(div$Ellipsis$ID,
+                           pattern = "(?<=_)[0-9]+", value = TRUE),
       SpeciesAffinity = aDO$SpeciesAffinities[as.numeric(Affinity)]
     ) |> changeAffinityLevels()
-    e[[i]]
-  },
-  e = targetEnvs, d = targetDivs, s = targetFiles)
-  
-  targetEnvsPool <- new.env()
-  load(targetPool, envir = targetEnvsPool)
-  
+    })
+  names(targetDivsU) <- targetDivsUN
+
+  # Repeat for Pools
+  targetPoolsUN <- unique(targetPools)
+  targetPoolsU <- lapply(targetPoolsUN, function(d) {
+    pool <- load(d)
+    pool <- get(pool)
+    return(pool)
+  })
+  names(targetPoolsU) <- targetPoolsUN
+
+  # Implement Associations
+  # Can make more memory efficient by reducing at this step just to the needed
+  # temporal slices.
+  targetEnvs <- lapply(targetFiles, new.env)
+  targetEnvs <- lapply(
+    seq_along(targetEnvs), function(i, e, s, d, p, r) {
+      # load(d[[i]], envir = e[[i]])
+      load(s[[i]], envir = e[[i]])
+      e[[i]]$Diversity <- targetDivsU[[d[i]]] # string/name indexing.
+      e[[i]]$Pool <- targetPoolsU[[p[i]]]
+      e[[i]]$Row <- r[i, ]
+      return(e[[i]])
+    },
+    e = targetEnvs,
+    s = targetFiles,
+    d = targetDivs,
+    p = targetPools,
+    r = Specification
+  )
+
   # Reconstruct environment
   targetEnvs <- lapply(targetEnvs, function(env) {
     intervention <- #T/F
       !("EffectiveReproductionRate" %in% names(env$result$Ellipsis$Affinity))
-    
+
     env$calculator <- with(
       env$result,
       CalculateTrophicStructure(
-        Pool = targetEnvsPool$Pool,
+        Pool = env$Pool,
         ReproductionRate =
           if (!intervention) {
             Ellipsis$Affinity$EffectiveReproductionRate
@@ -120,12 +145,12 @@ generateNetworks <- function(
             Ellipsis$Affinity$EffectiveReproductionRateIntervention
           },
         NumEnvironments = NumEnvironments,
-        InteractionMatrices = targetEnvsPool$InteractionMatrices,
+        InteractionMatrices = env$Pool$InteractionMatrices,
         EliminationThreshold = Parameters$EliminationThreshold,
         LinkThreshold = 0.01
       )
     )
-    
+
     env$trophics <- with(
       env$result,
       lapply(targetTimes, function(t) { # <- #TODO times from Spec here
@@ -138,14 +163,26 @@ generateNetworks <- function(
         return(retval)
       })
     )
-    
+
     return(env)
   })
-  
-  
+
   ## CREATE NETWORKS: #########################################################
   # Should be easy from here out?
   # May need to handle rearrangement at the end to make sure promise above kept.
+
+  targetEnvs <- lapply(targetEnvs, function(env) {
+    env$graphs <- lapply(env$trophics, function(TandEV) {
+      time <- TandEV$Time
+      EVs <- TandEV$EdgeVertexLists[[1]] # Probably accidentally wrapped 1 extra.
+      list(graphs = lapply(EVs, function(patch) { # Keep one layer for the multi-patch case.
+        tidygraph::tbl_graph(
+          nodes = patch$Vertices, edges = patch$Edges
+        )
+      }), Time = time)
+    })
+    return(env)
+  })
 }
 ### Example Networks: #########################################################
 
