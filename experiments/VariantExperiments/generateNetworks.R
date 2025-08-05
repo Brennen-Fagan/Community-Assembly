@@ -27,61 +27,66 @@ generateNetworks <- function(
   )
 
   ## Load Targets: #############################################################
-  targetDirs <- with(Specification, dir(
-    pattern = paste0(
+  targetDirs <- sapply(
+    with(Specification, paste0(
       "TSTS_Simulations_",
       PoolPatch, "-", Interactions, "_",
       PoolPatchSeed, "-", InteractionsSeed, "_"
-    ),
+    )),
+    dir,
+    path = ".",
     full.names = TRUE
-  ))
+  )
 
   targetFiles <- dir(targetDirs, pattern = "(Sim|Int)", full.names = T)
 
   ### Retrieval Base: ##########################################################
-  targetFiles <- with(Specification, grep(
-    x = targetFiles,
-    pattern = paste0(
+  targetFiles <- lapply(
+    with(Specification, paste0(
       PoolPatch, "-", Interactions, "-", Events, "-",
       InitialConditions, "-", Dispersal, "-", NicheDistance, "-", Affinity, "_",
       PoolPatchSeed, "-", InteractionsSeed, "-", EventsSeed, "-",
       InitialConditionsSeed, "-", AffinitySeed, "_"
-    ),
-    value = TRUE
-  ))
-  targetFilesSim <- grep(
-    x = targetFiles,
-    pattern = "_Simulation_",
-    fixed = TRUE,
-    value = TRUE
-  ) # Done.
-
-  ### Retrieval Intervention: ##################################################
-  targetFilesInt <- grep(
-    x = targetFiles,
-    pattern = "Int",
-    fixed = TRUE,
-    value = TRUE
-  ) # Check the right intervention asked for.
-
-  targetFilesInt <- grep(
-    x = targetFilesInt,
-    pattern = with(Specification, paste0(
-      InterventionPatchType, "-", InterventionTimeType, "-",
-      InterventionDispersal, "-", InterventionNicheDistance, "_",
-      InterventionPatchSeed, "-", InterventionTimeSeed
     )),
-    fixed = TRUE,
+    function(pat, ...) unique(grep(pat, ...)),
+    x = targetFiles,
     value = TRUE
   )
 
+  targetFiles <- lapply(
+    seq_along(targetFiles), function(i, f, s) {
+      if (!is.na(s[i, ]$InterventionPatchType)) {
+        sapply(
+          with(s[i, ], paste0(
+            InterventionPatchType, "-", InterventionTimeType, "-",
+            InterventionDispersal, "-", InterventionNicheDistance, "_",
+            InterventionPatchSeed, "-", InterventionTimeSeed
+          )),
+          grep, # within S$Row grep.
+          x = f[[i]],
+          fixed = TRUE,
+          value = TRUE
+        )
+      } else {
+        f[[i]]
+      }
+    },
+    f = targetFiles, s = Specification
+  )
+
+  stopifnot(unlist(lapply(targetFiles, length)) == 1)
+  targetFiles <- unlist(targetFiles)
+
   # Families of targets:
-  targetFiles <- c(targetFilesSim, targetFilesInt)
+  # targetFiles <- c(targetFilesSim, targetFilesInt)
+  # Need to fold together back in order of Specification's rows.
   targetDivs <- gsub(x = targetFiles,
                      pattern = "_(Simulation|Intervention)_",
                      replacement = "_Diversity_")
-  targetPools <- dir(targetDirs, pattern = "Pool",
-                     full.names = T)
+  targetPools <- sapply(dirname(targetFiles),
+                        dir,
+                        pattern = "Pool",
+                        full.names = T)
 
   ### Perform Load: ############################################################
   # Load Diversities and prepare associations.
@@ -98,7 +103,7 @@ generateNetworks <- function(
                            pattern = "(?<=_)[0-9]+", value = TRUE, perl = TRUE),
       SpeciesAffinity = aDO$SpeciesAffinities[as.numeric(Affinity)]
     ) |> changeAffinityLevels()
-    })
+  })
   names(targetDivsU) <- targetDivsUN
 
   # Repeat for Pools
@@ -113,6 +118,8 @@ generateNetworks <- function(
   # Implement Associations
   # Can make more memory efficient by reducing at this step just to the needed
   # temporal slices.
+  # Can also reduce loads if this becomes a bottleneck (why?) by treating the
+  # load(s[[i]]) as with the diversities/pools above.
   targetEnvs <- replicate(length(targetFiles), new.env())
   targetEnvs <- lapply(
     seq_along(targetEnvs), function(i, e, s, d, p, r) {
