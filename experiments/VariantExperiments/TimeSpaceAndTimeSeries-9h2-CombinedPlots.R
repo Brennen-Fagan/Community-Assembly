@@ -403,7 +403,7 @@ specification <- diversitiesRichness |> tidytable::select(c(
       Intervention %in% c("(0)", "(0.5)", "(1)") &
       PoolPatchSeed %in% as.character(newplot2_a_seed) &
       Time == newplot2_a_time
-  # ) | (
+    # ) | (
 
   )
 ) |> tidytable::distinct(
@@ -809,37 +809,37 @@ newplot4_dataC <- newplot4_dataA |> tidytable::group_by(
   PoolPatch:AffinitySeed
 ) |> tidytable::mutate(
   Time = Time - Time[which.min(Time[!is.na(InterventionPatchSeed)])]
-# ) |> tidytable::group_by(
-#   PoolPatch:AffinitySeed
-# ) |> tidytable::complete(
-#   # Time 0 since intervention is not "observed" in the original runs, but
-#   # we have a workaround, since it should have been observed identically
-#   # across the different intervention runs!
-#   Time, InterventionPatchType
-# ) |> tidytable::filter(
-#   Time >= 0 | !is.na(Value)
-# ) |> tidytable::group_by(
-#   Time, PoolPatch:AffinitySeed
-# ) |> tidytable::mutate(
-#   # Now to fill in from the grouped data.
-#   Value = ifelse(
-#     is.na(Value),
-#     if(length(unique(na.omit(Value))) == 1) {unique(na.omit(Value))} else NA,
-#     Value
-#   ),
-#   Intervention = ifelse(
-#     is.na(Intervention),
-#     ifelse(!is.na(InterventionPatchType), NA, # Shouldn't happen.
-#            tidytable::case_when( # Abusing PatchAffinities (will need a redo.)
-#              Affinity <= 7 ~ "(0)",
-#              Affinity <= 14 ~ "(0.25)",
-#              Affinity <= 21 ~ "(0.5)",
-#              Affinity <= 28 ~ "(0.75)",
-#              Affinity <= 35 ~ "(1)",
-#              TRUE ~ NA
-#            )),
-#     Intervention
-#   )
+  # ) |> tidytable::group_by(
+  #   PoolPatch:AffinitySeed
+  # ) |> tidytable::complete(
+  #   # Time 0 since intervention is not "observed" in the original runs, but
+  #   # we have a workaround, since it should have been observed identically
+  #   # across the different intervention runs!
+  #   Time, InterventionPatchType
+  # ) |> tidytable::filter(
+  #   Time >= 0 | !is.na(Value)
+  # ) |> tidytable::group_by(
+  #   Time, PoolPatch:AffinitySeed
+  # ) |> tidytable::mutate(
+  #   # Now to fill in from the grouped data.
+  #   Value = ifelse(
+  #     is.na(Value),
+  #     if(length(unique(na.omit(Value))) == 1) {unique(na.omit(Value))} else NA,
+  #     Value
+  #   ),
+  #   Intervention = ifelse(
+  #     is.na(Intervention),
+  #     ifelse(!is.na(InterventionPatchType), NA, # Shouldn't happen.
+  #            tidytable::case_when( # Abusing PatchAffinities (will need a redo.)
+  #              Affinity <= 7 ~ "(0)",
+  #              Affinity <= 14 ~ "(0.25)",
+  #              Affinity <= 21 ~ "(0.5)",
+  #              Affinity <= 28 ~ "(0.75)",
+  #              Affinity <= 35 ~ "(1)",
+  #              TRUE ~ NA
+  #            )),
+  #     Intervention
+  #   )
 )
 
 ##### a: ######################################################################
@@ -1200,7 +1200,7 @@ newplot4_c <- diversitiesRichness |> tidytable::filter(
       group = interaction(SpeciesAffinity, Intervention),
       # color = InterventionInitial
       color = InterventionFinal
-      )
+  )
 ) + ggplot2::geom_point(
   show.legend = FALSE
 ) + ggplot2::geom_smooth(
@@ -1258,17 +1258,17 @@ diversitiesRichness |> tidytable::filter(
 
 
 newplot4 <- ggpubr::ggarrange(
-    plotlist = list(
-      newplot4_a,
-      ggpubr::ggarrange(
-        plotlist = list(
-          newplot4_b,
-          newplot4_c
-        ),
-        ncol = 1
-      )
-    ), nrow = 1 #, widths = c(0.5, 0.27, 0.23)
-  )
+  plotlist = list(
+    newplot4_a,
+    ggpubr::ggarrange(
+      plotlist = list(
+        newplot4_b,
+        newplot4_c
+      ),
+      ncol = 1
+    )
+  ), nrow = 1 #, widths = c(0.5, 0.27, 0.23)
+)
 
 ggplot2::ggsave(plot = newplot4, filename = "Figure4_Prototype1.png",
                 units = "cm", width = 6.5*3, height = 6.5*2)
@@ -1333,9 +1333,10 @@ newplot5_a <- diversitiesRichness |> tidytable::filter(
 ) |> ggplot(
   aes(x = Time, y = Value, color = Intervention)
 ) + ggplot2::geom_line(
-  show.legend = FALSE
+  # show.legend = FALSE
 ) + coord_cartesian(
-  xlim = c(16600, 17300)
+  xlim = c(16600, 17300),
+  ylim = c(6, 26)
 ) + ggplot2::geom_point(
   show.legend = FALSE,
   data = newplot5_a_Specification
@@ -1343,7 +1344,7 @@ newplot5_a <- diversitiesRichness |> tidytable::filter(
   y = "Richness"
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
-  name = "Local Land-use"
+  name = ""#"Local Land-use"
 ) + ggplot2::guides(
   linetype = "none",
   color = ggplot2::guide_legend(ncol = 3),
@@ -1352,7 +1353,7 @@ newplot5_a <- diversitiesRichness |> tidytable::filter(
   tag = "a)"
 ) + ggplot2::theme_minimal(
 ) + ggplot2::theme(
-  legend.position = c(0.3, 0.09),
+  legend.position = c(0.6, 0.075),
   plot.tag.position = c(0.025, 1)
 )
 
@@ -1361,17 +1362,34 @@ newplot5_a <- diversitiesRichness |> tidytable::filter(
 newplot5_b <- ggarrange(plotlist = ggarrange(
   plotlist = lapply(
     newplot5_a_Networks$Envs[c(1, 3:6, 2, 7:10)],
-    function(e) e$singletonGraphs[[1]] + ggplot2::theme_void()
+    function(e) {
+      e$singletonGraphs[[1]] + ggplot2::theme_void(
+      ) + ggplot2::ggtitle(
+         e$Row$Time
+      ) + ggplot2::annotate(
+        "text", x = 0.02, y = 0.5, label = e$Row$Intervention, hjust = 0
+      ) + ggplot2::theme(
+        panel.border = ggplot2::element_rect(
+          # Ordinal in different order than color palette, and indexing
+          # defaults to as.numeric for ordinal rather than as.character.
+          color = colorPalette[as.character(e$Row$Intervention)],
+          fill = NA
+        ),
+        plot.title = ggplot2::element_text(size = 13, hjust = 1)
+      )
+    }
   ),
   ncol = 5
-), nrow = 2, labels = list("b)", "c)"))
+), nrow = 2, labels = list("b)", "c)"),
+font.label = list(face = "plain"),
+vjust = 1.4, hjust = 0)
 
 
 newplot5 <- ggpubr::ggarrange(
   plotlist = list(
     newplot5_a,
     newplot5_b
-  ), nrow = 1 #, widths = c(0.5, 0.27, 0.23)
+  ), nrow = 1, widths = c(0.35, 0.65)
 )
 
 ggplot2::ggsave(plot = newplot5, filename = "Figure5_Prototype1.png",
