@@ -903,6 +903,34 @@ thinAbundanceEqualTimeSteps <- function(
   return(abundance)
 }
 
+thinAbundanceTimes <- function(abundance, threshold, times) {
+  time <- abundance[, 1]
+
+  if (any(times < min(time))) {
+    warning("times before start of time requested. Removing.")
+    times[times < min(time)] <- NULL
+  }
+  if (any(times > max(time))) {
+    warning("times after end of time requested. Removing.")
+    times[times > max(time)] <- NULL
+  }
+
+  rows <- unique(
+    sapply(times, function(x, y) {which.max(y >= x)}, y = time)
+  )
+
+  abundance <- abundance[rows, ]
+  abundance[, 1] <- times
+  # Technically an approximation, but we should be high resolution
+  # enough for it not to be a problem.
+
+  # Remove illegal values (that the numerical engine uses as inbetweens).
+  toEliminate <- abundance[, -1] < threshold # & abundance[, -1] > 0
+  abundance[, -1][toEliminate] <- 0
+
+  return(abundance)
+}
+
 hillWrapper <- function(env, i) {
   if (length(dim(env)) >= 1 && ncol(env) == 1) {
     metrics <- do.call(rbind, lapply(env, function(i)
@@ -1069,34 +1097,57 @@ calculateDiversityMetrics <- function(
   }
 
   # Beta Temporal: ############################################################
-  # ASSUMING ALREADY EQUAL TIME DIFFERENCES.
+  # Picking most common 4 time differences, but assuming sorted already.
+  # Note, we do it at this step to make sure we don't have a really common
+  # primary difference causing more 2+-ary differences than other primaries.
+  candidates <- sort(as.numeric(names( # Diff subtracts 1, hence 3.
+    tail(sort(table(diff(time)), partial = length(time) - 3), n = 4)
+  )))
+
+  # Look for the candidate differences in the times.
+  timediffs <- outer(time, time, `-`)
+  # Arrange so that the candidate differences are what are analysed.
+  timesets <- lapply(candidates, function(cand) {
+    ro <- row(timediffs)[cand == timediffs]
+    co <- col(timediffs)[cand == timediffs]
+    data.frame(row = ro, col = co)
+  })
 
   diversityBetaTime <- dplyr::bind_rows(lapply(
     1:nenvironments, function(i) {
-      lapply(2:nrow(envs[[i]]), function(r) {
-        target <- rbind(envs[[i]][r-1, ], envs[[i]][r, ])
-        distsBC <- betapart::beta.pair.abund(
-          x = target, index.family = "bray")
-        distsJ <- betapart::beta.pair(
-          x = (target > 0) + 0, index.family = "jaccard")
-        expand.grid(
-          Environment1 = i,
-          Environment2 = NA
-        ) %>% dplyr::mutate(
-          Time = time[r],
-          TimeBrayCurtisBalance = as.vector(distsBC$beta.bray.bal),
-          TimeBrayCurtisGradient = as.vector(distsBC$beta.bray.gra),
-          TimeBrayCurtis = as.vector(distsBC$beta.bray),
-          TimeJaccardTurnover = as.vector(distsJ$beta.jtu),
-          TimeJaccardNestedness = as.vector(distsJ$beta.jne),
-          TimeJaccard = as.vector(distsJ$beta.jac)
-        )
-      }) %>% dplyr::bind_rows()
+      env <- envs[[i]]
+      lapply(1:length(timesets), function(j) {
+        rcs <- timesets[[j]]
+        lapply(1:nrow(rcs), function(r) {
+          target <- rbind(env[rcs$col[r], ], env[rcs$row[r], ])
+          distsBC <- betapart::beta.pair.abund(
+            x = target, index.family = "bray")
+          distsJ <- betapart::beta.pair(
+            x = (target > 0) + 0, index.family = "jaccard")
+          retval <- expand.grid(
+            Environment1 = i,
+            Environment2 = NA
+          ) %>% dplyr::mutate(
+            Ti = time[rcs$col[r]], # Will fix in a moment, don't worry!
+            TimeBrayCurtisBalance = as.vector(distsBC$beta.bray.bal),
+            TimeBrayCurtisGradient = as.vector(distsBC$beta.bray.gra),
+            TimeBrayCurtis = as.vector(distsBC$beta.bray),
+            TimeJaccardTurnover = as.vector(distsJ$beta.jtu),
+            TimeJaccardNestedness = as.vector(distsJ$beta.jne),
+            TimeJaccard = as.vector(distsJ$beta.jac)
+          )
+          names(retval)[4:9] <- paste0(names(retval)[4:9], ": ", candidates[j])
+          retval <- retval %>% tidyr::pivot_longer(
+            cols = tidyr::starts_with("Time"),
+            names_to = "Metric", values_to = "Value"
+          ) %>% dplyr::rename(
+            Time = Ti
+          )
+          return(retval)
+        }) %>% dplyr::bind_rows()
+      })  %>% dplyr::bind_rows()
     }
-  )) %>% tidyr::pivot_longer(
-    cols = TimeBrayCurtisBalance:TimeJaccard,
-    names_to = "Metric", values_to = "Value"
-  )
+  ))
 
   return(dplyr::bind_rows(
     diversityAlpha,
