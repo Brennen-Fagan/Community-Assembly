@@ -204,7 +204,7 @@ plotMeanAndInner <- function(
     facets
   ) + ggplot2::scale_color_manual(
     values = colorPalette, aesthetics = c("color", "fill"),
-    name = "Local Land-use"
+    name = "Habitat's Land-use"
   ) + ggplot2::scale_linetype_manual(
     name = "Species Preferences",
     values = linetypePalette
@@ -423,6 +423,15 @@ newplot2_dataA <- diversitiesRichness |> tidytable::filter(
   is.na(Subset)
 ) |> tidytable::left_join(endTimes |> dplyr::select(-Times))
 
+newplot2_dataAS <- diversitiesRichness |> tidytable::filter(
+  SpeciesAffinity == "100% 0",
+  NicheDistance == "5",
+  Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
+  (PoolPatchSeed %in% as.character(343:386)),
+  Metric == "Alpha Hill:0",
+  !is.na(Subset)
+) |> tidytable::left_join(endTimes |> dplyr::select(-Times))
+
 newplot2_indices <- exampleNetworks$Index |> tidytable::filter(
   SpeciesAffinity == "100% 0",
   NicheDistance == "5",
@@ -458,21 +467,31 @@ newplot2_dataC <- Pers |> tidytable::filter(
 
 ##### a: ######################################################################
 newplot2_a <- plotMeanAndInner(
-  newplot2_dataA |> tidytable::filter(
-    Intervention %in% c("(0)", "(0.5)", "(1)")
+  rbind(
+    newplot2_dataA |> tidytable::filter(
+      Intervention %in% c("(0)", "(0.5)", "(1)")
+    ),
+    # We want to appear in the legend but not on the plot!
+    newplot2_dataA |> tidytable::filter(
+      PoolPatchSeed == newplot2_a_seed,
+      Intervention %in% c("(0.25)", "(0.75)"),
+      abs(Time - newplot2_a_time) == min(abs(Time - newplot2_a_time))
+    ) |> tidytable::mutate(
+      Value = -100
+    )
   ), CIs = 0.75, facets = as.formula(. ~ .)
 ) + ggplot2::geom_point(
   data = newplot2_dataA |> tidytable::filter(
-    PoolPatchSeed == newplot2_a_seed,
-    Intervention %in% c("(0)", "(0.5)", "(1)"),
-    abs(Time - newplot2_a_time) == min(abs(Time - newplot2_a_time))
-  )
+      PoolPatchSeed == newplot2_a_seed,
+      Intervention %in% c("(0)", "(0.5)", "(1)"),
+      abs(Time - newplot2_a_time) == min(abs(Time - newplot2_a_time))
+    )
 ) + ggplot2::labs(
   y = "Richness"
 ) + ggplot2::guides(
   linetype = "none",
-  color = ggplot2::guide_legend(ncol = 3),
-  fill = ggplot2::guide_legend(ncol = 3)
+  color = ggplot2::guide_legend(ncol = 5),
+  fill = ggplot2::guide_legend(ncol = 5)
 ) + ggplot2::coord_cartesian(
   xlim = c(0, 40000), ylim = c(0, 42), expand = FALSE
 ) + ggplot2::annotation_custom(
@@ -515,10 +534,13 @@ newplot2_a <- plotMeanAndInner(
 ) + ggplot2::labs(
   tag = "a)"
 ) + ggplot2::theme(
-  legend.position = c(0.3, 0.09),
+  legend.position = c(0.5, 0.09),
   plot.tag.position = c(0.025, 1)
 ) + ggplot2::scale_x_continuous(
   breaks = (0:3)*10000
+) + ggplot2::annotate(
+  "text", x = 36500, y = c(16, 38), size = 3, lineheight = 0.7,
+  label = c("Fully\nAdapted", "Poorly\nAdapted")
 )
 
 ##### b: ######################################################################
@@ -551,11 +573,11 @@ newplot2_b <- ggplot2::ggplot(
   notch = TRUE, outlier.size = 0,
   position = ggplot2::position_dodge(0.9),
   width = 0.28
-) + ggplot2::geom_jitter(
-  alpha = 0.25
+# ) + ggplot2::geom_jitter(
+#   alpha = 0.25
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
-  name = "Local Land-use"
+  name = "Habitat's Land-use"
 ) + ggplot2::labs(
   tag = "b)"
 ) + ggplot2::theme_minimal(
@@ -563,14 +585,14 @@ newplot2_b <- ggplot2::ggplot(
   plot.tag.position = c(0.05, 1)
 ) + ggplot2::labs(
   y = "Avg. Richness",
-  x = "Local Land-use"
+  x = "Habitat's Land-use"
 ) + ggplot2::guides(
   color = "none",
   fill = "none"
 ) + ggplot2::coord_cartesian(
   ylim = c(0, 42), expand = FALSE
 ) + ggplot2::annotate(
-  "text", x = c(1.5, 4.5), y = 5, label = c("High\nMatch", "Low\nMatch")
+  "text", x = c(1.5, 4.5), y = 5, label = c("Well\nAdapted", "Poorly\nAdapted")
 )
 
 ##### c: ######################################################################
@@ -608,11 +630,11 @@ newplot2_c <- ggplot2::ggplot(
 ) + ggplot2::theme(
   plot.tag.position = c(0.05, 1)
 ) + ggplot2::facet_grid(
-  SpeciesType ~ .
+  factor(SpeciesType, levels = c("Consumer", "Basal"), ordered = TRUE) ~ .
 ) + ggplot2::scale_x_discrete(
   breaks = c("(0)", "(0.5)", "(1)")
 ) + ggplot2::labs(
-  x = "Local Land-use"
+  x = "Habitat's Land-use"
 )
 
 newplot2 <- ggpubr::ggarrange(
@@ -624,6 +646,122 @@ newplot2 <- ggpubr::ggarrange(
 )
 
 ggplot2::ggsave(plot = newplot2, filename = "Figure2_Prototype6.png",
+                units = "cm", width = 6.5*3, height = 6.5*2)
+
+### 2 Supplement: #############################################################
+##### a: ######################################################################
+newplot2_as <- plotMeanAndInner(
+  rbind(
+    newplot2_dataAS |> tidytable::filter(
+      Intervention %in% c("(0)", "(0.5)", "(1)")
+    ),
+    # We want to appear in the legend but not on the plot!
+    newplot2_dataAS |> tidytable::filter(
+      PoolPatchSeed == newplot2_a_seed,
+      Intervention %in% c("(0.25)", "(0.75)"),
+      abs(Time - newplot2_a_time) == min(abs(Time - newplot2_a_time)),
+      !is.na(Subset)
+    ) |> tidytable::mutate(
+      Value = -100
+    )
+  ), CIs = 0.75, facets = as.formula(
+    factor(Subset, levels = c("Consumer_0", "Basal_0"), ordered = TRUE) ~ .
+  )
+) + ggplot2::geom_point(
+  data = newplot2_dataAS |> tidytable::filter(
+    PoolPatchSeed == newplot2_a_seed,
+    Intervention %in% c("(0)", "(0.5)", "(1)"),
+    abs(Time - newplot2_a_time) == min(abs(Time - newplot2_a_time))
+  )
+) + ggplot2::labs(
+  y = "Richness"
+) + ggplot2::guides(
+  linetype = "none",
+  color = ggplot2::guide_legend(ncol = 5),
+  fill = ggplot2::guide_legend(ncol = 5)
+) + ggplot2::coord_cartesian(
+  xlim = c(0, 31000), ylim = c(0, 42), expand = FALSE
+) + ggplot2::geom_rect(
+  data = data.frame(
+    1 # 1 rectangle per row, so dummy df to prevent overplotting
+  ),
+  xmin = min(newplot2_dataA$Start),
+  xmax = max(newplot2_dataA$Stop),
+  ymin = 0, ymax = max(newplot2_dataA$Value),
+  fill = "grey",
+  alpha = 0.2,
+  inherit.aes = FALSE
+) + ggplot2::labs(
+  tag = "a)"
+) + ggplot2::theme(
+  legend.position = c(0.5, 0.9),
+  plot.tag.position = c(0.025, 1)
+) + ggplot2::scale_x_continuous(
+  breaks = (0:3)*10000
+)
+
+##### b: ######################################################################
+newplot2_bs <- ggplot2::ggplot(
+  newplot2_dataAS |> tidytable::filter(
+    Time > Start, Time < Stop
+  ) |> tidytable::group_by(
+    PoolPatchSeed, Intervention, SpeciesAffinity, Subset
+  ) |> tidytable::summarise(
+    Value = mean(Value)
+  ),
+  ggplot2::aes(
+    x = Intervention,
+    y = Value,
+    color = Intervention
+  )
+) + ggplot2::geom_rect(
+  data = data.frame(
+    1 # 1 rectangle per row, so dummy df to prevent overplotting
+  ),
+  xmin = 0,
+  xmax = 6,
+  ymin = 0, ymax = max(newplot2_dataA$Value),
+  fill = "grey",
+  alpha = 0.2,
+  inherit.aes = FALSE
+) + ggplot2::geom_violin(
+  position = ggplot2::position_dodge(0.9)
+) + ggplot2::geom_boxplot(
+  notch = TRUE, outlier.size = 0,
+  position = ggplot2::position_dodge(0.9),
+  width = 0.28
+  # ) + ggplot2::geom_jitter(
+  #   alpha = 0.25
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat's Land-use"
+) + ggplot2::labs(
+  tag = "b)"
+) + ggplot2::theme_minimal(
+) + ggplot2::theme(
+  plot.tag.position = c(0.05, 1)
+) + ggplot2::labs(
+  y = "Avg. Richness",
+  x = "Habitat's Land-use"
+) + ggplot2::guides(
+  color = "none",
+  fill = "none"
+) + ggplot2::coord_cartesian(
+  ylim = c(0, 42), expand = FALSE
+# ) + ggplot2::annotate(
+#   "text", x = c(1.5, 4.5), y = 5, label = c("Well\nAdapted", "Poorly\nAdapted")
+) + ggplot2::facet_grid(
+  factor(Subset, levels = c("Consumer_0", "Basal_0"), ordered = TRUE) ~ .
+)
+
+newplot2s <- ggpubr::ggarrange(
+  plotlist = list(
+    newplot2_as,
+    newplot2_bs
+  ), nrow = 1, widths = c(0.5, 0.4)
+)
+
+ggplot2::ggsave(plot = newplot2s, filename = "Figure2s1_Prototype2.png",
                 units = "cm", width = 6.5*3, height = 6.5*2)
 
 ### Plot 3:####################################################################
@@ -696,7 +834,7 @@ newplot3_a <- ggplot2::ggplot(
   alpha = 0.25
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
-  name = "Local Land-use"
+  name = "Habitat's Land-use"
 ) + ggplot2::labs(
   tag = "a)"
 ) + ggplot2::theme_minimal(
@@ -704,7 +842,7 @@ newplot3_a <- ggplot2::ggplot(
   plot.tag.position = c(0.01, 1)
 ) + ggplot2::labs(
   y = "Avg. Richness",
-  x = "Local Land-use"
+  x = "Habitat's Land-use"
 ) + ggplot2::guides(
   color = "none",
   fill = "none"
@@ -752,7 +890,7 @@ newplot3_b <- ggplot2::ggplot(
 ) + ggplot2::facet_grid(
   SpeciesType ~ SpeciesAffinity
 ) + ggplot2::labs(
-  x = "Local Land-use\n(Binned and Ordered by Preference)"
+  x = "Habitat's Land-use\n(Binned and Ordered by Preference)"
 )
 
 newplot3 <- ggpubr::ggarrange(
@@ -939,8 +1077,8 @@ newplot4_b <- rbind(
 ) + ggplot2::labs(
   title = "Long Time Scales",
   tag = "b)",
-  # x = "Initial Local Land-Use",
-  x = "Final Local Land-Use",
+  # x = "Initial Habitat's Land-Use",
+  x = "Final Habitat's Land-Use",
   y = "Impact - Control (Richness)"
 ) + ggplot2::theme(
   plot.tag.position = c(0.01, 1),
@@ -954,8 +1092,8 @@ newplot4_b <- rbind(
 ) + ggplot2::scale_y_continuous(
   sec.axis = ggplot2::sec_axis(
     trans = function(x) x,
-    # name = "Final Local Land-Use",
-    name = "Initial Local Land-Use",
+    # name = "Final Habitat's Land-Use",
+    name = "Initial Habitat's Land-Use",
     breaks = NULL, labels = NA
   )
 )
@@ -1138,7 +1276,7 @@ temporalVCounterfactualStats |> filter(
 # ) + ggplot2::theme_minimal(
 # ) + ggplot2::labs(
 #   tag = "b)",
-#   x = "Final Local Land-Use",
+#   x = "Final Habitat's Land-Use",
 #   y = "Impact - Control (Richness)"
 # ) + ggplot2::theme(
 #   plot.tag.position = c(0.01, 1),
@@ -1151,7 +1289,7 @@ temporalVCounterfactualStats |> filter(
 #   name = "Habitat Land-use"
 # ) + ggplot2::scale_y_continuous(
 #   sec.axis = ggplot2::sec_axis(
-#     trans = function(x) x, name = "Initial Local Land-Use",
+#     trans = function(x) x, name = "Initial Habitat's Land-Use",
 #     breaks = NULL, labels = NA
 #   )
 # )
@@ -1227,8 +1365,8 @@ newplot4_c <- diversitiesRichness |> tidytable::filter(
 ) + ggplot2::scale_y_continuous(
   sec.axis = ggplot2::sec_axis(
     trans = function(x) x,
-    # name = "Final Local Land-Use",
-    name = "Initial Local Land-Use",
+    # name = "Final Habitat's Land-Use",
+    name = "Initial Habitat's Land-Use",
     breaks = NULL, labels = NA
   )
 )
@@ -1344,7 +1482,7 @@ newplot5_a <- diversitiesRichness |> tidytable::filter(
   y = "Richness"
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
-  name = ""#"Local Land-use"
+  name = ""#"Habitat's Land-use"
 ) + ggplot2::guides(
   linetype = "none",
   color = ggplot2::guide_legend(ncol = 3),
