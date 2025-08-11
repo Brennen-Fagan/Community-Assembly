@@ -47,7 +47,8 @@ simulationWrapper <- function(
     EliminationThreshold = 10^-4, # Below which species are removed.
     ArrivalDensity =  4 * 10 ^ 3 * 10^-4, # Traill et al. 2007: MULTIPLIED BY ET.
     MaximumTimeStep = 5, # Maximum time solver can proceed without elimination. # From 1
-    BetweenEventSteps = 2 # Number of steps to reach next event to smooth. # From 10
+    BetweenEventSteps = 2, # Number of steps to reach next event to smooth. # From 10
+    Date = Sys.Date() # Label for the folders
   )
   namespold <- names(params)
   params[(namespnew <- names(parameters))] <- parameters
@@ -145,7 +146,7 @@ simulationWrapper <- function(
       "TSTS_Simulations_", # Separate the Name (TSTS) and Type (Simulations)
       partialID,
       "_", # Separate the Date
-      Sys.Date())
+      params$Date)
   )
   if (!dir.exists(datfolder)) {
     dir.create(datfolder)

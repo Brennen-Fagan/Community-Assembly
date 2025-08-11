@@ -29,6 +29,14 @@ directory <- '.'
 source(file.path(directory, simulationsTarget))
 
 if (runSimulationsFlag) {
+  librarypath <- file.path(".", "Rlibs")
+  if (!dir.exists(librarypath)) {
+    dir.create(librarypath, showWarnings = FALSE)
+  }
+  .libPaths(c(librarypath, .libPaths()))
+
+  allLibraryPaths <- .libPaths()
+
   source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
   source(file.path(directory, "TimeSpaceAndTimeSeries-10-Dictionaries.R"))
   source(file.path(directory, "TimeSpaceAndTimeSeries-10b-SimulationFunction.R"))
@@ -39,12 +47,20 @@ if (runSimulationsFlag) {
   library(iterators)
 }
 
-if (!exists("cores"))
-  cores <- 1 # Normally happy to put higher, but there's not the redundancy of
-# pools in this go round, so each pool needs to be made, and that takes a lot
-# of cores!
+if (!exists("cores")) {
+  if (is.null(cargs <- commandArgs(trailingOnly = TRUE)[1])) {
+    cores <- 1 # Normally happy to put higher, but there's not the redundancy of
+    # pools in this go round, so each pool needs to be made, and that takes a lot
+    # of cores!
+  } else {
+    cores <- as.numeric(cargs)
+  }
+}
+print(paste("cores", cores))
 
 # Setup Notes: ################################################################
+thisDate <- "2025-07-30" #Sys.Date()
+
 # Parameters: #################################################################
 if (simulationsTarget == simulationsTargets[1]) {
     numberPools <- 44 # Power Analysis: detect 95% non-zero if 2 richdiff at 8sd.
@@ -274,9 +290,16 @@ if (runSimulationsFlag) {
   toExport <- toExport[toExport %in% ls()]
 
   success <- foreach::foreach(
-    pc = iterators::iter(parameterChoices, by = "row"),
-    .packages = c("RMTRCode2", "dplyr"), .export = toExport
+    #pc = iterators::iter(parameterChoices[(nrow(parameterChoices)*3/4):(nrow(parameterChoices)*4/4), ], by = "row"),
+    pc = iterators::iter(parameterChoices[(nrow(parameterChoices)):1, ], by = "row"),
+    # .packages = c("RMTRCode2", "dplyr"), 
+    .export = toExport
   ) %op% {
+    directory <- '.'
+    librarypath <- file.path(directory, "Rlibs")
+    .libPaths(c(librarypath, .libPaths()))
+    library(RMTRCode2); library(dplyr)
+    
     pc <- unlist(pc) # untibble so we are passing numerics.
     simulationWrapper(
       poolpatchDictionaryChoice = pc[1],
@@ -294,6 +317,7 @@ if (runSimulationsFlag) {
       patchAffinityDictionaryChoice = pc[13],
       patchAffinitySeedChoice = pc[14],
       logisticCarryingCapacity = logisticCarryingCapacity,
+      parameters = list(Date = thisDate),
       returnResults = FALSE,
       saveResults = TRUE,
       skipIfSaveExists = TRUE

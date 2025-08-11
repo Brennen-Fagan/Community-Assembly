@@ -28,6 +28,15 @@ preferredTimestep <- 10 # Characteristic Time Scale Units
 # The current value is about 1 recording per 2 events (of ext. and/or imm.).
 
 # Libraries: ##################################################################
+directory <- '.'
+librarypath <- file.path(directory, "Rlibs")
+if (!dir.exists(librarypath)) {
+  dir.create(librarypath, showWarnings = FALSE)
+}
+.libPaths(c(librarypath, .libPaths()))
+
+allLibraryPaths <- .libPaths()
+
 library(dplyr)
 library(RMTRCode2)
 library(betapart) # Dependency for the diversity calculation
@@ -76,8 +85,13 @@ Diversity <- foreach::foreach(
   x = iterators::iter(
     dir(datfolders, full.names = TRUE,
         pattern = "(Simulation|Result|Intervention)")
-  ), .packages = c("dplyr", "RMTRCode2")
+  )#, .packages = c("dplyr", "RMTRCode2")
 ) %op% {
+  directory <- '.'
+  librarypath <- file.path(directory, "Rlibs")
+  .libPaths(c(librarypath, .libPaths()))
+  library(RMTRCode2); library(dplyr)
+  
   x_properties <- strsplit(basename(x), split = splitchar)
   stopifnot(length(x_properties) == 1#,
             #x_properties[[1]][1] == "TSTS",

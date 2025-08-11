@@ -600,7 +600,7 @@ interventionWrapper <- function(
     ExtinctionProportion = loaded$Parameters$ExtinctionProportion,
     MaximumTimeStep = loaded$Parameters$MaximumTimeStep,
     BetweenEventSteps = loaded$Parameters$BetweenEventSteps,
-    Verbose = TRUE,
+    Verbose = FALSE,
     HistorySeed = loaded$HistorySeed, # Not used as events are passed through.
     # Using the ellipsis pass through feature:
     Timescale = "Simulation",

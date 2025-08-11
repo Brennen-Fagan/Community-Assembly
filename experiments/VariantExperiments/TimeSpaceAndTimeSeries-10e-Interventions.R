@@ -1,25 +1,41 @@
-library(dplyr)
-library(parallel)
-library(doParallel)
-library(foreach)
-library(iterators)
 
 directory <- '.'
+librarypath <- file.path(directory, "Rlibs")
+if (!dir.exists(librarypath)) {
+  dir.create(librarypath, showWarnings = FALSE)
+}
+.libPaths(c(librarypath, .libPaths()))
+
+allLibraryPaths <- .libPaths()
+
 source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-0-Interventions.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-10b-SimulationFunction.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-10d-InterventionFunction.R"))
 
+library(parallel)
+library(doParallel)
+library(foreach)
+library(iterators)
+library(dplyr)
+
 dirTag <- "TSTS_Simulations"
-dirDate <- "2025-01-27"
+dirDate <- "2025-07-30"
 baseTag <-  "TSTS_Simulation" # Note the distinction ("s").
 # simulationsTargetIndex <- ... # Can set, or let default to most recent.
 if (!exists("simulationsTargetIndex"))
   simulationsTargetIndex <- "NA" # as.character(NUMBER)
-cores <- 12
 
+cargs <- as.numeric(commandArgs(trailingOnly = TRUE)[1])
+if (!exists("cores")) {
+  if (is.null(cargs)) {
+    cores <- 12
+  } else {
+    cores <- cargs
+  }
+}
 
-runSimulations <- FALSE
+runSimulations <- FALSE # Turns off run step of 10c.
 source(file.path(directory, "TimeSpaceAndTimeSeries-10c-Simulations.R"))
 # For Side Effects, specifically parameterChoices.
 
@@ -81,7 +97,9 @@ parameterChoices <- parameterChoices %>% dplyr::ungroup() %>% dplyr::filter(
 ) %>% dplyr::select(-priority, -firsts)
 
 # Run across each row of parameterChoices: ####################################
-clust <- parallel::makeCluster(min(nrow(parameterChoices), cores))
+clust <- parallel::makeCluster(
+  min(nrow(parameterChoices), cores), outfile = ""
+)
 doParallel::registerDoParallel(clust)
 
 toExport <- unlist(lapply(
@@ -106,11 +124,22 @@ toExport <- toExport[!grepl("=", toExport, fixed = TRUE) &
                        !is.na(toExport) ]
 toExport <- toExport[toExport %in% ls()]
 
+#print(parameterChoices)
+#print("##########################################################################")
+#print(toExport)
+#print("##########################################################################")
+
 success <- foreach::foreach(
   pc = iterators::iter(parameterChoices, by = "row"),
-  .packages = c("RMTRCode2", "dplyr"), .export = toExport
+  #.packages = c("RMTRCode2", "dplyr"),
+  .export = toExport
 ) %dopar% {
   # ) %do% {
+  directory <- '.'
+  librarypath <- file.path(directory, "Rlibs")
+  .libPaths(c(librarypath, .libPaths()))
+  library(RMTRCode2); library(dplyr)
+  
   pc <- as.list(pc) # untibble so we are passing numerics and strings.
   fileID <- file.path(
     paste0(
@@ -126,7 +155,10 @@ success <- foreach::foreach(
       ".RData"
     )
   )
-  if (file.exists(fileID))
+  #print(fileID)
+  #print("##########################################################################")
+  if (file.exists(fileID)) {
+    print(paste(fileID, "Exists"))
     interventionWrapper(
       # ID = list(
       #   Tag = fileTags,
@@ -155,8 +187,9 @@ success <- foreach::foreach(
       interventionDistanceDictionaryChoice = pc[[20]],
       returnResults = FALSE,
       saveResults = TRUE,
-      skipIfSaveExists = FALSE
+      skipIfSaveExists = TRUE
     )
+  }
 }
 
 parallel::stopCluster(clust)
