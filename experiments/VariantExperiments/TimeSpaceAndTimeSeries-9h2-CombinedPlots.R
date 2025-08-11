@@ -803,7 +803,7 @@ newplot3_dataB <- Pers |> tidytable::filter(
 ##### a: ######################################################################
 newplot3_a <- ggplot2::ggplot(
   newplot3_dataA |> tidytable::filter(
-    Time > Start, Time < Stop
+    Time > Start, Time < Stop, SpeciesAffinity == "50% 0, 50% 1"
   ) |> tidytable::group_by(
     PoolPatchSeed, Intervention, SpeciesAffinity
   ) |> tidytable::summarise(
@@ -830,13 +830,55 @@ newplot3_a <- ggplot2::ggplot(
   notch = TRUE, outlier.size = 0,
   position = ggplot2::position_dodge(0.9),
   width = 0.28
-) + ggplot2::geom_jitter(
-  alpha = 0.25
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat's Land-use"
+) + ggplot2::theme_minimal(
+) + ggplot2::theme(
+  plot.tag.position = c(0.01, 1)
 ) + ggplot2::labs(
-  tag = "a)"
+  y = "Avg. Richness",
+  x = "Habitat's Land-use"
+) + ggplot2::guides(
+  color = "none",
+  fill = "none"
+) + ggplot2::coord_cartesian(
+  ylim = c(0, 42), expand = FALSE
+) + ggplot2::facet_wrap(
+  SpeciesAffinity ~ .
+)
+newplot3_b <- ggplot2::ggplot(
+  newplot3_dataA |> tidytable::filter(
+    Time > Start, Time < Stop, SpeciesAffinity == "Uniform(0, 1)"
+  ) |> tidytable::group_by(
+    PoolPatchSeed, Intervention, SpeciesAffinity
+  ) |> tidytable::summarise(
+    Value = mean(Value)
+  ),
+  ggplot2::aes(
+    x = Intervention,
+    y = Value,
+    color = Intervention
+  )
+) + ggplot2::geom_rect(
+  data = data.frame(
+    1 # 1 rectangle per row, so dummy df to prevent overplotting
+  ),
+  xmin = 0,
+  xmax = 6,
+  ymin = 0, ymax = max(newplot2_dataA$Value),
+  fill = "grey",
+  alpha = 0.2,
+  inherit.aes = FALSE
+) + ggplot2::geom_violin(
+  position = ggplot2::position_dodge(0.9), scale = "count"
+) + ggplot2::geom_boxplot(
+  notch = TRUE, outlier.size = 0,
+  position = ggplot2::position_dodge(0.9),
+  width = 0.28
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat's Land-use"
 ) + ggplot2::theme_minimal(
 ) + ggplot2::theme(
   plot.tag.position = c(0.01, 1)
@@ -852,8 +894,74 @@ newplot3_a <- ggplot2::ggplot(
   SpeciesAffinity ~ .
 )
 
+# Iteration 10 will have the actual affinities, rather than the affinitybins
+# available, which will allow us to look at P/CDFs rather than bar charts.
+# It still lets us think about how to quantify the distribution of affinities.
+# I'm thinking Persistence as a weight, then by species aggregation. That way
+# we get something like if I pick a random simulation, a random time, and then
+# a random species, the plot shows the probability we would get a certain
+# land-use preference out. (Weight by abundance as well for individuals, but
+# that skews even more heavily towards basal species.)
+
+newplot3_inset1 <- ggplot2::ggplot(
+  newplot3_dataB |> tidytable::filter(SpeciesAffinity == "50% 0, 50% 1"),
+  ggplot2::aes(
+    x = AffinityBins,
+    weight = Persistence,
+    fill = Intervention
+  )
+) + ggplot2::geom_bar(
+  show.legend = FALSE
+) + ggplot2::facet_grid(
+  . ~ Intervention
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat's Land-use"
+) + ggplot2::theme_void(
+) + ggplot2::theme(
+  panel.background = ggplot2::element_rect(fill = "white")
+) + ggplot2::coord_cartesian(
+  expand = FALSE
+)
+newplot3_inset2 <- ggplot2::ggplot(
+  newplot3_dataB |> tidytable::filter(SpeciesAffinity == "Uniform(0, 1)"),
+  ggplot2::aes(
+    x = AffinityBins,
+    weight = Persistence,
+    fill = Intervention
+  )
+) + ggplot2::geom_bar(
+  show.legend = FALSE
+) + ggplot2::facet_grid(
+  . ~ Intervention
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat's Land-use"
+) + ggplot2::theme_void(
+) + ggplot2::theme(
+  panel.background = ggplot2::element_rect(fill = "white")
+) + ggplot2::coord_cartesian(
+  expand = FALSE
+)
+
+newplot3 <- ggpubr::ggarrange(
+  plotlist = list(
+    newplot3_a + ggplot2::annotation_custom(
+      ggplot2::ggplotGrob(newplot3_inset1),
+      xmin = 0.55, xmax = 5.45, ymin = 30, ymax = 40
+    ),
+    newplot3_b + ggplot2::annotation_custom(
+      ggplot2::ggplotGrob(newplot3_inset2),
+      xmin = 0.55, xmax = 5.45, ymin = 30, ymax = 40
+    )
+  ), nrow = 1
+)
+
+ggplot2::ggsave(plot = newplot3, filename = "Figure3_Prototype6.png",
+                units = "cm", width = 6.5*3, height = 6.5*2)
+
 ##### b: ######################################################################
-newplot3_b <- ggplot2::ggplot(
+newplot3_bs <- ggplot2::ggplot(
   newplot3_dataB,
   ggplot2::aes(
     y = Persistence,
@@ -882,30 +990,50 @@ newplot3_b <- ggplot2::ggplot(
   values = c("limegreen", "goldenrod2")
 ) + ggplot2::scale_y_log10(
 ) + ggplot2::theme_minimal(
-) + ggplot2::labs(
-  tag = "b)", x = "Habitat"
 ) + ggplot2::theme(
   plot.tag.position = c(0.01, 1),
   strip.text.x = ggplot2::element_blank()
 ) + ggplot2::facet_grid(
-  SpeciesType ~ SpeciesAffinity
+  factor(SpeciesType, levels = c("Consumer", "Basal"), ordered = TRUE) ~
+    SpeciesAffinity
 ) + ggplot2::labs(
-  x = "Habitat's Land-use\n(Binned and Ordered by Preference)"
+  x = "Habitat's Land-use,\nsubdivided by Species Land-use Preference"
+) + ggplot2::geom_text(
+  data = rbind(
+    data.frame(
+      x = c(1:5 - 0.22, 1:5 + 0.22),
+      y = 12000,
+      lab = c(rep("0", 5), rep("1", 5)),
+      SpeciesAffinity = "50% 0, 50% 1"
+    ),
+    data.frame(
+      # Approximately the "right" spacing when blown up to large scales...
+      x = c(1:5 - 0.36, 1:5 - 0.18, 1:5 - 0, 1:5 + 0.18, 1:5 + 0.36),
+      y = 12000,
+      lab = c(rep("0.1", 5), rep("0.3", 5), rep("0.5", 5),
+              rep("0.7", 5), rep("0.9", 5)),
+      SpeciesAffinity = "Uniform(0, 1)"
+    )
+  ),
+  inherit.aes = FALSE,
+  mapping = ggplot2::aes(
+    x = x, y = y, label = lab
+  )
 )
 
-newplot3 <- ggpubr::ggarrange(
-  plotlist = list(
-    newplot3_a,
-    newplot3_b
-  ), nrow = 2, widths = c(0.5, 0.5)
-)
+# newplot3 <- ggpubr::ggarrange(
+#   plotlist = list(
+#     newplot3_a,
+#     newplot3_b
+#   ), nrow = 2, widths = c(0.5, 0.5)
+# )
 
-ggplot2::ggsave(plot = newplot3, filename = "Figure3_Prototype4.png",
-                units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(plot = newplot3_bs, filename = "Figure3s1_Prototype2.png",
+                units = "cm", width = 6.5*6, height = 6.5*2)
 
 ##### Why the losses: #########################################################
 # Turnover amongst different groups?
-diversitiesTimeBC
+# diversitiesTimeBC
 
 ### Plot 4:####################################################################
 # Need to contrast with 2a (Richness). Long and short time scales.
