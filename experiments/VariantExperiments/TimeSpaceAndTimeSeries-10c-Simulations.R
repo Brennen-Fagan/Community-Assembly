@@ -47,8 +47,8 @@ if (runSimulationsFlag) {
   library(iterators)
 }
 
-if (!exists("cores")) {
-  if (is.null(cargs <- commandArgs(trailingOnly = TRUE)[1])) {
+if (!exists("cores") || is.na(cores)) {
+  if (is.null(cargs <- commandArgs(trailingOnly = TRUE)[1]) || is.na(cargs)) {
     cores <- 1 # Normally happy to put higher, but there's not the redundancy of
     # pools in this go round, so each pool needs to be made, and that takes a lot
     # of cores!
@@ -292,14 +292,14 @@ if (runSimulationsFlag) {
   success <- foreach::foreach(
     #pc = iterators::iter(parameterChoices[(nrow(parameterChoices)*3/4):(nrow(parameterChoices)*4/4), ], by = "row"),
     pc = iterators::iter(parameterChoices[(nrow(parameterChoices)):1, ], by = "row"),
-    # .packages = c("RMTRCode2", "dplyr"), 
+    # .packages = c("RMTRCode2", "dplyr"),
     .export = toExport
   ) %op% {
     directory <- '.'
     librarypath <- file.path(directory, "Rlibs")
     .libPaths(c(librarypath, .libPaths()))
     library(RMTRCode2); library(dplyr)
-    
+
     pc <- unlist(pc) # untibble so we are passing numerics.
     simulationWrapper(
       poolpatchDictionaryChoice = pc[1],
