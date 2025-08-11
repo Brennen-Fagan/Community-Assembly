@@ -10,8 +10,16 @@ alsoload <- FALSE # if TRUE, try to load all diversity files encountered.
 overwrite <- TRUE
 
 datfolders <- dir(pattern = "TSTS_Simulations_")#.+2025-07-30$")
-# cores <- 15 # Parallelization?
-cores <- commandArgs()[1]
+
+cargs <- as.numeric(commandArgs(trailingOnly = TRUE)[1])
+if (!exists("cores")) {
+  if (is.null(cargs)) {
+    cores <- 12
+  } else {
+    cores <- cargs
+  }
+}
+
 preferredTimestep <- 10 # Characteristic Time Scale Units
 # Previously Event rate was ~1/CTU, now it's more like ~0.1/CTU in theory.
 # (This seems reasonably close in practice looking at 1 example and observing
@@ -91,13 +99,13 @@ Diversity <- foreach::foreach(
   librarypath <- file.path(directory, "Rlibs")
   .libPaths(c(librarypath, .libPaths()))
   library(RMTRCode2); library(dplyr)
-  
+
   x_properties <- strsplit(basename(x), split = splitchar)
   stopifnot(length(x_properties) == 1#,
             #x_properties[[1]][1] == "TSTS",
             #x_properties[[1]][2] == "Simulation"
   )
-  
+
   filename <- file.path(
     dirname(x),
     if (flag == "TSTS") {
@@ -112,7 +120,7 @@ Diversity <- foreach::foreach(
       paste0("Diversity_", x)
     }
   )
-  
+
   if(!overwrite && file.exists(filename)) {
     if (alsoload) {
       load(filename)
@@ -126,12 +134,12 @@ Diversity <- foreach::foreach(
     } else {
       x_pool <- NULL
     }
-    
+
     # Load result to analyse.
     loaded <- load(x) # names
     stopifnot(length(loaded) == 1)
     loaded <- (get(loaded)) # objects
-    
+
     # Unify format, double check time scale and make sure on same time scale.
     if (!"ReactionTime" %in% names(loaded$Ellipsis)) {
       loaded$Ellipsis$ReactionTime <- loaded$ReactionTime
@@ -144,12 +152,12 @@ Diversity <- foreach::foreach(
         loaded$Abundance[, 1] / loaded$Ellipsis$ReactionTime
       if ("TimeIntervention" %in% names(loaded$Ellipsis$Affinity)) {
         loaded$Ellipsis$Affinity$TimeIntervention <-
-          loaded$Ellipsis$Affinity$TimeIntervention / 
+          loaded$Ellipsis$Affinity$TimeIntervention /
           loaded$Ellipsis$ReactionTime
       }
       loaded$Ellipsis$Timescale <- "Characteristic"
     }
-    
+
     loaded$Abundance <- thinAbundanceTimes(
       abundance = loaded$Abundance,
       threshold = loaded$Parameters$EliminationThreshold,
@@ -163,24 +171,24 @@ Diversity <- foreach::foreach(
           by = max(diff(loaded$Abundance[, 1]), preferredTimestep)
         ),
         # Intervention times, aligned s.t. 0 = intervention.
-        loaded$Ellipsis$Affinity$TimeIntervention + 
+        loaded$Ellipsis$Affinity$TimeIntervention +
           c(0:10, 2*(6:10), 20+3*(1:10)) # by 1s til 10, 2s til 20, 3s til 50.
       ))
     )
-    
+
     if (exists("x_pool") && !is.null(x_pool)) {
       numberOfSpecies <- nrow(x_pool)
     } else {
       numberOfSpecies <- (ncol(loaded$Abundance) - 1) / loaded$NumEnvironments
     }
-    
-    
+
+
     # Bad implementation (in a few ways!); bins presences in 0.1s of time units.
     Presence <- RMTRCode2::Calculate_Species(loaded, bintimes = FALSE)
     if (nrow(Presence) == 0) {
       warning("No species presences detected at this resolution.")
     }
-    
+
     # Major edit that is somewhat of a backslide.
     # Instead of programmatically using the named different columns of the
     # pool, we're going to be working off of a list entry. For speed of coding,
@@ -195,12 +203,12 @@ Diversity <- foreach::foreach(
         } else {
           loaded$Ellipsis$Affinity$SpeciesAffinities
         }
-      
+
       # If Basal/Consumer is present, we can break it into the constituents.
       if ("Type" %in% names(x_pool)) {
         AffinitiesBinned <- paste0(x_pool$Type, "_", AffinitiesBinned)
       }
-      
+
       DiversityNiche <- lapply(
         unique(AffinitiesBinned),
         function(AffinityType) {
@@ -215,18 +223,18 @@ Diversity <- foreach::foreach(
           )
           loaded_subset <- loaded
           loaded_subset$Abundance <- loaded_subset$Abundance[, idcolumns]
-          
+
           Diversities <- calculateDiversityMetrics(
             abundance = loaded_subset$Abundance,
             nspecies = length(idcolumns) - 1,
             nenvironments = loaded$NumEnvironments,
             sizes = if ("Size" %in% names(x_pool)) x_pool$Size
           )
-          
+
           Diversities$Subset <- AffinityType
           return(Diversities)
         }) %>% dplyr::bind_rows()
-      
+
       # Add in the relevant trait information.
       if (nrow(Presence) > 0) {
         Presence <- Presence %>% dplyr::left_join(
@@ -239,7 +247,7 @@ Diversity <- foreach::foreach(
         )
       }
     }
-    
+
     DiversityAll <- calculateDiversityMetrics(
       abundance = loaded$Abundance,
       nspecies = numberOfSpecies,
@@ -247,7 +255,7 @@ Diversity <- foreach::foreach(
       sizes = if ("Size" %in% names(x_pool)) x_pool$Size
     )
     DiversityAll$Subset <- NA
-    
+
     Diversity <-
       list(
         Diversity =
@@ -256,11 +264,11 @@ Diversity <- foreach::foreach(
         Presence = Presence,
         Ellipsis = loaded$Ellipsis
       )
-    
+
     if ("ParentRun" %in% names(Diversity$Ellipsis))
       Diversity$Ellipsis$GrandparentRun <- Diversity$Ellipsis$ParentRun
     Diversity$Ellipsis$ParentRun <- x
-    
+
     # So now Diversity contains summary statistics, presence/absence values,
     # and simulation metadata.
     save(Diversity, file = filename)
