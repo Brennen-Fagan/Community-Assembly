@@ -9,12 +9,12 @@ alsoload <- FALSE # if TRUE, try to load all diversity files encountered.
 # if FALSE, only try to create new diversity files (and return the outputs).
 overwrite <- TRUE
 
-datfolders <- dir(pattern = "TSTS_Simulations_")#.+2025-07-30$")
+datfolders <- dir(pattern = "TSTS_Simulations_.+2025-07-30$")
 
 cargs <- as.numeric(commandArgs(trailingOnly = TRUE)[1])
 if (!exists("cores")) {
-  if (is.null(cargs)) {
-    cores <- 12
+  if (is.null(cargs) || is.na(cargs)) {
+    cores <- 1
   } else {
     cores <- cargs
   }
@@ -224,11 +224,15 @@ Diversity <- foreach::foreach(
           loaded_subset <- loaded
           loaded_subset$Abundance <- loaded_subset$Abundance[, idcolumns]
 
+          if ("Size" %in% names(x_pool))
+            # Note the (-)1 is there to preserve (resp., remove) the times.
+            sizes_subset <- x_pool$Size[idcolumns[-1]]
+
           Diversities <- calculateDiversityMetrics(
             abundance = loaded_subset$Abundance,
             nspecies = length(idcolumns) - 1,
             nenvironments = loaded$NumEnvironments,
-            sizes = if ("Size" %in% names(x_pool)) x_pool$Size
+            sizes = if ("Size" %in% names(x_pool)) sizes_subset
           )
 
           Diversities$Subset <- AffinityType

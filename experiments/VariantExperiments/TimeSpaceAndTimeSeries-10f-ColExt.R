@@ -125,11 +125,13 @@ poolmats <- lapply(
   })
 
 # Calculations: ###############################################################
+allfiles <- dir(datfolders, full.names = TRUE,
+                pattern = "(Simulation|Result|Intervention)")
+
 ColExt <- foreach::foreach(
-  x = iterators::iter(
-    dir(datfolders, full.names = TRUE,
-        pattern = "(Simulation|Result|Intervention)")
-  )#, .packages = c("dplyr", "RMTRCode2")
+  id = iterators::iter(1:length(allfiles)),
+  x = iterators::iter(allfiles)
+  #, .packages = c("dplyr", "RMTRCode2")
 ) %op% {
   .libPaths(c(librarypath, .libPaths()))
   library("dplyr")
@@ -163,7 +165,7 @@ ColExt <- foreach::foreach(
       loaded <- (get(loaded)) # objects
     }
   } else {
-    print(filename)
+    print(paste(id, filename))
     x_dir <- dirname(x)
     x_poolind <- which(unlist(lapply(poolmats, function(y) y$Dir == x_dir)))
     if(length(x_poolind) == 1) {
