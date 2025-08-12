@@ -28,8 +28,8 @@ if (!exists("simulationsTargetIndex"))
 
 cargs <- as.numeric(commandArgs(trailingOnly = TRUE)[1])
 if (!exists("cores")) {
-  if (is.null(cargs)) {
-    cores <- 12
+  if (is.null(cargs) || is.na(cargs)) {
+    cores <- 1
   } else {
     cores <- cargs
   }
@@ -139,7 +139,7 @@ success <- foreach::foreach(
   librarypath <- file.path(directory, "Rlibs")
   .libPaths(c(librarypath, .libPaths()))
   library(RMTRCode2); library(dplyr)
-  
+
   pc <- as.list(pc) # untibble so we are passing numerics and strings.
   fileID <- file.path(
     paste0(
