@@ -231,6 +231,7 @@ plotGraph <- function(graph, mainLayout, legends = FALSE) {
   ) + ggraph::geom_edge_diagonal(
     mapping = aes(
       color = Type,
+      #color = node1.Type, # but then exploit+ between consumers is orange.
       linetype = Type,
       alpha = log10(effectNormalised),
       end_cap = circle(node2.nodesize+2, 'pt')
@@ -251,9 +252,12 @@ plotGraph <- function(graph, mainLayout, legends = FALSE) {
   ) + xlab(
     "Land-use Preference"
   ) + scale_color_manual(
-    values = c("limegreen", "goldenrod2")
+    values = c("Basal" = "limegreen", "Consumer" = "goldenrod2")
   ) + ggraph::scale_edge_color_manual(
-    values = rev(c("limegreen", "goldenrod2"))
+    values =
+      c("Exploit+" = "limegreen", "Exploit-" = "goldenrod2")
+      # c("Basal" = "limegreen", "Consumer" = "goldenrod2")
+
   ) + scale_size(
     range = c(0.5, 4)
     # limits = c(10^-5, 10^5)#, trans = "log10"

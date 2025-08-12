@@ -54,20 +54,20 @@ generateNetworks <- function(
 
   targetFiles <- lapply(
     seq_along(targetFiles), function(i, f, s) {
-        grep(
-          if (!is.na(s[i, ]$InterventionPatchType)) {
-            with(s[i, ], paste0(
-              InterventionPatchType, "-", InterventionTimeType, "-",
-              InterventionDispersal, "-", InterventionNicheDistance, "_",
-              InterventionPatchSeed, "-", InterventionTimeSeed
-            ))
-            } else {
-              "_Simulation_"
-            },
-          x = f[[i]],
-          fixed = TRUE,
-          value = TRUE
-        )
+      grep(
+        if (!is.na(s[i, ]$InterventionPatchType)) {
+          with(s[i, ], paste0(
+            InterventionPatchType, "-", InterventionTimeType, "-",
+            InterventionDispersal, "-", InterventionNicheDistance, "_",
+            InterventionPatchSeed, "-", InterventionTimeSeed
+          ))
+        } else {
+          "_Simulation_"
+        },
+        x = f[[i]],
+        fixed = TRUE,
+        value = TRUE
+      )
     },
     f = targetFiles, s = Specification
   )
@@ -204,9 +204,9 @@ generateNetworks <- function(
         env_undirected <- lapply(env$graphs, tidygraph::to_undirected)
         env_undirected <- lapply(env$graphs, tidygraph::select, "node")
         if (length(env_undirected) > 1) {
-          for (i in 2:length(env_undirected)) {
+          for (j in 2:length(env_undirected)) {
             env_undirected[[1]] <- tidygraph::graph_join(
-              env_undirected[[1]], env_undirected[[i]], by = "node"
+              env_undirected[[1]], env_undirected[[j]], by = "node"
             )
           }
         }
@@ -215,9 +215,9 @@ generateNetworks <- function(
       # Repeat across targets.
       env_undirected <- env_undirecteds[[1]][[1]]
       if (length(env_undirecteds) > 1) {
-        for (i in 2:length(env_undirecteds)) {
+        for (j in 2:length(env_undirecteds)) {
           env_undirected <- tidygraph::graph_join(
-            env_undirected, env_undirecteds[[i]][[1]], by = "node"
+            env_undirected, env_undirecteds[[j]][[1]], by = "node"
           )
         }
       }
@@ -231,7 +231,15 @@ generateNetworks <- function(
         # need to undirect again (because recording can be either direction?)
         env_undirected <- tidygraph::to_undirected(env_undirected)
         env_undirected <- env_undirected |> tidygraph::convert(tidygraph::to_simple)
-        layout <- ggraph::create_layout(env_undirected, "backbone")
+        # layout <- ggraph::create_layout(env_undirected, "backbone")
+        layout <- ggraph::create_layout(
+          env_undirected,
+          "igraph", algorithm = "bipartite",
+          types = targetPoolsU[[i]]$Pool$Type[
+            env_undirected %N>% tidygraph::pull(
+              node
+            ) |> substring(2) |> as.numeric()
+            ] == "Basal")
       } else {
         layout <- ggraph::create_layout(env_undirected, "auto")
       }
@@ -285,8 +293,8 @@ generateNetworks <- function(
         cbind(
           Time = env$Row$Time,
           env$Diversity[
-          1, c("PoolPatchSeed", "SpeciesAffinity",
-               "NicheDistance", "Intervention")]
+            1, c("PoolPatchSeed", "SpeciesAffinity",
+                 "NicheDistance", "Intervention")]
         )
     )
   )
