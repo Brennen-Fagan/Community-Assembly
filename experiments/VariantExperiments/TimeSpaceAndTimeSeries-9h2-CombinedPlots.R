@@ -1284,21 +1284,25 @@ newplot4_b_smooths <- ggplot2::ggplot_build(
   Subset = rev(levels(factor(newplot4_dataB$Subset)))[PANEL],
   Intervention = names(colorPalette_0.5)[
     apply(outer(colour, colorPalette_0.5, `==`), 1, which)
-    ]
+    ],
+  yshift = y + c(-1, +2.5, -2, -4, -1, -3, -2, +2.5)
 )
 
 newplot4_b <-
-  newplot4_b + ggplot2::coord_cartesian(xlim = c(0, 14)) + ggrepel::geom_label_repel(
   # Witchcraft from stackoverflow.com/a/6675163
   # works by pre-building the plot and then extracting coordinates.
+  newplot4_b + ggplot2::coord_cartesian(
+    xlim = c(0, 14), clip = "off"
+  ) + ggplot2::geom_segment(
+    data = newplot4_b_smooths,
+    mapping = ggplot2::aes(x = x+1, y = yshift, xend = x, yend = y,
+                           color = Intervention),
+    show.legend = FALSE,
+    inherit.aes = FALSE
+  ) + ggplot2::geom_label(
   data = newplot4_b_smooths,
-  mapping = ggplot2::aes(x = x, y = y, label = Intervention, color = Intervention),
-  nudge_x = 3,
-  xlim = c(9, 10.5),
-  min.segment.length = 0,
-  force = 2,
-  # box.padding = 0.1,
-  # direction = "x",
+  mapping = ggplot2::aes(x = x+2.5, y = yshift,
+                         label = Intervention, color = Intervention),
   show.legend = FALSE,
   inherit.aes = FALSE
 )
