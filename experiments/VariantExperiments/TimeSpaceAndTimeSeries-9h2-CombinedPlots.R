@@ -256,7 +256,7 @@ plotGraph <- function(graph, mainLayout, legends = FALSE) {
   ) + ggraph::scale_edge_color_manual(
     values =
       c("Exploit+" = "limegreen", "Exploit-" = "goldenrod2")
-      # c("Basal" = "limegreen", "Consumer" = "goldenrod2")
+    # c("Basal" = "limegreen", "Consumer" = "goldenrod2")
 
   ) + scale_size(
     range = c(0.5, 4)
@@ -486,10 +486,10 @@ newplot2_a <- plotMeanAndInner(
   ), CIs = 0.75, facets = as.formula(. ~ .)
 ) + ggplot2::geom_point(
   data = newplot2_dataA |> tidytable::filter(
-      PoolPatchSeed == newplot2_a_seed,
-      Intervention %in% c("(0)", "(0.5)", "(1)"),
-      abs(Time - newplot2_a_time) == min(abs(Time - newplot2_a_time))
-    )
+    PoolPatchSeed == newplot2_a_seed,
+    Intervention %in% c("(0)", "(0.5)", "(1)"),
+    abs(Time - newplot2_a_time) == min(abs(Time - newplot2_a_time))
+  )
 ) + ggplot2::labs(
   y = "Richness"
 ) + ggplot2::guides(
@@ -577,8 +577,8 @@ newplot2_b <- ggplot2::ggplot(
   notch = TRUE, outlier.size = 0,
   position = ggplot2::position_dodge(0.9),
   width = 0.28
-# ) + ggplot2::geom_jitter(
-#   alpha = 0.25
+  # ) + ggplot2::geom_jitter(
+  #   alpha = 0.25
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat's Land-use"
@@ -752,8 +752,8 @@ newplot2_bs <- ggplot2::ggplot(
   fill = "none"
 ) + ggplot2::coord_cartesian(
   ylim = c(0, 42), expand = FALSE
-# ) + ggplot2::annotate(
-#   "text", x = c(1.5, 4.5), y = 5, label = c("Well\nAdapted", "Poorly\nAdapted")
+  # ) + ggplot2::annotate(
+  #   "text", x = c(1.5, 4.5), y = 5, label = c("Well\nAdapted", "Poorly\nAdapted")
 ) + ggplot2::facet_grid(
   factor(Subset, levels = c("Consumer_0", "Basal_0"), ordered = TRUE) ~ .
 )
@@ -1304,12 +1304,12 @@ newplot4_b <-
     show.legend = FALSE,
     inherit.aes = FALSE
   ) + ggplot2::geom_label(
-  data = newplot4_b_smooths,
-  mapping = ggplot2::aes(x = x+2.5, y = yshift,
-                         label = Intervention, color = Intervention),
-  show.legend = FALSE,
-  inherit.aes = FALSE
-)
+    data = newplot4_b_smooths,
+    mapping = ggplot2::aes(x = x+2.5, y = yshift,
+                           label = Intervention, color = Intervention),
+    show.legend = FALSE,
+    inherit.aes = FALSE
+  )
 
 newplot4 <- ggpubr::ggarrange(
   plotlist = list(
@@ -1378,7 +1378,7 @@ newplot4_bs <- diversitiesRichness |> tidytable::filter(
       InterventionInitial, InterventionFinal,
       Subset
     )
-  # )
+    # )
   ) |> tidytable::filter(Subset %in% c("Basal_0", "Consumer_0"))
 ) |> tidytable::mutate(
   Time = ifelse(is.na(Time), 0, Time),
@@ -1531,38 +1531,51 @@ newplot5_a <- diversitiesRichness |> tidytable::filter(
   # show.legend = FALSE
 ) + coord_cartesian(
   xlim = c(16600, 17300),
-  ylim = c(6, 26)
+  ylim = c(6, 28)
+) + ggplot2::geom_rect(
+  data = newplot5_a_Specification |> tidytable::group_by(
+    Time
+  ) |> tidytable::summarise(
+    xmin = Time - 2, xmax = Time + 2,
+    ymin = 5, ymax = 27
+  ),
+  mapping = ggplot2::aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+  color = "grey", inherit.aes = FALSE, alpha = 0.2
 ) + ggplot2::geom_point(
   show.legend = FALSE,
   data = newplot5_a_Specification
-) + ggplot2::labs(
-  y = "Richness"
+) + ggplot2::geom_vline(
+  xintercept = (
+    newplot5_a_Networks$Envs[[3]]$result$Ellipsis$Affinity$TimeIntervention
+    / newplot5_a_Networks$Envs[[3]]$result$ReactionTime
+  ), linetype = "dashed"
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = ""#"Habitat's Land-use"
 ) + ggplot2::guides(
   linetype = "none",
-  color = ggplot2::guide_legend(ncol = 3),
-  fill = ggplot2::guide_legend(ncol = 3)
+  color = ggplot2::guide_legend(ncol = 4),
+  fill = ggplot2::guide_legend(ncol = 4)
 ) + ggplot2::labs(
   tag = "a)"
+  #   y = "Richness "
 ) + ggplot2::theme_minimal(
 ) + ggplot2::theme(
-  legend.position = c(0.6, 0.075),
-  plot.tag.position = c(0.025, 1)
+  legend.position = c(0.5, 1.2),
+  plot.tag.position = c(0, 1),
+  axis.title.y = ggplot2::element_blank()
 )
 
 # For some reason, this is returning a list of two plots rather than a single
 # plot when used with ncol or nrow.
 newplot5_b <- ggarrange(plotlist = ggarrange(
   plotlist = lapply(
-    newplot5_a_Networks$Envs[c(1, 3:6, 2, 7:10)],
-    function(e) {
-      e$singletonGraphs[[1]] + ggplot2::theme_void(
-      ) + ggplot2::ggtitle(
-         e$Row$Time
+    seq_along(newplot5_a_Networks$Envs),
+    function(i, e) {
+      e <- e[[i]]
+      g <- e$singletonGraphs[[1]] + ggplot2::theme_void(
       ) + ggplot2::annotate(
-        "text", x = 0.02, y = 0.5, label = e$Row$Intervention, hjust = 0
+        "text", x = -0.05, y = 0.5, label = e$Row$Time, hjust = 0
       ) + ggplot2::theme(
         panel.border = ggplot2::element_rect(
           # Ordinal in different order than color palette, and indexing
@@ -1571,8 +1584,13 @@ newplot5_b <- ggarrange(plotlist = ggarrange(
           fill = NA
         ),
         plot.title = ggplot2::element_text(size = 13, hjust = 1)
+      ) + ggplot2::ggtitle(
+        if (i %in% c(1, 2, 6, 7)) {e$Row$Intervention} else {""}
       )
-    }
+
+      return(g)
+    },
+    e = newplot5_a_Networks$Envs[c(1, 3:6, 2, 7:10)]
   ),
   ncol = 5
 ), nrow = 2, labels = list("b)", "c)"),
@@ -1584,10 +1602,37 @@ newplot5 <- ggpubr::ggarrange(
   plotlist = list(
     newplot5_a,
     newplot5_b
-  ), nrow = 1, widths = c(0.35, 0.65)
+  ), nrow = 2, heights = c(0.2/0.9, 0.7/0.9)
 )
 
-ggplot2::ggsave(plot = newplot5, filename = "Figure5_Prototype1.png",
+# Decorate with additional indicators.
+newplot5 <-
+  newplot5 + ggplot2::annotate(
+  "curve", x = 0.2, y = 0.865, xend = 0.1, yend = 0.73,
+  arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc"))
+) + ggplot2::annotate(
+  "curve", x = 0.23, y = 0.865, xend = 0.3, yend = 0.73,
+  arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc")),
+  curvature = -0.3
+) + ggplot2::annotate(
+  "curve", x = 0.33, y = 0.865, xend = 0.5, yend = 0.73,
+  arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc")),
+  curvature = -0.3
+) + ggplot2::annotate(
+  "curve", x = 0.45, y = 0.865, xend = 0.7, yend = 0.73,
+  arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc")),
+  curvature = -0.3
+) + ggplot2::annotate(
+  "curve", x = 0.7, y = 0.865, xend = 0.9, yend = 0.73,
+  arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc")),
+  curvature = -0.2
+) + ggplot2::annotate(
+  "segment", linetype = "dashed", x = 0.215, y = 0.865, xend = 0.2, yend = 0.745
+) + ggplot2::annotate(
+  "segment", linetype = "dashed", x = 0.2, y = 0.745, xend = 0.2, yend = 0
+)
+
+ggplot2::ggsave(plot = newplot5, filename = "Figure5_Prototype2.png",
                 units = "cm", width = 6.5*3, height = 6.5*2)
 
 ### Plot 6: ###################################################################
