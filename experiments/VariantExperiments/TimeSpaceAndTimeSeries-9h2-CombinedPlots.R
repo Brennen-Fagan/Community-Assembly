@@ -23,12 +23,13 @@ source("CalculateTrophicStructure.R") # Calculator creator.
 source("toCheddar.R") # Updated function.
 
 # Resources: ##################################################################
-interventionMatrix <- matrix(
-  c("(0)", "(0)->(0.25)", "(0)->(0.5)", "(0)->(0.75)", "(0)->(1)",
-    "(0.25)->(0)", "(0.25)", "(0.25)->(0.5)", "(0.25)->(0.75)", "(0.25)->(1)",
-    "(0.5)->(0)", "(0.5)->(0.25)", "(0.5)", "(0.5)->(0.75)", "(0.5)->(1)",
-    "(0.75)->(0)", "(0.75)->(0.25)", "(0.75)->(0.5)", "(0.75)", "(0.75)->(1)",
-    "(1)->(0)", "(1)->(0.25)", "(1)->(0.5)", "(1)->(0.75)", "(1)"),
+interventionMatrix <- matrix(c(
+  "(0)", "(0)->(0.25)", "(0)->(0.5)", "(0)->(0.75)", "(0)->(1)",
+  "(0.25)->(0)", "(0.25)", "(0.25)->(0.5)", "(0.25)->(0.75)", "(0.25)->(1)",
+  "(0.5)->(0)", "(0.5)->(0.25)", "(0.5)", "(0.5)->(0.75)", "(0.5)->(1)",
+  "(0.75)->(0)", "(0.75)->(0.25)", "(0.75)->(0.5)", "(0.75)", "(0.75)->(1)",
+  "(1)->(0)", "(1)->(0.25)", "(1)->(0.5)", "(1)->(0.75)", "(1)"
+  ),
   byrow = TRUE, nrow = 5)
 
 ### colors: ###################################################################
@@ -1330,7 +1331,9 @@ diversitiesRichness |> tidytable::filter(
   (PoolPatchSeed %in% as.character(343:386)),
   Metric == "Alpha Hill:0",
   is.na(Subset)
-) |> tidytable::left_join(endTimes |> dplyr::select(-Times)) |> tidytable::group_by(
+) |> tidytable::left_join(
+  endTimes |> dplyr::select(-Times)
+) |> tidytable::group_by(
   SpeciesAffinity, Intervention, PoolPatchSeed
 ) |> tidytable::arrange(
   Time
@@ -1920,6 +1923,192 @@ newplot5 <-
 
 ggplot2::ggsave(plot = newplot5, filename = "Figure5_Prototype2.png",
                 units = "cm", width = 6.5*3, height = 6.5*2)
+
+##### 5s: #####################################################################
+# Chris wanted to know if we could generalise figure 5 further. Given it is a
+# one-off, I'm not entirely certain about how to do this, but I can draft some
+# ideas. First, the figure 4 supplements characterise how the system changes in
+# response to the varying land-uses and preferences. Chris is wanting to know
+# then how the network structure is changing over time.
+
+# One possibility to play with: biofabric, sorted by descending size within
+# components.
+# ggraph::ggraph(
+#   layout = ggraph::create_layout(
+#     graph = newplot5_a_Networks$Envs[[3]]$graphs[[1]] %N>% mutate(
+#       nodesize = (log10(N)+5)/10+1
+#     ), layout = "fabric", sort.by = rev(Size))
+# ) + ggraph::geom_node_range(
+#   mapping = aes(
+#     color = Type,
+#     size = nodesize
+#   )
+# ) + ggraph::geom_edge_span(
+#   mapping = aes(
+#     color = Type,
+#     #color = node1.Type, # but then exploit+ between consumers is orange.
+#     linetype = Type,
+#     alpha = log10(effectNormalised)
+#   ),
+#   arrow = arrow(length = unit(2, 'mm'))
+# ) + theme_minimal(
+# ) + scale_color_manual(
+#   values = c("Basal" = "limegreen", "Consumer" = "goldenrod2")
+# ) + ggraph::scale_edge_color_manual(
+#   values =
+#     c("Exploit+" = "limegreen", "Exploit-" = "goldenrod2")
+#   # c("Basal" = "limegreen", "Consumer" = "goldenrod2")
+#
+# )
+# Not obviously effective, and the sorting doesn't work too well.
+# So it's not quite plug-n-play.
+
+##### 5s Idea 2: ##############################################################
+# Another interesting option: we plot vertical kde's for each intervention at
+# "-1", 10, 100, 200, and 400 time units from the intervention across all sims
+# with that land-use/intervention and species affinity setup. Then, *inside the
+# kde's* we plot all of points with little-no sizes along the axis (or maybe
+# along the edge of the kde?). More imporantly, we plot the *edges* with a fixed
+# alpha and size so that we can see the spread of interactions across the kdes.
+
+####### Mockup 1: #############################################################
+newplot5_as_Specification <- diversitiesRichness |> tidytable::filter(
+  NicheDistance == "5",
+  (PoolPatchSeed %in% as.character(343:386)),
+  Metric == "Alpha Hill:0",
+  # SpeciesAffinity == "100% 0",
+  Intervention %in% c("(0)->(0.5)", "(0.5)->(0)"),
+  is.na(Subset)
+) |> tidytable::group_by(
+  PoolPatch:InterventionFinal
+) |> tidytable::filter(
+  Time %% 1 != 0 | # I.e., time recorded just before the intervention!
+    dplyr::lag(Time) %% 1 != 0 | # First time after the intervention (v9 !!)
+    dplyr::lag(Time, n = 11) %% 1 != 0 | # 10 * 10 + 1 time steps
+    dplyr::lag(Time, n = 21) %% 1 != 0 |
+    dplyr::lag(Time, n = 41) %% 1 != 0
+) |> tidytable::mutate(
+  Time2 = tidytable::case_when(
+    Time %% 1 != 0 ~ -1,
+    dplyr::lag(Time) %% 1 != 0 ~ 10,
+    dplyr::lag(Time, n = 2) %% 1 != 0 ~ 100,
+    dplyr::lag(Time, n = 3) %% 1 != 0 ~ 200,
+    dplyr::lag(Time, n = 4) %% 1 != 0 ~ 400
+  )
+) |> tidytable::ungroup(
+)
+
+newplot5_as_Networks <- generateNetworks(newplot5_as_Specification)
+
+newplot5_kdes <- lapply(
+  newplot5_as_Networks$Envs, function(e) {
+    e$trophics$EdgeVertexLists[[1]][[1]]$Vertices |> tidytable::select(
+      node, Type, Size, N
+    ) |> cbind(e$Row |> tidytable::select(Time, PoolPatch:InterventionFinal))
+  }
+) |> tidytable::bind_rows(
+) |> tidytable::group_by(
+  PoolPatch:InterventionFinal
+) |> tidytable::arrange(
+  Time
+# ) |> tidytable::mutate( # fix for having not done it ahead of time...
+#   Time2 = tidytable::case_when(
+#     Time == unique(Time)[1] ~ -1,
+#     Time == unique(Time)[2] ~ 10,
+#     Time == unique(Time)[3] ~ 100,
+#     Time == unique(Time)[4] ~ 200,
+#     Time == unique(Time)[5] ~ 400
+#   )
+) |> tidytable::ungroup(
+)
+
+# newplot5_graph <- lapply(newplot5_as_Networks$Envs, function(e)
+#   e$graphs[[1]] %N>% select(
+#     node, Type, Size
+#   ) %N>% mutate(
+#     e$Row |> select(Time, PoolPatch:InterventionFinal)
+#   ) %E>% mutate(
+#     e$Row |> select(Time, PoolPatch:InterventionFinal)
+#   )
+# ) |> tidygraph::bind_graphs(
+# ) %N>% tidygraph::group_by( # Only supports manual specification
+#   PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, Events,
+#   EventsSeed, InitialConditions, InitialConditionsSeed, Dispersal,
+#   NicheDistance, Affinity, AffinitySeed, InterventionPatchType,
+#   InterventionPatchSeed, InterventionTimeType, InterventionTimeSeed,
+#   InterventionDispersal, InterventionNicheDistance, Intervention,
+#   SpeciesAffinity, InterventionInitial, InterventionFinal
+# ) %N>% tidygraph::arrange(
+#   Time
+# ) %N>% tidygraph::mutate( # fix for having not done it ahead of time...
+#   Time2 = dplyr::case_when(
+#     Time == unique(Time)[1] ~ -1,
+#     Time == unique(Time)[2] ~ 10,
+#     Time == unique(Time)[3] ~ 100,
+#     Time == unique(Time)[4] ~ 200,
+#     Time == unique(Time)[5] ~ 400
+#   )
+# ) %N>% tidygraph::ungroup(
+# ) %E>% tidygraph::group_by( # Only supports manual specification
+#   PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, Events,
+#   EventsSeed, InitialConditions, InitialConditionsSeed, Dispersal,
+#   NicheDistance, Affinity, AffinitySeed, InterventionPatchType,
+#   InterventionPatchSeed, InterventionTimeType, InterventionTimeSeed,
+#   InterventionDispersal, InterventionNicheDistance, Intervention,
+#   SpeciesAffinity, InterventionInitial, InterventionFinal
+# ) %E>% tidygraph::arrange(
+#   Time
+# ) %E>% tidygraph::mutate( # fix for having not done it ahead of time...
+#   Time2 = dplyr::case_when(
+#     Time == unique(Time)[1] ~ -1,
+#     Time == unique(Time)[2] ~ 10,
+#     Time == unique(Time)[3] ~ 100,
+#     Time == unique(Time)[4] ~ 200,
+#     Time == unique(Time)[5] ~ 400
+#   )
+# ) %E>% tidygraph::ungroup(
+# )
+
+# ggraph::ggraph(
+#   ggraph::create_layout(newplot5_graph, "manual",
+#                         y = newplot5_graph %N>% tidygraph::pull(Size), x = -0.5)
+ggplot2::ggplot(
+) + ggplot2::geom_density(
+  data = newplot5_kdes,
+  mapping = ggplot2::aes(
+    y = Size, fill = Type, color = Intervention
+  ),
+  trim = TRUE
+  # ) + ggplot2::geom_rug(
+  #   ggplot2::aes(color = Type)
+# ) + ggraph::geom_edge_arc(
+#   mapping = aes(
+#     color = Type,
+#     #color = node1.Type, # but then exploit+ between consumers is orange.
+#     linetype = Type,
+#     alpha = log10(effectNormalised),
+#     end_cap = circle(2, 'pt')
+#   ),
+#   arrow = arrow(length = unit(2, 'mm')),
+#   alpha = 0.2,
+#   show.legend = FALSE
+# ) + ggraph::geom_node_point(
+#   mapping = aes(
+#     color = Type
+#   ),
+#   show.legend = FALSE
+#   # ) + ggplot2::geom_hline(
+#   #   yintercept = -1, linetype = "dashed", color = "black"
+) + ggplot2::facet_grid(
+  Intervention + SpeciesAffinity ~ Time2
+) + ggplot2::scale_y_log10(
+) + ggplot2::scale_color_manual(
+  values = colorPalette,
+  name = "Habitat Land-use"
+) + ggplot2::scale_fill_manual(
+  values = c("Basal" = "limegreen", "Consumer" = "goldenrod2")
+) + ggplot2::theme_minimal(
+)
 
 ### Plot 6: ###################################################################
 # Pseudo-relaxation time of the system from the intervention to its new final
