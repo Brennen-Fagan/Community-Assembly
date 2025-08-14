@@ -9,6 +9,12 @@ alsoload <- FALSE # if TRUE, try to load all diversity files encountered.
 # if FALSE, only try to create new diversity files (and return the outputs).
 overwrite <- TRUE
 
+# If TimeIntervention is not present, should we calculate it?
+substituteTimeIntervention <- function(times) {
+  mean(c(median(times), 1/2 * max(times)))
+}
+# substituteTimeIntervention <- NULL
+
 datfolders <- dir(pattern = "TSTS_Simulations_.+2025-07-30$")
 
 cargs <- as.numeric(commandArgs(trailingOnly = TRUE)[1])
@@ -89,11 +95,13 @@ poolmats <- lapply(
   })
 
 # Calculations: ###############################################################
+allfiles <- dir(datfolders, full.names = TRUE,
+                pattern = "(Simulation|Result|Intervention)")
+
 Diversity <- foreach::foreach(
-  x = iterators::iter(
-    dir(datfolders, full.names = TRUE,
-        pattern = "(Simulation|Result|Intervention)")
-  )#, .packages = c("dplyr", "RMTRCode2")
+  id = iterators::iter(1:length(allfiles)),
+  x = iterators::iter(allfiles)
+  #, .packages = c("dplyr", "RMTRCode2")
 ) %op% {
   directory <- '.'
   librarypath <- file.path(directory, "Rlibs")
@@ -126,7 +134,7 @@ Diversity <- foreach::foreach(
       load(filename)
     }
   } else {
-    print(filename)
+    print(paste(id, filename))
     x_dir <- dirname(x)
     x_poolind <- which(unlist(lapply(poolmats, function(y) y$Dir == x_dir)))
     if(any(x_poolind)) {
@@ -158,10 +166,17 @@ Diversity <- foreach::foreach(
       loaded$Ellipsis$Timescale <- "Characteristic"
     }
 
+    if (!"TimeIntervention" %in% names(loaded$Ellipsis$Affinity) &&
+        !is.null(substituteTimeIntervention)) {
+      loaded$Ellipsis$Affinity$TimeIntervention <-
+        substituteTimeIntervention(loaded$Events$Times)
+    }
+
+
     loaded$Abundance <- thinAbundanceTimes(
       abundance = loaded$Abundance,
       threshold = loaded$Parameters$EliminationThreshold,
-      times = sort(c(
+      times = sort(unique(c(
         # Start time
         min(loaded$Abundance[, 1]),
         # Base sequence, aligned to CTU time scale.
@@ -173,7 +188,7 @@ Diversity <- foreach::foreach(
         # Intervention times, aligned s.t. 0 = intervention.
         loaded$Ellipsis$Affinity$TimeIntervention +
           c(0:10, 2*(6:10), 20+3*(1:10)) # by 1s til 10, 2s til 20, 3s til 50.
-      ))
+      )))
     )
 
     if (exists("x_pool") && !is.null(x_pool)) {
