@@ -12,14 +12,14 @@ datfolders <- dir(pattern = "TSTS_Simulations_.+2025-07-30$")
 
 cargs <- as.numeric(commandArgs(trailingOnly = TRUE)[1])
 if (!exists("cores")) {
-  if (is.null(cargs)) {
-    cores <- 12
+  if (is.null(cargs) || is.na(cargs)) {
+    cores <- 1
   } else {
     cores <- cargs
   }
 }
 
-print(paste0("Cores", cores))
+print(paste("Cores", cores))
 
 # Libraries: ##################################################################
 librarypath <- file.path(".", "Rlibs")
@@ -47,19 +47,19 @@ flattenCEs <- function(CE) {
   id <- strsplit(
     strsplit(
       # Remove .RData.
-      strsplit(basename(CE$Ellipsis$ParentRun), ".", fixed = TRUE)[[1]][1], 
+      strsplit(basename(CE$Ellipsis$ParentRun), ".", fixed = TRUE)[[1]][1],
       # Remove TSTS_Type and split seeds off.
-      "_", fixed = TRUE)[[1]][-c(1:2)], 
+      "_", fixed = TRUE)[[1]][-c(1:2)],
     # Separate out the id values.
-    "-", fixed = TRUE 
+    "-", fixed = TRUE
   )
-  
+
   if (length(id) < 3) {
     # I.e., no intervention.
     id[[3]] <- rep(NA, 4)
     id[[4]] <- rep(NA, 2)
   }
-  
+
   tidytable::data.table(CE$Events) %>% tidytable::rename(
     EventType = Type.x,
     SpeciesType = Type.y
@@ -136,13 +136,13 @@ ColExt <- foreach::foreach(
   .libPaths(c(librarypath, .libPaths()))
   library("dplyr")
   library("RMTRCode2")
-  
+
   x_properties <- strsplit(basename(x), split = splitchar)
   stopifnot(length(x_properties) == 1#,
             #x_properties[[1]][1] == "TSTS",
             #x_properties[[1]][2] == "Simulation"
   )
-  
+
   filename <- file.path(
     dirname(x),
     if (flag == "TSTS") {
@@ -157,7 +157,7 @@ ColExt <- foreach::foreach(
       paste0("ColExt_", x)
     }
   )
-  
+
   if(!overwrite && file.exists(filename)) {
     if (alsoload) {
       loaded <- load(filename)
@@ -173,12 +173,12 @@ ColExt <- foreach::foreach(
     } else {
       x_pool <- NULL
     }
-    
+
     # Load result to analyse.
     loaded <- load(x) # names
     stopifnot(length(loaded) == 1)
     loaded <- (get(loaded)) # objects
-    
+
     # Unify format, double check time scale and make sure on same time scale.
     if (!"ReactionTime" %in% names(loaded$Ellipsis)) {
       loaded$Ellipsis$ReactionTime <- loaded$ReactionTime
@@ -191,14 +191,14 @@ ColExt <- foreach::foreach(
         loaded$Abundance[, 1] / loaded$Ellipsis$ReactionTime
       loaded$Ellipsis$Timescale <- "Characteristic"
     }
-    
+
     ColExt <- calculateColExtMetrics(loaded)
-    
+
     # Add in Traits.
     if (!is.null(x_pool)) {
       ColExt <- ColExt %>% dplyr::left_join(x_pool, by = c("Species" = "ID"))
     }
-    
+
     if ("SpeciesAffinities" %in% names(loaded$Ellipsis$Affinity)) {
       # Identify Niche Cuts. If discrete, this is by value. If continuous, or
       # there are many bins, then this is by binning.
@@ -209,7 +209,7 @@ ColExt <- foreach::foreach(
         } else {
           loaded$Ellipsis$Affinity$SpeciesAffinities
         }
-      
+
       ColExt <- ColExt %>% dplyr::left_join(
         data.frame(
           Species = 1:length(result$Ellipsis$Affinity$SpeciesAffinities),
@@ -217,7 +217,7 @@ ColExt <- foreach::foreach(
           AffinityBins = AffinitiesBinned),
         by = "Species")
     }
-    
+
     ColExt <- list(Events = ColExt, Ellipsis = list())
     if ("ParentRun" %in% names(loaded$Ellipsis)) {
       # Must be an Intervention Run
@@ -228,11 +228,11 @@ ColExt <- foreach::foreach(
         loaded$Abundance[1, 1] # / loaded$ReactionTime # Already scaled above.
     }
     ColExt$Ellipsis$ParentRun <- x
-    
+
     # So now ColExt contains both neutral and dynamic observed events through
     # time, the appropriate bins to ease plotting, and simulation metadata.
     save(ColExt, file = filename)
-    
+
     if (alsoload) {
       ColExt # return the object to the foreach loop.
     }
@@ -251,7 +251,7 @@ if (alsoload) {
   # This leaves a problem in the form of the intervention time, however.
   # The most correct solution is likely to load the intervention run to check.
   # (Or else, re-run the entire evaluation while including this information.)
-  
+
   ColExtBase <- vector("list")
   ColExtIntervention <- vector("list")
   CEIs <- unlist(lapply(
@@ -259,11 +259,11 @@ if (alsoload) {
   ))
   CEBs <- which(!CEIs)
   CEIs <- which(CEIs)
-  
+
   ColExtBase <- ColExt[CEBs]
   names(ColExtBase) <-
     unlist(lapply(ColExtBase, function(CE) CE$Ellipsis$ParentRun))
-  
+
   # Process Intervention CEs, deposit into the CE results.
   ColExtIntervention <- foreach::foreach(
     CEindex = iterators::iter(
@@ -280,16 +280,16 @@ if (alsoload) {
     )
     CE
   }
-  
+
   # Recombine into a single set.
   ColExt <- c(ColExtBase, ColExtIntervention)
-  
+
   # Save this almost processed object so we don't miss out.
   save(ColExt, file = "ColExt10a1_full.RData")
-  
+
   # Flatten the object to facilitate plotting. Fairly fast believe it or not.
   ColExt <- tidytable::bind_rows(lapply(ColExt, flattenCEs))
-  
+
   # Save the flat object for combination with the flattened diversities.
   save(ColExt, file = "ColExt10a1_flat.RData")
 }

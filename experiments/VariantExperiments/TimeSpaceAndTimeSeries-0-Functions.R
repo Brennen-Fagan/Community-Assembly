@@ -1425,7 +1425,7 @@ calculateColExtMetrics <- function(sim) {
               thisEvent$Species == thisChange$species &&
               thisEvent$Environment == thisChange$environments &&
               (thisChange$type == -1 && thisEvent$Type == "Arrival")
-              ) {
+          ) {
             # "Poorly Timed False Positive Arrival"
             event <- rbind(event, data.frame(
               Times = time,
@@ -1463,9 +1463,9 @@ calculateColExtMetrics <- function(sim) {
     sim$Events %>% dplyr::filter(!Success, Type == "Arrival"),
     # Add in faux out events corresponding to remaining in the simulation.
     data.frame(
-      Times = sim$Abundance[nrow(sim$Abundance), 1],
-      Species = ((endState - 1) %% nspecies) + 1,
-      Environment = ((endState - 1) %/% nspecies) + 1,
+      Times = unname(sim$Abundance[nrow(sim$Abundance), 1]),
+      Species = unname(((endState - 1) %% nspecies) + 1),
+      Environment = unname(((endState - 1) %/% nspecies) + 1),
       Type = "EndOfSimulation",
       Success = TRUE
     )
