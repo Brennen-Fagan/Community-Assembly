@@ -915,9 +915,7 @@ thinAbundanceTimes <- function(abundance, threshold, times) {
     times[times > max(time)] <- NULL
   }
 
-  rows <- unique(
-    sapply(times, function(x, y) {which.max(y >= x)}, y = time)
-  )
+  rows <- sapply(times, function(x, y) {which.max(y >= x)}, y = time)
 
   abundance <- abundance[rows, ]
   abundance[, 1] <- times
