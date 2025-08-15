@@ -45,8 +45,8 @@ labelInterventionTime <- function(lo) {
     strsplit(
       # Remove .RData.
       strsplit(basename(lo$Ellipsis$ID), ".", fixed = TRUE)[[1]][1],
-      # Remove TSTS_Type and split seeds off.
-      "_", fixed = TRUE)[[1]][-c(1:2)],
+      # Split seeds off.
+      "_", fixed = TRUE)[[1]],
     # Separate out the id values.
     "-", fixed = TRUE
   )
