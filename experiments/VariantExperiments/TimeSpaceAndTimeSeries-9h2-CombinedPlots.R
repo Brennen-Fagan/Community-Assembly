@@ -21,6 +21,7 @@ source('TimeSpaceAndTimeSeries-0-Functions.R')
 source("flattenDiversity.R") # Flatten the data for the networks.
 source("CalculateTrophicStructure.R") # Calculator creator.
 source("toCheddar.R") # Updated function.
+source("generateNetworks.R")
 
 # Resources: ##################################################################
 interventionMatrix <- matrix(c(
@@ -253,11 +254,11 @@ plotGraph <- function(graph, mainLayout, legends = FALSE) {
   ) + xlab(
     "Land-use Preference"
   ) + scale_color_manual(
-    values = c("Basal" = "limegreen", "Consumer" = "goldenrod2")
+    values = c("Basal" = "darkgreen", "Consumer" = "burlywood4")
   ) + ggraph::scale_edge_color_manual(
     values =
-      c("Exploit+" = "limegreen", "Exploit-" = "goldenrod2")
-    # c("Basal" = "limegreen", "Consumer" = "goldenrod2")
+      c("Exploit+" = "darkgreen", "Exploit-" = "burlywood4")
+    # c("Basal" = "darkgreen", "Consumer" = "burlywood4")
 
   ) + scale_size(
     range = c(0.5, 4)
@@ -386,8 +387,8 @@ diversitiesRichness <- diversitiesRichness |> changeAffinityLevels(
 # This function takes in a specification (essentially, the information from
 # the diversities objects, but not the measurements in those objects).
 # The specification can be of multiple rows.
-source("generateNetworks.R")
-newplot2_a_seed <- "343"; newplot2_a_time <- 30000
+# newplot2_a_seed <- "358"; newplot2_a_time <- 25000
+newplot2_a_seed <- "374"; newplot2_a_time <- 25000
 specification <- diversitiesRichness |> tidytable::select(c(
   # Which network:
   "Time", "Environment1",
@@ -505,7 +506,9 @@ newplot2_a <- plotMeanAndInner(
       ggplot2::theme_void(
       ) + ggplot2::theme(
         plot.background = ggplot2::element_rect(fill = "white")
-      )
+      ) + ggplot2::coord_cartesian(
+        xlim = c(NA, NA), ylim = c(-2, 0.5)
+      ) # Easiest to probably just not worry about comparing between.
   ),
   xmin = 30500, xmax = 40000, ymin = 7, ymax = 17
 ) + ggplot2::annotation_custom(
@@ -514,7 +517,9 @@ newplot2_a <- plotMeanAndInner(
       ggplot2::theme_void(
       ) + ggplot2::theme(
         plot.background = ggplot2::element_rect(fill = "white")
-      )
+      ) + ggplot2::coord_cartesian(
+        xlim = c(NA, NA), ylim = c(-2, 0.5)
+      ) # Easiest to probably just not worry about comparing between.
   ),
   xmin = 30500, xmax = 40000, ymin = 18, ymax = 28
 ) + ggplot2::annotation_custom(
@@ -523,7 +528,9 @@ newplot2_a <- plotMeanAndInner(
       ggplot2::theme_void(
       ) + ggplot2::theme(
         plot.background = ggplot2::element_rect(fill = "white")
-      )
+      ) + ggplot2::coord_cartesian(
+        xlim = c(NA, NA), ylim = c(-2, 0.5)
+      ) # Easiest to probably just not worry about comparing between.
   ),
   xmin = 30500, xmax = 40000, ymin = 29, ymax = 39
 ) + ggplot2::geom_rect(
@@ -536,11 +543,24 @@ newplot2_a <- plotMeanAndInner(
   fill = "grey",
   alpha = 0.2,
   inherit.aes = FALSE
+) + ggplot2::geom_segment(
+  data = data.frame(
+    x = newplot2_a_time+250,
+    y = c(10, 22, 39),
+    xend = 30500,
+    yend = c(11, 22, 36),
+    Intervention = c("(0)", "(0.5)", "(1)")
+  ),
+  mapping = ggplot2::aes(
+    x = x, y = y, xend = xend, yend = yend, color = Intervention
+  ),
+  inherit.aes = FALSE,
+  arrow = arrow(length = unit(0.03, "npc"))
 ) + ggplot2::labs(
   tag = "a)"
 ) + ggplot2::theme(
   legend.position = c(0.5, 0.09),
-  plot.tag.position = c(0.025, 1)
+  plot.tag.position = c(0.025, 0.95)
 ) + ggplot2::scale_x_continuous(
   breaks = (0:3)*10000
 ) + ggplot2::annotate(
@@ -580,6 +600,9 @@ newplot2_b <- ggplot2::ggplot(
   width = 0.28
   # ) + ggplot2::geom_jitter(
   #   alpha = 0.25
+) + ggplot2::geom_line(
+  data = ~ summarise(group_by(.x, Intervention), Value = mean(Value)),
+  color = "black", group = 1
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat's Land-use"
@@ -587,7 +610,7 @@ newplot2_b <- ggplot2::ggplot(
   tag = "b)"
 ) + ggplot2::theme_minimal(
 ) + ggplot2::theme(
-  plot.tag.position = c(0.05, 1)
+  plot.tag.position = c(0.05, 0.95)
 ) + ggplot2::labs(
   y = "Avg. Richness",
   x = "Habitat's Land-use"
@@ -622,18 +645,18 @@ newplot2_c <- ggplot2::ggplot(
   inherit.aes = FALSE
 ) + ggplot2::geom_violin(
   position = ggplot2::position_dodge(0.9), show.legend = FALSE,
-  scale = "count", draw_quantiles = 0.5
+  scale = "count", draw_quantiles = 0.5, linewidth = 1.3
 ) + ggplot2::scale_color_manual(
   values = colorPalette,
   name = "Habitat Land-use"
 ) + ggplot2::scale_fill_manual(
-  values = c("limegreen", "goldenrod2")
+  values = c("darkgreen", "burlywood4")
 ) + ggplot2::scale_y_log10(
 ) + ggplot2::theme_minimal(
 ) + ggplot2::labs(
   tag = "c)", x = "Habitat"
 ) + ggplot2::theme(
-  plot.tag.position = c(0.05, 1)
+  plot.tag.position = c(0.05, 0.95)
 ) + ggplot2::facet_grid(
   factor(SpeciesType, levels = c("Consumer", "Basal"), ordered = TRUE) ~ .
 ) + ggplot2::scale_x_discrete(
@@ -648,6 +671,13 @@ newplot2 <- ggpubr::ggarrange(
     newplot2_b,
     newplot2_c
   ), nrow = 1, widths = c(0.5, 0.27, 0.23)
+)
+
+newplot2 <- newplot2 + ggplot2::annotate(
+  "curve",
+  x = 0.35, y = 0.97, xend = c(0.57, 0.87), yend = 0.97,
+  curvature = -0.075,
+  arrow = arrow(length = unit(0.03, "npc"))
 )
 
 ggplot2::ggsave(plot = newplot2, filename = "Figure2_Prototype6.png",
@@ -992,7 +1022,7 @@ newplot3_bs <- ggplot2::ggplot(
   values = colorPalette,
   name = "Habitat Land-use"
 ) + ggplot2::scale_fill_manual(
-  values = c("limegreen", "goldenrod2")
+  values = c("darkgreen", "burlywood4")
 ) + ggplot2::scale_y_log10(
 ) + ggplot2::theme_minimal(
 ) + ggplot2::theme(
@@ -1953,11 +1983,11 @@ ggplot2::ggsave(plot = newplot5, filename = "Figure5_Prototype2.png",
 #   arrow = arrow(length = unit(2, 'mm'))
 # ) + theme_minimal(
 # ) + scale_color_manual(
-#   values = c("Basal" = "limegreen", "Consumer" = "goldenrod2")
+#   values = c("Basal" = "darkgreen", "Consumer" = "burlywood4")
 # ) + ggraph::scale_edge_color_manual(
 #   values =
-#     c("Exploit+" = "limegreen", "Exploit-" = "goldenrod2")
-#   # c("Basal" = "limegreen", "Consumer" = "goldenrod2")
+#     c("Exploit+" = "darkgreen", "Exploit-" = "burlywood4")
+#   # c("Basal" = "darkgreen", "Consumer" = "burlywood4")
 #
 # )
 # Not obviously effective, and the sorting doesn't work too well.
@@ -1977,6 +2007,8 @@ newplot5_as_Specification <- diversitiesRichness |> tidytable::filter(
   (PoolPatchSeed %in% as.character(343:386)),
   Metric == "Alpha Hill:0",
   # SpeciesAffinity == "100% 0",
+  # SpeciesAffinity == "50% 0, 50% 1",
+  SpeciesAffinity == "Uniform(0, 1)",
   Intervention %in% c("(0)->(0.5)", "(0.5)->(0)"),
   is.na(Subset)
 ) |> tidytable::group_by(
@@ -2004,13 +2036,19 @@ newplot5_kdes <- lapply(
   newplot5_as_Networks$Envs, function(e) {
     e$trophics$EdgeVertexLists[[1]][[1]]$Vertices |> tidytable::select(
       node, Type, Size, N
-    ) |> cbind(e$Row |> tidytable::select(Time, PoolPatch:InterventionFinal))
+    ) |> cbind(
+      e$Row |> tidytable::select(Time, Time2, PoolPatch:InterventionFinal)
+      ) |> tidytable::mutate(
+        AffinityVals = e$result$Ellipsis$Affinity$SpeciesAffinities[
+          as.numeric(substring(node, 2))
+          ]
+      )
   }
 ) |> tidytable::bind_rows(
-) |> tidytable::group_by(
-  PoolPatch:InterventionFinal
-) |> tidytable::arrange(
-  Time
+# ) |> tidytable::group_by(
+#   PoolPatch:InterventionFinal
+# ) |> tidytable::arrange(
+#   Time
 # ) |> tidytable::mutate( # fix for having not done it ahead of time...
 #   Time2 = tidytable::case_when(
 #     Time == unique(Time)[1] ~ -1,
@@ -2019,7 +2057,7 @@ newplot5_kdes <- lapply(
 #     Time == unique(Time)[4] ~ 200,
 #     Time == unique(Time)[5] ~ 400
 #   )
-) |> tidytable::ungroup(
+# ) |> tidytable::ungroup(
 )
 
 # newplot5_graph <- lapply(newplot5_as_Networks$Envs, function(e)
@@ -2106,8 +2144,67 @@ ggplot2::ggplot(
   values = colorPalette,
   name = "Habitat Land-use"
 ) + ggplot2::scale_fill_manual(
-  values = c("Basal" = "limegreen", "Consumer" = "goldenrod2")
+  values = c("Basal" = "darkgreen", "Consumer" = "burlywood4")
 ) + ggplot2::theme_minimal(
+)
+
+ggplot2::ggsave(
+  ggplot2::ggplot(
+  ) + ggplot2::geom_density(
+    data = newplot5_kdes,
+    mapping = ggplot2::aes(
+      y = Size, fill = Type, color = Intervention
+    ),
+    trim = TRUE
+  ) + ggplot2::facet_grid(
+    Intervention + SpeciesAffinity ~ Time2
+  ) + ggplot2::scale_y_log10(
+  ) + ggplot2::scale_color_manual(
+    values = colorPalette,
+    name = "Habitat Land-use"
+  ) + ggplot2::scale_fill_manual(
+    values = c("Basal" = "darkgreen", "Consumer" = "burlywood4")
+  ) + ggplot2::theme_minimal(
+  ),
+  # filename = "Figure5s1_Prototype1.png", # 100% 0
+  # filename = "Figure5s2_Prototype1.png", # 50% 0, 50% 1
+  filename = "Figure5s3_Prototype1.png", # Uniform(0, 1)
+  units = "cm", width = 6.5*3, height = 6.5*2
+)
+
+ggplot2::ggsave(
+  ggplot2::ggplot(
+  ) + ggplot2::geom_density_2d(
+  # ) + ggplot2::geom_bin_2d(
+    data = newplot5_kdes,
+    mapping = ggplot2::aes(
+      x = AffinityVals, y = Size,
+      # fill = Type,
+      color = Intervention,
+      group = interaction(Type, Intervention)
+    ),
+    # bins = 10
+    alpha = 0.4,
+    contour_var = "count",
+    adjust = 0.7
+    # trim = TRUE
+  ) + ggplot2::geom_hline(
+    yintercept = 0.1, color = "red", show.legend = FALSE
+  ) + ggplot2::facet_grid(
+    Intervention + SpeciesAffinity ~ Time2
+  ) + ggplot2::scale_y_log10(
+  ) + ggplot2::scale_color_manual(
+    values = colorPalette,
+    name = "Habitat Land-use"
+  ) + ggplot2::scale_fill_manual(
+    values = c("Basal" = "darkgreen", "Consumer" = "burlywood4")
+  # ) + ggplot2::scale_fill_viridis_c(
+  ) + ggplot2::theme_minimal(
+  ) + ggplot2::xlab(
+    "Land-use Type"
+  ),
+  filename = "Figure5s4_Prototype1.png", # Uniform(0, 1)
+  units = "cm", width = 10*3, height = 10*2
 )
 
 ### Plot 6: ###################################################################
