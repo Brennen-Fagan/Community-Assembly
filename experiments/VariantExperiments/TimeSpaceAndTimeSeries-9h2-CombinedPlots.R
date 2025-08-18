@@ -8,6 +8,8 @@ options(bitmapType = "cairo")
 # If second number is less than 1, we lose persistent species.
 end <- c(0.602, 0.9045) # Aiming for 20000 - 30000. These go ~0.0003% away.
 
+defaultNicheDistance <- "7" # "3"::2, "5"::5, "7"::10
+
 # Libraries: ##################################################################
 library(ggplot2)
 library(ggpubr)
@@ -405,7 +407,7 @@ specification <- diversitiesRichness |> tidytable::select(c(
   # 2A
   (
     SpeciesAffinity == "100% 0" &
-      NicheDistance == "5" &
+      NicheDistance == defaultNicheDistance &
       Intervention %in% c("(0)", "(0.5)", "(1)") &
       PoolPatchSeed %in% as.character(newplot2_a_seed) &
       Time == newplot2_a_time
@@ -422,7 +424,7 @@ exampleNetworks <- generateNetworks(specification)
 # a=>b&c
 newplot2_dataA <- diversitiesRichness |> tidytable::filter(
   SpeciesAffinity == "100% 0",
-  NicheDistance == "5",
+  NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
   (PoolPatchSeed %in% as.character(343:386)),
   Metric == "Alpha Hill:0",
@@ -431,7 +433,7 @@ newplot2_dataA <- diversitiesRichness |> tidytable::filter(
 
 newplot2_dataAS <- diversitiesRichness |> tidytable::filter(
   SpeciesAffinity == "100% 0",
-  NicheDistance == "5",
+  NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
   (PoolPatchSeed %in% as.character(343:386)),
   Metric == "Alpha Hill:0",
@@ -440,14 +442,14 @@ newplot2_dataAS <- diversitiesRichness |> tidytable::filter(
 
 newplot2_indices <- exampleNetworks$Index |> tidytable::filter(
   SpeciesAffinity == "100% 0",
-  NicheDistance == "5",
+  NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.5)", "(1)"),
   (PoolPatchSeed %in% as.character(343:386))
 )
 
 newplot2_dataC <- Pers |> tidytable::filter(
   SpeciesAffinity == "100% 0",
-  NicheDistance == "5",
+  NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
   (PoolPatchSeed %in% as.character(343:386))
 ) |> tidytable::filter(
@@ -802,7 +804,7 @@ ggplot2::ggsave(plot = newplot2s, filename = "Figure2s1_Prototype2.png",
 ### Plot 3:####################################################################
 newplot3_dataA <- diversitiesRichness |> tidytable::filter(
   SpeciesAffinity != "100% 0",
-  NicheDistance == "5",
+  NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
   (PoolPatchSeed %in% as.character(343:386)),
   Metric == "Alpha Hill:0",
@@ -811,7 +813,7 @@ newplot3_dataA <- diversitiesRichness |> tidytable::filter(
 
 newplot3_dataB <- Pers |> tidytable::filter(
   SpeciesAffinity != "100% 0",
-  NicheDistance == "5",
+  NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
   (PoolPatchSeed %in% as.character(343:386))
 ) |> tidytable::filter(
@@ -1096,14 +1098,14 @@ newplot4_dataA <- diversitiesRichness |> tidytable::filter(
   SpeciesAffinity == "100% 0",
   # SpeciesAffinity == "50% 0, 50% 1",
   # SpeciesAffinity == "Uniform(0, 1)",
-  NicheDistance == "5",
+  NicheDistance == defaultNicheDistance,
   (PoolPatchSeed %in% as.character(343:386)),
   Metric == "Alpha Hill:0",
   is.na(Subset)
 ) |> tidytable::left_join(endTimes |> dplyr::select(-Times))
 
 newplot4_dataB <- diversitiesRichness |> tidytable::filter(
-  NicheDistance == "5",
+  NicheDistance == defaultNicheDistance,
   (PoolPatchSeed %in% as.character(343:386)),
   Metric == "Alpha Hill:0",
   InterventionInitial == "(0.5)",
@@ -1193,7 +1195,7 @@ newplot4_a <- plotMeanAndInner(
 temporalVCounterfactualStats <- rbind(
   # Temporal Substitution
   diversitiesRichness |> tidytable::filter(
-    NicheDistance == "5",
+    NicheDistance == defaultNicheDistance,
     (PoolPatchSeed %in% as.character(343:386)),
     Metric == "Alpha Hill:0",
     is.na(Subset)
@@ -1213,7 +1215,7 @@ temporalVCounterfactualStats <- rbind(
   # Counterfactual comparison TODO, ONLY 100% VALID AFTER RE-RUNS WITH FIXED
   #                                 POOL PREFERENCE ASSIGNMENTS.
   diversitiesRichness |> tidytable::filter(
-    NicheDistance == "5",
+    NicheDistance == defaultNicheDistance,
     (PoolPatchSeed %in% as.character(343:386)),
     Metric == "Alpha Hill:0",
     is.na(Subset)
@@ -1357,7 +1359,7 @@ ggplot2::ggsave(plot = newplot4, filename = "Figure4_Prototype2.png",
 
 ##### table: ##################################################################
 diversitiesRichness |> tidytable::filter(
-  NicheDistance == "5",
+  NicheDistance == defaultNicheDistance,
   (PoolPatchSeed %in% as.character(343:386)),
   Metric == "Alpha Hill:0",
   is.na(Subset)
@@ -1383,7 +1385,7 @@ diversitiesRichness |> tidytable::filter(
 
 ##### bs1: ####################################################################
 newplot4_bs <- diversitiesRichness |> tidytable::filter(
-  NicheDistance == "5",
+  NicheDistance == defaultNicheDistance,
   (PoolPatchSeed %in% as.character(343:386)),
   Metric == "Alpha Hill:0",
   InterventionInitial %in% c("(0)", "(1)"),
@@ -1505,7 +1507,7 @@ ggplot2::ggsave(plot = newplot4_bs, filename = "Figure4s1_Prototype1.png",
 
 ##### bs2: ####################################################################
 newplot4_bs2 <- diversitiesRichness |> tidytable::filter(
-  NicheDistance == "5",
+  NicheDistance == defaultNicheDistance,
   (PoolPatchSeed %in% as.character(343:386)),
   Metric == "Alpha Hill:0",
   # InterventionInitial %in% c("(0)", "(1)"),
@@ -1593,7 +1595,7 @@ ggplot2::ggsave(plot = newplot4_bs2, filename = "Figure4s2_Prototype1.png",
 
 ##### bs3: ####################################################################
 newplot4_bs3 <- diversitiesRichness |> tidytable::filter(
-  NicheDistance == "5",
+  NicheDistance == defaultNicheDistance,
   (PoolPatchSeed %in% as.character(343:386)),
   Metric == "Alpha Hill:0",
   # InterventionInitial %in% c("(0)", "(1)"),
@@ -1683,7 +1685,7 @@ ggplot2::ggsave(plot = newplot4_bs3, filename = "Figure4s3_Prototype1.png",
 
 ##### bs4: ####################################################################
 newplot4_dataBS4 <- diversitiesRichness |> tidytable::filter(
-  NicheDistance == "5",
+  NicheDistance == defaultNicheDistance,
   (PoolPatchSeed %in% as.character(343:386)),
   Metric == "Alpha Hill:0",
   # InterventionInitial %in% c("(0)", "(1)"),
@@ -1800,7 +1802,7 @@ ggplot2::ggsave(plot = newplot4_bs4, filename = "Figure4s4_Prototype2.png",
 
 # Try something like the below to identify a good option:
 # diversitiesRichness |> tidytable::filter(
-#   NicheDistance == "5",
+#   NicheDistance == defaultNicheDistance,
 #   (PoolPatchSeed %in% as.character(383)),#:386)),
 #   Metric == "Alpha Hill:0",
 #   SpeciesAffinity == "100% 0",
@@ -1817,7 +1819,7 @@ ggplot2::ggsave(plot = newplot4_bs4, filename = "Figure4s4_Prototype2.png",
 # )
 
 newplot5_a_Specification <- rbind(diversitiesRichness |> tidytable::filter(
-  NicheDistance == "5",
+  NicheDistance == defaultNicheDistance,
   (PoolPatchSeed %in% as.character(383)),#:386)),
   Metric == "Alpha Hill:0",
   SpeciesAffinity == "100% 0",
@@ -1825,7 +1827,7 @@ newplot5_a_Specification <- rbind(diversitiesRichness |> tidytable::filter(
   Time %in% c(16700),
   is.na(Subset)
 ), diversitiesRichness |> tidytable::filter(
-  NicheDistance == "5",
+  NicheDistance == defaultNicheDistance,
   (PoolPatchSeed %in% as.character(383)),#:386)),
   Metric == "Alpha Hill:0",
   SpeciesAffinity == "100% 0",
@@ -1837,7 +1839,7 @@ newplot5_a_Specification <- rbind(diversitiesRichness |> tidytable::filter(
 newplot5_a_Networks <- generateNetworks(newplot5_a_Specification)
 
 newplot5_a <- diversitiesRichness |> tidytable::filter(
-  NicheDistance == "5",
+  NicheDistance == defaultNicheDistance,
   (PoolPatchSeed %in% as.character(383)),#:386)),
   Metric == "Alpha Hill:0",
   SpeciesAffinity == "100% 0",
@@ -2003,7 +2005,7 @@ ggplot2::ggsave(plot = newplot5, filename = "Figure5_Prototype2.png",
 
 ####### Mockup 1: #############################################################
 newplot5_as_Specification <- diversitiesRichness |> tidytable::filter(
-  NicheDistance == "5",
+  NicheDistance == defaultNicheDistance,
   (PoolPatchSeed %in% as.character(343:386)),
   Metric == "Alpha Hill:0",
   # SpeciesAffinity == "100% 0",
