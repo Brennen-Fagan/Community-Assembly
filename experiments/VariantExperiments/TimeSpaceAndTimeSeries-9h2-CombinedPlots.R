@@ -1191,84 +1191,84 @@ newplot4_a <- plotMeanAndInner(
   #   shrink = FALSE
 )
 
-##### Temporal Vs. Counterfactual Statistics: #################################
-temporalVCounterfactualStats <- rbind(
-  # Temporal Substitution
-  diversitiesRichness |> tidytable::filter(
-    NicheDistance == defaultNicheDistance,
-    (PoolPatchSeed %in% as.character(343:386)),
-    Metric == "Alpha Hill:0",
-    is.na(Subset)
-  ) |> tidytable::left_join(endTimes |> dplyr::select(-Times)) |> tidytable::group_by(
-    SpeciesAffinity, Intervention, PoolPatchSeed
-  ) |> tidytable::filter(
-    Time == max(16300, min(Time)) | Time == 30000
-  ) |> tidytable::group_by(
-    SpeciesAffinity, PoolPatchSeed,
-    Intervention, InterventionInitial, InterventionFinal
-  ) |> tidytable::arrange(
-    Time
-  ) |> tidytable::summarise(
-    Value = Value[2] - Value[1],
-    Method = "Temporal"
-  ),
-  # Counterfactual comparison TODO, ONLY 100% VALID AFTER RE-RUNS WITH FIXED
-  #                                 POOL PREFERENCE ASSIGNMENTS.
-  diversitiesRichness |> tidytable::filter(
-    NicheDistance == defaultNicheDistance,
-    (PoolPatchSeed %in% as.character(343:386)),
-    Metric == "Alpha Hill:0",
-    is.na(Subset)
-  ) |> tidytable::left_join(endTimes |> dplyr::select(-Times)) |> tidytable::group_by(
-    SpeciesAffinity, Intervention, PoolPatchSeed
-  ) |> tidytable::filter(
-    Time == 30000
-  ) |> tidytable::group_by(
-    SpeciesAffinity, PoolPatchSeed,
-    # InterventionFinal # What if you had always been in your final state?
-    InterventionInitial # What if you had stayed in your initial state?
-  ) |> tidytable::mutate(
-    Value = Value - Value[InterventionInitial == InterventionFinal],
-    Method = "Counterfactual"
-  ) |> tidytable::select(
-    SpeciesAffinity, PoolPatchSeed,
-    Intervention, InterventionInitial, InterventionFinal,
-    Value, Method
-  )
-  # ) |> tidytable::filter(
-  #   InterventionFinal == "(0)"
-) |> tidytable::group_by(
-  SpeciesAffinity:InterventionFinal
-) |> tidytable::mutate(
-  Deviation = Value - Value[Method=="Counterfactual"]
-) |> tidytable::group_by(
-  SpeciesAffinity, Intervention:InterventionFinal, Method
-) |> tidytable::summarise(
-  Mean = mean(Value),
-  StDev = sd(Value),
-  Bias = mean(Deviation),
-  MeanAbsDev = mean(abs(Deviation)),
-  PADGT1 = sum(abs(Deviation) > 1)/tidytable::n(),
-  PADGT3 = sum(abs(Deviation) > 3)/tidytable::n(),
-  PADGT5 = sum(abs(Deviation) > 5)/tidytable::n()
-)
-
-temporalVCounterfactualStats |> pivot_wider(
-  names_from = Method, values_from = StDev,
-  id_cols = c(SpeciesAffinity,
-              Intervention, InterventionInitial, InterventionFinal)
-) |> filter(
-  Counterfactual != 0
-) |> mutate(
-  out = (Temporal - Counterfactual)
-) |> pull(out) |> quantile(probs = (seq(from = 0.05, by = 0.05, to = 0.95)))
-
-temporalVCounterfactualStats |> filter(
-  Method != "Counterfactual"
-) |> pull(Bias) |> summary()
-temporalVCounterfactualStats |> filter(
-  Method != "Counterfactual"
-) |> pull(Bias) |> quantile(probs = (seq(from = 0.05, by = 0.05, to = 0.95)))
+# ##### Temporal Vs. Counterfactual Statistics: #################################
+# temporalVCounterfactualStats <- rbind(
+#   # Temporal Substitution
+#   diversitiesRichness |> tidytable::filter(
+#     NicheDistance == defaultNicheDistance,
+#     (PoolPatchSeed %in% as.character(343:386)),
+#     Metric == "Alpha Hill:0",
+#     is.na(Subset)
+#   ) |> tidytable::left_join(endTimes |> dplyr::select(-Times)) |> tidytable::group_by(
+#     SpeciesAffinity, Intervention, PoolPatchSeed
+#   ) |> tidytable::filter(
+#     Time == max(16300, min(Time)) | Time == 30000
+#   ) |> tidytable::group_by(
+#     SpeciesAffinity, PoolPatchSeed,
+#     Intervention, InterventionInitial, InterventionFinal
+#   ) |> tidytable::arrange(
+#     Time
+#   ) |> tidytable::summarise(
+#     Value = Value[2] - Value[1],
+#     Method = "Temporal"
+#   ),
+#   # Counterfactual comparison TODO, ONLY 100% VALID AFTER RE-RUNS WITH FIXED
+#   #                                 POOL PREFERENCE ASSIGNMENTS.
+#   diversitiesRichness |> tidytable::filter(
+#     NicheDistance == defaultNicheDistance,
+#     (PoolPatchSeed %in% as.character(343:386)),
+#     Metric == "Alpha Hill:0",
+#     is.na(Subset)
+#   ) |> tidytable::left_join(endTimes |> dplyr::select(-Times)) |> tidytable::group_by(
+#     SpeciesAffinity, Intervention, PoolPatchSeed
+#   ) |> tidytable::filter(
+#     Time == 30000
+#   ) |> tidytable::group_by(
+#     SpeciesAffinity, PoolPatchSeed,
+#     # InterventionFinal # What if you had always been in your final state?
+#     InterventionInitial # What if you had stayed in your initial state?
+#   ) |> tidytable::mutate(
+#     Value = Value - Value[InterventionInitial == InterventionFinal],
+#     Method = "Counterfactual"
+#   ) |> tidytable::select(
+#     SpeciesAffinity, PoolPatchSeed,
+#     Intervention, InterventionInitial, InterventionFinal,
+#     Value, Method
+#   )
+#   # ) |> tidytable::filter(
+#   #   InterventionFinal == "(0)"
+# ) |> tidytable::group_by(
+#   SpeciesAffinity:InterventionFinal
+# ) |> tidytable::mutate(
+#   Deviation = Value - Value[Method=="Counterfactual"]
+# ) |> tidytable::group_by(
+#   SpeciesAffinity, Intervention:InterventionFinal, Method
+# ) |> tidytable::summarise(
+#   Mean = mean(Value),
+#   StDev = sd(Value),
+#   Bias = mean(Deviation),
+#   MeanAbsDev = mean(abs(Deviation)),
+#   PADGT1 = sum(abs(Deviation) > 1)/tidytable::n(),
+#   PADGT3 = sum(abs(Deviation) > 3)/tidytable::n(),
+#   PADGT5 = sum(abs(Deviation) > 5)/tidytable::n()
+# )
+#
+# temporalVCounterfactualStats |> pivot_wider(
+#   names_from = Method, values_from = StDev,
+#   id_cols = c(SpeciesAffinity,
+#               Intervention, InterventionInitial, InterventionFinal)
+# ) |> filter(
+#   Counterfactual != 0
+# ) |> mutate(
+#   out = (Temporal - Counterfactual)
+# ) |> pull(out) |> quantile(probs = (seq(from = 0.05, by = 0.05, to = 0.95)))
+#
+# temporalVCounterfactualStats |> filter(
+#   Method != "Counterfactual"
+# ) |> pull(Bias) |> summary()
+# temporalVCounterfactualStats |> filter(
+#   Method != "Counterfactual"
+# ) |> pull(Bias) |> quantile(probs = (seq(from = 0.05, by = 0.05, to = 0.95)))
 
 ##### b: ######################################################################
 # Could probably add in the counterfactual as well, but might be too messy?
@@ -2217,3 +2217,128 @@ ggplot2::ggsave(
 # and then compare, we should be able to observe roughly the same relaxation
 # time (so long as we don't perform the second rescaling to have interventions
 # fixed at 0.5?).
+
+
+### Other statistics: #########################################################
+# Calculate the difference in the distributions of the sizes through time for
+# the region of interest. The distribution captures picking a random species at
+# a random time in a random simulation and reporting its size.
+# I'm choosing a bootstrap like option to reflect the description above and to
+# make it clearer that I'm actually interested in the distribution of
+# distributions.
+
+# # Not terribly effective; seems like it might be picking up on possibly minute
+# # differences...
+# temp <- lapply(
+#   1:4,
+#   FUN = function(i, dat) {
+#     lapply(
+#       (i+1):5,
+#       function(j, i, dat) {
+#         print(paste(i, j))
+#         data.frame(
+#           i = unique(dat[[i]]$Intervention),
+#           j = unique(dat[[j]]$Intervention),
+#           p.value = ks.test(dat[[i]]$Sample,
+#                             dat[[j]]$Sample,
+#                             simulate.p.value = TRUE)$p.value
+#         )
+#         },
+#       i = i, dat = dat)
+#   } ,
+#   dat = Pers |> tidytable::filter(
+#     NicheDistance == defaultNicheDistance,
+#     (PoolPatchSeed %in% as.character(343:386)),
+#     SpeciesAffinity == "Uniform(0, 1)",
+#     InterventionInitial == InterventionFinal,
+#     Stop > In, Start < Out
+#   ) |> tidytable::group_by(
+#     Intervention, Size
+#   ) |> tidytable::summarise(
+#     Weight = sum(Out - In),
+#     .groups = "drop"
+#   ) |> dplyr::group_by(
+#     Intervention
+#   ) |> dplyr::mutate(
+#     Weight = Weight / sum(Weight)
+#   ) |> dplyr::arrange(
+#     Size
+#   ) |> dplyr::group_map(
+#     .f = function(dat, key)
+#       cbind(
+#         data.frame(
+#           Sample = with(
+#             dat,
+#             sample(size = 100, x = Size, replace = TRUE, prob = Weight)
+#           ),
+#           n = 1:100
+#         ),
+#         key
+#       )
+#   )
+# )
+
+# Ack, it's picking up something real.
+# I'm annoyed I didn't think of this earlier!
+newplot6_Data <- Pers |> tidytable::filter(
+  NicheDistance == defaultNicheDistance,
+  (PoolPatchSeed %in% as.character(343:386)),
+  # SpeciesAffinity == "100% 0",
+  # SpeciesAffinity == "50% 0, 50% 1",
+  # SpeciesAffinity == "Uniform(0, 1)",
+  # InterventionInitial == InterventionFinal,
+  Stop > In, Start < Out
+) |> tidytable::group_by(
+  Intervention, InterventionInitial, InterventionFinal, Size, SpeciesAffinity
+) |> tidytable::summarise(
+  Weight = sum(Out - In),
+  .groups = "drop"
+) |> dplyr::group_by(
+  Intervention, InterventionInitial, InterventionFinal, SpeciesAffinity
+) |> dplyr::mutate(
+  Weight = Weight / sum(Weight)
+) |> dplyr::ungroup(
+)
+newplot_6a <- ggplot2::ggplot(
+  newplot6_Data,
+  ggplot2::aes(x = Size, y = Weight, color = Intervention)
+  ) + ggplot2::geom_col(
+    show.legend = FALSE
+# ) + ggplot2::geom_line(
+#   data = ~ .x |> dplyr::arrange(Size) |> dplyr::group_by(
+#     SpeciesAffinity, Intervention, InterventionInitial, InterventionFinal
+#   ) |> dplyr::mutate(Weight = cumsum(Weight)),
+#   show.legend = FALSE
+  ) + ggplot2::facet_grid(
+    SpeciesAffinity + InterventionInitial ~ InterventionFinal
+) + ggplot2::scale_color_manual(
+  values = colorPalette
+) + ggplot2::scale_x_log10(
+) + ggplot2::geom_vline(
+  xintercept = 0.1
+)
+newplot_6b <- ggplot2::ggplot(
+  newplot6_Data,
+  ggplot2::aes(x = Size, y = Weight, color = Intervention)
+  # ) + ggplot2::geom_col(
+  #   show.legend = FALSE
+) + ggplot2::geom_line(
+  data = ~ .x |> dplyr::arrange(Size) |> dplyr::group_by(
+    SpeciesAffinity, Intervention, InterventionInitial, InterventionFinal
+  ) |> dplyr::mutate(Weight = cumsum(Weight)),
+  show.legend = FALSE
+  ) + ggplot2::facet_grid(
+    SpeciesAffinity ~.#+ InterventionInitial ~ InterventionFinal
+) + ggplot2::scale_color_manual(
+  values = colorPalette
+) + ggplot2::scale_x_log10(
+) + ggplot2::geom_vline(
+  xintercept = 0.1
+)
+
+newplot6 <- ggarrange(newplot_6a, newplot_6b)
+ggplot2::ggsave(
+  newplot6,
+  filename = "Figure6s_Prototype1.png", # Uniform(0, 1)
+  units = "cm", width = 10*3, height = 10*2
+)
