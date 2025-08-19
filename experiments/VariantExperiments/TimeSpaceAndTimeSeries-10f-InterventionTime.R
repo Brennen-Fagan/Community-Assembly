@@ -13,6 +13,7 @@ substituteTimeIntervention <- function(times) {
 # substituteTimeIntervention <- NULL
 
 datfolders <- dir(pattern = "TSTS_Simulations_.+2025-07-30$")
+# datfolders <- dir(pattern = "TSTS_Simulations_.+2025-01-2[0-9]$")
 
 cargs <- as.numeric(commandArgs(trailingOnly = TRUE)[1])
 if (!exists("cores")) {

@@ -796,6 +796,61 @@ ConvertPreparedToBeta <- function(
 
 # Not a finished function!
 interventionNamingScheme <- function(aff, ppa, ipt) {
+  aDO <- patchAffinityDictionaryOrigin[aff, ]
+  ppDO <- poolpatchDictionaryOrigin[ppa, ]
+
+  if (explicit <- grepl(pattern = "rep", aDO$PatchAffinities)) {
+    initState <-
+      paste0("(", paste( # NOT PRETTY FOR 10, MAY WANT TO JUST REPORT FUNC CALL
+        vals <- retrieveFunction(aDO$PatchAffinities)(ppDO$NumberEnvironments),
+        collapse = ", "), ")")
+  } else {
+    initState <-
+      paste0(aDO$PatchAffinities, "(", ppDO$NumberEnvironments, ")")
+  }
+
+  if(is.na(ipt)) {return(initState)}
+
+  ipDO <- interventionPatchDictionaryOrigin[ipt, ]
+
+  if (ppDO$NumberEnvironments == 1) {
+    finState <- paste0(
+      "(", retrieveFunction(ipDO$PatchAffinities)(ppDO$NumberEnvironments), ")"
+    )
+  } else if (is.na(ipDO$InterventionLocation) ||
+             !explicit ||
+             !grepl(pattern = "rep", ipDO$PatchAffinities)) {
+
+    finState <- # InterventionPercentage is a bit of a misnomer!
+      paste0(ipDO$InterventionPercentage * 100, "%", ipDO$PatchAffinities)
+
+  } else if (ipDO$InterventionLocation == 0) {# Left
+
+    valsnew <- retrieveFunction(ipDO$PatchAffinities)(ppDO$NumberEnvironments)
+
+    finState <- paste0("(", paste(
+      valsnew[1:(ppDO$NumberEnvironments*ipDO$InterventionPercentage)],
+      vals[
+        (ppDO$NumberEnvironments*ipDO$InterventionPercentage + 1):
+          ppDO$NumberEnvironments],
+      collapse = ", ", sep = ", "), ")")
+
+  } else if (ipDO$InterventionLocation == 1) {# Right
+
+    valsnew <- retrieveFunction(ipDO$PatchAffinities)(ppDO$NumberEnvironments)
+
+    finState <- paste0("(", paste(
+      vals[1:(ppDO$NumberEnvironments*(1 - ipDO$InterventionPercentage))],
+      valsnew[
+        (ppDO$NumberEnvironments*(1 - ipDO$InterventionPercentage) + 1):
+          ppDO$NumberEnvironments],
+      collapse = ", ", sep = ", "), ")")
+  }
+
+  return(paste0(initState, "->", finState))
+}
+
+interventionNamingScheme9 <- function(aff, ppa, ipt) {
   aDO <- affinityDictionaryOrigin[aff, ]
   ppDO <- poolpatchDictionaryOrigin[ppa, ]
 
@@ -916,7 +971,7 @@ thinAbundanceTimes <- function(abundance, threshold, times) {
   }
 
   rows <- sapply(times, function(x, y) {which.max(y >= x)}, y = time)
-
+  
   abundance <- abundance[rows, ]
   abundance[, 1] <- times
   # Technically an approximation, but we should be high resolution
@@ -1461,9 +1516,9 @@ calculateColExtMetrics <- function(sim) {
     sim$Events %>% dplyr::filter(!Success, Type == "Arrival"),
     # Add in faux out events corresponding to remaining in the simulation.
     data.frame(
-      Times = unname(sim$Abundance[nrow(sim$Abundance), 1]),
-      Species = unname(((endState - 1) %% nspecies) + 1),
-      Environment = unname(((endState - 1) %/% nspecies) + 1),
+      Times = sim$Abundance[nrow(sim$Abundance), 1],
+      Species = ((endState - 1) %% nspecies) + 1,
+      Environment = ((endState - 1) %/% nspecies) + 1,
       Type = "EndOfSimulation",
       Success = TRUE
     )

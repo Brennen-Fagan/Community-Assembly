@@ -6,7 +6,7 @@ overwrite <- TRUE
 prefix <- "diversitiesFlattened10"
 
 # Libraries: ##################################################################
-source("TimeSpaceAndTimeSeries-9-Dictionaries.R")
+source("TimeSpaceAndTimeSeries-10-Dictionaries.R")
 source('TimeSpaceAndTimeSeries-0-Functions.R')
 library(tidytable)
 
@@ -48,26 +48,26 @@ for (datfolder in datfolders) {
   
   # Human readable patch affinities
   diversitiesInterventionStrings <- diversitiesFlattened %>% dplyr::select(
-    Affinity, PoolPatch, InterventionPatchType
+    PatchAffinity, PoolPatch, InterventionPatchType
   ) %>% dplyr::distinct(
   ) %>% dplyr::mutate(
     Intervention = unlist(mapply(
       FUN = interventionNamingScheme,
-      Affinity, PoolPatch, InterventionPatchType
+      PatchAffinity, PoolPatch, InterventionPatchType
     ))
   )
   
   # Col-wise append
   diversitiesFlattened <- diversitiesFlattened %>% dplyr::left_join(
     diversitiesInterventionStrings,
-    by = c("Affinity", "PoolPatch", "InterventionPatchType"),
+    by = c("PatchAffinity", "PoolPatch", "InterventionPatchType"),
     multiple = "all"
   )
   
   # Human readable species affinities
   diversitiesFlattened <- diversitiesFlattened %>% dplyr::mutate(
     SpeciesAffinity =
-      affinityDictionaryOrigin$SpeciesAffinities[as.numeric(Affinity)]
+      speciesAffinityDictionaryOrigin$SpeciesAffinities[as.numeric(SpeciesAffinity)]
   )
   
   # Correct the NA for richness values
