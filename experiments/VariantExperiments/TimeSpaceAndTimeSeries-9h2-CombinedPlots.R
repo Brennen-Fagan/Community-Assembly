@@ -2220,66 +2220,7 @@ ggplot2::ggsave(
 
 
 ### Other statistics: #########################################################
-# Calculate the difference in the distributions of the sizes through time for
-# the region of interest. The distribution captures picking a random species at
-# a random time in a random simulation and reporting its size.
-# I'm choosing a bootstrap like option to reflect the description above and to
-# make it clearer that I'm actually interested in the distribution of
-# distributions.
-
-# # Not terribly effective; seems like it might be picking up on possibly minute
-# # differences...
-# temp <- lapply(
-#   1:4,
-#   FUN = function(i, dat) {
-#     lapply(
-#       (i+1):5,
-#       function(j, i, dat) {
-#         print(paste(i, j))
-#         data.frame(
-#           i = unique(dat[[i]]$Intervention),
-#           j = unique(dat[[j]]$Intervention),
-#           p.value = ks.test(dat[[i]]$Sample,
-#                             dat[[j]]$Sample,
-#                             simulate.p.value = TRUE)$p.value
-#         )
-#         },
-#       i = i, dat = dat)
-#   } ,
-#   dat = Pers |> tidytable::filter(
-#     NicheDistance == defaultNicheDistance,
-#     (PoolPatchSeed %in% as.character(343:386)),
-#     SpeciesAffinity == "Uniform(0, 1)",
-#     InterventionInitial == InterventionFinal,
-#     Stop > In, Start < Out
-#   ) |> tidytable::group_by(
-#     Intervention, Size
-#   ) |> tidytable::summarise(
-#     Weight = sum(Out - In),
-#     .groups = "drop"
-#   ) |> dplyr::group_by(
-#     Intervention
-#   ) |> dplyr::mutate(
-#     Weight = Weight / sum(Weight)
-#   ) |> dplyr::arrange(
-#     Size
-#   ) |> dplyr::group_map(
-#     .f = function(dat, key)
-#       cbind(
-#         data.frame(
-#           Sample = with(
-#             dat,
-#             sample(size = 100, x = Size, replace = TRUE, prob = Weight)
-#           ),
-#           n = 1:100
-#         ),
-#         key
-#       )
-#   )
-# )
-
-# Ack, it's picking up something real.
-# I'm annoyed I didn't think of this earlier!
+##### Examine the difference in distributions of sizes visually. ##############
 newplot6_Data <- Pers |> tidytable::filter(
   NicheDistance == defaultNicheDistance,
   (PoolPatchSeed %in% as.character(343:386)),
@@ -2340,5 +2281,96 @@ newplot6 <- ggarrange(newplot_6a, newplot_6b)
 ggplot2::ggsave(
   newplot6,
   filename = "Figure6s_Prototype1.png", # Uniform(0, 1)
-  units = "cm", width = 10*3, height = 10*2
+  units = "cm", width = 20*3, height = 20*2
 )
+
+##### Examine the differences in edge locations. ##############################
+# We can't really do this for all times without causing memory, etc. problems.
+# So we look at a narrow set.
+
+# newplot2_a_time <- 25000
+newplot7_Spec <- diversitiesRichness |> tidytable::select(c(
+  # Which network:
+  "Time", "Environment1",
+  # Which File (Base):
+  "PoolPatch", "PoolPatchSeed", "Interactions", "InteractionsSeed",
+  "Events", "EventsSeed", "InitialConditions", "InitialConditionsSeed",
+  "Dispersal", "NicheDistance", "Affinity", "AffinitySeed",
+  # Which File (Intervention):
+  "InterventionPatchType", "InterventionPatchSeed", "InterventionTimeType",
+  "InterventionTimeSeed", "InterventionDispersal", "InterventionNicheDistance",
+  # Ease of Use
+  "SpeciesAffinity", "Intervention"
+)) |> tidytable::filter(
+  (
+    SpeciesAffinity == "100% 0" &
+      NicheDistance == defaultNicheDistance &
+      Intervention %in% c("(0)", "(0.5)", "(1)") &
+      PoolPatchSeed %in% as.character(343:386) &
+      Time == newplot2_a_time
+    # ) | (
+
+  )
+) |> tidytable::distinct(
+)
+
+newplot7_Nets <- generateNetworks(newplot7_Spec)
+
+# Scratch work for what we are trying to do upon getting to v10.
+exampleNetworks$Index |> split(
+  1:nrow(exampleNetworks$Index)
+) |> tidytable::map_dfr(
+  .f = function(spec) {
+    env <- exampleNetworks$Envs[[spec$ID]]
+    edges <- env$trophics$EdgeVertexLists[[1]][[1]]$Edges |> tidytable::select(
+      from, to, effectActual
+    ) |> tidytable::mutate(
+      Weight = abs(effectActual) # Want the overall effect, but not clear if
+      #                            normalisation is a concern here.
+    ) |> tidytable::left_join(
+      env$trophics$EdgeVertexLists[[1]][[1]]$Vertices |> tidytable::select(
+        node, Size
+      ),
+      by = c("from" = "node")
+    ) |> tidytable::rename(
+      fromSize = Size
+    ) |> tidytable::left_join(
+      env$trophics$EdgeVertexLists[[1]][[1]]$Vertices |> tidytable::select(
+        node, Size
+      ),
+      by = c("to" = "node")
+    ) |> tidytable::rename(
+      toSize = Size
+    ) |> tidytable::bind_cols(
+      spec
+    )
+  }
+) |> tidytable::rowwise(
+) |> tidytable::mutate(
+  InSize = min(fromSize, toSize),
+  OutSize = max(fromSize, toSize)
+) |> tidytable::pivot_longer(
+  cols = c(InSize, OutSize),
+  names_to = "inout",
+  values_to = "Size"
+) |> tidytable::mutate(
+  Weight = ifelse(inout == "InSize", +Weight, -Weight)
+) |> tidytable::group_by(
+  PoolPatchSeed, SpeciesAffinity, NicheDistance, Intervention,
+  Size
+) |> tidytable::summarise(
+  Total = sum(Weight),
+  .groups = "drop"
+) |> tidytable::arrange(
+  Size
+) |> tidytable::group_by(
+  PoolPatchSeed, SpeciesAffinity, NicheDistance, Intervention
+) |> tidytable::mutate(
+  Total = cumsum(Total)
+) |> ggplot2::ggplot(
+  ggplot2::aes(x = Size, y = Total, color = Intervention)
+) + ggplot2::geom_line(
+) + ggplot2::scale_x_log10(
+)
+
+##### Turnover related statistics: ############################################
