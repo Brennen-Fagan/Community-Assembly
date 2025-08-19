@@ -2370,7 +2370,151 @@ exampleNetworks$Index |> split(
 ) |> ggplot2::ggplot(
   ggplot2::aes(x = Size, y = Total, color = Intervention)
 ) + ggplot2::geom_line(
+) + ggplot2::scale_color_manual(
+  values = colorPalette
 ) + ggplot2::scale_x_log10(
+) + ggplot2::geom_vline(
+  xintercept = 0.1
 )
 
+##### In/Out Statistics: ######################################################
+# Problem here: need to translate to the newer formatting, and then make the
+# plots nicer for human consumption, since the bar charts weren't doing a great
+# job iirc.
+
+# plotValueChart <- function(
+#   data, facets = as.formula(Intervention ~ SpeciesAffinity)
+# ) {
+#   ggplot2::ggplot(
+#     data,
+#     ggplot2::aes(x = interaction(InType,
+#                                  OutType,
+#                                  sep = "\n"),#"",
+#                  y = ChartValue,
+#                  fill = interaction(InType,
+#                                     OutType,
+#                                     sep = "/"))
+#   ) + ggplot2::geom_col(
+#     show.legend = FALSE
+#   ) + ggplot2::facet_grid(
+#     facets
+#   ) + ggplot2::theme_minimal(
+#   ) + ggplot2::labs(
+#     x = "Enter/Exit Type", y = "Count"#, fill = "In/Out"
+#   )
+# }
+
+# .divs, # diversitiesAll
+# .ps, # Pers
+# .ces, # ColExt
+# .ets, # endTimes
+# .gs, # Singleton Graphs
+# ... # commonfilters
+# plotValueChart(
+  #   rbind(
+  #     .ps %>% tidytable::filter(
+  #       ...,
+  #       Persistence > 0,
+  #       InType != externalNames["Dispersal"],
+  #       In < Stop, Out > Start
+  #     ) %>% tidytable::group_by(
+  #       SpeciesAffinity, InType, OutType, Intervention
+  #     ) %>% tidytable::summarise(
+  #       ChartValue = tidytable::n() / tidytable::n_distinct(PoolPatchSeed)
+  #     ) %>% dplyr::mutate( # Tidytable renders as character again!
+  #       Intervention =
+  #         factor(Intervention,
+  #                levels = rev(c("(0)", "(0)->(0.5)", "(0)->(1)",
+  #                               "(0.5)",
+  #                               "(1)")),
+  #                ordered = TRUE)
+  #     ),
+  #     .ces %>% tidytable::filter(
+  #       ...,
+  #       !Success | EventType == "Present",
+  #       Times > Start, Times < Stop
+  #     ) %>% tidytable::mutate(
+  #       InType = externalNames[
+  #         ifelse(EventType == "Arrival", "Failed Arrival", "Present")
+  #         ],
+  #       OutType = externalNames["NA"]
+  #     ) %>% tidytable::group_by(
+  #       SpeciesAffinity, InType, OutType, Intervention
+  #     ) %>% tidytable::summarise(
+  #       ChartValue = tidytable::n() / tidytable::n_distinct(PoolPatchSeed)
+  #     ) %>% dplyr::mutate( # Tidytable renders as character again!
+  #       Intervention =
+  #         factor(Intervention,
+  #                levels = rev(c("(0)", "(0)->(0.5)", "(0)->(1)",
+  #                               "(0.5)",
+  #                               "(1)")),
+  #                ordered = TRUE)
+  #     )
+  #   ),
+  #   facets = as.formula(Intervention ~ .)
+  # ) + ggplot2::theme(
+  #   legend.position = "bottom"
+  # ) + ggplot2::guides(
+  #   fill = ggplot2::guide_legend(nrow = 2)
+  # ) + ggplot2::ylab(
+  #   "Average Count in a Simulation"
+  # )
+
 ##### Turnover related statistics: ############################################
+# Problem here: data is bimodal, so central tendency isn't quite catching the
+# right information.
+
+# newplot5_dataB <- diversitiesAll %>% newplot5_filtration(
+# ) %>% tidytable::filter(
+#   Metric == "TimeBrayCurtis",
+#   is.na(Subset)
+# ) %>% tidytable::left_join(endTimes %>% dplyr::select(-Times))
+#
+# newplot5_ba <- plotMeanAndInner(
+#   newplot5_dataB, CIs = 0.75, facets = as.formula(. ~ .)
+#   # ) + ggplot2::geom_rect(
+#   #   data = data.frame(
+#   #     1 # 1 rectangle per row, so dummy df to prevent overplotting
+#   #   ),
+#   #   xmin = min(newplot5_dataB$Start),
+#   #   xmax = max(newplot5_dataB$Stop),
+#   #   ymin = 0, ymax = max(newplot5_dataB$Value, na.rm = TRUE),
+#   #   fill = "grey",
+#   #   alpha = 0.2,
+#   #   inherit.aes = FALSE
+# ) + ggplot2::labs(
+#   y = "Time-BC",
+#   tag = "b)"
+# ) + ggplot2::theme(
+#   legend.position = "none",
+#   plot.tag.position = c(0.05, 1)
+# ) + ggplot2::coord_cartesian(
+#   xlim = c(0, 30000), ylim = c(0, 0.5), expand = FALSE
+# )
+# newplot5_bb <- ggplot2::ggplot(
+#   newplot5_dataB %>% tidytable::filter(
+#     Time > Start, Time < Stop
+#   ),
+#   ggplot2::aes(
+#     y = Value, color = Intervention
+#   )
+# ) + ggplot2::geom_density(
+#   adjust = 1/2, show.legend = FALSE
+# ) + ggplot2::coord_cartesian(
+#   ylim = c(0, 0.5), expand = FALSE
+# ) + ggplot2::theme_minimal(
+# ) + ggplot2::scale_color_manual(
+#   values = colorPalette, aesthetics = c("color", "fill"),
+#   name = "Habitat Land-use"
+# ) + ggplot2::scale_x_continuous(
+#   name = "", labels = function(x) rep("", length(x))
+# ) + ggplot2::theme(
+#   axis.title.y = ggplot2::element_blank(),
+#   axis.text.y = ggplot2::element_blank(),
+#   axis.ticks.y = ggplot2::element_blank()#,
+#   # axis.text.x = ggplot2::element_blank()
+# )
+# newplot5_b <- ggpubr::ggarrange(
+#   newplot5_ba, newplot5_bb,
+#   nrow = 1, widths = c(0.9, 0.1), align = "h"
+# )
