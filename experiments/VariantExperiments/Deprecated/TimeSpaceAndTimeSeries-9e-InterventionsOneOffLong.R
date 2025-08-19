@@ -11,77 +11,43 @@ source(file.path(directory, "TimeSpaceAndTimeSeries-9b-SimulationFunction.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-9d-InterventionFunction.R"))
 
 dirTag <- "TSTS_Simulations"
-dirDate <- "2025-01-27"
+dirDate <- "2025-05-12"
 baseTag <-  "TSTS_Simulation" # Note the distinction ("s").
-# simulationsTargetIndex <- ... # Can set, or let default to most recent.
-if (!exists("simulationsTargetIndex"))
-  simulationsTargetIndex <- "NA" # as.character(NUMBER)
-cores <- 4 # 16
 
+cores <- 3
 
-runSimulations <- FALSE
-source(file.path(directory, "TimeSpaceAndTimeSeries-9c-Simulations.R"))
-# For Side Effects, specifically parameterChoices.
+seeds <- withRandom({runif(10)*1e8}, seed = 94311482)
 
-stopifnot(exists("parameterChoices"))
-
-# Previously: # All combinations!!!
-# parameterChoices <- parameterChoices %>% dplyr::full_join(
-#   with(experiments, expand.grid(
-#     ip = iPDO$ID,
-#     ipSeed = 1, # No random components
-#     it = iTDO$ID,
-#     itSeed = 1, # No random components
-#     itDisp = iDispChoice,
-#     itDist = iDistChoice,
-#     stringsAsFactors = FALSE
-#   )),
-#   by = character() # cross-join
-# )
-
-# Now, build for separate combinations.
-interventionChoices <- dplyr::bind_rows(lapply(
-  experiments, function(experiment) {
-    with(
-      experiment,
-      expand.grid( # All combinations!
-        pp = ppDO$ID,
-        dyn = dynDO$ID,
-        events = eDO$ID,
-        initconds = icDO$ID,
-        dispersal = dispDO$ID,
-        affinity = aDO$ID,
-        distance = distDO$ID,
-        # Need the above for incoming left_join. Below is the new stuff.
-        ip = iPDO$ID,
-        ipSeed = 1, # No random components
-        it = iTDO$ID,
-        itSeed = 1, # No random components
-        itDisp = iDispChoice,
-        itDist = iDistChoice,
-        stringsAsFactors = FALSE
-      )
-    )}))
-
-parameterChoices <- parameterChoices %>% dplyr::left_join(
-  interventionChoices,
-  by = c("pp", "dyn", "events", "initconds",
-         "dispersal", "affinity", "distance"),
-  multiple = "all"
+parameterChoices <- data.frame(
+  poolpatchDictionaryChoice = rep(142486, 3), # regular pools
+  poolpatchSeedChoice = seeds[1], # shared pool
+  dynamicsDictionaryChoice = rep(4929, 3), # regular dynamics
+  dynamicsSeedChoice = seeds[2], # shared dynamics
+  eventsDictionaryChoice = rep(28, 3), # regular events
+  eventsSeedChoice = seeds[3], # shared events
+  initialConditionsDictionaryChoice = rep(1, 3), # empty habitat
+  initialConditionsSeedChoice = seeds[4], # shared ICs
+  dispersalDictionaryChoice = rep(NA, 3), # no dispersal
+  distanceDictionaryChoice = rep(5, 3), # Start with 5^(1 - 2*dist).
+  affinityDictionaryChoice = c(1, 15, 29), # (0), (0), (0.5), (1) with 100% 0.
+  affinitySeedChoice = seeds[5:7], # different affinities
+  interventionPatchDictionaryChoice = rep(111, 3), # ->0
+  interventionPatchSeedChoice = seeds[8], # consistency
+  interventionTimeDictionaryChoice = rep(3, 3), # 5% in.
+  interventionTimeSeedChoice = seeds[9], # consistency
+  interventionDispersalDictionaryChoice =  rep(NA, 3), # no dispersal,
+  interventionDistanceDictionaryChoice = rep(5, 3) # 5 fold change both directions
 )
 
-# Since we've had success with making sure that the interruptions that do
-# nothing do in fact do nothing, we can eliminate those from the parameter
-# choices.
-# (Note: no need to prioritise since all pools are already made.)
-parameterChoices <- parameterChoices %>% dplyr::ungroup() %>% dplyr::filter(
-  affinityDictionaryOrigin$PatchAffinities[affinity] !=
-    interventionPatchDictionaryOrigin$PatchAffinities[ip]
-) %>% dplyr::select(-priority, -firsts)
+eventsDictionaryOrigin[28,]$EventsNumberMultiplier <- 200
 
-# Run across each row of parameterChoices: ####################################
-clust <- parallel::makeCluster(min(nrow(parameterChoices), cores))
-doParallel::registerDoParallel(clust)
+if (cores > 1) {
+  clust <- parallel::makeCluster(min(nrow(parameterChoices), cores))
+  doParallel::registerDoParallel(clust)
+  `%op%` <- `%dopar%`
+} else {
+  `%op%` <- `%do%`
+}
 
 toExport <- unlist(lapply(
   1:9, # Non-seed, non-previous columns of parameterChoices
@@ -92,7 +58,7 @@ toExport <- unlist(lapply(
                                 function(x) all(is.character(x))))
     dictChoices[, stringCols] %>% unlist()
   },
-  pcs = parameterChoices %>% dplyr::select(-dplyr::ends_with("Seed")),
+  pcs = parameterChoices %>% dplyr::select(-dplyr::contains("Seed")),
   dicts = list(poolpatchDictionaryOrigin, dynamicsDictionaryOrigin,
                eventsDictionaryOrigin, initialConditionsDictionaryOrigin,
                dispersalDictionaryOrigin,
@@ -108,7 +74,7 @@ toExport <- toExport[toExport %in% ls()]
 success <- foreach::foreach(
   pc = iterators::iter(parameterChoices, by = "row"),
   .packages = c("RMTRCode2", "dplyr"), .export = toExport
-) %dopar% {
+) %op% {
   # ) %do% {
   pc <- as.list(pc) # untibble so we are passing numerics and strings.
   fileID <- file.path(
@@ -151,8 +117,9 @@ success <- foreach::foreach(
       interventionDistanceDictionaryChoice = pc[[18]],
       returnResults = FALSE,
       saveResults = TRUE,
-      skipIfSaveExists = TRUE
+      skipIfSaveExists = FALSE
     )
 }
 
-parallel::stopCluster(clust)
+if (cores > 1)
+  parallel::stopCluster(clust)

@@ -1516,7 +1516,7 @@ newplot5_dataA <- diversitiesAll %>% newplot5_filtration(
 
 newplot5_dataB <- diversitiesAll %>% newplot5_filtration(
 ) %>% tidytable::filter(
-  Metric == "TimeJaccard",
+  Metric == "TimeBrayCurtis",
   is.na(Subset)
 ) %>% tidytable::left_join(endTimes %>% dplyr::select(-Times))
 
@@ -1536,17 +1536,17 @@ newplot5_dataC <- tidytable::bind_rows(
 
 newplot5_a <- plotMeanAndInner(
   newplot5_dataA, CIs = 0.75, facets = as.formula(. ~ .)
-) + ggplot2::geom_point(
-  data = newplot5_dataA %>% tidytable::filter(
-    PoolPatchSeed == targetSeed
-  ) %>% tidytable::group_by(
-    Intervention
-  ) %>% tidytable::mutate(
-    TimeDist = abs(Time + 1e-6 - targetTimes), # Preference a side.
-    IsMin = TimeDist == min(TimeDist)
-  ) %>% tidytable::filter(
-    IsMin
-  )
+  # ) + ggplot2::geom_point(
+  #   data = newplot5_dataA %>% tidytable::filter(
+  #     PoolPatchSeed == targetSeed
+  #   ) %>% tidytable::group_by(
+  #     Intervention
+  #   ) %>% tidytable::mutate(
+  #     TimeDist = abs(Time + 1e-6 - targetTimes), # Preference a side.
+  #     IsMin = TimeDist == min(TimeDist)
+  #   ) %>% tidytable::filter(
+  #     IsMin
+  #   )
 ) + ggplot2::labs(
   y = "Richness"
 ) + ggplot2::guides(
@@ -1554,62 +1554,62 @@ newplot5_a <- plotMeanAndInner(
   color = ggplot2::guide_legend(ncol = 3),
   fill = ggplot2::guide_legend(ncol = 3)
 ) + ggplot2::coord_cartesian(
-  xlim = c(0, 40000), expand = FALSE
-) + ggplot2::annotation_custom(
-  ggplot2::ggplotGrob(
-    targetEnvs[[
-      (targetEnvsIndex %>% newplot5_filtration %>% dplyr::pull(ID))[1]
-      ]]$singletonGraphs[[1]][[1]] + ggplot2::theme(
-        plot.background = ggplot2::element_rect(fill = "white"),
-        axis.title.x = ggplot2::element_blank(),
-        axis.text.x = ggplot2::element_blank(),
-        axis.ticks.x = ggplot2::element_blank(),
-        axis.title.y = ggplot2::element_blank(),
-        axis.text.y = ggplot2::element_blank(),
-        axis.ticks.y = ggplot2::element_blank()
-      )
-  ),
-  xmin = 30500, xmax = 40000, ymin = 7, ymax = 17
-) + ggplot2::annotation_custom(
-  ggplot2::ggplotGrob(
-    targetEnvs[[
-      (targetEnvsIndex %>% newplot5_filtration %>% dplyr::pull(ID))[2]
-      ]]$singletonGraphs[[1]][[1]] + ggplot2::theme(
-        plot.background = ggplot2::element_rect(fill = "white"),
-        axis.title.x = ggplot2::element_blank(),
-        axis.text.x = ggplot2::element_blank(),
-        axis.ticks.x = ggplot2::element_blank(),
-        axis.title.y = ggplot2::element_blank(),
-        axis.text.y = ggplot2::element_blank(),
-        axis.ticks.y = ggplot2::element_blank()
-      )
-  ),
-  xmin = 30500, xmax = 40000, ymin = 18, ymax = 28
-) + ggplot2::annotation_custom(
-  ggplot2::ggplotGrob(
-    targetEnvs[[
-      (targetEnvsIndex %>% newplot5_filtration %>% dplyr::pull(ID))[3]
-      ]]$singletonGraphs[[1]][[1]] + ggplot2::theme(
-        plot.background = ggplot2::element_rect(fill = "white"),
-        axis.title.x = ggplot2::element_blank(),
-        axis.text.x = ggplot2::element_blank(),
-        axis.ticks.x = ggplot2::element_blank(),
-        axis.title.y = ggplot2::element_blank(),
-        axis.text.y = ggplot2::element_blank(),
-        axis.ticks.y = ggplot2::element_blank()
-      )
-  ),
-  xmin = 30500, xmax = 40000, ymin = 29, ymax = 39
-) + ggplot2::geom_rect(
-  data = data.frame(
-    1 # 1 rectangle per row, so dummy df to prevent overplotting
-  ),
-  xmin = min(newplot5_dataA$Start),
-  xmax = max(newplot5_dataA$Stop),
-  ymin = 0, ymax = max(newplot5_dataA$Value),
-  fill = "grey",
-  alpha = 0.2,
-  inherit.aes = FALSE
+  #   xlim = c(0, 40000), expand = FALSE
+  # ) + ggplot2::annotation_custom(
+  #   ggplot2::ggplotGrob(
+  #     targetEnvs[[
+  #       (targetEnvsIndex %>% newplot5_filtration %>% dplyr::pull(ID))[1]
+  #       ]]$singletonGraphs[[1]][[1]] + ggplot2::theme(
+  #         plot.background = ggplot2::element_rect(fill = "white"),
+  #         axis.title.x = ggplot2::element_blank(),
+  #         axis.text.x = ggplot2::element_blank(),
+  #         axis.ticks.x = ggplot2::element_blank(),
+  #         axis.title.y = ggplot2::element_blank(),
+  #         axis.text.y = ggplot2::element_blank(),
+  #         axis.ticks.y = ggplot2::element_blank()
+  #       )
+  #   ),
+  #   xmin = 30500, xmax = 40000, ymin = 7, ymax = 17
+  # ) + ggplot2::annotation_custom(
+  #   ggplot2::ggplotGrob(
+  #     targetEnvs[[
+  #       (targetEnvsIndex %>% newplot5_filtration %>% dplyr::pull(ID))[2]
+  #       ]]$singletonGraphs[[1]][[1]] + ggplot2::theme(
+  #         plot.background = ggplot2::element_rect(fill = "white"),
+  #         axis.title.x = ggplot2::element_blank(),
+  #         axis.text.x = ggplot2::element_blank(),
+  #         axis.ticks.x = ggplot2::element_blank(),
+  #         axis.title.y = ggplot2::element_blank(),
+  #         axis.text.y = ggplot2::element_blank(),
+  #         axis.ticks.y = ggplot2::element_blank()
+  #       )
+  #   ),
+  #   xmin = 30500, xmax = 40000, ymin = 18, ymax = 28
+  # ) + ggplot2::annotation_custom(
+  #   ggplot2::ggplotGrob(
+  #     targetEnvs[[
+  #       (targetEnvsIndex %>% newplot5_filtration %>% dplyr::pull(ID))[3]
+  #       ]]$singletonGraphs[[1]][[1]] + ggplot2::theme(
+  #         plot.background = ggplot2::element_rect(fill = "white"),
+  #         axis.title.x = ggplot2::element_blank(),
+  #         axis.text.x = ggplot2::element_blank(),
+  #         axis.ticks.x = ggplot2::element_blank(),
+  #         axis.title.y = ggplot2::element_blank(),
+  #         axis.text.y = ggplot2::element_blank(),
+  #         axis.ticks.y = ggplot2::element_blank()
+  #       )
+  #   ),
+  #   xmin = 30500, xmax = 40000, ymin = 29, ymax = 39
+  # ) + ggplot2::geom_rect(
+  #   data = data.frame(
+  #     1 # 1 rectangle per row, so dummy df to prevent overplotting
+  #   ),
+  #   xmin = min(newplot5_dataA$Start),
+  #   xmax = max(newplot5_dataA$Stop),
+  #   ymin = 0, ymax = max(newplot5_dataA$Value),
+  #   fill = "grey",
+  #   alpha = 0.2,
+  #   inherit.aes = FALSE
 ) + ggplot2::labs(
   tag = "a)"
 ) + ggplot2::theme(
@@ -1617,20 +1617,42 @@ newplot5_a <- plotMeanAndInner(
   plot.tag.position = c(0.05, 1)
 )
 
+ggplot2::ggplot(
+  newplot5_dataA %>% tidytable::filter(
+    Time > Start, Time < Stop
+  ),
+  ggplot2::aes(
+    y = Value, color = Intervention
+  )
+) + ggplot2::geom_density(
+  adjust = 1, show.legend = FALSE
+) + ggplot2::theme_minimal(
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat Land-use"
+) + ggplot2::scale_x_continuous(
+  name = "", labels = function(x) rep("", length(x))
+) + ggplot2::theme(
+  axis.title.y = ggplot2::element_blank(),
+  axis.text.y = ggplot2::element_blank(),
+  axis.ticks.y = ggplot2::element_blank()#,
+  # axis.text.x = ggplot2::element_blank()
+)
+
 newplot5_ba <- plotMeanAndInner(
   newplot5_dataB, CIs = 0.75, facets = as.formula(. ~ .)
-) + ggplot2::geom_rect(
-  data = data.frame(
-    1 # 1 rectangle per row, so dummy df to prevent overplotting
-  ),
-  xmin = min(newplot5_dataB$Start),
-  xmax = max(newplot5_dataB$Stop),
-  ymin = 0, ymax = max(newplot5_dataB$Value, na.rm = TRUE),
-  fill = "grey",
-  alpha = 0.2,
-  inherit.aes = FALSE
+  # ) + ggplot2::geom_rect(
+  #   data = data.frame(
+  #     1 # 1 rectangle per row, so dummy df to prevent overplotting
+  #   ),
+  #   xmin = min(newplot5_dataB$Start),
+  #   xmax = max(newplot5_dataB$Stop),
+  #   ymin = 0, ymax = max(newplot5_dataB$Value, na.rm = TRUE),
+  #   fill = "grey",
+  #   alpha = 0.2,
+  #   inherit.aes = FALSE
 ) + ggplot2::labs(
-  y = "Time-Jaccard",
+  y = "Time-BC",
   tag = "b)"
 ) + ggplot2::theme(
   legend.position = "none",
@@ -1666,6 +1688,11 @@ newplot5_b <- ggpubr::ggarrange(
   nrow = 1, widths = c(0.9, 0.1), align = "h"
 )
 
+ggpubr::ggarrange(
+  newplot5_a, newplot5_b,
+  nrow = 1, widths = c(0.6, 0.4)
+)
+
 ggplot2::ggplot(
   newplot5_dataC,
   ggplot2::aes(
@@ -1673,6 +1700,59 @@ ggplot2::ggplot(
     fill = interaction(InType, OutType)
   )) + ggplot2::geom_bar(
   )
+
+
+# New Plot 6: #################################################################
+newplot6_filtration <- function(.) {tidytable::filter(
+  .,
+  SpeciesAffinity == "100% 0",
+  NicheDistance == "5",
+  Intervention %in% c("(0)", "(0.5)->(0)", "(1)->(0)"),
+  (PoolPatchSeed %in% as.character(343:386))
+)}
+
+newplot6_dataA <- diversitiesAll %>% newplot6_filtration(
+) %>% tidytable::filter(
+  Metric == "Alpha Hill:0",
+  is.na(Subset)
+) %>% tidytable::left_join(endTimes %>% dplyr::select(-Times))
+
+newplot6_dataB <- diversitiesAll %>% newplot6_filtration(
+) %>% tidytable::filter(
+  Metric == "TimeJaccard",
+  is.na(Subset)
+) %>% tidytable::left_join(endTimes %>% dplyr::select(-Times))
+
+
+# New Plot 7: #################################################################
+newplot7_filtration <- function(.) {tidytable::filter(
+  .,
+  SpeciesAffinity == "Uniform(0, 1)",
+  NicheDistance == "5",
+  Intervention %in% c("(0)", "(0.5)->(0)", "(1)->(0)"),
+  (PoolPatchSeed %in% as.character(343:386))
+)}
+
+newplot7_dataA <- diversitiesAll %>% newplot7_filtration(
+) %>% tidytable::filter(
+  Metric == "Alpha Hill:0",
+  is.na(Subset)
+) %>% tidytable::left_join(endTimes %>% dplyr::select(-Times))
+
+# New Plot 8: #################################################################
+newplot8_filtration <- function(.) {tidytable::filter(
+  .,
+  SpeciesAffinity == "Uniform(0, 1)",
+  NicheDistance == "5",
+  Intervention %in% c("(1)", "(0.5)->(1)", "(0)->(1)"),
+  (PoolPatchSeed %in% as.character(343:386))
+)}
+
+newplot8_dataA <- diversitiesAll %>% newplot8_filtration(
+) %>% tidytable::filter(
+  Metric == "Alpha Hill:0",
+  is.na(Subset)
+) %>% tidytable::left_join(endTimes %>% dplyr::select(-Times))
 
 # Statistics: #################################################################
 # SI FIGURE?
@@ -1960,6 +2040,58 @@ diff_unif_to0  %>% dplyr::group_by(Intervention1) %>% dplyr::group_map(
     ) %>% summary())
 )
 
+##### What happens after intervention: ########################################
+diversitiesRichness |> tidytable::filter(
+  NicheDistance == "5",
+  (PoolPatchSeed %in% as.character(343:386)),
+  Metric == "Alpha Hill:0",
+  is.na(Subset)
+) |> tidytable::left_join(
+  endTimes |> dplyr::select(-Times)
+) |> tidytable::group_by(
+  SpeciesAffinity, Intervention, PoolPatchSeed,
+  InterventionInitial, InterventionFinal
+) |> tidytable::arrange(
+  Time
+) |> tidytable::filter(
+  InterventionInitial != InterventionFinal,
+  Time == Time[1] | Time == Time[2]
+) |> tidytable::summarise(
+  Time = Time[2] - Time[1],
+  Value = Value[2] - Value[1],
+  Method = "Temporal",
+  .groups = "drop"
+) |> ggplot2::ggplot(
+  aes(x = Time, y = Value,
+      group = interaction(SpeciesAffinity, Intervention),
+      color = InterventionInitial)
+) + ggplot2::geom_point() + ggplot2::facet_grid(
+  SpeciesAffinity ~ InterventionFinal
+) + ggplot2::geom_smooth()
+
+diversitiesRichness |> tidytable::filter(
+  NicheDistance == "5",
+  (PoolPatchSeed %in% as.character(343:386)),
+  Metric == "Alpha Hill:0",
+  is.na(Subset)
+) |> tidytable::left_join(endTimes |> dplyr::select(-Times)) |> tidytable::group_by(
+  SpeciesAffinity, Intervention, PoolPatchSeed
+) |> tidytable::arrange(
+  Time
+) |> tidytable::filter(
+  InterventionInitial != InterventionFinal,
+  Time == Time[1] | Time == Time[2]
+) |> tidytable::summarise(
+  InterventionChange = abs(
+    as.numeric(gsub(InterventionInitial, pattern = "[(]|[)]", replacement = ""))
+    - as.numeric(gsub(InterventionFinal, pattern = "[(]|[)]", replacement = ""))
+  ),
+  Time = Time[2] - Time[1],
+  Value = Value[2] - Value[1],
+  Method = "Temporal",
+  .groups = "drop"
+) |> with(table(Intervention, sign(Value), SpeciesAffinity))
+
 # MIGHT REQUIRE VIKING: ########################################################
 # Can we look for clusters? We remove transient species since they don't have
 # time to change the ecosystem generally.
@@ -2042,7 +2174,7 @@ with(list(pick = 10),
          function(i, s) (
            temp2[[pick]]$ECDFs[[i]]$Basal(s) +
              temp2[[pick]]$ECDFs[[i]]$Consumers(s)
-           ),
+         ),
          i = Index, s = Sizes
        ))
      ) %>% ggplot2::ggplot(
@@ -2135,15 +2267,15 @@ color_codes <- do.call(rbind, lapply(
                    data.frame(
                      First = i,
                      Key = paste(Intervention, SpeciesAffinity, sep = ", ")))
-  )) %>% dplyr::mutate(
-    KeyIndex = as.numeric(factor(Key)),
-    Color = colorspace::qualitative_hcl(length(unique(Key)))[KeyIndex]
-  )
+)) %>% dplyr::mutate(
+  KeyIndex = as.numeric(factor(Key)),
+  Color = colorspace::qualitative_hcl(length(unique(Key)))[KeyIndex]
+)
 index_coords <- index_coords %>% dplyr::left_join(color_codes)
 
 matrix_ecdf_dist_nona <- matrix_ecdf_dist
 matrix_ecdf_dist_nona[is.na(matrix_ecdf_dist_nona)] <- Inf
-  # 1e3 * max(matrix_ecdf_dist, na.rm = T)
+# 1e3 * max(matrix_ecdf_dist, na.rm = T)
 matrix_ecdf_dist_omitna <- matrix_ecdf_dist[
   rowSums(is.na(matrix_ecdf_dist)) != ncol(matrix_ecdf_dist) - 1,
   colSums(is.na(matrix_ecdf_dist)) != nrow(matrix_ecdf_dist) - 1
@@ -2162,9 +2294,30 @@ ggplot2::ggplot(
   ggplot2::aes(y = Group, x = Key, color = Key),
   data = cbind(
     index_coords[-which(rowSums(is.na(matrix_ecdf_dist)) == ncol(matrix_ecdf_dist) - 1),],
-    Group = factor(cutree(agnesout, k = 7))
+    Group = factor(cutree(dianaout, k = 4))
   )
-) + ggplot2::geom_point(position = "jitter")
+) + ggplot2::geom_point(
+  position = "jitter"
+) + ggplot2::theme(
+  axis.text.x = ggplot2::element_text(angle = 30, hjust = 1)
+)
+
+ggplot2::ggplot(
+  ggplot2::aes(y = GroupD, x = GroupA),
+  data = cbind(
+    index_coords[-which(rowSums(is.na(matrix_ecdf_dist)) == ncol(matrix_ecdf_dist) - 1),],
+    GroupA = factor(cutree(agnesout, k = 13)),
+    GroupD = factor(cutree(dianaout, k = 4))
+  ) %>% filter(GroupA %in% 1:3)
+) + ggplot2::geom_bin2d(
+) + ggplot2::theme(
+  axis.text.x = ggplot2::element_text(angle = 30, hjust = 1)
+) + ggplot2::facet_wrap(
+  .~Key
+) + ggplot2::labs(
+  subtitle = "GroupA levels above 3 discarded."
+) + ggplot2::scale_fill_viridis_c(
+)
 # Suggests that I probably need to be swapping my statistics.
 # I expected something with all basals to be quite distinct from a mixed
 # basal-consumer system. Meanwhile the Uniform(0, 1) seem to enter multiple

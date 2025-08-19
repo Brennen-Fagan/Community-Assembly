@@ -8,6 +8,8 @@ alsoload <- TRUE # if TRUE, try to load all ColExt files encountered.
 # if FALSE, only try to create new ColExt files (and return the outputs).
 overwrite <- FALSE # if TRUE, ignore whether a previous file exists.
 
+
+
 #datfolders <- dir(pattern = "TSTS_Simulations_")#.+2024-11-19$")
 datfolders <- dir(pattern = "TSTS_Simulations_.+2025-01-2.$")
 # datfolders <- dir(pattern = "CompareEliminationThresholds$")

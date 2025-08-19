@@ -2,8 +2,8 @@
 library(ggplot2)
 library(dplyr)
 
-quickfolder <- "TSTS_Simulations_2-1_30-30_2024-10-22"
-quickbase <- "TSTS_Diversity_2-1-4-2-NA-7-21_30-30-53-2-12"
+quickfolder <- "TSTS_Simulations_2-1_31-31_2024-10-22"
+quickbase <- "TSTS_Diversity_2-1-4-2-NA-7-21_31-31-54-5-32"
 # experiments
 # ppDO, dynDO, eDO, icDO, dispDO, distDO, aDO,
 # dir(path = quickfolder, pattern = "Diversity_2-1-4-2-NA-7-21")

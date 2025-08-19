@@ -6,14 +6,14 @@
 # Parameters: #################################################################
 alsoload <- TRUE # if TRUE, try to load all ColExt files encountered.
 # if FALSE, only try to create new ColExt files (and return the outputs).
-overwrite <- FALSE #TRUE # if TRUE, ignore whether a previous file exists.
+overwrite <- TRUE #TRUE # if TRUE, ignore whether a previous file exists.
 
-#datfolders <- dir(pattern = "TSTS_Simulations_")#.+2024-11-19$")
-datfolders <- dir(pattern = "TSTS_Simulations_.+2025-01-2.$")
+datfolders <- dir(pattern = "TSTS_Simulations_")#.+2024-11-19$")
+# datfolders <- dir(pattern = "TSTS_Simulations_.+2025-01-2.$")
 # datfolders <- dir(pattern = "CompareEliminationThresholds$")
-#cores <- 12 # Parallelization?
-cargs <- as.numeric(commandArgs(TRUE))
-cores <- cargs[1]
+cores <- 15 # Parallelization?
+# cargs <- as.numeric(commandArgs(TRUE))
+# cores <- cargs[1]
 
 # Libraries: ##################################################################
 librarypath <- file.path(".", "Rlibs")
@@ -123,7 +123,7 @@ ColExt <- foreach::foreach(
   .libPaths(c(librarypath, .libPaths()))
   library("dplyr")
   library("RMTRCode2")
-  
+
   x_properties <- strsplit(basename(x), split = splitchar)
   stopifnot(length(x_properties) == 1#,
             #x_properties[[1]][1] == "TSTS",
