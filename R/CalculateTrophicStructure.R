@@ -6,7 +6,7 @@ CalculateTrophicStructure <- function(
 ) {
   # Borrowing from LM1996-NumPoolCom-FoodWebs-2021-07.Rmd
   nrowPool <- nrow(Pool)
-  `%>%` <- magrittr::`%>%`
+  `|>` <- magrittr::`|>`
   
   # This function should be appliable row-wise to the results.
   # One does need to remove the time column, as usual.
@@ -125,27 +125,27 @@ CalculateTrophicStructure <- function(
           IntriG, IntriL
         )
         
-        EdgeDataFrame <- EdgeDataFrame %>% dplyr::rename(
+        EdgeDataFrame <- EdgeDataFrame |> dplyr::rename(
           # Empirically speaking, to and from appear reversed.
           # A consumer (from) should have a negative effect on resource (to),
           # but the organisation so far marks it as positive. We fix this.
           tempname = to,
           to = from
-        ) %>% dplyr::rename(
+        ) |> dplyr::rename(
           from = tempname
-        ) %>% dplyr::filter(
+        ) |> dplyr::filter(
           # Remove placeholder entries
           effectPerUnit != 0
-        ) %>% dplyr::mutate(
+        ) |> dplyr::mutate(
           # Useful to keep effects separate
           effectSign = sign(effectPerUnit)
-        ) %>% dplyr::group_by(
+        ) |> dplyr::group_by(
           to, effectSign
-        ) %>% dplyr::mutate(
+        ) |> dplyr::mutate(
           # Perform the post mortem of the most influential from's
           effectEfficiency = effectPerUnit / sum(effectPerUnit),
           effectNormalised = effectActual / sum(effectActual)
-        ) %>% dplyr::arrange(to)
+        ) |> dplyr::arrange(to)
         
         list(
           Edges = EdgeDataFrame,

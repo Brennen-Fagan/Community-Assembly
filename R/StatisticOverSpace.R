@@ -11,21 +11,21 @@ StatisticOverSpace <- function(
   inm <- levels[[i]][2]
   
   # Attach labels.
-  d <- d %>% dplyr::filter(
+  d <- d |> dplyr::filter(
     pbs == Pool,
     inm == Noise,
     Time > burnin, Time < burnout
-  ) %>% dplyr::left_join(
+  ) |> dplyr::left_join(
     spacelabs, by = "Space"
-  ) %>% dplyr::mutate(
+  ) |> dplyr::mutate(
     Neutral = paste("(", Neutral, ")", sep = "")
-  ) %>% tidyr::unite(
+  ) |> tidyr::unite(
     col = "group", Neutral, Space, remove = FALSE
   )
   
-  xlabs <- d %>% dplyr::select(
+  xlabs <- d |> dplyr::select(
     Space, Dispersal
-  ) %>% dplyr::distinct() %>% dplyr::arrange(Space) %>% dplyr::mutate(
+  ) |> dplyr::distinct() |> dplyr::arrange(Space) |> dplyr::mutate(
     Space = as.character(Space),
     Label = paste(Space, Dispersal, sep = "\n")
   )

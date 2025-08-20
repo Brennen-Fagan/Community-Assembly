@@ -24,7 +24,7 @@ Calculate_Species <- function(result, bintimes = FALSE) {
         }
       )
       return(
-        dplyr::bind_rows(species) %>% dplyr::mutate(
+        dplyr::bind_rows(species) |> dplyr::mutate(
           Environment = i
         )
       )
@@ -37,11 +37,11 @@ Calculate_Species <- function(result, bintimes = FALSE) {
     # Should equalise time steps.
     SpeciesPerEnvironment <- lapply(
       SpeciesPerEnvironment, function(SPE) {
-        SPE %>% dplyr::mutate(
+        SPE |> dplyr::mutate(
           TimeFloor = floor(Time*10)/10
-        ) %>% dplyr::group_by(
+        ) |> dplyr::group_by(
           TimeFloor, Species, Environment
-        ) %>% dplyr::summarise(
+        ) |> dplyr::summarise(
           Abundance = median(Abundance, na.rm = TRUE)
         )
       })

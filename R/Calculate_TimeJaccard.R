@@ -49,17 +49,17 @@ Calculate_TimeJaccard <- function(loaded, nspecies, minTime = NULL) {
     numSpecies = sum(nspecies)
   )
 
-  diversity <- dplyr::bind_rows(diversity) %>% tidyr::pivot_longer(
+  diversity <- dplyr::bind_rows(diversity) |> tidyr::pivot_longer(
     cols = tidyr::starts_with("Jaccard"),
     names_to = "Measurement", values_to = "Value"
   )
-  diversity_avg <- diversity %>% dplyr::group_by(
+  diversity_avg <- diversity |> dplyr::group_by(
     Time, Measurement
-  ) %>% dplyr::summarise(
+  ) |> dplyr::summarise(
     Value = mean(Value),
     .groups = "drop"
-  ) %>% dplyr::ungroup(
-  ) %>% dplyr::mutate(
+  ) |> dplyr::ungroup(
+  ) |> dplyr::mutate(
     Environment = "Mean"
   )
 

@@ -50,9 +50,9 @@ Calculate_Diversity <- function(loaded, nspecies) {
   
   print("alpha")
   ### Gamma Diversity: ##################################################
-  diversity_gamma <- diversity_alpha %>% dplyr::group_by(
+  diversity_gamma <- diversity_alpha |> dplyr::group_by(
     Time
-  ) %>% dplyr::summarise(
+  ) |> dplyr::summarise(
     Mean = mean(Richness),
     Mean_Basal = mean(Richness_Basal),
     Mean_Consumer = mean(Richness_Consumer),
@@ -85,13 +85,13 @@ Calculate_Diversity <- function(loaded, nspecies) {
       ),
       function(x) length(x[x!=""])
     ))
-  ) %>% dplyr::select(
+  ) |> dplyr::select(
     -dplyr::starts_with("Species")
-  ) %>% tidyr::pivot_longer(
+  ) |> tidyr::pivot_longer(
     cols = !Time,
     names_to = "Measurement",
     values_to = "Value"
-  ) %>% dplyr::mutate(
+  ) |> dplyr::mutate(
     Environment = "Gamma"
   )
   
@@ -112,11 +112,11 @@ Calculate_Diversity <- function(loaded, nspecies) {
       dataf <- expand.grid(
         Env1 = 1:envs,
         Env2 = 1:envs
-      ) %>% dplyr::filter(
+      ) |> dplyr::filter(
         Env1 < Env2
-      ) %>% dplyr::arrange(
+      ) |> dplyr::arrange(
         Env1, Env2
-      ) %>% dplyr::mutate(
+      ) |> dplyr::mutate(
         Time = time,
         Jaccard = as.vector(dists)
       )
@@ -127,32 +127,32 @@ Calculate_Diversity <- function(loaded, nspecies) {
   )
   diversity_beta <- dplyr::bind_rows(
     diversity_beta
-  ) %>% tidyr::unite(
+  ) |> tidyr::unite(
     "Environment", Env1, Env2, sep = " "
-  ) %>% dplyr::rename(
+  ) |> dplyr::rename(
     Value = Jaccard
-  ) %>% dplyr::mutate(
+  ) |> dplyr::mutate(
     Measurement = "Jaccard"
   )
   
-  diversity_beta_avg <- diversity_beta %>% dplyr::group_by(
+  diversity_beta_avg <- diversity_beta |> dplyr::group_by(
     Time, Measurement
-  ) %>% dplyr::summarise(
+  ) |> dplyr::summarise(
     Value = mean(Value)
-  ) %>% dplyr::ungroup(
-  ) %>% dplyr::mutate(
+  ) |> dplyr::ungroup(
+  ) |> dplyr::mutate(
     Environment = "Mean"
   )
   print("beta")
   
   Diversities <- dplyr::bind_rows(
-    diversity_alpha %>% dplyr::select(
+    diversity_alpha |> dplyr::select(
       -Species_Basal, -Species_Consumer, -Species
-    ) %>% tidyr::pivot_longer(
+    ) |> tidyr::pivot_longer(
       c(-Time, -Environment),
       names_to = "Measurement",
       values_to = "Value"
-    ) %>% dplyr::mutate(
+    ) |> dplyr::mutate(
       Environment = as.character(Environment)
     ),
     diversity_beta,

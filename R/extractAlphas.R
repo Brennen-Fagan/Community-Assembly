@@ -6,11 +6,11 @@ extractAlphas <- function(Diversity, Attributes) {
       d = Diversity$Diversities,
       a = Attributes
     )
-  ) %>% dplyr::select(-Species) %>% dplyr::mutate(
+  ) |> dplyr::select(-Species) |> dplyr::mutate(
     Time = floor(Time * time_grouping_size)/time_grouping_size
-  ) %>% dplyr::group_by(
+  ) |> dplyr::group_by(
     Time, Environment, Set, Number, History, Pool, Noise, Neutral, Space
-  ) %>% dplyr::summarise(
+  ) |> dplyr::summarise(
     Richness = floor(median(Richness)),
     Richness_Basal = floor(median(Richness_Basal)),
     Richness_Consumer = floor(median(Richness_Consumer)),

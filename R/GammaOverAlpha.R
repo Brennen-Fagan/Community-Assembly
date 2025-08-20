@@ -14,43 +14,43 @@ GammaOverAlpha <- function(
   pbs <- levels[[i]][1]
   inm <- levels[[i]][2]
   
-  d <- d %>% dplyr::filter(
+  d <- d |> dplyr::filter(
     Pool == pbs,
     Noise == inm
-  ) %>% dplyr::left_join(
+  ) |> dplyr::left_join(
     spacelabs, by = "Space"
-  ) %>% dplyr::left_join(
+  ) |> dplyr::left_join(
     neutrallabs, by = "Neutral"
   )
   
   if (!is.null(NumberSelect) &&
       !is.null(HistorySelect) &&
       !is.null(EnvirSelect)) {
-    number <- d %>% dplyr::select(
+    number <- d |> dplyr::select(
       Space, Neutral, Number, History, Environment
-    ) %>% dplyr::distinct() %>% dplyr::arrange(
+    ) |> dplyr::distinct() |> dplyr::arrange(
       Number
-    ) %>% dplyr::group_by(
+    ) |> dplyr::group_by(
       Space, Neutral
-    ) %>% dplyr::filter(
+    ) |> dplyr::filter(
       Number %in% (min(Number) - 1 + NumberSelect)
-    ) %>% dplyr::group_by(
+    ) |> dplyr::group_by(
       Space, Neutral, Number
-    ) %>% dplyr::filter(
+    ) |> dplyr::filter(
       History %in% (min(History) - 1 + HistorySelect)
-    ) %>% dplyr::group_by(
+    ) |> dplyr::group_by(
       Space, Neutral, Number, History
-    ) %>% dplyr::filter(
+    ) |> dplyr::filter(
       Environment %in% (min(Environment) - 1 + EnvirSelect)
     )
     
-    dTraj <- d %>% dplyr::semi_join(number, by = c(
+    dTraj <- d |> dplyr::semi_join(number, by = c(
       "Space", "Neutral", "Number", "History", "Environment"
     ))
     
-    dTrajStop <- dTraj %>% dplyr::group_by(
+    dTrajStop <- dTraj |> dplyr::group_by(
       Number, History, Environment
-    ) %>% dplyr::slice_max(Time)
+    ) |> dplyr::slice_max(Time)
     
   } else if (!is.null(NumberSelect) ||
              !is.null(HistorySelect) ||
@@ -58,7 +58,7 @@ GammaOverAlpha <- function(
     warning("Not all of Selects are null or non-null. Skipping trajectory.")
   }
   
-  dga <- d %>% dplyr::filter(
+  dga <- d |> dplyr::filter(
     Time > burnin, Time < burnout
   )
   
@@ -70,9 +70,9 @@ GammaOverAlpha <- function(
     breaks = seq(-0.5, max(dga$`Richness, Alpha`,
                            dga$`Richness, Gamma`) + 1, 1)
   ) + ggplot2::geom_point(
-    data = dga %>% group_by(
+    data = dga |> group_by(
       Immigration, Extinction, Space, Dispersal
-    ) %>% summarise(
+    ) |> summarise(
       `Richness, Alpha` = mean(`Richness, Alpha`, na.rm = TRUE),
       `Richness, Gamma` = mean(`Richness, Gamma`, na.rm = TRUE),
       .groups = "drop"

@@ -1,7 +1,7 @@
 AvgGammaAlphaOverTime <- function(DAG) {
-  DAG %>% dplyr::group_by(
+  DAG |> dplyr::group_by(
     Time, Set, Number, Pool, Noise, Neutral, Space
-  ) %>% dplyr::summarise(
+  ) |> dplyr::summarise(
     `Richness, Alpha` = mean(`Richness, Alpha`),
     `Richness_Basal, Alpha` = mean(`Richness_Basal, Alpha`),
     `Richness_Consumer, Alpha` = mean(`Richness_Consumer, Alpha`),
@@ -9,12 +9,12 @@ AvgGammaAlphaOverTime <- function(DAG) {
     `Richness_Basal, Gamma` = mean(`Richness_Basal, Gamma`),
     `Richness_Consumer, Gamma` = mean(`Richness_Consumer, Gamma`),
     .groups = "drop"
-  ) %>% tidyr::pivot_longer(
+  ) |> tidyr::pivot_longer(
     cols = c("Richness, Alpha", "Richness, Gamma",
              "Richness_Basal, Alpha", "Richness_Consumer, Alpha",
              "Richness_Basal, Gamma", "Richness_Consumer, Gamma"),
     names_to = "Measurement", values_to = "Value"
-  ) %>% ggplot2::ggplot(
+  ) |> ggplot2::ggplot(
     mapping = ggplot2::aes(
       x = Time, y= Value,
       group = Measurement, color = Measurement

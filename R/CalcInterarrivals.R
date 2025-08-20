@@ -1,9 +1,9 @@
 CalcInterarrivals <- function(presenceChanges) {
-  presenceChanges %>% dplyr::group_by(
+  presenceChanges |> dplyr::group_by(
     Simulation
-  ) %>% dplyr::arrange(
+  ) |> dplyr::arrange(
     Time
-  ) %>% dplyr::mutate(
+  ) |> dplyr::mutate(
     LagTime = dplyr::lag(Time),
     WaitTime = Time - LagTime,
     LagType = dplyr::lag(Type)

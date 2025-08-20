@@ -33,7 +33,7 @@ FindPresenceChanges <- function(loaded) {
           TRUE ~ "OOPS"
         )
       )
-    }, y = xdiff, locs = changelocs) %>% dplyr::bind_rows()
+    }, y = xdiff, locs = changelocs) |> dplyr::bind_rows()
     
     changelocs <- sort(unique(unlist(changelocs)))
     
@@ -60,12 +60,12 @@ FindPresenceChanges <- function(loaded) {
       Species = ((i - 1) %% numSpecies) + 1,
       Type = unlist(changesregional),
       Regional = TRUE
-    ) %>% dplyr::filter(Type != "Discard")
+    ) |> dplyr::filter(Type != "Discard")
     
     reports <- dplyr::full_join(
       reportspatch, reportsregion,
       by = c("Time", "Species", "Type")
-    ) %>% dplyr::mutate(
+    ) |> dplyr::mutate(
       Regional = ifelse(is.na(Regional), FALSE, Regional)
     )
     

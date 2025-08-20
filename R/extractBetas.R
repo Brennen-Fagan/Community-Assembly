@@ -6,11 +6,11 @@ extractBetas <- function(Diversity, Attributes) {
       d = Diversity$Diversities,
       a = Attributes
     )
-  ) %>% dplyr::mutate(
+  ) |> dplyr::mutate(
     Time = floor(Time * time_grouping_size)/time_grouping_size
-  ) %>% dplyr::group_by(
+  ) |> dplyr::group_by(
     Time, Env1, Env2, Set, Number, History, Pool, Noise, Neutral, Space
-  ) %>% dplyr::summarise(
+  ) |> dplyr::summarise(
     Jaccard = median(Jaccard),
     .groups = "drop"
   )

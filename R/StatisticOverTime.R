@@ -11,25 +11,25 @@ StatisticOverTime <- function(
   inm <- levels[[i]][2]
   
   # Attach labels.
-  d <- d %>% dplyr::filter(
+  d <- d |> dplyr::filter(
     pbs == Pool,
     inm == Noise
-  ) %>% dplyr::left_join(
+  ) |> dplyr::left_join(
     spacelabs, by = "Space"
-  ) %>% dplyr::left_join(
+  ) |> dplyr::left_join(
     neutrallabs, by = "Neutral"
-  ) %>% tidyr::unite(
+  ) |> tidyr::unite(
     col = "group", !Time & !dplyr::all_of(ytarget), remove = FALSE
   )
   
-  da <- da %>% dplyr::filter(
+  da <- da |> dplyr::filter(
     pbs == Pool,
     inm == Noise
-  ) %>% dplyr::left_join(
+  ) |> dplyr::left_join(
     spacelabs, by = "Space"
-  ) %>% dplyr::left_join(
+  ) |> dplyr::left_join(
     neutrallabs, by = "Neutral"
-  ) %>% tidyr::unite(
+  ) |> tidyr::unite(
     col = "group", !Time & !Low & !High & !Central, remove = FALSE
   )
   

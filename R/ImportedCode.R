@@ -1,3 +1,3 @@
 # Imported code
 
-`%>%` <- dplyr::`%>%`
+`|>` <- dplyr::`|>`

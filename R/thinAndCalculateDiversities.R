@@ -74,9 +74,9 @@ thinAndCalculateDiversities <- function(loaded, nspecies,
   
   print("alpha")
   ### Gamma Diversity: ##################################################
-  diversity_gamma <- diversity_alpha %>% dplyr::group_by(
+  diversity_gamma <- diversity_alpha |> dplyr::group_by(
     Time
-  ) %>% dplyr::summarise(
+  ) |> dplyr::summarise(
     Mean = mean(Richness),
     Mean_Basal = mean(Richness_Basal),
     Mean_Consumer = mean(Richness_Consumer),
@@ -109,11 +109,11 @@ thinAndCalculateDiversities <- function(loaded, nspecies,
       ),
       function(x) length(x[x!=""])
     ))
-  ) %>% tidyr::pivot_longer(
+  ) |> tidyr::pivot_longer(
     cols = c(Mean, Var, Gamma),
     names_to = "Aggregation",
     values_to = "Richness"
-  ) %>% dplyr::mutate(
+  ) |> dplyr::mutate(
     Basals = case_when(
       Aggregation == "Mean" ~ Mean_Basal,
       Aggregation == "Var" ~ Var_Basal,
@@ -126,7 +126,7 @@ thinAndCalculateDiversities <- function(loaded, nspecies,
       Aggregation == "Gamma" ~ as.numeric(Gamma_Consumer),
       TRUE ~ -1
     )
-  ) %>% dplyr::select(
+  ) |> dplyr::select(
     -Mean_Basal, -Var_Basal, -Gamma_Basal,
     -Mean_Consumer, -Var_Consumer, -Gamma_Consumer,
     -SpeciesTotal, -SpeciesTotal_Basal, -SpeciesTotal_Consumer
@@ -149,11 +149,11 @@ thinAndCalculateDiversities <- function(loaded, nspecies,
       dataf <- expand.grid(
         Env1 = 1:envs,
         Env2 = 1:envs
-      ) %>% dplyr::filter(
+      ) |> dplyr::filter(
         Env1 < Env2
-      ) %>% dplyr::arrange(
+      ) |> dplyr::arrange(
         Env1, Env2
-      ) %>% dplyr::mutate(
+      ) |> dplyr::mutate(
         Time = time,
         Jaccard = as.vector(dists)
       )
@@ -166,7 +166,7 @@ thinAndCalculateDiversities <- function(loaded, nspecies,
   
   ### Return Diversities: ###############################################
   return(list(
-    alpha = diversity_alpha %>% dplyr::select(
+    alpha = diversity_alpha |> dplyr::select(
       -Species_Basal, -Species_Consumer
     ),
     beta = diversity_beta,
