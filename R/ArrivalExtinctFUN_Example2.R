@@ -1,8 +1,3 @@
-ArrivalFUN_Example <- function(Events, Rate) {
-  cumsum(rexp(Events, Rate))
-}
-ExtinctFUN_Example <- ArrivalFUN_Example
-
 ArrivalFUN_Example2 <- function(Events, Rate) {
   if (Rate == 0 || Events == 0) {
     # Waiting finite time for infinite wait times.
