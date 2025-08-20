@@ -1,5 +1,5 @@
-load("/shared/storage/biology/rsrch/lcab/research/btf500/CommunityAssembly/RMTRCode2/experiments/RMTR-MNA/Data_2022-08-05/MNA-ExampleOutcome-Result-Env10-None.RData")
-load("/shared/storage/biology/rsrch/lcab/research/btf500/CommunityAssembly/RMTRCode2/experiments/RMTR-MNA/Data_2022-08-05/MNA-ExampleOutcome-PoolMats-Env10.RData")
+load("Data_2022-08-05/MNA-ExampleOutcome-Result-Env10-None.RData")
+load("Data_2022-08-05/MNA-ExampleOutcome-PoolMats-Env10.RData")
 library(RMTRCode2)
 library(dplyr)
 RMTRCode2::CalculateTrophicStructure(
