@@ -2478,7 +2478,11 @@ rbind(
     endTimes
   ) |> tidytable::mutate(
     SpeciesAffinity =
-      affinityDictionaryOrigin$SpeciesAffinities[as.numeric(Affinity)]
+      affinityDictionaryOrigin$SpeciesAffinities[as.numeric(Affinity)],
+    Intervention = unlist(mapply(
+      FUN = interventionNamingScheme,
+      Affinity, PoolPatch, InterventionPatchType
+    ))
   ) |> changeAffinityLevels(
   ) |> changeInterventionLevels(
   ) |> tidytable::filter(
@@ -2500,6 +2504,8 @@ rbind(
 ##### Turnover related statistics: ############################################
 # Problem here: data is bimodal, so central tendency isn't quite catching the
 # right information.
+
+load("diversitiesFlattened9a9_subset4TimeBC.RData")
 
 # newplot5_dataB <- diversitiesAll %>% newplot5_filtration(
 # ) %>% tidytable::filter(
