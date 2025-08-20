@@ -1,3 +1,0 @@
-This folder uses the same *pool* but not the same *interaction matrices* as that of Figure3-ExampleOutcomes/Data_2023-03-02. These are copied here with the tag HIK6 (e.g. MNA-ExampleExtProp-Result-Env10-Ring-5-1-1-ExtProp1HIK6.RData).
-Similarly, I overloaded the events with that of Ring-5 in the same folder (Events$Events <- results$Events; Events$Events$Success <- NA; Events$Seed <- result$HistorySeed).
-This does not appear to have been necessary (the associated history seed seems to still have been 28665115) but was done for safety's sake.

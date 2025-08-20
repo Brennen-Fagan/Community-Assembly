@@ -1,4 +1,0 @@
-WARNING:
-
-After inspection of the Interaction matrices and code, I believe that the PrPr (Predator-Prey) system was actually a mutualistic system with particularly high plant reproductive rate.
-Inspection of the data supports this conclusion due to the large number of species present.
