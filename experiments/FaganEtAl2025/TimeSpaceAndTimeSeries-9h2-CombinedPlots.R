@@ -8,7 +8,7 @@ options(bitmapType = "cairo")
 # If second number is less than 1, we lose persistent species.
 end <- c(0.602, 0.9045) # Aiming for 20000 - 30000. These go ~0.0003% away.
 
-defaultNicheDistance <- "7" # "3"::2, "5"::5, "7"::10
+defaultNicheDistance <- "5" # "3"::2, "5"::5, "7"::10
 
 # Libraries: ##################################################################
 library(ggplot2)
@@ -287,7 +287,7 @@ diversitiesInterventionStrings <- ColExt |> tidytable::select(
 ) |> tidytable::distinct(
 ) |> tidytable::mutate(
   Intervention = unlist(mapply(
-    FUN = interventionNamingScheme,
+    FUN = interventionNamingScheme9,
     Affinity, PoolPatch, InterventionPatchType
   ))
 )
