@@ -7,9 +7,12 @@ allOurFunctions <- ls("package:RMTRCode2")
 
 # Assumed this dir is root package directory.
 thisdir <- '.'
-targdirs <- file.path(thisdir, "experiments", c(
+targdirs <- c(
+  file.path(thisdir, "experiments", "FaganEtAl2023", c(
   "Figure3-ExampleOutcomes", "Figure4-MetasimulationStudy", "Tests"
-))
+  )),
+  file.path(thisdir, "experiments", "FaganEtAl2025")
+)
 Rdir <- file.path(thisdir, "R")
 
 # Get files, look for functions used that are mine.
