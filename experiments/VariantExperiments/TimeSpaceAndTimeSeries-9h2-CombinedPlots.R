@@ -32,8 +32,8 @@ interventionMatrix <- matrix(c(
   "(0.5)->(0)", "(0.5)->(0.25)", "(0.5)", "(0.5)->(0.75)", "(0.5)->(1)",
   "(0.75)->(0)", "(0.75)->(0.25)", "(0.75)->(0.5)", "(0.75)", "(0.75)->(1)",
   "(1)->(0)", "(1)->(0.25)", "(1)->(0.5)", "(1)->(0.75)", "(1)"
-  ),
-  byrow = TRUE, nrow = 5)
+),
+byrow = TRUE, nrow = 5)
 
 ### colors: ###################################################################
 # Algorithmic: first index = 100%, second index = 50%
@@ -1778,7 +1778,7 @@ newplot4_bs4 <- newplot4_dataBS4 |> tidytable::right_join(
            #                    "Consumer_1", "Basal_1"),
            # labels = c("C0", "B0", "C1", "B1"),
            # ordered = TRUE
-           ) ~ InterventionFinal
+    ) ~ InterventionFinal
 ) + ggplot2::theme(
   plot.tag.position = c(0.01, 1),
   # strip.text.x = ggplot2::element_blank()
@@ -1929,29 +1929,29 @@ newplot5 <- ggpubr::ggarrange(
 # Decorate with additional indicators.
 newplot5 <-
   newplot5 + ggplot2::annotate(
-  "curve", x = 0.2, y = 0.865, xend = 0.1, yend = 0.73,
-  arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc"))
-) + ggplot2::annotate(
-  "curve", x = 0.23, y = 0.865, xend = 0.3, yend = 0.73,
-  arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc")),
-  curvature = -0.3
-) + ggplot2::annotate(
-  "curve", x = 0.33, y = 0.865, xend = 0.5, yend = 0.73,
-  arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc")),
-  curvature = -0.3
-) + ggplot2::annotate(
-  "curve", x = 0.45, y = 0.865, xend = 0.7, yend = 0.73,
-  arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc")),
-  curvature = -0.3
-) + ggplot2::annotate(
-  "curve", x = 0.7, y = 0.865, xend = 0.9, yend = 0.73,
-  arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc")),
-  curvature = -0.2
-) + ggplot2::annotate(
-  "segment", linetype = "dashed", x = 0.215, y = 0.865, xend = 0.2, yend = 0.745
-) + ggplot2::annotate(
-  "segment", linetype = "dashed", x = 0.2, y = 0.745, xend = 0.2, yend = 0
-)
+    "curve", x = 0.2, y = 0.865, xend = 0.1, yend = 0.73,
+    arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc"))
+  ) + ggplot2::annotate(
+    "curve", x = 0.23, y = 0.865, xend = 0.3, yend = 0.73,
+    arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc")),
+    curvature = -0.3
+  ) + ggplot2::annotate(
+    "curve", x = 0.33, y = 0.865, xend = 0.5, yend = 0.73,
+    arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc")),
+    curvature = -0.3
+  ) + ggplot2::annotate(
+    "curve", x = 0.45, y = 0.865, xend = 0.7, yend = 0.73,
+    arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc")),
+    curvature = -0.3
+  ) + ggplot2::annotate(
+    "curve", x = 0.7, y = 0.865, xend = 0.9, yend = 0.73,
+    arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc")),
+    curvature = -0.2
+  ) + ggplot2::annotate(
+    "segment", linetype = "dashed", x = 0.215, y = 0.865, xend = 0.2, yend = 0.745
+  ) + ggplot2::annotate(
+    "segment", linetype = "dashed", x = 0.2, y = 0.745, xend = 0.2, yend = 0
+  )
 
 ggplot2::ggsave(plot = newplot5, filename = "Figure5_Prototype2.png",
                 units = "cm", width = 6.5*3, height = 6.5*2)
@@ -2040,26 +2040,26 @@ newplot5_kdes <- lapply(
       node, Type, Size, N
     ) |> cbind(
       e$Row |> tidytable::select(Time, Time2, PoolPatch:InterventionFinal)
-      ) |> tidytable::mutate(
-        AffinityVals = e$result$Ellipsis$Affinity$SpeciesAffinities[
-          as.numeric(substring(node, 2))
-          ]
-      )
+    ) |> tidytable::mutate(
+      AffinityVals = e$result$Ellipsis$Affinity$SpeciesAffinities[
+        as.numeric(substring(node, 2))
+        ]
+    )
   }
 ) |> tidytable::bind_rows(
-# ) |> tidytable::group_by(
-#   PoolPatch:InterventionFinal
-# ) |> tidytable::arrange(
-#   Time
-# ) |> tidytable::mutate( # fix for having not done it ahead of time...
-#   Time2 = tidytable::case_when(
-#     Time == unique(Time)[1] ~ -1,
-#     Time == unique(Time)[2] ~ 10,
-#     Time == unique(Time)[3] ~ 100,
-#     Time == unique(Time)[4] ~ 200,
-#     Time == unique(Time)[5] ~ 400
-#   )
-# ) |> tidytable::ungroup(
+  # ) |> tidytable::group_by(
+  #   PoolPatch:InterventionFinal
+  # ) |> tidytable::arrange(
+  #   Time
+  # ) |> tidytable::mutate( # fix for having not done it ahead of time...
+  #   Time2 = tidytable::case_when(
+  #     Time == unique(Time)[1] ~ -1,
+  #     Time == unique(Time)[2] ~ 10,
+  #     Time == unique(Time)[3] ~ 100,
+  #     Time == unique(Time)[4] ~ 200,
+  #     Time == unique(Time)[5] ~ 400
+  #   )
+  # ) |> tidytable::ungroup(
 )
 
 # newplot5_graph <- lapply(newplot5_as_Networks$Envs, function(e)
@@ -2121,24 +2121,24 @@ ggplot2::ggplot(
   trim = TRUE
   # ) + ggplot2::geom_rug(
   #   ggplot2::aes(color = Type)
-# ) + ggraph::geom_edge_arc(
-#   mapping = aes(
-#     color = Type,
-#     #color = node1.Type, # but then exploit+ between consumers is orange.
-#     linetype = Type,
-#     alpha = log10(effectNormalised),
-#     end_cap = circle(2, 'pt')
-#   ),
-#   arrow = arrow(length = unit(2, 'mm')),
-#   alpha = 0.2,
-#   show.legend = FALSE
-# ) + ggraph::geom_node_point(
-#   mapping = aes(
-#     color = Type
-#   ),
-#   show.legend = FALSE
-#   # ) + ggplot2::geom_hline(
-#   #   yintercept = -1, linetype = "dashed", color = "black"
+  # ) + ggraph::geom_edge_arc(
+  #   mapping = aes(
+  #     color = Type,
+  #     #color = node1.Type, # but then exploit+ between consumers is orange.
+  #     linetype = Type,
+  #     alpha = log10(effectNormalised),
+  #     end_cap = circle(2, 'pt')
+  #   ),
+  #   arrow = arrow(length = unit(2, 'mm')),
+  #   alpha = 0.2,
+  #   show.legend = FALSE
+  # ) + ggraph::geom_node_point(
+  #   mapping = aes(
+  #     color = Type
+  #   ),
+  #   show.legend = FALSE
+  #   # ) + ggplot2::geom_hline(
+  #   #   yintercept = -1, linetype = "dashed", color = "black"
 ) + ggplot2::facet_grid(
   Intervention + SpeciesAffinity ~ Time2
 ) + ggplot2::scale_y_log10(
@@ -2177,7 +2177,7 @@ ggplot2::ggsave(
 ggplot2::ggsave(
   ggplot2::ggplot(
   ) + ggplot2::geom_density_2d(
-  # ) + ggplot2::geom_bin_2d(
+    # ) + ggplot2::geom_bin_2d(
     data = newplot5_kdes,
     mapping = ggplot2::aes(
       x = AffinityVals, y = Size,
@@ -2200,7 +2200,7 @@ ggplot2::ggsave(
     name = "Habitat Land-use"
   ) + ggplot2::scale_fill_manual(
     values = c("Basal" = "darkgreen", "Consumer" = "burlywood4")
-  # ) + ggplot2::scale_fill_viridis_c(
+    # ) + ggplot2::scale_fill_viridis_c(
   ) + ggplot2::theme_minimal(
   ) + ggplot2::xlab(
     "Land-use Type"
@@ -2243,15 +2243,15 @@ newplot6_Data <- Pers |> tidytable::filter(
 newplot_6a <- ggplot2::ggplot(
   newplot6_Data,
   ggplot2::aes(x = Size, y = Weight, color = Intervention)
-  ) + ggplot2::geom_col(
-    show.legend = FALSE
-# ) + ggplot2::geom_line(
-#   data = ~ .x |> dplyr::arrange(Size) |> dplyr::group_by(
-#     SpeciesAffinity, Intervention, InterventionInitial, InterventionFinal
-#   ) |> dplyr::mutate(Weight = cumsum(Weight)),
-#   show.legend = FALSE
-  ) + ggplot2::facet_grid(
-    SpeciesAffinity + InterventionInitial ~ InterventionFinal
+) + ggplot2::geom_col(
+  show.legend = FALSE
+  # ) + ggplot2::geom_line(
+  #   data = ~ .x |> dplyr::arrange(Size) |> dplyr::group_by(
+  #     SpeciesAffinity, Intervention, InterventionInitial, InterventionFinal
+  #   ) |> dplyr::mutate(Weight = cumsum(Weight)),
+  #   show.legend = FALSE
+) + ggplot2::facet_grid(
+  SpeciesAffinity + InterventionInitial ~ InterventionFinal
 ) + ggplot2::scale_color_manual(
   values = colorPalette
 ) + ggplot2::scale_x_log10(
@@ -2268,8 +2268,8 @@ newplot_6b <- ggplot2::ggplot(
     SpeciesAffinity, Intervention, InterventionInitial, InterventionFinal
   ) |> dplyr::mutate(Weight = cumsum(Weight)),
   show.legend = FALSE
-  ) + ggplot2::facet_grid(
-    SpeciesAffinity ~.#+ InterventionInitial ~ InterventionFinal
+) + ggplot2::facet_grid(
+  SpeciesAffinity ~.#+ InterventionInitial ~ InterventionFinal
 ) + ggplot2::scale_color_manual(
   values = colorPalette
 ) + ggplot2::scale_x_log10(
@@ -2382,6 +2382,8 @@ exampleNetworks$Index |> split(
 # plots nicer for human consumption, since the bar charts weren't doing a great
 # job iirc.
 
+
+
 # plotValueChart <- function(
 #   data, facets = as.formula(Intervention ~ SpeciesAffinity)
 # ) {
@@ -2411,54 +2413,89 @@ exampleNetworks$Index |> split(
 # .gs, # Singleton Graphs
 # ... # commonfilters
 # plotValueChart(
-  #   rbind(
-  #     .ps %>% tidytable::filter(
-  #       ...,
-  #       Persistence > 0,
-  #       InType != externalNames["Dispersal"],
-  #       In < Stop, Out > Start
-  #     ) %>% tidytable::group_by(
-  #       SpeciesAffinity, InType, OutType, Intervention
-  #     ) %>% tidytable::summarise(
-  #       ChartValue = tidytable::n() / tidytable::n_distinct(PoolPatchSeed)
-  #     ) %>% dplyr::mutate( # Tidytable renders as character again!
-  #       Intervention =
-  #         factor(Intervention,
-  #                levels = rev(c("(0)", "(0)->(0.5)", "(0)->(1)",
-  #                               "(0.5)",
-  #                               "(1)")),
-  #                ordered = TRUE)
-  #     ),
-  #     .ces %>% tidytable::filter(
-  #       ...,
-  #       !Success | EventType == "Present",
-  #       Times > Start, Times < Stop
-  #     ) %>% tidytable::mutate(
-  #       InType = externalNames[
-  #         ifelse(EventType == "Arrival", "Failed Arrival", "Present")
-  #         ],
-  #       OutType = externalNames["NA"]
-  #     ) %>% tidytable::group_by(
-  #       SpeciesAffinity, InType, OutType, Intervention
-  #     ) %>% tidytable::summarise(
-  #       ChartValue = tidytable::n() / tidytable::n_distinct(PoolPatchSeed)
-  #     ) %>% dplyr::mutate( # Tidytable renders as character again!
-  #       Intervention =
-  #         factor(Intervention,
-  #                levels = rev(c("(0)", "(0)->(0.5)", "(0)->(1)",
-  #                               "(0.5)",
-  #                               "(1)")),
-  #                ordered = TRUE)
-  #     )
-  #   ),
-  #   facets = as.formula(Intervention ~ .)
-  # ) + ggplot2::theme(
-  #   legend.position = "bottom"
-  # ) + ggplot2::guides(
-  #   fill = ggplot2::guide_legend(nrow = 2)
-  # ) + ggplot2::ylab(
-  #   "Average Count in a Simulation"
-  # )
+#   rbind(
+#     .ps %>% tidytable::filter(
+#       ...,
+#       Persistence > 0,
+#       InType != externalNames["Dispersal"],
+#       In < Stop, Out > Start
+#     ) %>% tidytable::group_by(
+#       SpeciesAffinity, InType, OutType, Intervention
+#     ) %>% tidytable::summarise(
+#       ChartValue = tidytable::n() / tidytable::n_distinct(PoolPatchSeed)
+#     ) %>% dplyr::mutate( # Tidytable renders as character again!
+#       Intervention =
+#         factor(Intervention,
+#                levels = rev(c("(0)", "(0)->(0.5)", "(0)->(1)",
+#                               "(0.5)",
+#                               "(1)")),
+#                ordered = TRUE)
+#     ),
+#     .ces %>% tidytable::filter(
+#       ...,
+#       !Success | EventType == "Present",
+#       Times > Start, Times < Stop
+#     ) %>% tidytable::mutate(
+#       InType = externalNames[
+#         ifelse(EventType == "Arrival", "Failed Arrival", "Present")
+#         ],
+#       OutType = externalNames["NA"]
+#     ) %>% tidytable::group_by(
+#       SpeciesAffinity, InType, OutType, Intervention
+#     ) %>% tidytable::summarise(
+#       ChartValue = tidytable::n() / tidytable::n_distinct(PoolPatchSeed)
+#     ) %>% dplyr::mutate( # Tidytable renders as character again!
+#       Intervention =
+#         factor(Intervention,
+#                levels = rev(c("(0)", "(0)->(0.5)", "(0)->(1)",
+#                               "(0.5)",
+#                               "(1)")),
+#                ordered = TRUE)
+#     )
+#   ),
+#   facets = as.formula(Intervention ~ .)
+# ) + ggplot2::theme(
+#   legend.position = "bottom"
+# ) + ggplot2::guides(
+#   fill = ggplot2::guide_legend(nrow = 2)
+# ) + ggplot2::ylab(
+#   "Average Count in a Simulation"
+# )
+
+rbind(
+  Pers |> tidytable::filter(
+    ...,
+    Persistence > 0,
+    InType != externalNames["Dispersal"],
+    In < Stop, Out > Start
+  ) |> tidytable::group_by(
+    SpeciesAffinity, InType, OutType, Intervention
+  ) |> tidytable::summarise(
+    ChartValue = tidytable::n() / tidytable::n_distinct(PoolPatchSeed)
+  ),
+  ColExt |> tidytable::left_join(
+    # Start and Stop aren't already present in this version
+    endTimes
+  ) |> tidytable::mutate(
+    SpeciesAffinity =
+      affinityDictionaryOrigin$SpeciesAffinities[as.numeric(Affinity)]
+  ) |> changeAffinityLevels(
+  ) |> changeInterventionLevels(
+  ) |> tidytable::filter(
+    ...,
+    !Success | EventType == "Present",
+    Times > Start, Times < Stop
+  ) |> tidytable::mutate(
+    InType = externalNames[
+      ifelse(EventType == "Arrival", "Failed Arrival", "Present")
+      ],
+    OutType = externalNames["NA"]
+  ) |> tidytable::group_by(
+    SpeciesAffinity, InType, OutType, Intervention
+  ) |> tidytable::summarise(
+    ChartValue = tidytable::n() / tidytable::n_distinct(PoolPatchSeed)
+  )
+)
 
 ##### Turnover related statistics: ############################################
 # Problem here: data is bimodal, so central tendency isn't quite catching the
