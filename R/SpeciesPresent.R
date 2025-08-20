@@ -1,9 +1,6 @@
-# Foreach operators
-`%dopar%` <- foreach::`%dopar%`
-`%do%` <- foreach::`%do%`
-`%:%` <- foreach::`%:%`
-
 SpeciesPresent <- function(Abundance, Threshold = 1E-4) {
+  `%do%` <- foreach::`%do%`
+
   # resultsNotNAs <- apply(
   #   Abundance[, -1],
   #   MARGIN = 1,
