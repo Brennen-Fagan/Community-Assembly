@@ -7,7 +7,7 @@
 # Parameters: #################################################################
 alsoload <- FALSE # if TRUE, try to load all diversity files encountered.
 # if FALSE, only try to create new diversity files (and return the outputs).
-overwrite <- TRUE
+overwrite <- FALSE
 
 # If TimeIntervention is not present, should we calculate it?
 substituteTimeIntervention <- function(times) {
