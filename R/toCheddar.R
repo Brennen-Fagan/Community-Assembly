@@ -2,7 +2,7 @@
 toCheddar <- function(EVList, name = " ") {# Edges Vertices List
   `%>%` <- magrittr::`%>%`
 
-  if (is.na(EVList$Edges) && is.na(EVList$Vertices)) {
+  if (all(is.na(EVList$Edges)) && all(is.na(EVList$Vertices))) {
     return(NA)
   }
 
@@ -11,14 +11,14 @@ toCheddar <- function(EVList, name = " ") {# Edges Vertices List
   # cheddar does not like "cannibalism".
   links <- links[
     links$to != links$from,
-  ]
+    ]
 
   # "[C]olumns called ‘resource’ and ‘consumer’ must be given."
   links <- dplyr::bind_rows(
     links %>% dplyr::filter(effectSign == 1) %>% dplyr::rename(
       resource = from, consumer = to),
     links %>% dplyr::filter(effectSign == -1) %>% dplyr::rename(
-      resource = to, consumer = from),
+      resource = to, consumer = from)
   ) %>% dplyr::select(-Type) # Cheddar confuses node Type and edge Type.
 
   cheddar::Community(
