@@ -1,0 +1,1 @@
+not <- function(f) function(...) !f(...)
