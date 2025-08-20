@@ -1,3 +1,0 @@
-# Imported code
-
-`|>` <- dplyr::`|>`

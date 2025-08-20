@@ -1,7 +1,5 @@
 # From FoodWebPostMortem.R, 2023-02-24
 toCheddar <- function(EVList, name = " ") {# Edges Vertices List
-  `|>` <- magrittr::`|>`
-
   if (all(is.na(EVList$Edges)) && all(is.na(EVList$Vertices))) {
     return(NA)
   }
