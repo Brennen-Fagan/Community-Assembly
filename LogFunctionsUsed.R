@@ -7,13 +7,14 @@ allOurFunctions <- ls("package:RMTRCode2")
 
 # Assumed this dir is root package directory.
 thisdir <- '.'
+Rdir <- file.path(thisdir, "R")
 targdirs <- c(
+  Rdir,
   file.path(thisdir, "experiments", "FaganEtAl2023", c(
   "Figure3-ExampleOutcomes", "Figure4-MetasimulationStudy", "Tests"
   )),
   file.path(thisdir, "experiments", "FaganEtAl2025")
 )
-Rdir <- file.path(thisdir, "R")
 
 # Get files, look for functions used that are mine.
 targfiles <- dir(
