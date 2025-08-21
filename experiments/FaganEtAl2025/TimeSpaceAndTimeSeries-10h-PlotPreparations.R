@@ -1,7 +1,8 @@
 # Settings / Parameters: ######################################################
-load("diversitiesFlattened10a1_subsetRichness.RData")
-load("ColExt10a1_flat.RData")
-load("TSTS_Interventions_10a1.RData")
+# Required for interventionStrings and endTimes, which have downstream deps.
+if (!exists("ColExt")) {
+  load("ColExt10a1_flat.RData")
+}
 
 # Problems with X11
 options(bitmapType = "cairo")
@@ -12,21 +13,24 @@ end <- c(0.602, 0.9045) # Aiming for 20000 - 30000. These go ~0.0003% away.
 
 defaultNicheDistance <- "5" # "3"::2, "5"::5, "7"::10
 
-# Libraries: ##################################################################
-library(RMTRCode2)
-library(ggplot2)
-library(ggpubr)
-library(tidytable)
-library(tidygraph)
-library(ggraph)
-library(ggforce)
+# Common Libraries / Functions: ###############################################
+library(RMTRCode2) # Personal
+library(ggplot2)   # Plotting
+library(ggpubr)    # Combining Plots
+library(tidytable) # Data Manipulation
+# library(tidygraph)
+# library(ggraph)
+# library(ggforce)
 
-source("TimeSpaceAndTimeSeries-10-Dictionaries.R")
-# source('TimeSpaceAndTimeSeries-0-Functions.R')
-# source("flattenDiversity.R") # Flatten the data for the networks.
-# source("CalculateTrophicStructure.R") # Calculator creator.
-# source("toCheddar.R") # Updated function.
-# source("generateNetworks.R")
+# WISOTT: What it says on the tin.
+source("TimeSpaceAndTimeSeries-10-Dictionaries.R") # Defines IDs
+source(file.path("R", "changeAffinityLevels.R")) # Species Prefs.
+source(file.path("R", "changeInterventionLevels.R")) # Land-use names.
+source(file.path("R", "colorPaletteAlg.R")) # Color scheme.
+source(file.path("R", "interventionNamingScheme.R")) # WISOTT.
+source(file.path("R", "plotGraph.R")) # WISOTT.
+source(file.path("R", "plotMeanAndInner.R")) # WISOTT for Value over Time.
+source(file.path("R", "unifyAffinityBins.R")) # Make intervals consistent.
 
 # Resources: ##################################################################
 interventionMatrix <- matrix(c(
@@ -39,28 +43,6 @@ interventionMatrix <- matrix(c(
 byrow = TRUE, nrow = 5)
 
 ### colors: ###################################################################
-# Algorithmic: first index = 100%, second index = 50%
-#              (0) => 1,0,0, (0.5) => 0,1,0, (1) => 0,0,1
-#              (0.25) => 0.5,0.5,0, (0.75) => 0,0.5,0.5
-colorPaletteAlg <- function(intervention) {
-  intervention <- as.numeric(strsplit(
-    gsub(intervention, pattern = "[(|)]", replacement = ""),
-    split = "->")[[1]])
-  x <- intervention[1]
-  y <- if(length(intervention) == 2) {
-    intervention[2]
-  } else {
-    intervention[1]
-  }
-  DescTools::CmykToRgb(
-    min(max(0, (0.5-x)/0.5) + 0.5*max(0, (0.5-y)/0.5), 1),
-    min(max(0, (0.5 - abs(x - 0.5))/0.5)
-        + 0.5*max(0, (0.5 - abs(y - 0.5))/0.5), 1),
-    min(max(0, (x-0.5)/0.5)+ 0.5*max(0, (y-0.5)/0.5), 1),
-    0.25
-  )
-}
-
 colorPalette <- sapply(interventionMatrix, colorPaletteAlg)
 
 linetypePalette <- c(
@@ -81,73 +63,67 @@ externalNames <- c(
   "EndOfSimulation" = "Persistent",
   "NA"              = "NA"
 )
-### Functions: ################################################################
-changeAffinityLevels <- function(df) {
-  df |> tidytable::mutate(
-    SpeciesAffinity = tidytable::case_when(
-      SpeciesAffinity == "rep_0" ~ "100% 0",
-      SpeciesAffinity == "evensplit_01" ~ "50% 0, 50% 1",
-      SpeciesAffinity == "runif" ~ "Uniform(0, 1)",
-      TRUE ~ SpeciesAffinity
-    ),
-    SpeciesAffinity = factor(SpeciesAffinity, levels = c(
-      "100% 0", "50% 0, 50% 1", "Uniform(0, 1)"
-    ), ordered = TRUE)
-  )
-}
 
-changeInterventionLevels <- function(df) {
-  df |> tidytable::mutate(
-    Intervention = factor(
-      Intervention,
-      levels = t(interventionMatrix)[1:prod(dim(interventionMatrix))],
-      ordered = TRUE
-    ),
-    InterventionInitial = tidytable::case_when(
-      Intervention %in% interventionMatrix[1, ] ~ diag(interventionMatrix)[1],
-      Intervention %in% interventionMatrix[2, ] ~ diag(interventionMatrix)[2],
-      Intervention %in% interventionMatrix[3, ] ~ diag(interventionMatrix)[3],
-      Intervention %in% interventionMatrix[4, ] ~ diag(interventionMatrix)[4],
-      Intervention %in% interventionMatrix[5, ] ~ diag(interventionMatrix)[5],
-      TRUE ~ NA_character_
-    ),
-    InterventionInitial = factor(
-      InterventionInitial,
-      levels = c(
-        diag(interventionMatrix)
-      ), ordered = TRUE
-    ),
-    InterventionFinal = tidytable::case_when(
-      Intervention %in% interventionMatrix[, 1] ~ diag(interventionMatrix)[1],
-      Intervention %in% interventionMatrix[, 2] ~ diag(interventionMatrix)[2],
-      Intervention %in% interventionMatrix[, 3] ~ diag(interventionMatrix)[3],
-      Intervention %in% interventionMatrix[, 4] ~ diag(interventionMatrix)[4],
-      Intervention %in% interventionMatrix[, 5] ~ diag(interventionMatrix)[5],
-      TRUE ~ NA_character_
-    ),
-    InterventionFinal = factor(
-      InterventionFinal,
-      levels = c(
-        diag(interventionMatrix)
-      ), ordered = TRUE
-    )
-  )
-}
+### Strings: ##################################################################
+# Enhance readability, from 9g TablePlots
+interventionStrings <- ColExt |> tidytable::select(
+  PatchAffinity, PoolPatch, InterventionPatchType
+) |> tidytable::distinct(
+) |> tidytable::mutate(
+  Intervention = unlist(mapply(
+    FUN = interventionNamingScheme,
+    PatchAffinity, PoolPatch, InterventionPatchType
+  ))
+)
 
-unifyAffinityBins <- function(., n = 5) {
-  tidytable::separate_wider_delim(
-    .,
-    col = "AffinityBins", names = c("Left", "Right"), delim = ","
-  ) |> tidytable::mutate(
-    Left =
-      round(as.numeric(gsub(pattern = "^[(]", replacement = "", x = Left))*n)/n,
-    Right =
-      round(as.numeric(gsub(pattern = "\\]$", replacement = "", x = Right))*n)/n,
-    AffinityBins = ifelse(
-      is.na(Right), as.character(Left),
-      paste0("(", Left, ", ", Right, "]")
-    )
-  )
-}
+### End times: #################################################################
+# Work out the end times so we can truncate the simulations
+# so that we are making sure our comparisons are equivalent.
+endTimes <- ColExt |> tidytable::rename(
+  DispersalParam = Dispersal
+) |> tidytable::filter(
+  EventType == "EndOfSimulation"
+) |> tidytable::select(
+  Times, PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, Events,
+  EventsSeed, InitialConditions, InitialConditionsSeed, DispersalParam,
+  NicheDistance,
+  SpeciesAffinity, SpeciesAffinitySeed, PatchAffinity, PatchAffinitySeed
+) |> tidytable::distinct(
+) |> tidytable::group_by(
+  PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, Events,
+  EventsSeed, InitialConditions, InitialConditionsSeed, DispersalParam,
+  NicheDistance,
+  SpeciesAffinity, SpeciesAffinitySeed, PatchAffinity, PatchAffinitySeed
+) |> tidytable::summarise(
+  Times = max(Times),
+  ExtraMn = min(Times),
+  ExtraS = diff(Times),
+  ExtraN = tidytable::n(),
+  .groups = "drop"
+) |> tidytable::mutate( # In the plots:
+  Start = end[1] * Times, # Neglect anything with an out time before this.
+  Stop = end[2] * Times # Neglect anything with an in time after this.
+)
+
+stopifnot(all(abs(endTimes$ExtraS) < 0.1)) # In practice, should be ~ 1e-11.
+# Example Debugged:
+# ColExt |> tidytable::rename(
+#   DispersalParam = Dispersal
+# ) |> tidytable::filter(
+#   EventType == "EndOfSimulation",
+#   NicheDistance == "7",
+#   SpeciesAffinity == "1",
+#   PoolPatchSeed %in% c(26, 29)
+# ) |> tidytable::select(
+#   -Species, -Environment, -Success, -SpeciesType, -Size,
+#   -ReproductionRate, -Affinity, -AffinityBins, -PostIntervention
+# ) |> tidytable::distinct(
+# ) |> tidytable::arrange(
+#   Times
+# )
+
+endTimes <- endTimes |> tidytable::select(
+  -ExtraMn, ExtraS, ExtraN
+)
 
 # Verify as we load that the intervention times are calc'd correctedly.
