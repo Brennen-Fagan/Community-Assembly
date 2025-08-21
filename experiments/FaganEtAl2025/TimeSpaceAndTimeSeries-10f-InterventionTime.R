@@ -2,7 +2,7 @@
 # Discovered a need for the specific intervention times.
 # Borrowing from 10f-Diversity to collect all of the intervention times
 # using the "now standard" substituteTimeIntervention.
-# In the future, we might need to consider dynamically grabbing it from 
+# In the future, we might need to consider dynamically grabbing it from
 # each set of, or each individual!, intervention file, which would be messier.
 
 # Parameters: #################################################################
@@ -51,13 +51,13 @@ labelInterventionTime <- function(lo) {
     # Separate out the id values.
     "-", fixed = TRUE
   )
-  
+
   if (length(id) < 3) {
     # I.e., no intervention.
     id[[3]] <- rep(NA, 4)
     id[[4]] <- rep(NA, 2)
   }
-  
+
   tidytable::data.table(
     TimeIntervention = lo$Ellipsis$Affinity$TimeIntervention,
     PoolPatch = id[[1]][1],
@@ -122,21 +122,21 @@ Interventions <- foreach::foreach(
   librarypath <- file.path(directory, "Rlibs")
   .libPaths(c(librarypath, .libPaths()))
   library(tidytable)
-  
+
   x_properties <- strsplit(basename(x), split = splitchar)
   stopifnot(length(x_properties) == 1#,
             #x_properties[[1]][1] == "TSTS",
             #x_properties[[1]][2] == "Simulation"
   )
-  
+
   print(paste(id, x))
   x_dir <- dirname(x)
-  
+
   # Load result to analyse.
   loaded <- load(x) # names
   stopifnot(length(loaded) == 1)
   loaded <- (get(loaded)) # objects
-  
+
   # Unify format, double check time scale and make sure on same time scale.
   if (!"ReactionTime" %in% names(loaded$Ellipsis)) {
     loaded$Ellipsis$ReactionTime <- loaded$ReactionTime
@@ -154,13 +154,13 @@ Interventions <- foreach::foreach(
     }
     loaded$Ellipsis$Timescale <- "Characteristic"
   }
-  
+
   if (!"TimeIntervention" %in% names(loaded$Ellipsis$Affinity) &&
       !is.null(substituteTimeIntervention)) {
     loaded$Ellipsis$Affinity$TimeIntervention <-
       substituteTimeIntervention(loaded$Events$Times)
   }
-  
+
   labelInterventionTime(loaded)
 }
 
