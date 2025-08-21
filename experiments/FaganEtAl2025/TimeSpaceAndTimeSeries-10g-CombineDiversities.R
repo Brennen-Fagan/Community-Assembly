@@ -1,7 +1,7 @@
 
 datfolders <- dir(pattern = "TSTS_Simulations_.+2025-07-30")
 
-overwrite <- TRUE
+overwrite <- FALSE # TRUE
 
 prefix <- "diversitiesFlattened10"
 
@@ -20,11 +20,11 @@ for (datfolder in datfolders) {
   datfolderID <- paste0(
     strsplit(datfolder, split = "_")[[1]][-c(1:2)],
     collapse = "_")
-  
+
   filestring <- paste0(prefix, "_", datfolderID,".RData")
-  
+
   if (file.exists(filestring) && !overwrite) {next()}
-  
+
   diversities <- lapply(
     dir(datfolder, full.names = TRUE, pattern = "Diversity"), function(x) {
       names <- load(x)
@@ -32,7 +32,7 @@ for (datfolder in datfolders) {
       obj <- get(names)
       return(c(obj, "Dir" = dirname(x), "File" = basename(x)))
     })
-  
+
   diversitiesFlattened <- vector(mode = "list", length = length(diversities))
   for(i in 1:length(diversitiesFlattened)) {
     # Pop front of diversities, process, put in flattened, remove.
@@ -41,11 +41,11 @@ for (datfolder in datfolders) {
     diversities[[1]] <- NULL
     gc()
   }
-  
+
   rm(diversities)
-  
+
   diversitiesFlattened <- do.call(rbind, diversitiesFlattened)
-  
+
   # Human readable patch affinities
   diversitiesInterventionStrings <- diversitiesFlattened %>% dplyr::select(
     PatchAffinity, PoolPatch, InterventionPatchType
@@ -56,20 +56,20 @@ for (datfolder in datfolders) {
       PatchAffinity, PoolPatch, InterventionPatchType
     ))
   )
-  
+
   # Col-wise append
   diversitiesFlattened <- diversitiesFlattened %>% dplyr::left_join(
     diversitiesInterventionStrings,
     by = c("PatchAffinity", "PoolPatch", "InterventionPatchType"),
     multiple = "all"
   )
-  
+
   # Human readable species affinities
   diversitiesFlattened <- diversitiesFlattened %>% dplyr::mutate(
-    SpeciesAffinity =
+    SpeciesPreferences =
       speciesAffinityDictionaryOrigin$SpeciesAffinities[as.numeric(SpeciesAffinity)]
   )
-  
+
   # Correct the NA for richness values
   diversitiesFlattened <- diversitiesFlattened %>% dplyr::mutate(
     Value = dplyr::case_when(
@@ -77,10 +77,10 @@ for (datfolder in datfolders) {
       TRUE ~ Value
     )
   )
-  
+
   save(diversitiesFlattened,
        file = filestring)
-  
+
   rm(diversitiesFlattened)
   gc()
 }
@@ -90,27 +90,29 @@ for (datfolder in datfolders) {
   datfolderID <- paste0(
     strsplit(datfolder, split = "_")[[1]][-c(1:2)],
     collapse = "_")
-  
+
   filestring <- paste0(prefix, "_", datfolderID,".RData")
-  
+
   stopifnot(file.exists(filestring))
-  
+
+  print(filestring)
+
   objnames <- load(filestring)
   obj <- get(objnames)
-  
+
   # We just can't get past the memory barrier, so we'll need to reduce the
   # amount of data we are looking at.
   obj <- obj %>% tidytable::filter(
     # Multiples of 100 for long term behaviour, everything for short term.
-    (round(Time, digits = -1) %% 100) == 0 | (Time > 15000 & Time < 20000)
+    (round(Time, digits = -1) %% 100) == 0 | (Time > 15000 & Time < 18000)
   )
-  
+
   if(!is.null(diversitiesAll)) {
     diversitiesAll <- tidytable::bind_rows(diversitiesAll, obj)
   } else {
     diversitiesAll <- obj
   }
-  
+
   rm(obj)
   rm(list = objnames)
   gc()
@@ -124,6 +126,7 @@ diversitiesRichness <- diversitiesAll %>% tidytable::filter(
 )
 
 save(diversitiesRichness, file = paste0(prefix,"a1_subsetRichness.RData"))
+rm(diversitiesRichness); gc()
 
 diversitiesTimeBC <- diversitiesAll %>% tidytable::filter(
   grepl(x = Metric, pattern = "TimeBrayCurtis")
