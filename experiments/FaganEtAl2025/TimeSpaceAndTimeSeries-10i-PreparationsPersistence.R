@@ -1,7 +1,14 @@
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 
+# If not load, then run.
+
+loadPers <- TRUE
+fileNamePers <- "TSTS_Pers_10a1.RData"
+
 # ~ 10 Minutes.
-if (!exists("Pers")) {
+if (!exists("Pers") && loadPers) {
+  load(fileNamePers)
+} else {
   # Persistences: ################################################################
   Pers <- ColExt |> tidytable::rename(
     DispersalParam = Dispersal
@@ -56,7 +63,9 @@ if (!exists("Pers")) {
     Persistence = Out - In,
     # Enhance Readability:
     SpeciesPreferences =
-      affinityDictionaryOrigin$SpeciesAffinities[as.numeric(Affinity)]
+      speciesAffinityDictionaryOrigin$SpeciesAffinities[
+        as.numeric(SpeciesAffinity)
+        ]
   ) |> changePreferencesLevels(
   ) |> tidytable::select(
     -Dispersal, -Arrival, -Extinct, -`Dynamic Loss`, -EndOfSimulation
@@ -68,4 +77,6 @@ if (!exists("Pers")) {
   ) |> tidytable::left_join(
     endTimes
   ) |> unifyAffinityBins()
+  
+  save(Pers, file = fileNamePers)
 }
