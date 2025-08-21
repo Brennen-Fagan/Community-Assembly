@@ -5,7 +5,7 @@ library(Matrix)
 
 # Directory Functions and Objects: ############################################
 directory <- "." # Should be "VariantExperiments"
-source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
+# source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-10-Dictionaries.R"))
 
 # Function Definition: ########################################################
@@ -26,7 +26,7 @@ handlerID <- function(
     } else {
       runDictionaryTag <- "TSTS_Simulations"
     }
-    
+
     runDictionary <- with(ID, {
       paste0(runDictionaryTag, "_",
              # PARAMETERS:
@@ -35,15 +35,15 @@ handlerID <- function(
              poolpatchSeedChoice, "-", dynamicsSeedChoice, "_",
              Date)
     })
-    
+
     datfile <- with(
       ID, paste0(
         runDictionaryTag, "_",
         # PARAMETERS:
         poolpatchDictionaryChoice, "-", dynamicsDictionaryChoice, "-",
         eventsDictionaryChoice, "-", initialConditionsDictionaryChoice, "-",
-        dispersalDictionaryChoice, "-", distanceDictionaryChoice, "-", 
-        speciesAffinityDictionaryChoice, "-", 
+        dispersalDictionaryChoice, "-", distanceDictionaryChoice, "-",
+        speciesAffinityDictionaryChoice, "-",
         patchAffinityDictionaryChoice, "_",
         # SEEDS:
         poolpatchSeedChoice, "-", dynamicsSeedChoice, "-",
@@ -51,14 +51,14 @@ handlerID <- function(
         speciesAffinitySeedChoice, "-", patchAffinitySeedChoice,
         ".RData")
     )
-    
+
   } else if (length(ID) == 1) {# The file.path(dirname, basename) itself.
     if (is.list(ID)) {
       ID <- unlist(ID)
     }
     runDictionary <- dirname(ID)
     datfile <- basename(ID)
-    
+
   } else if (length(ID) <= 15 && length(ID) >= 13) { # Unnamed list of components
     #TODO Double check that adjusted correctly.
     runDictionary0 <- 0
@@ -83,7 +83,7 @@ handlerID <- function(
         runDictionaryTag <- "TSTS_Simulations"
       }
     }
-    
+
     tryCatch({
       runDictionary <- # Note awkward order.
         paste0(runDictionaryTag, "_",
@@ -94,7 +94,7 @@ handlerID <- function(
                # poolpatchSeedChoice, "-", dynamicsSeedChoice, "_",
                ID[[runDictionary0 + 2]], "-", ID[[runDictionary0 + 4]], "_",
                runDictionaryDate)
-      
+
       if (is.null(runDictionaryDate)) {
         if (!exists("directory")) directory <- "."
         candidates <- grep(dir(directory), pattern = runDictionary,
@@ -104,7 +104,7 @@ handlerID <- function(
         }
         runDictionary <- candidates
       }
-      
+
       # , ,
       datfile <- with(
         ID, paste0(
@@ -116,7 +116,7 @@ handlerID <- function(
           ID[[runDictionary0 + 5]], "-", ID[[runDictionary0 + 7]], "-",
           # dispersalDictionaryChoice, "-", distanceDictionaryChoice, "-",
           ID[[runDictionary0 + 9]], "-", ID[[runDictionary0 + 10]], "-",
-          # speciesAffinityDictionaryChoice, "-", 
+          # speciesAffinityDictionaryChoice, "-",
           # patchAffinityDictionaryChoice, "_",
           ID[[runDictionary0 + 11]], "-", ID[[runDictionary0 + 13]], "_",
           # SEEDS:
@@ -128,7 +128,7 @@ handlerID <- function(
           ID[[runDictionary0 + 12]], "-", ID[[runDictionary0 + 14]],
           ".RData")
       )
-      
+
     }, error = function(e) {
       stop(stopmsg)
     }
@@ -136,7 +136,7 @@ handlerID <- function(
   } else {
     stop(stopmsg)
   }
-  
+
   return(list(
     runDictionary = runDictionary, # dirname
     datfile = file.path(runDictionary, datfile) # file.path(dirname, basename)
@@ -163,15 +163,15 @@ interventionWrapper <- function(
   files <- handlerID(ID)
   runDictionary <- files$runDictionary
   datfile <- files$datfile
-  
+
   # Source Files: #############################################################
-  
+
   # Extract exposed properties.
   datfile_properties <- strsplit(
     strsplit(basename(datfile), split = ".", fixed = TRUE)[[1]][1],
     split = "_", fixed = TRUE)
   stopifnot(length(datfile_properties) == 1)
-  
+
   appendID <- paste0(
     # PARAMETERS:
     interventionPatchDictionaryChoice, "-", # Bundle Inter-Simulation Constants.
@@ -185,7 +185,7 @@ interventionWrapper <- function(
     # Where dynamics would go if necessary.
     interventionTimeSeedChoice
   )
-  
+
   # Put failure point before loads.
   if(saveResults) {
     # Reformulate file name.
@@ -202,7 +202,7 @@ interventionWrapper <- function(
                  collapse = ""),
              ".RData")
     )
-    
+
     if (file.exists(filename)) {
       if (skipIfSaveExists) {
         warning(paste(filename, "already exists. Returning -1."))
@@ -214,21 +214,21 @@ interventionWrapper <- function(
       }
     }
   }
-  
+
   datPoolMats <- dir(runDictionary,
                      "PoolPatchDynamics.+[.]RData$",
                      full.names = T)
   poolMats <- new.env()
   load(datPoolMats, envir = poolMats)
   NumberOfEnvironments <- length(poolMats$InteractionMatrices$Mats)
-  
+
   # Load file.
   loaded <- load(datfile) # names
   stopifnot(length(loaded) == 1)
   loaded <- get(loaded) # objects
-  
+
   # Regular function: #########################################################
-  
+
   interventionPatchDictionary <-
     interventionPatchDictionaryOrigin[
       interventionPatchDictionaryChoice, , drop = FALSE
@@ -238,7 +238,7 @@ interventionWrapper <- function(
     seed = seedsMain$patches
   )
   interventionPatchSeedIndex <- indexFactory()
-  
+
   interventionTimeDictionary <- interventionTimeDictionaryOrigin[
     interventionTimeDictionaryChoice,
     ]
@@ -247,7 +247,7 @@ interventionWrapper <- function(
     seed = seedsMain$times
   )
   interventionTimeSeedIndex <- indexFactory()
-  
+
   if (toupper(interventionDispersalDictionaryChoice) %in%
       c("P", "PRE", "PREV", "PREVIOUS") # "PREVIOUS" is meaning. "p" for storage.
   ) {
@@ -259,7 +259,7 @@ interventionWrapper <- function(
     ifelse(is.na(interventionDispersalDictionaryChoice),
            1, interventionDispersalDictionaryChoice + 2),
     ]
-  
+
   if (toupper(interventionDistanceDictionaryChoice) %in%
       c("P", "PRE", "PREV", "PREVIOUS") # "PREVIOUS" is meaning. "p" for storage.
   ) {
@@ -269,7 +269,7 @@ interventionWrapper <- function(
   }
   interventionDistanceDictionary <-
     distanceDictionaryOrigin[interventionDistanceDictionaryChoice, ]
-  
+
   # Instantiate Dispersal Matrix: #############################################
   if (NumberOfEnvironments > 1) {
     DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
@@ -285,13 +285,13 @@ interventionWrapper <- function(
       dims = c(nrow(poolMats$Pool), nrow(poolMats$Pool))
     )
   }
-  
+
   # Interventions: ############################################################
   # Number:
   NumberOfInterventions <- round(
     NumberOfEnvironments * interventionPatchDictionary$InterventionPercentage
   )
-  
+
   # New values:
   # Note: this is technically excessive, but keeping the number of environments
   # in total is easier for programming below.
@@ -310,7 +310,7 @@ interventionWrapper <- function(
       )
     }
   }), nrow = NumberOfEnvironments)
-  
+
   # Locations:
   id <- interventionPatchSeedIndex()
   interventionPatches <- with(interventionPatchDictionary, {
@@ -345,7 +345,7 @@ interventionWrapper <- function(
             by = 1)
     }
   })
-  
+
   # Time:
   id <- interventionTimeSeedIndex()
   interventionTime <- with(interventionTimeDictionary, {
@@ -360,15 +360,15 @@ interventionWrapper <- function(
       stop(paste0("Method (Intervention Time): ", method, " not implemented."))
     }
   })
-  
+
   ##### Post-intervention adjusted intrinsic growth/decay rates: ##############
   rho <- retrieveFunction(interventionDistanceDictionary$rhofunction)
-  
+
   grid <- expand.grid(
     pool = 1:nrow(poolMats$Pool), # Fastest Varying
     patch = 1:length(interventionPatchAffinities) # Slower Varying.
   )
-  
+
   # Obtain previous "maximal" rprimes, assuming this is true at abundance = 0.
   rprimemaxOld <- loaded$Ellipsis$Affinity$EffectiveReproductionRate
   if (is.function(rprimemaxOld)) {
@@ -380,7 +380,7 @@ interventionWrapper <- function(
         parms = list(Patch = i))
     ))
   }
-  
+
   # Convert to intervention rprime functions.
   rprime <- with(poolMats, {
     mapply(
@@ -400,7 +400,7 @@ interventionWrapper <- function(
       }
     )
   })
-  
+
   # Need to specify each patch separately with how I've implemented the
   # DynamicsFunction. (I recall wanting to have per patch stats.)
   # Note, this is inefficient.
@@ -448,13 +448,13 @@ interventionWrapper <- function(
       return(rprimeSwitches[[parms$Patch]](t, parms, ...))
     }
   }
-  
+
   # If function, need to retrieve the logistic limit.
   logisticCarryingCapacity <- as.list(environment(
     loaded$Ellipsis$Affinity$EffectiveReproductionRate
   ))$logisticCarryingCapacity
   # NULL if not present.
-  
+
   # Reincorporate the logistic functional form as appropriate.
   # Unclear as to how to do this more generally.
   # (Might be able to hack the function environment???)
@@ -507,7 +507,7 @@ interventionWrapper <- function(
       stop("logisticCarryingCapacity term not recognised.")
     }
   }
-  
+
   interventionPerCapitaDynamics <- with(poolMats, {
     # TECH DEBT: Copied from 6a-simulations.R
     if (is.function(rprimef)) {
@@ -556,7 +556,7 @@ interventionWrapper <- function(
       }
     }
   })
-  
+
   # Set new initial values based on when we fork the simulation.
   # Note: we don't need to worry about time conversions yet because all
   # calculations so far are in the same time scale as was provided.
@@ -564,10 +564,10 @@ interventionWrapper <- function(
   timeInterventionRow <- which.max(
     loaded$Abundance[, 1] > interventionTime
   ) - 1
-  
+
   timeInitial <- loaded$Abundance[timeInterventionRow, 1]
   abundanceInitial <- loaded$Abundance[timeInterventionRow, -1]
-  
+
   ## Events
   # Note formatting is a list containing a data.frame named Events.
   eventsPostIntervention <- list(
@@ -577,8 +577,8 @@ interventionWrapper <- function(
   # Why not timeIntervention? To make sure that we don't miss out on an event.
   # Possibly unnecessary.
   eventsPostIntervention$Events$Success <- NA
-  
-  
+
+
   # Need to worry about time conversion here because we need to be on the
   # simulation scale if we weren't already (to match with the rates).
   # Run Simulation: ###########################################################
@@ -617,11 +617,11 @@ interventionWrapper <- function(
       EffectiveReproductionRateIntervention = rprime #TODO rprimef???
     )
   )
-  
+
   # Save Simulation: ##########################################################
   if(saveResults)
     save(result, file = filename)
-  
+
   if(returnResults) {
     return(results)
   } else {

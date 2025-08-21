@@ -8,11 +8,12 @@ if (!dir.exists(librarypath)) {
 
 allLibraryPaths <- .libPaths()
 
-source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
-source(file.path(directory, "TimeSpaceAndTimeSeries-0-Interventions.R"))
+# source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
+# source(file.path(directory, "TimeSpaceAndTimeSeries-0-Interventions.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-10b-SimulationFunction.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-10d-InterventionFunction.R"))
 
+library(RMTRCode2)
 library(parallel)
 library(doParallel)
 library(foreach)
@@ -97,10 +98,15 @@ parameterChoices <- parameterChoices %>% dplyr::ungroup() %>% dplyr::filter(
 ) %>% dplyr::select(-priority, -firsts)
 
 # Run across each row of parameterChoices: ####################################
-clust <- parallel::makeCluster(
-  min(nrow(parameterChoices), cores), outfile = ""
-)
-doParallel::registerDoParallel(clust)
+if (cores > 1) {
+  clust <- parallel::makeCluster(
+    min(nrow(parameterChoices), cores), outfile = ""
+  )
+  doParallel::registerDoParallel(clust)
+  `%op%` <- `%dopar%`
+} else {
+  `%op%` <- `%do%`
+}
 
 toExport <- unlist(lapply(
   1:10, # Non-seed, non-previous columns of parameterChoices
@@ -133,7 +139,7 @@ success <- foreach::foreach(
   pc = iterators::iter(parameterChoices, by = "row"),
   #.packages = c("RMTRCode2", "dplyr"),
   .export = toExport
-) %dopar% {
+) %op% {
   # ) %do% {
   directory <- '.'
   librarypath <- file.path(directory, "Rlibs")
