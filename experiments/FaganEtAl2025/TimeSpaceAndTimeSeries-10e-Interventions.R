@@ -199,3 +199,6 @@ success <- foreach::foreach(
 }
 
 parallel::stopCluster(clust)
+
+# TSTS_Intervention_142486-4929-28-1-NA-7-1-2_26-26-26-26-76-127_111-1-p-p_1-1.RData
+# needed extra timings added to prevent explosion -> infty. Start at 685464.8.

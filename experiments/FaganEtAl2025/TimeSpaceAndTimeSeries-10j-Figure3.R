@@ -1,18 +1,24 @@
+
+source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
+source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
+
+figure3 <- list()
+
 ### Plot 3:####################################################################
-newplot3_dataA <- diversitiesRichness |> tidytable::filter(
-  SpeciesAffinity != "100% 0",
+figure3$dataA <- diversitiesRichness |> tidytable::filter(
+  SpeciesPreferences != "100% 0",
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
-  (PoolPatchSeed %in% as.character(343:386)),
+  (PoolPatchSeed %in% as.character(1:44)),
   Metric == "Alpha Hill:0",
   is.na(Subset)
 ) |> tidytable::left_join(endTimes |> dplyr::select(-Times))
 
-newplot3_dataB <- Pers |> tidytable::filter(
-  SpeciesAffinity != "100% 0",
+figure3$dataB <- Pers |> tidytable::filter(
+  SpeciesPreferences != "100% 0",
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
-  (PoolPatchSeed %in% as.character(343:386))
+  (PoolPatchSeed %in% as.character(1:44))
 ) |> tidytable::filter(
   In < Stop, Out > Start # Not things outside of [Start, Stop]
 ) |> tidytable::mutate(
