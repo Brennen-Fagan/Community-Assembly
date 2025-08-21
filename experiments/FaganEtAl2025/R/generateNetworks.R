@@ -13,7 +13,8 @@ generateNetworks <- function(
     # Which File (Base):
     "PoolPatch", "PoolPatchSeed", "Interactions", "InteractionsSeed",
     "Events", "EventsSeed", "InitialConditions", "InitialConditionsSeed",
-    "Dispersal", "NicheDistance", "Affinity", "AffinitySeed",
+    "Dispersal", "NicheDistance", "SpeciesAffinity",
+    "SpeciesAffinitySeed", "PatchAffinity", "PatchAffinitySeed",
     # Which File (Intervention):
     "InterventionPatchType", "InterventionPatchSeed", "InterventionTimeType",
     "InterventionTimeSeed", "InterventionDispersal", "InterventionNicheDistance"
@@ -43,9 +44,11 @@ generateNetworks <- function(
   targetFiles <- lapply(
     with(Specification, paste0(
       PoolPatch, "-", Interactions, "-", Events, "-",
-      InitialConditions, "-", Dispersal, "-", NicheDistance, "-", Affinity, "_",
+      InitialConditions, "-", Dispersal, "-", NicheDistance, "-",
+      SpeciesAffinity, "-", PatchAffinity, "_",
       PoolPatchSeed, "-", InteractionsSeed, "-", EventsSeed, "-",
-      InitialConditionsSeed, "-", AffinitySeed# , "_"
+      InitialConditionsSeed, "-", SpeciesAffinitySeed, "-", PatchAffinitySeed
+      # , "_"
     )),
     function(pat, ...) unique(grep(pat, ...)),
     x = targetFiles,
