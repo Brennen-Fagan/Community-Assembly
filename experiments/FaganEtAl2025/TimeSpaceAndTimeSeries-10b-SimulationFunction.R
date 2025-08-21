@@ -5,7 +5,7 @@ library(Matrix)
 
 # Directory Functions and Objects: ############################################
 directory <- "." # Should be "VariantExperiments"
-source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
+# source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
 source(file.path(directory, "TimeSpaceAndTimeSeries-10-Dictionaries.R"))
 
 # Function Definition: ########################################################
@@ -34,7 +34,7 @@ simulationWrapper <- function(
     "dynamics"          = 64343803,
     "speciesAffinity"   = 3361566,
     "patchAffinity"     = 79927625,
-    "initialConditions" = 8554899 
+    "initialConditions" = 8554899
   ),
   logisticCarryingCapacity = NULL, # list(Basal=x, Consumer=y) or (Total=z)
   returnResults = FALSE,
@@ -57,7 +57,7 @@ simulationWrapper <- function(
       "Unknown names in parameters: ", paste(namespNotFound, collapse = ", ")
     )
   }
-  
+
   # Dictionaries: #############################################################
   poolpatchDictionary <-
     poolpatchDictionaryOrigin[poolpatchDictionaryChoice, ] %>% dplyr::mutate(
@@ -69,7 +69,7 @@ simulationWrapper <- function(
     seed = seedsMain$pools
   )
   poolpatchSeedIndex <- indexFactory()
-  
+
   dynamicsDictionary <-
     dynamicsDictionaryOrigin[dynamicsDictionaryChoice, ]
   dynamicsSeed <- withRandom(
@@ -77,7 +77,7 @@ simulationWrapper <- function(
     seed = seedsMain$dynamics
   )
   dynamicsSeedIndex <- indexFactory()
-  
+
   eventsDictionary <-
     eventsDictionaryOrigin[eventsDictionaryChoice, ]
   eventsSeed <- withRandom(
@@ -85,7 +85,7 @@ simulationWrapper <- function(
     seed = seedsMain$events
   )
   eventsSeedIndex <- indexFactory()
-  
+
   initialConditionsDictionary <-
     initialConditionsDictionaryOrigin[initialConditionsDictionaryChoice,]
   initialConditionsSeed <- withRandom(
@@ -93,14 +93,14 @@ simulationWrapper <- function(
     seed = seedsMain$initialConditions
   )
   initialConditionsSeedIndex <- indexFactory()
-  
+
   dispersalDictionary <-
     dispersalDictionaryOrigin[ifelse(is.na(dispersalDictionaryChoice),
                                      1, dispersalDictionaryChoice + 2), ]
-  
+
   distanceDictionary <-
     distanceDictionaryOrigin[distanceDictionaryChoice, ]
-  
+
   speciesAffinityDictionary <-
     speciesAffinityDictionaryOrigin[speciesAffinityDictionaryChoice, ]
   speciesAffinitySeed <- withRandom(
@@ -108,7 +108,7 @@ simulationWrapper <- function(
     seed = seedsMain$speciesAffinity
   )
   speciesAffinitySeedIndex <- indexFactory()
-  
+
   patchAffinityDictionary <-
     patchAffinityDictionaryOrigin[patchAffinityDictionaryChoice, ]
   patchAffinitySeed <- withRandom(
@@ -116,7 +116,7 @@ simulationWrapper <- function(
     seed = seedsMain$patchAffinity
   )
   patchAffinitySeedIndex <- indexFactory()
-  
+
   # Edit params: ##############################################################
   if ("InteractionEliminationThreshold" %in% names(dynamicsDictionary)) {
     warning(paste0("Overwriting Elimination Threshold with: ",
@@ -130,7 +130,7 @@ simulationWrapper <- function(
     params$ArrivalDensity <-
       eventsDictionary$ColonizationPropaguleSize
   }
-  
+
   # Files: ####################################################################
   partialID <- paste0(
     # PARAMETERS:
@@ -151,7 +151,7 @@ simulationWrapper <- function(
   if (!dir.exists(datfolder)) {
     dir.create(datfolder)
   }
-  
+
   fullID <- paste0(
     # PARAMETERS:
     poolpatchDictionaryChoice, "-", # Bundle Inter-Simulation Constants.
@@ -161,7 +161,7 @@ simulationWrapper <- function(
     dispersalDictionaryChoice, "-", # Commonly changed.
     distanceDictionaryChoice, "-", # Commonly changed.
     speciesAffinityDictionaryChoice, "-", # Of Experimental interest.
-    patchAffinityDictionaryChoice, "_", 
+    patchAffinityDictionaryChoice, "_",
     # SEEDS:
     poolpatchSeedChoice, "-",
     dynamicsSeedChoice, "-",
@@ -170,8 +170,8 @@ simulationWrapper <- function(
     speciesAffinitySeedChoice, "-",
     patchAffinitySeedChoice
   )
-  
-  
+
+
   if(saveResults) {
     datfile <- file.path(
       datfolder,
@@ -188,7 +188,7 @@ simulationWrapper <- function(
       }
     }
   }
-  
+
   datfile_ppd <- file.path(
     datfolder,
     paste0(
@@ -202,7 +202,7 @@ simulationWrapper <- function(
       datfile_ppd_write <- TRUE
     }
   }
-  
+
   # Pools and Interaction Matrices: ###########################################
   if (exists("datfile_ppd_envir")) {
     # Pool, InteractionMatrices, DynamicsFunction, CharacteristicRate,
@@ -234,7 +234,7 @@ simulationWrapper <- function(
               )
       )
     })
-    
+
     id <- poolpatchSeedIndex()
     Speeds <- with(poolpatchDictionary, {
       if(is.numeric(PoolDispersalSpeed)) {
@@ -250,12 +250,12 @@ simulationWrapper <- function(
         )
       }
     })
-    
+
     Pool <- cbind(
       Pool,
       Speed = Speeds
     )
-    
+
     id <- dynamicsSeedIndex()
     # NOT THE FINAL PERCAPITADYNAMICS FUNCTION.
     DynamicsFunction <- with(dynamicsDictionary, {
@@ -264,7 +264,7 @@ simulationWrapper <- function(
         seed = withRandom(runif(id)[id] * 1e8, seed = dynamicsSeed)
       )}
     )
-    
+
     id <- dynamicsSeedIndex()
     IntMatFunc <- with(dynamicsDictionary, {
       withRandom(
@@ -285,7 +285,7 @@ simulationWrapper <- function(
         seed = withRandom(runif(id)[id] * 1e8, seed = dynamicsSeed)
       )}
     )
-    
+
     id <- dynamicsSeedIndex()
     InteractionMatrices <- RMTRCode2::CreateEnvironmentInteractions(
       Pool = Pool,
@@ -293,11 +293,11 @@ simulationWrapper <- function(
       ComputeInteractionMatrix = IntMatFunc,
       EnvironmentSeeds = withRandom(runif(id)[id] * 1e8, seed = dynamicsSeed)
     )
-    
+
     CharacteristicRate <- max(unlist(lapply(
       InteractionMatrices$Mats, function(m) {abs(eigen(m)$values)}
     )))
-    
+
     if (exists("datfile_ppd_write") && datfile_ppd_write) {
       save(Pool,
            InteractionMatrices, DynamicsFunction, CharacteristicRate,
@@ -305,7 +305,7 @@ simulationWrapper <- function(
            file = datfile_ppd)
     }
   }
-  
+
   # Affinities are no longer a part of the pool-patch framework.
   id <- speciesAffinitySeedIndex()
   SpeciesAffinities <- with(speciesAffinityDictionary, {
@@ -320,9 +320,9 @@ simulationWrapper <- function(
       )
     }
   })
-  
+
   Pool <- cbind(Pool, Affinity = SpeciesAffinities)
-  
+
   id <- patchAffinitySeedIndex()
   PatchAffinities <- matrix(with(patchAffinityDictionary, {
     if(is.numeric(PatchAffinities)) {
@@ -338,14 +338,14 @@ simulationWrapper <- function(
       )
     }
   }), nrow = poolpatchDictionary$NumberEnvironments)
-  
+
   # Events: #####################################################################
   EventsEach <- with(poolpatchDictionary, {
     retrieveFunction(eventsDictionary$EventsFunction)(
       NumberEnvironments, Basals + Consumers
     )
   })
-  
+
   Events <- with(eventsDictionary, {
     RMTRCode2::CreateAssemblySequence(
       Species = with(poolpatchDictionary, Basals + Consumers),
@@ -359,7 +359,7 @@ simulationWrapper <- function(
       HistorySeed = eventsSeed
     )}
   )
-  
+
   print(combinations <-
           table(Events$Events$Species,
                 Events$Events$Environment,
@@ -367,11 +367,11 @@ simulationWrapper <- function(
   if(any(combinations == 0)) {warning(
     "Exists a species which doesn't immigrate to/extirpate from an environment."
   )}
-  
+
   # Instantiate PerCapitaDynamics: ############################################
   # We've already built the "functional" interactions matrix, but we now need
   # to apply the transformation r' = r rho^(sign(r)) and then combine.
-  
+
   # Not a function, so we don't need to on the fly.
   # We'll be a bit lazy here, but hopefully readable and clear.
   grid <- expand.grid(
@@ -390,7 +390,7 @@ simulationWrapper <- function(
         )[1]
       }
     ) ^ sign(rep(Pool$ReproductionRate, poolpatchDictionary$NumberEnvironments))
-  
+
   if (!is.null(logisticCarryingCapacity)) {
     if ("basal" %in% tolower(names(logisticCarryingCapacity))) {
       if ("consumer" %in% tolower(names(logisticCarryingCapacity))) {
@@ -427,7 +427,7 @@ simulationWrapper <- function(
       stop("logisticCarryingCapacity term not recognised.")
     }
   }
-  
+
   if (is.function(rprime)) {
     # Calculate rprime using Parms$Patch
     if (is.function(InteractionMatrices$Mats[[1]])) {
@@ -473,7 +473,7 @@ simulationWrapper <- function(
       )
     }
   }
-  
+
   # Instantiate Dispersal Matrix: #############################################
   if (poolpatchDictionary$NumberEnvironments > 1) {
     DispersalMatrix <- RMTRCode2::CreateDispersalMatrix(
@@ -489,7 +489,7 @@ simulationWrapper <- function(
       dims = c(nrow(Pool), nrow(Pool))
     )
   }
-  
+
   # Set initial population conditions: ########################################
   # For each environment, decide what to instantiate, apply the method, then
   # supply the remainders (within the environment for correct order) with 0s.
@@ -500,13 +500,13 @@ simulationWrapper <- function(
       1:poolpatchDictionary$NumberEnvironments,
       function(i) {
         pI <- rep(0, nrow(Pool))
-        
+
         pICalc <- switch(
           initialConditionsDictionary$Species,
           "None" = NA,
           "Basal" = 1:sum(Pool$Type == "Basal"),
           "All" = 1:nrow(Pool))
-        
+
         if (!is.na(pICalc[1])) {
           pI[pICalc] <- switch(
             initialConditionsDictionary$Method,
@@ -525,7 +525,7 @@ simulationWrapper <- function(
         }
         return(pI)
       }))
-  
+
   # Run Simulation: ###########################################################
   result <- RMTRCode2::MultipleNumericalAssembly_Dispersal(
     Pool = Pool,
@@ -555,11 +555,11 @@ simulationWrapper <- function(
     # Ellipsis$Affinity$EffectiveReproductionRate, i.e.,
     # environment(result$Ellipsis$Affinity$EffectiveReproductionRate)$logisticCarryingCapacity
   )
-  
+
   # Save Simulation: ##########################################################
   if(saveResults)
     save(result, file = datfile)
-  
+
   if(returnResults) {
     return(results)
   } else {
