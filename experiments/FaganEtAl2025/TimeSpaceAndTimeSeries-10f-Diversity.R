@@ -55,7 +55,8 @@ library(dplyr)
 library(RMTRCode2)
 library(betapart) # Dependency for the diversity calculation
 
-source("TimeSpaceAndTimeSeries-0-Functions.R") # Abundance metrics.
+# source("TimeSpaceAndTimeSeries-0-Functions.R") # Abundance metrics.
+source(file.path("R", "Calculate_Species.R"))
 
 library(parallel)
 library(iterators)

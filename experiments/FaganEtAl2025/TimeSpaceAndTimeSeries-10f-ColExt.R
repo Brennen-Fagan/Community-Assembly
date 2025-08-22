@@ -6,7 +6,7 @@
 # Parameters: #################################################################
 alsoload <- TRUE # if TRUE, try to load all ColExt files encountered.
 # if FALSE, only try to create new ColExt files (and return the outputs).
-overwrite <- TRUE #TRUE # if TRUE, ignore whether a previous file exists.
+overwrite <- FALSE #TRUE # if TRUE, ignore whether a previous file exists.
 
 datfolders <- dir(pattern = "TSTS_Simulations_.+2025-07-30$")
 
@@ -33,8 +33,9 @@ allLibraryPaths <- .libPaths()
 library(dplyr)
 library(RMTRCode2)
 
-source("TimeSpaceAndTimeSeries-0-Functions.R") # Abundance metrics.
+# source("TimeSpaceAndTimeSeries-0-Functions.R") # Abundance metrics.
 # debug(calculateColExtMetrics)
+source(file.path("R", "calculateColExtMetrics.R"))
 
 library(parallel)
 library(iterators)
