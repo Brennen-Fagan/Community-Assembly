@@ -1,9 +1,11 @@
-
+# Setup: ######################################################################
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
+source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 
 figure3 <- list()
 
+# Main Plots: #################################################################
 ### Plot 3:####################################################################
 figure3$dataA <- diversitiesRichness |> tidytable::filter(
   SpeciesPreferences != "100% 0",
@@ -41,11 +43,11 @@ figure3$dataB <- Pers |> tidytable::filter(
 )
 
 ##### a: ######################################################################
-newplot3_a <- ggplot2::ggplot(
-  newplot3_dataA |> tidytable::filter(
-    Time > Start, Time < Stop, SpeciesAffinity == "50% 0, 50% 1"
+figure3$plotA <- ggplot2::ggplot(
+  figure3$dataA |> tidytable::filter(
+    Time > Start, Time < Stop, SpeciesPreferences == "50% 0, 50% 1"
   ) |> tidytable::group_by(
-    PoolPatchSeed, Intervention, SpeciesAffinity
+    PoolPatchSeed, Intervention, SpeciesPreferences
   ) |> tidytable::summarise(
     Value = mean(Value)
   ),
@@ -54,16 +56,18 @@ newplot3_a <- ggplot2::ggplot(
     y = Value,
     color = Intervention
   )
+  ###### Background Annotation: ###############################################
 ) + ggplot2::geom_rect(
   data = data.frame(
     1 # 1 rectangle per row, so dummy df to prevent overplotting
   ),
   xmin = 0,
   xmax = 6,
-  ymin = 0, ymax = max(newplot2_dataA$Value),
+  ymin = 0, ymax = richnessYMax,
   fill = "grey",
   alpha = 0.2,
   inherit.aes = FALSE
+  ####### Core Plot: ##########################################################
 ) + ggplot2::geom_violin(
   position = ggplot2::position_dodge(0.9), scale = "count"
 ) + ggplot2::geom_boxplot(
@@ -83,15 +87,16 @@ newplot3_a <- ggplot2::ggplot(
   color = "none",
   fill = "none"
 ) + ggplot2::coord_cartesian(
-  ylim = c(0, 42), expand = FALSE
+  ylim = c(0, richnessYMax), expand = FALSE
 ) + ggplot2::facet_wrap(
-  SpeciesAffinity ~ .
+  SpeciesPreferences ~ .
 )
-newplot3_b <- ggplot2::ggplot(
-  newplot3_dataA |> tidytable::filter(
-    Time > Start, Time < Stop, SpeciesAffinity == "Uniform(0, 1)"
+
+figure3$plotB <- ggplot2::ggplot(
+  figure3$dataA |> tidytable::filter(
+    Time > Start, Time < Stop, SpeciesPreferences == "Uniform(0, 1)"
   ) |> tidytable::group_by(
-    PoolPatchSeed, Intervention, SpeciesAffinity
+    PoolPatchSeed, Intervention, SpeciesPreferences
   ) |> tidytable::summarise(
     Value = mean(Value)
   ),
@@ -100,16 +105,18 @@ newplot3_b <- ggplot2::ggplot(
     y = Value,
     color = Intervention
   )
+  ###### Background Annotation: ###############################################
 ) + ggplot2::geom_rect(
   data = data.frame(
     1 # 1 rectangle per row, so dummy df to prevent overplotting
   ),
   xmin = 0,
   xmax = 6,
-  ymin = 0, ymax = max(newplot2_dataA$Value),
+  ymin = 0, ymax = richnessYMax,
   fill = "grey",
   alpha = 0.2,
   inherit.aes = FALSE
+  ####### Core Plot: ##########################################################
 ) + ggplot2::geom_violin(
   position = ggplot2::position_dodge(0.9), scale = "count"
 ) + ggplot2::geom_boxplot(
@@ -129,9 +136,9 @@ newplot3_b <- ggplot2::ggplot(
   color = "none",
   fill = "none"
 ) + ggplot2::coord_cartesian(
-  ylim = c(0, 42), expand = FALSE
+  ylim = c(0, richnessYMax), expand = FALSE
 ) + ggplot2::facet_wrap(
-  SpeciesAffinity ~ .
+  SpeciesPreferences ~ .
 )
 
 # Iteration 10 will have the actual affinities, rather than the affinitybins
@@ -143,8 +150,8 @@ newplot3_b <- ggplot2::ggplot(
 # land-use preference out. (Weight by abundance as well for individuals, but
 # that skews even more heavily towards basal species.)
 
-newplot3_inset1 <- ggplot2::ggplot(
-  newplot3_dataB |> tidytable::filter(SpeciesAffinity == "50% 0, 50% 1"),
+figure3$insetA <- ggplot2::ggplot(
+  figure3$dataB |> tidytable::filter(SpeciesPreferences == "50% 0, 50% 1"),
   ggplot2::aes(
     x = AffinityBins,
     weight = Persistence,
@@ -163,8 +170,8 @@ newplot3_inset1 <- ggplot2::ggplot(
 ) + ggplot2::coord_cartesian(
   expand = FALSE
 )
-newplot3_inset2 <- ggplot2::ggplot(
-  newplot3_dataB |> tidytable::filter(SpeciesAffinity == "Uniform(0, 1)"),
+figure3$insetB <- ggplot2::ggplot(
+  newplot3_dataB |> tidytable::filter(SpeciesPreferences == "Uniform(0, 1)"),
   ggplot2::aes(
     x = AffinityBins,
     weight = Persistence,
@@ -184,18 +191,18 @@ newplot3_inset2 <- ggplot2::ggplot(
   expand = FALSE
 )
 
-newplot3 <- ggpubr::ggarrange(
+figure3$plot <- ggpubr::ggarrange(
   plotlist = list(
-    newplot3_a + ggplot2::annotation_custom(
-      ggplot2::ggplotGrob(newplot3_inset1),
+    figure3$plotA + ggplot2::annotation_custom(
+      ggplot2::ggplotGrob(figure3$insetA),
       xmin = 0.55, xmax = 5.45, ymin = 30, ymax = 40
     ),
-    newplot3_b + ggplot2::annotation_custom(
-      ggplot2::ggplotGrob(newplot3_inset2),
+    figure3$plotB + ggplot2::annotation_custom(
+      ggplot2::ggplotGrob(figure3$insetB),
       xmin = 0.55, xmax = 5.45, ymin = 30, ymax = 40
     )
   ), nrow = 1
 )
 
-ggplot2::ggsave(plot = newplot3, filename = "Figure3_Prototype6.png",
+ggplot2::ggsave(plot = figure3$plot, filename = "Figure3_Prototype7.png",
                 units = "cm", width = 6.5*3, height = 6.5*2)

@@ -96,9 +96,9 @@ figure2$plotA <- plotMeanAndInner(
     ),
     # We want to appear in the legend but not on the plot!
     figure2$dataA |> tidytable::filter(
-      PoolPatchSeed == newplot2_a_seed,
+      PoolPatchSeed == figure2$graph$seed,
       Intervention %in% c("(0.25)", "(0.75)"),
-      abs(Time - newplot2_a_time) == min(abs(Time - newplot2_a_time))
+      abs(Time - figure2$graph$time) == min(abs(Time - figure2$graph$time))
     ) |> tidytable::mutate(
       Value = -100 # coord_cartesian will eliminate these points.
     )
@@ -116,7 +116,7 @@ figure2$plotA <- plotMeanAndInner(
   color = ggplot2::guide_legend(ncol = 5),
   fill = ggplot2::guide_legend(ncol = 5)
 ) + ggplot2::coord_cartesian(
-  xlim = c(0, 40000), ylim = c(0, 42), expand = FALSE
+  xlim = c(0, 40000), ylim = c(0, richnessYMax), expand = FALSE
   ####### Insets: #############################################################
 ) + ggplot2::annotation_custom(
   ggplot2::ggplotGrob(
@@ -164,7 +164,7 @@ figure2$plotA <- plotMeanAndInner(
   ),
   xmin = min(figure2$dataA$Start),
   xmax = max(figure2$dataA$Stop),
-  ymin = 0, ymax = max(figure2$dataA$Value),
+  ymin = 0, ymax = richnessYMax,
   fill = "grey",
   alpha = 0.2,
   inherit.aes = FALSE
@@ -207,16 +207,20 @@ figure2$plotB <- ggplot2::ggplot(
     y = Value,
     color = Intervention
   )
+) + ggplot2::coord_cartesian(
+  ylim = c(0, richnessYMax), expand = FALSE
+  ###### Background Annotation: ###############################################
 ) + ggplot2::geom_rect(
   data = data.frame(
     1 # 1 rectangle per row, so dummy df to prevent overplotting
   ),
   xmin = 0,
   xmax = 6,
-  ymin = 0, ymax = max(newplot2_dataA$Value),
+  ymin = 0, ymax = richnessYMax,
   fill = "grey",
   alpha = 0.2,
   inherit.aes = FALSE
+  ####### Core Plot: ##########################################################
 ) + ggplot2::geom_violin(
   position = ggplot2::position_dodge(0.9)
 ) + ggplot2::geom_boxplot(
@@ -233,6 +237,7 @@ figure2$plotB <- ggplot2::ggplot(
   name = "Habitat's Land-use"
 ) + ggplot2::labs(
   tag = "b)"
+  ####### Annotations: ########################################################
 ) + ggplot2::theme_minimal(
 ) + ggplot2::theme(
   plot.tag.position = c(0.05, 0.95)
@@ -242,8 +247,6 @@ figure2$plotB <- ggplot2::ggplot(
 ) + ggplot2::guides(
   color = "none",
   fill = "none"
-) + ggplot2::coord_cartesian(
-  ylim = c(0, 42), expand = FALSE
 ) + ggplot2::annotate(
   "text", x = c(1.5, 4.5), y = 5, label = c("Well\nAdapted", "Poorly\nAdapted")
 )
@@ -258,6 +261,7 @@ figure2$plotC <- ggplot2::ggplot(
     group = interaction(Intervention, SpeciesType),
     fill = SpeciesType
   )
+  ###### Background Annotation: ###############################################
 ) + ggplot2::geom_rect(
   data = data.frame(
     1 # 1 rectangle per row, so dummy df to prevent overplotting
@@ -268,6 +272,7 @@ figure2$plotC <- ggplot2::ggplot(
   fill = "grey",
   alpha = 0.2,
   inherit.aes = FALSE
+  ####### Core Plot: ##########################################################
 ) + ggplot2::geom_violin(
   position = ggplot2::position_dodge(0.9), show.legend = FALSE,
   scale = "count", draw_quantiles = 0.5, linewidth = 1.3
@@ -290,20 +295,20 @@ figure2$plotC <- ggplot2::ggplot(
   x = "Habitat's Land-use"
 )
 
-newplot2 <- ggpubr::ggarrange(
+figure2$plot <- ggpubr::ggarrange(
   plotlist = list(
-    newplot2_a,
-    newplot2_b,
-    newplot2_c
+    figure2$plotA,
+    figure2$plotB,
+    figure2$plotC
   ), nrow = 1, widths = c(0.5, 0.27, 0.23)
 )
 
-newplot2 <- newplot2 + ggplot2::annotate(
+figure2$plot <- figure2$plot + ggplot2::annotate(
   "curve",
   x = 0.35, y = 0.97, xend = c(0.57, 0.87), yend = 0.97,
   curvature = -0.075,
   arrow = arrow(length = unit(0.03, "npc"))
 )
 
-ggplot2::ggsave(plot = newplot2, filename = "Figure2_Prototype7.png",
+ggplot2::ggsave(plot = figure2$plot, filename = "Figure2_Prototype7.png",
                 units = "cm", width = 6.5*3, height = 6.5*2)

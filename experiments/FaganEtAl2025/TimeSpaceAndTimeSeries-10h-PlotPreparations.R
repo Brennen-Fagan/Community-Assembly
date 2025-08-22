@@ -13,6 +13,8 @@ end <- c(0.602, 0.9045) # Aiming for 20000 - 30000. These go ~0.0003% away.
 
 defaultNicheDistance <- "5" # "3"::2, "5"::5, "7"::10
 
+richnessYMax <- 42
+
 # Common Libraries / Functions: ###############################################
 library(RMTRCode2) # Personal
 library(ggplot2)   # Plotting
