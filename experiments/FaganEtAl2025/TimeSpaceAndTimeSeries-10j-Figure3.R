@@ -1,4 +1,7 @@
 # Setup: ######################################################################
+# Plot of Richness as a function of species preferences and land-use,
+# when species preferences are 50% 50% or Uniform.
+
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
@@ -11,16 +14,16 @@ figure3$dataA <- diversitiesRichness |> tidytable::filter(
   SpeciesPreferences != "100% 0",
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
-  (PoolPatchSeed %in% as.character(1:44)),
+  PoolPatchSeed %in% basePoolPatchSeeds,
   Metric == "Alpha Hill:0",
   is.na(Subset)
-) |> tidytable::left_join(endTimes |> dplyr::select(-Times))
+)
 
 figure3$dataB <- Pers |> tidytable::filter(
   SpeciesPreferences != "100% 0",
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
-  (PoolPatchSeed %in% as.character(1:44))
+  PoolPatchSeed %in% basePoolPatchSeeds
 ) |> tidytable::filter(
   In < Stop, Out > Start # Not things outside of [Start, Stop]
 ) |> tidytable::mutate(
@@ -171,7 +174,7 @@ figure3$insetA <- ggplot2::ggplot(
   expand = FALSE
 )
 figure3$insetB <- ggplot2::ggplot(
-  newplot3_dataB |> tidytable::filter(SpeciesPreferences == "Uniform(0, 1)"),
+  figure3$dataB |> tidytable::filter(SpeciesPreferences == "Uniform(0, 1)"),
   ggplot2::aes(
     x = AffinityBins,
     weight = Persistence,

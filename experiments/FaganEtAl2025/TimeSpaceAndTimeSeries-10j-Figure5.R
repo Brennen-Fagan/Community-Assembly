@@ -1,13 +1,18 @@
-### Plot 5: ###################################################################
-# Progression of network change as we undergo intervention. As a base plot
+# Setup: ######################################################################
+# Progression of network change as we undergo intervention. For orientation,
 # we use the richness changes of two experiments that are trading places.
-# Both of these should probably be 100% 0. Maybe (0) -> (0.5) and (0.5) -> (0).
-# Because of the size of the plots, we can't actually show them along the
-# richness plots directly. We could potentially put labeled points instead,
-# and then time staggered facets. I think we'll need higher resolution evals
-# in order to capture the level of detail we're describing in the main text.
-# We also need to convert the existing code for creating the networks into
-# more general code, since we'll need to make a few here as well...
+
+source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
+source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
+source(file.path("R", "generateNetworks.R")) # To create inset graphs.
+
+# This is better as an environment, but that's more opaque.
+figure5 <- list(
+  graph = list(
+    seed = "1",
+    time = 25000
+  )
+)
 
 # Try something like the below to identify a good option:
 # diversitiesRichness |> tidytable::filter(
@@ -27,43 +32,46 @@
 #   xlim = c(16600, 17300)
 # )
 
-newplot5_a_Specification <- rbind(diversitiesRichness |> tidytable::filter(
+# Main Plots: #################################################################
+### Plot 5: ###################################################################
+
+figure5$graph$specification <- rbind(diversitiesRichness |> tidytable::filter(
   NicheDistance == defaultNicheDistance,
-  (PoolPatchSeed %in% as.character(383)),#:386)),
+  PoolPatchSeed %in% figure5$graph$seed,
+  Time == figure5$graph$time[1],
   Metric == "Alpha Hill:0",
-  SpeciesAffinity == "100% 0",
+  SpeciesPreferences == "100% 0",
   Intervention %in% c("(0)", "(0.5)"),
-  Time %in% c(16700),
   is.na(Subset)
 ), diversitiesRichness |> tidytable::filter(
   NicheDistance == defaultNicheDistance,
-  (PoolPatchSeed %in% as.character(383)),#:386)),
+  PoolPatchSeed %in% figure5$graph$seed,
+  Time == figure5$graph$time[-1],
   Metric == "Alpha Hill:0",
-  SpeciesAffinity == "100% 0",
+  SpeciesPreferences == "100% 0",
   Intervention %in% c("(0)->(0.5)", "(0.5)->(0)"),
-  Time %in% c(16720, 16800, 16900, 17100),
   is.na(Subset)
 ))
 
-newplot5_a_Networks <- generateNetworks(newplot5_a_Specification)
+figure5$graph$networks <- generateNetworks(figure5$graph$specification)
 
-newplot5_a <- diversitiesRichness |> tidytable::filter(
+##### a: ######################################################################
+figure5$plotA <- diversitiesRichness |> tidytable::filter(
   NicheDistance == defaultNicheDistance,
-  (PoolPatchSeed %in% as.character(383)),#:386)),
+  PoolPatchSeed == figure5$graph$seed,
   Metric == "Alpha Hill:0",
   SpeciesAffinity == "100% 0",
   Intervention %in% c("(0)->(0.5)", "(0.5)->(0)", "(0)", "(0.5)"),
-  Time > 16000, Time < 18000,
+  Time > 16300, Time < 17500,
   is.na(Subset)
 ) |> ggplot(
   aes(x = Time, y = Value, color = Intervention)
 ) + ggplot2::geom_line(
-  # show.legend = FALSE
 ) + coord_cartesian(
   xlim = c(16600, 17300),
   ylim = c(6, 28)
 ) + ggplot2::geom_rect(
-  data = newplot5_a_Specification |> tidytable::group_by(
+  data = figure5$graph$specification |> tidytable::group_by(
     Time
   ) |> tidytable::summarise(
     xmin = Time - 2, xmax = Time + 2,
@@ -73,11 +81,11 @@ newplot5_a <- diversitiesRichness |> tidytable::filter(
   color = "grey", inherit.aes = FALSE, alpha = 0.2
 ) + ggplot2::geom_point(
   show.legend = FALSE,
-  data = newplot5_a_Specification
+  data = figure5$graph$specification
 ) + ggplot2::geom_vline(
   xintercept = (
-    newplot5_a_Networks$Envs[[3]]$result$Ellipsis$Affinity$TimeIntervention
-    / newplot5_a_Networks$Envs[[3]]$result$ReactionTime
+    figure5$graph$networks$Envs[[3]]$result$Ellipsis$Affinity$TimeIntervention
+    / figure5$graph$networks$Envs[[3]]$result$ReactionTime
   ), linetype = "dashed"
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
@@ -96,11 +104,12 @@ newplot5_a <- diversitiesRichness |> tidytable::filter(
   axis.title.y = ggplot2::element_blank()
 )
 
+##### b: ######################################################################
 # For some reason, this is returning a list of two plots rather than a single
 # plot when used with ncol or nrow.
-newplot5_b <- ggarrange(plotlist = ggarrange(
+figure5$plotB <- ggarrange(plotlist = ggarrange(
   plotlist = lapply(
-    seq_along(newplot5_a_Networks$Envs),
+    seq_along(figure5$graph$networks$Envs),
     function(i, e) {
       e <- e[[i]]
       g <- e$singletonGraphs[[1]] + ggplot2::theme_void(
@@ -117,10 +126,10 @@ newplot5_b <- ggarrange(plotlist = ggarrange(
       ) + ggplot2::ggtitle(
         if (i %in% c(1, 2, 6, 7)) {e$Row$Intervention} else {""}
       )
-      
+
       return(g)
     },
-    e = newplot5_a_Networks$Envs[c(1, 3:6, 2, 7:10)]
+    e = figure5$graph$networks$Envs[c(1, 3:6, 2, 7:10)]
   ),
   ncol = 5
 ), nrow = 2, labels = list("b)", "c)"),
@@ -128,16 +137,17 @@ font.label = list(face = "plain"),
 vjust = 1.4, hjust = 0)
 
 
-newplot5 <- ggpubr::ggarrange(
+figure5$plot <- ggpubr::ggarrange(
   plotlist = list(
-    newplot5_a,
-    newplot5_b
+    figure5$plotA,
+    figure5$plotB
   ), nrow = 2, heights = c(0.2/0.9, 0.7/0.9)
 )
 
 # Decorate with additional indicators.
-newplot5 <-
-  newplot5 + ggplot2::annotate(
+figure5$plot <-
+  # Arrows to the corresponding panel.
+  figure5$plot + ggplot2::annotate(
     "curve", x = 0.2, y = 0.865, xend = 0.1, yend = 0.73,
     arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc"))
   ) + ggplot2::annotate(
@@ -156,11 +166,14 @@ newplot5 <-
     "curve", x = 0.7, y = 0.865, xend = 0.9, yend = 0.73,
     arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc")),
     curvature = -0.2
+    # Intervention Line
   ) + ggplot2::annotate(
-    "segment", linetype = "dashed", x = 0.215, y = 0.865, xend = 0.2, yend = 0.745
+    "segment", linetype = "dashed",
+    x = 0.215, y = 0.865, xend = 0.2, yend = 0.745
   ) + ggplot2::annotate(
-    "segment", linetype = "dashed", x = 0.2, y = 0.745, xend = 0.2, yend = 0
+    "segment", linetype = "dashed",
+    x = 0.2, y = 0.745, xend = 0.2, yend = 0
   )
 
-ggplot2::ggsave(plot = newplot5, filename = "Figure5_Prototype2.png",
+ggplot2::ggsave(plot = figure5$plot, filename = "Figure5_Prototype4.png",
                 units = "cm", width = 6.5*3, height = 6.5*2)

@@ -1,4 +1,8 @@
 # Setup: ######################################################################
+# Plot of Richness as a function of species preferences and land-use,
+# when species preferences are 100% 0.
+# Also functinally an overview plot of network structure.
+
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsPersistence.R")
@@ -29,15 +33,15 @@ figure2$graph$specification <- diversitiesRichness |> tidytable::select(c(
   # Ease of Use
   "SpeciesPreferences", "Intervention"
 )) |> tidytable::filter(
-  SpeciesAffinity == "100% 0" &
-    NicheDistance == defaultNicheDistance &
-    Intervention %in% c("(0)", "(0.5)", "(1)") &
-    PoolPatchSeed %in% as.character(figure2$graph$seed) &
-    Time == figure2$graph$time
+  SpeciesAffinity == "100% 0",
+  NicheDistance == defaultNicheDistance,
+  Intervention %in% c("(0)", "(0.5)", "(1)"),
+  PoolPatchSeed %in% figure2$graph$seed,
+  Time == figure2$graph$time
 ) |> tidytable::distinct(
 )
 
-figure2$graph$exampleNetworks <- generateNetworks(figure2$graph$specification)
+figure2$graph$networks <- generateNetworks(figure2$graph$specification)
 
 # Main Plots: #################################################################
 ### Plot 2:####################################################################
@@ -46,17 +50,17 @@ figure2$dataA <- diversitiesRichness |> tidytable::filter(
   SpeciesPreferences == "100% 0",
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
-  (PoolPatchSeed %in% as.character(343:386)),
+  PoolPatchSeed %in% basePoolPatchSeeds,
   Metric == "Alpha Hill:0",
   is.na(Subset)
-) |> tidytable::left_join(endTimes |> dplyr::select(-Times))
+)
 
 
-figure2$indices <- figure2$graph$exampleNetworks$Index |> tidytable::filter(
+figure2$indices <- figure2$graph$networks$Index |> tidytable::filter(
   SpeciesPreferences == "100% 0",
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.5)", "(1)"),
-  (PoolPatchSeed %in% as.character(343:386))
+  PoolPatchSeed %in% basePoolPatchSeeds
 ) |> tidytable::arrange(
   Intervention
 )
@@ -65,7 +69,7 @@ figure2$dataC <- Pers |> tidytable::filter(
   SpeciesPreferences == "100% 0",
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
-  (PoolPatchSeed %in% as.character(343:386))
+  PoolPatchSeed %in% basePoolPatchSeeds
 ) |> tidytable::filter(
   In < Stop, Out > Start # Not things outside of [Start, Stop]
 ) |> tidytable::mutate(
@@ -120,7 +124,7 @@ figure2$plotA <- plotMeanAndInner(
   ####### Insets: #############################################################
 ) + ggplot2::annotation_custom(
   ggplot2::ggplotGrob(
-    figure2$graph$exampleNetworks$Envs[[
+    figure2$graph$networks$Envs[[
       figure2$indices$ID[1]
       ]]$singletonGraphs[[1]] +
       ggplot2::theme_void(
@@ -133,7 +137,7 @@ figure2$plotA <- plotMeanAndInner(
   xmin = 30500, xmax = 40000, ymin = 7, ymax = 17
 ) + ggplot2::annotation_custom(
   ggplot2::ggplotGrob(
-    figure2$graph$exampleNetworks$Envs[[
+    figure2$graph$networks$Envs[[
       figure2$indices$ID[2]
       ]]$singletonGraphs[[1]] +
       ggplot2::theme_void(
@@ -146,7 +150,7 @@ figure2$plotA <- plotMeanAndInner(
   xmin = 30500, xmax = 40000, ymin = 18, ymax = 28
 ) + ggplot2::annotation_custom(
   ggplot2::ggplotGrob(
-    figure2$graph$exampleNetworks$Envs[[
+    figure2$graph$networks$Envs[[
       figure2$indices$ID[3]
       ]]$singletonGraphs[[1]] +
       ggplot2::theme_void(
