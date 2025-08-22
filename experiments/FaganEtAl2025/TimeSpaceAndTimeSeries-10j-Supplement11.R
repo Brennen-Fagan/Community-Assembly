@@ -6,7 +6,7 @@
 
 
 # plotValueChart <- function(
-#   data, facets = as.formula(Intervention ~ SpeciesAffinity)
+#   data, facets = as.formula(Intervention ~ SpeciesPreferences)
 # ) {
 #   ggplot2::ggplot(
 #     data,
@@ -41,7 +41,7 @@
 #       InType != externalNames["Dispersal"],
 #       In < Stop, Out > Start
 #     ) %>% tidytable::group_by(
-#       SpeciesAffinity, InType, OutType, Intervention
+#       SpeciesPreferences, InType, OutType, Intervention
 #     ) %>% tidytable::summarise(
 #       ChartValue = tidytable::n() / tidytable::n_distinct(PoolPatchSeed)
 #     ) %>% dplyr::mutate( # Tidytable renders as character again!
@@ -62,7 +62,7 @@
 #         ],
 #       OutType = externalNames["NA"]
 #     ) %>% tidytable::group_by(
-#       SpeciesAffinity, InType, OutType, Intervention
+#       SpeciesPreferences, InType, OutType, Intervention
 #     ) %>% tidytable::summarise(
 #       ChartValue = tidytable::n() / tidytable::n_distinct(PoolPatchSeed)
 #     ) %>% dplyr::mutate( # Tidytable renders as character again!
@@ -90,7 +90,7 @@ rbind(
     InType != externalNames["Dispersal"],
     In < Stop, Out > Start
   ) |> tidytable::group_by(
-    SpeciesAffinity, InType, OutType, Intervention
+    SpeciesPreferences, InType, OutType, Intervention
   ) |> tidytable::summarise(
     ChartValue = tidytable::n() / tidytable::n_distinct(PoolPatchSeed)
   ),
@@ -98,7 +98,7 @@ rbind(
     # Start and Stop aren't already present in this version
     endTimes
   ) |> tidytable::mutate(
-    SpeciesAffinity =
+    SpeciesPreferences =
       affinityDictionaryOrigin$SpeciesAffinities[as.numeric(Affinity)],
     Intervention = unlist(mapply(
       FUN = interventionNamingScheme,
@@ -116,7 +116,7 @@ rbind(
       ],
     OutType = externalNames["NA"]
   ) |> tidytable::group_by(
-    SpeciesAffinity, InType, OutType, Intervention
+    SpeciesPreferences, InType, OutType, Intervention
   ) |> tidytable::summarise(
     ChartValue = tidytable::n() / tidytable::n_distinct(PoolPatchSeed)
   )

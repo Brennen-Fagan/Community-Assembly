@@ -8,7 +8,7 @@ fileNamePers <- "TSTS_Pers_10a1.RData"
 
 # ~ 10 Minutes.
 if (!exists("Pers")) {
-  if (loadPers) {
+  if (loadPers && file.exists(fileNamePers)) {
       load(fileNamePers)
     } else {
       # Persistences: ################################################################
@@ -17,11 +17,11 @@ if (!exists("Pers")) {
       ) |> tidytable::filter(
         EventType != "Present", Success # False Arrivals might mess this up.
       ) |> tidytable::group_by(
-        Species, Environment, SpeciesType, Size, ReproductionRate, Speed, 
-        Affinity, AffinityBins, 
-        PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, Events, 
+        Species, Environment, SpeciesType, Size, ReproductionRate, Speed,
+        Affinity, AffinityBins,
+        PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, Events,
         EventsSeed, InitialConditions, InitialConditionsSeed, DispersalParam,
-        NicheDistance, 
+        NicheDistance,
         SpeciesAffinity, SpeciesAffinitySeed, PatchAffinity, PatchAffinitySeed,
         InterventionPatchType, InterventionPatchSeed,
         InterventionTimeType, InterventionTimeSeed, InterventionDispersal,
@@ -36,11 +36,11 @@ if (!exists("Pers")) {
         id_cols = c(
           # THERE HAS TO BE SOMETHING NICER HERE???
           # Species/Environment/Simulation Identifiers
-          Species, Environment, SpeciesType, Size, ReproductionRate, Speed, 
-          Affinity, AffinityBins, 
-          PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, Events, 
+          Species, Environment, SpeciesType, Size, ReproductionRate, Speed,
+          Affinity, AffinityBins,
+          PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, Events,
           EventsSeed, InitialConditions, InitialConditionsSeed, DispersalParam,
-          NicheDistance, 
+          NicheDistance,
           SpeciesAffinity, SpeciesAffinitySeed, PatchAffinity, PatchAffinitySeed,
           InterventionPatchType, InterventionPatchSeed,
           InterventionTimeType, InterventionTimeSeed, InterventionDispersal,
@@ -79,7 +79,7 @@ if (!exists("Pers")) {
       ) |> tidytable::left_join(
         endTimes
       ) |> unifyAffinityBins()
-      
+
       save(Pers, file = fileNamePers)
     }
 }

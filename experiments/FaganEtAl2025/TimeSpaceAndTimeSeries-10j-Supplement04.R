@@ -4,12 +4,12 @@ newplot4_bs <- diversitiesRichness |> tidytable::filter(
   (PoolPatchSeed %in% as.character(343:386)),
   Metric == "Alpha Hill:0",
   InterventionInitial %in% c("(0)", "(1)"),
-  SpeciesAffinity == "100% 0",
+  SpeciesPreferences == "100% 0",
   !is.na(Subset)
 ) |> tidytable::left_join(
   endTimes |> dplyr::select(-Times)
 ) |> tidytable::group_by(
-  SpeciesAffinity, Intervention, PoolPatchSeed,
+  SpeciesPreferences, Intervention, PoolPatchSeed,
   InterventionInitial, InterventionFinal, Subset
 ) |> tidytable::arrange(
   Time
@@ -26,7 +26,7 @@ newplot4_bs <- diversitiesRichness |> tidytable::filter(
   tidytable::expand(
     diversitiesRichness,
     tidytable::nesting(
-      SpeciesAffinity, Intervention, # SpeciesAffinity not working???
+      SpeciesPreferences, Intervention, # SpeciesAffinity not working???
       InterventionInitial, InterventionFinal,
       Subset
     )
@@ -36,12 +36,12 @@ newplot4_bs <- diversitiesRichness |> tidytable::filter(
   Time = ifelse(is.na(Time), 0, Time),
   Value = ifelse(is.na(Value), 0, Value),
   Weight = ifelse(is.na(Weight), 1e9, Weight), # Unclear has an effect.
-  SpeciesAffinity = ifelse(is.na(SpeciesAffinity), "100% 0", SpeciesAffinity)
+  SpeciesPreferences = ifelse(is.na(SpeciesPreferences), "100% 0", SpeciesPreferences)
 ) |> tidytable::filter(
   InterventionInitial %in% c("(0)", "(1)")
 ) |> ggplot2::ggplot(
   aes(x = Time, y = Value,
-      group = interaction(SpeciesAffinity, Intervention),
+      group = interaction(SpeciesPreferences, Intervention),
       # color = InterventionInitial
       # color = InterventionFinal
       color = Intervention

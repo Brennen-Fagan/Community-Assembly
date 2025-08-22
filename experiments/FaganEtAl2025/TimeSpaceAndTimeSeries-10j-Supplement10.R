@@ -10,16 +10,16 @@ newplot7_Spec <- diversitiesRichness |> tidytable::select(c(
   "InterventionPatchType", "InterventionPatchSeed", "InterventionTimeType",
   "InterventionTimeSeed", "InterventionDispersal", "InterventionNicheDistance",
   # Ease of Use
-  "SpeciesAffinity", "Intervention"
+  "SpeciesPreferences", "Intervention"
 )) |> tidytable::filter(
   (
-    SpeciesAffinity == "100% 0" &
+    SpeciesPreferences == "100% 0" &
       NicheDistance == defaultNicheDistance &
       Intervention %in% c("(0)", "(0.5)", "(1)") &
       PoolPatchSeed %in% as.character(343:386) &
       Time == newplot2_a_time
     # ) | (
-    
+
   )
 ) |> tidytable::distinct(
 )
@@ -66,7 +66,7 @@ exampleNetworks$Index |> split(
 ) |> tidytable::mutate(
   Weight = ifelse(inout == "InSize", +Weight, -Weight)
 ) |> tidytable::group_by(
-  PoolPatchSeed, SpeciesAffinity, NicheDistance, Intervention,
+  PoolPatchSeed, SpeciesPreferences, NicheDistance, Intervention,
   Size
 ) |> tidytable::summarise(
   Total = sum(Weight),
@@ -74,7 +74,7 @@ exampleNetworks$Index |> split(
 ) |> tidytable::arrange(
   Size
 ) |> tidytable::group_by(
-  PoolPatchSeed, SpeciesAffinity, NicheDistance, Intervention
+  PoolPatchSeed, SpeciesPreferences, NicheDistance, Intervention
 ) |> tidytable::mutate(
   Total = cumsum(Total)
 ) |> ggplot2::ggplot(

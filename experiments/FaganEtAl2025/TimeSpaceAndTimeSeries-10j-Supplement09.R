@@ -2,18 +2,18 @@
 newplot6_Data <- Pers |> tidytable::filter(
   NicheDistance == defaultNicheDistance,
   (PoolPatchSeed %in% as.character(343:386)),
-  # SpeciesAffinity == "100% 0",
-  # SpeciesAffinity == "50% 0, 50% 1",
-  # SpeciesAffinity == "Uniform(0, 1)",
+  # SpeciesPreferences == "100% 0",
+  # SpeciesPreferences == "50% 0, 50% 1",
+  # SpeciesPreferences == "Uniform(0, 1)",
   # InterventionInitial == InterventionFinal,
   Stop > In, Start < Out
 ) |> tidytable::group_by(
-  Intervention, InterventionInitial, InterventionFinal, Size, SpeciesAffinity
+  Intervention, InterventionInitial, InterventionFinal, Size, SpeciesPreferences
 ) |> tidytable::summarise(
   Weight = sum(Out - In),
   .groups = "drop"
 ) |> dplyr::group_by(
-  Intervention, InterventionInitial, InterventionFinal, SpeciesAffinity
+  Intervention, InterventionInitial, InterventionFinal, SpeciesPreferences
 ) |> dplyr::mutate(
   Weight = Weight / sum(Weight)
 ) |> dplyr::ungroup(
@@ -25,11 +25,11 @@ newplot_6a <- ggplot2::ggplot(
   show.legend = FALSE
   # ) + ggplot2::geom_line(
   #   data = ~ .x |> dplyr::arrange(Size) |> dplyr::group_by(
-  #     SpeciesAffinity, Intervention, InterventionInitial, InterventionFinal
+  #     SpeciesPreferences, Intervention, InterventionInitial, InterventionFinal
   #   ) |> dplyr::mutate(Weight = cumsum(Weight)),
   #   show.legend = FALSE
 ) + ggplot2::facet_grid(
-  SpeciesAffinity + InterventionInitial ~ InterventionFinal
+  SpeciesPreferences + InterventionInitial ~ InterventionFinal
 ) + ggplot2::scale_color_manual(
   values = colorPalette
 ) + ggplot2::scale_x_log10(
@@ -43,11 +43,11 @@ newplot_6b <- ggplot2::ggplot(
   #   show.legend = FALSE
 ) + ggplot2::geom_line(
   data = ~ .x |> dplyr::arrange(Size) |> dplyr::group_by(
-    SpeciesAffinity, Intervention, InterventionInitial, InterventionFinal
+    SpeciesPreferences, Intervention, InterventionInitial, InterventionFinal
   ) |> dplyr::mutate(Weight = cumsum(Weight)),
   show.legend = FALSE
 ) + ggplot2::facet_grid(
-  SpeciesAffinity ~.#+ InterventionInitial ~ InterventionFinal
+  SpeciesPreferences ~.#+ InterventionInitial ~ InterventionFinal
 ) + ggplot2::scale_color_manual(
   values = colorPalette
 ) + ggplot2::scale_x_log10(

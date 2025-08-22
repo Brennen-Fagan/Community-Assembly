@@ -1,27 +1,40 @@
+# Setup: ######################################################################
+# Figure 2 but for basal and consumer richness instead.
+
+source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
+source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
+
+supplement2 <- list()
+
 ### 2 Supplement: #############################################################
+
+supplement2$dataA <- diversitiesRichness |> tidytable::filter(
+  SpeciesPreferences == "100% 0",
+  NicheDistance == defaultNicheDistance,
+  Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
+  PoolPatchSeed %in% basePoolPatchSeeds,
+  Metric == "Alpha Hill:0",
+  !is.na(Subset)
+)
+
 ##### a: ######################################################################
-newplot2_as <- plotMeanAndInner(
+supplement2$plotA <- plotMeanAndInner(
   rbind(
-    newplot2_dataAS |> tidytable::filter(
+    supplement2$dataA |> tidytable::filter(
       Intervention %in% c("(0)", "(0.5)", "(1)")
     ),
     # We want to appear in the legend but not on the plot!
-    newplot2_dataAS |> tidytable::filter(
-      PoolPatchSeed == newplot2_a_seed,
+    supplement2$dataA |> tidytable::filter(
+      PoolPatchSeed == "1",
       Intervention %in% c("(0.25)", "(0.75)"),
-      abs(Time - newplot2_a_time) == min(abs(Time - newplot2_a_time)),
+      abs(Time - 0) == min(abs(Time - 0)),
       !is.na(Subset)
     ) |> tidytable::mutate(
       Value = -100
     )
   ), CIs = 0.75, facets = as.formula(
-    factor(Subset, levels = c("Consumer_0", "Basal_0"), ordered = TRUE) ~ .
-  )
-) + ggplot2::geom_point(
-  data = newplot2_dataAS |> tidytable::filter(
-    PoolPatchSeed == newplot2_a_seed,
-    Intervention %in% c("(0)", "(0.5)", "(1)"),
-    abs(Time - newplot2_a_time) == min(abs(Time - newplot2_a_time))
+    factor(Subset, levels = c("Consumer_0", "Basal_0"),
+           labels = c("Consumer", "Basal"), ordered = TRUE) ~ .
   )
 ) + ggplot2::labs(
   y = "Richness"
@@ -30,7 +43,7 @@ newplot2_as <- plotMeanAndInner(
   color = ggplot2::guide_legend(ncol = 5),
   fill = ggplot2::guide_legend(ncol = 5)
 ) + ggplot2::coord_cartesian(
-  xlim = c(0, 31000), ylim = c(0, 42), expand = FALSE
+  xlim = c(0, 31000), ylim = c(0, richnessYMax), expand = FALSE
 ) + ggplot2::geom_rect(
   data = data.frame(
     1 # 1 rectangle per row, so dummy df to prevent overplotting
@@ -51,11 +64,11 @@ newplot2_as <- plotMeanAndInner(
 )
 
 ##### b: ######################################################################
-newplot2_bs <- ggplot2::ggplot(
-  newplot2_dataAS |> tidytable::filter(
+supplement2$plotB <- ggplot2::ggplot(
+  supplement2$dataA |> tidytable::filter(
     Time > Start, Time < Stop
   ) |> tidytable::group_by(
-    PoolPatchSeed, Intervention, SpeciesAffinity, Subset
+    PoolPatchSeed, Intervention, SpeciesPreferences, Subset
   ) |> tidytable::summarise(
     Value = mean(Value)
   ),
@@ -70,7 +83,7 @@ newplot2_bs <- ggplot2::ggplot(
   ),
   xmin = 0,
   xmax = 6,
-  ymin = 0, ymax = max(newplot2_dataA$Value),
+  ymin = 0, ymax = richnessYMax,
   fill = "grey",
   alpha = 0.2,
   inherit.aes = FALSE
@@ -97,19 +110,20 @@ newplot2_bs <- ggplot2::ggplot(
   color = "none",
   fill = "none"
 ) + ggplot2::coord_cartesian(
-  ylim = c(0, 42), expand = FALSE
+  ylim = c(0, richnessYMax), expand = FALSE
   # ) + ggplot2::annotate(
   #   "text", x = c(1.5, 4.5), y = 5, label = c("Well\nAdapted", "Poorly\nAdapted")
 ) + ggplot2::facet_grid(
-  factor(Subset, levels = c("Consumer_0", "Basal_0"), ordered = TRUE) ~ .
+  factor(Subset, levels = c("Consumer_0", "Basal_0"),
+         labels = c("Consumer", "Basal"), ordered = TRUE) ~ .
 )
 
-newplot2s <- ggpubr::ggarrange(
+supplement2$plot <- ggpubr::ggarrange(
   plotlist = list(
-    newplot2_as,
-    newplot2_bs
+    supplement2$plotA,
+    supplement2$plotB
   ), nrow = 1, widths = c(0.5, 0.4)
 )
 
-ggplot2::ggsave(plot = newplot2s, filename = "Figure2s1_Prototype2.png",
+ggplot2::ggsave(plot = supplement2$plot, filename = "Figure2s1_Prototype3.png",
                 units = "cm", width = 6.5*3, height = 6.5*2)

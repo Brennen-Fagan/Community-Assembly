@@ -32,7 +32,7 @@ newplot3_bs <- ggplot2::ggplot(
   strip.text.x = ggplot2::element_blank()
 ) + ggplot2::facet_grid(
   factor(SpeciesType, levels = c("Consumer", "Basal"), ordered = TRUE) ~
-    SpeciesAffinity
+    SpeciesPreferences
 ) + ggplot2::labs(
   x = "Habitat's Land-use,\nsubdivided by Species Land-use Preference"
 ) + ggplot2::geom_text(
@@ -41,7 +41,7 @@ newplot3_bs <- ggplot2::ggplot(
       x = c(1:5 - 0.22, 1:5 + 0.22),
       y = 12000,
       lab = c(rep("0", 5), rep("1", 5)),
-      SpeciesAffinity = "50% 0, 50% 1"
+      SpeciesPreferences = "50% 0, 50% 1"
     ),
     data.frame(
       # Approximately the "right" spacing when blown up to large scales...
@@ -49,7 +49,7 @@ newplot3_bs <- ggplot2::ggplot(
       y = 12000,
       lab = c(rep("0.1", 5), rep("0.3", 5), rep("0.5", 5),
               rep("0.7", 5), rep("0.9", 5)),
-      SpeciesAffinity = "Uniform(0, 1)"
+      SpeciesPreferences = "Uniform(0, 1)"
     )
   ),
   inherit.aes = FALSE,

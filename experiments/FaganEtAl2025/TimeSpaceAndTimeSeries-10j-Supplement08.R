@@ -11,9 +11,9 @@ newplot5_as_Specification <- diversitiesRichness |> tidytable::filter(
   NicheDistance == defaultNicheDistance,
   (PoolPatchSeed %in% as.character(343:386)),
   Metric == "Alpha Hill:0",
-  # SpeciesAffinity == "100% 0",
-  # SpeciesAffinity == "50% 0, 50% 1",
-  SpeciesAffinity == "Uniform(0, 1)",
+  # SpeciesPreferences == "100% 0",
+  # SpeciesPreferences == "50% 0, 50% 1",
+  SpeciesPreferences == "Uniform(0, 1)",
   Intervention %in% c("(0)->(0.5)", "(0.5)->(0)"),
   is.na(Subset)
 ) |> tidytable::group_by(
@@ -80,7 +80,7 @@ newplot5_kdes <- lapply(
 #   NicheDistance, Affinity, AffinitySeed, InterventionPatchType,
 #   InterventionPatchSeed, InterventionTimeType, InterventionTimeSeed,
 #   InterventionDispersal, InterventionNicheDistance, Intervention,
-#   SpeciesAffinity, InterventionInitial, InterventionFinal
+#   SpeciesPreferences, InterventionInitial, InterventionFinal
 # ) %N>% tidygraph::arrange(
 #   Time
 # ) %N>% tidygraph::mutate( # fix for having not done it ahead of time...
@@ -98,7 +98,7 @@ newplot5_kdes <- lapply(
 #   NicheDistance, Affinity, AffinitySeed, InterventionPatchType,
 #   InterventionPatchSeed, InterventionTimeType, InterventionTimeSeed,
 #   InterventionDispersal, InterventionNicheDistance, Intervention,
-#   SpeciesAffinity, InterventionInitial, InterventionFinal
+#   SpeciesPreferences, InterventionInitial, InterventionFinal
 # ) %E>% tidygraph::arrange(
 #   Time
 # ) %E>% tidygraph::mutate( # fix for having not done it ahead of time...
@@ -143,7 +143,7 @@ ggplot2::ggplot(
   #   # ) + ggplot2::geom_hline(
   #   #   yintercept = -1, linetype = "dashed", color = "black"
 ) + ggplot2::facet_grid(
-  Intervention + SpeciesAffinity ~ Time2
+  Intervention + SpeciesPreferences ~ Time2
 ) + ggplot2::scale_y_log10(
 ) + ggplot2::scale_color_manual(
   values = colorPalette,
@@ -162,7 +162,7 @@ ggplot2::ggsave(
     ),
     trim = TRUE
   ) + ggplot2::facet_grid(
-    Intervention + SpeciesAffinity ~ Time2
+    Intervention + SpeciesPreferences ~ Time2
   ) + ggplot2::scale_y_log10(
   ) + ggplot2::scale_color_manual(
     values = colorPalette,
@@ -196,7 +196,7 @@ ggplot2::ggsave(
   ) + ggplot2::geom_hline(
     yintercept = 0.1, color = "red", show.legend = FALSE
   ) + ggplot2::facet_grid(
-    Intervention + SpeciesAffinity ~ Time2
+    Intervention + SpeciesPreferences ~ Time2
   ) + ggplot2::scale_y_log10(
   ) + ggplot2::scale_color_manual(
     values = colorPalette,
