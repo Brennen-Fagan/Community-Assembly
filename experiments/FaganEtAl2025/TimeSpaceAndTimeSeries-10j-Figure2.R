@@ -1,5 +1,7 @@
 # Setup: ######################################################################
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
+source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
+source("TimeSpaceAndTimeSeries-10i-PreparationsPersistence.R")
 source(file.path("R", "generateNetworks.R")) # To create inset graphs.
 
 # This is better as an environment, but that's more opaque.
@@ -19,13 +21,13 @@ figure2$graph$specification <- diversitiesRichness |> tidytable::select(c(
   "Dispersal", "NicheDistance",
   # Oops, there was a collision causing human readable to replace machine.
   # Will be replaced SpeciesAffinity#2 will -> SpeciesPreferences.
-  # "SpeciesAffinity",
+  "SpeciesAffinity",
   "SpeciesAffinitySeed", "PatchAffinity", "PatchAffinitySeed",
   # Which File (Intervention):
   "InterventionPatchType", "InterventionPatchSeed", "InterventionTimeType",
   "InterventionTimeSeed", "InterventionDispersal", "InterventionNicheDistance",
   # Ease of Use
-  "SpeciesAffinity", "Intervention"
+  "SpeciesPreferences", "Intervention"
 )) |> tidytable::filter(
   SpeciesAffinity == "100% 0" &
     NicheDistance == defaultNicheDistance &
@@ -40,8 +42,8 @@ figure2$graph$exampleNetworks <- generateNetworks(figure2$graph$specification)
 # Main Plots: #################################################################
 ### Plot 2:####################################################################
 # a=>b&c
-newplot2_dataA <- diversitiesRichness |> tidytable::filter(
-  SpeciesAffinity == "100% 0",
+figure2$dataA <- diversitiesRichness |> tidytable::filter(
+  SpeciesPreferences == "100% 0",
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
   (PoolPatchSeed %in% as.character(343:386)),
@@ -49,24 +51,18 @@ newplot2_dataA <- diversitiesRichness |> tidytable::filter(
   is.na(Subset)
 ) |> tidytable::left_join(endTimes |> dplyr::select(-Times))
 
-newplot2_dataAS <- diversitiesRichness |> tidytable::filter(
-  SpeciesAffinity == "100% 0",
-  NicheDistance == defaultNicheDistance,
-  Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
-  (PoolPatchSeed %in% as.character(343:386)),
-  Metric == "Alpha Hill:0",
-  !is.na(Subset)
-) |> tidytable::left_join(endTimes |> dplyr::select(-Times))
 
-newplot2_indices <- exampleNetworks$Index |> tidytable::filter(
-  SpeciesAffinity == "100% 0",
+figure2$indices <- figure2$graph$exampleNetworks$Index |> tidytable::filter(
+  SpeciesPreferences == "100% 0",
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.5)", "(1)"),
   (PoolPatchSeed %in% as.character(343:386))
+) |> tidytable::arrange(
+  Intervention
 )
 
-newplot2_dataC <- Pers |> tidytable::filter(
-  SpeciesAffinity == "100% 0",
+figure2$dataC <- Pers |> tidytable::filter(
+  SpeciesPreferences == "100% 0",
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
   (PoolPatchSeed %in% as.character(343:386))
@@ -92,26 +88,27 @@ newplot2_dataC <- Pers |> tidytable::filter(
 )
 
 ##### a: ######################################################################
-newplot2_a <- plotMeanAndInner(
+####### Core Plot: ############################################################
+figure2$plotA <- plotMeanAndInner(
   rbind(
-    newplot2_dataA |> tidytable::filter(
+    figure2$dataA |> tidytable::filter(
       Intervention %in% c("(0)", "(0.5)", "(1)")
     ),
     # We want to appear in the legend but not on the plot!
-    newplot2_dataA |> tidytable::filter(
+    figure2$dataA |> tidytable::filter(
       PoolPatchSeed == newplot2_a_seed,
       Intervention %in% c("(0.25)", "(0.75)"),
       abs(Time - newplot2_a_time) == min(abs(Time - newplot2_a_time))
     ) |> tidytable::mutate(
-      Value = -100
+      Value = -100 # coord_cartesian will eliminate these points.
     )
   ), CIs = 0.75, facets = as.formula(. ~ .)
 ) + ggplot2::geom_point(
-  data = newplot2_dataA |> tidytable::filter(
-    PoolPatchSeed == newplot2_a_seed,
+  data = function(x) {x |> tidytable::filter(
+    PoolPatchSeed == figure2$graph$seed,
     Intervention %in% c("(0)", "(0.5)", "(1)"),
-    abs(Time - newplot2_a_time) == min(abs(Time - newplot2_a_time))
-  )
+    abs(Time - figure2$graph$time) == min(abs(Time - figure2$graph$time))
+  )}
 ) + ggplot2::labs(
   y = "Richness"
 ) + ggplot2::guides(
@@ -120,9 +117,12 @@ newplot2_a <- plotMeanAndInner(
   fill = ggplot2::guide_legend(ncol = 5)
 ) + ggplot2::coord_cartesian(
   xlim = c(0, 40000), ylim = c(0, 42), expand = FALSE
+  ####### Insets: #############################################################
 ) + ggplot2::annotation_custom(
   ggplot2::ggplotGrob(
-    exampleNetworks$Envs[[newplot2_indices$ID[1]]]$singletonGraphs[[1]] +
+    figure2$graph$exampleNetworks$Envs[[
+      figure2$indices$ID[1]
+      ]]$singletonGraphs[[1]] +
       ggplot2::theme_void(
       ) + ggplot2::theme(
         plot.background = ggplot2::element_rect(fill = "white")
@@ -133,7 +133,9 @@ newplot2_a <- plotMeanAndInner(
   xmin = 30500, xmax = 40000, ymin = 7, ymax = 17
 ) + ggplot2::annotation_custom(
   ggplot2::ggplotGrob(
-    exampleNetworks$Envs[[newplot2_indices$ID[2]]]$singletonGraphs[[1]] +
+    figure2$graph$exampleNetworks$Envs[[
+      figure2$indices$ID[2]
+      ]]$singletonGraphs[[1]] +
       ggplot2::theme_void(
       ) + ggplot2::theme(
         plot.background = ggplot2::element_rect(fill = "white")
@@ -144,7 +146,9 @@ newplot2_a <- plotMeanAndInner(
   xmin = 30500, xmax = 40000, ymin = 18, ymax = 28
 ) + ggplot2::annotation_custom(
   ggplot2::ggplotGrob(
-    exampleNetworks$Envs[[newplot2_indices$ID[3]]]$singletonGraphs[[1]] +
+    figure2$graph$exampleNetworks$Envs[[
+      figure2$indices$ID[3]
+      ]]$singletonGraphs[[1]] +
       ggplot2::theme_void(
       ) + ggplot2::theme(
         plot.background = ggplot2::element_rect(fill = "white")
@@ -153,19 +157,20 @@ newplot2_a <- plotMeanAndInner(
       ) # Easiest to probably just not worry about comparing between.
   ),
   xmin = 30500, xmax = 40000, ymin = 29, ymax = 39
+  ####### Annotations: ########################################################
 ) + ggplot2::geom_rect(
   data = data.frame(
     1 # 1 rectangle per row, so dummy df to prevent overplotting
   ),
-  xmin = min(newplot2_dataA$Start),
-  xmax = max(newplot2_dataA$Stop),
-  ymin = 0, ymax = max(newplot2_dataA$Value),
+  xmin = min(figure2$dataA$Start),
+  xmax = max(figure2$dataA$Stop),
+  ymin = 0, ymax = max(figure2$dataA$Value),
   fill = "grey",
   alpha = 0.2,
   inherit.aes = FALSE
-) + ggplot2::geom_segment(
+) + ggplot2::geom_segment( # Arrows to the boxes.
   data = data.frame(
-    x = newplot2_a_time+250,
+    x = figure2$graph$time+250,
     y = c(10, 22, 39),
     xend = 30500,
     yend = c(11, 22, 36),
@@ -176,6 +181,9 @@ newplot2_a <- plotMeanAndInner(
   ),
   inherit.aes = FALSE,
   arrow = arrow(length = unit(0.03, "npc"))
+) + ggplot2::annotate(
+  "text", x = 36500, y = c(16, 38), size = 3, lineheight = 0.7,
+  label = c("Fully\nAdapted", "Poorly\nAdapted")
 ) + ggplot2::labs(
   tag = "a)"
 ) + ggplot2::theme(
@@ -183,14 +191,11 @@ newplot2_a <- plotMeanAndInner(
   plot.tag.position = c(0.025, 0.95)
 ) + ggplot2::scale_x_continuous(
   breaks = (0:3)*10000
-) + ggplot2::annotate(
-  "text", x = 36500, y = c(16, 38), size = 3, lineheight = 0.7,
-  label = c("Fully\nAdapted", "Poorly\nAdapted")
 )
 
 ##### b: ######################################################################
-newplot2_b <- ggplot2::ggplot(
-  newplot2_dataA |> tidytable::filter(
+figure2$plotB <- ggplot2::ggplot(
+  figure2$dataA |> tidytable::filter(
     Time > Start, Time < Stop
   ) |> tidytable::group_by(
     PoolPatchSeed, Intervention, SpeciesAffinity
@@ -244,8 +249,8 @@ newplot2_b <- ggplot2::ggplot(
 )
 
 ##### c: ######################################################################
-newplot2_c <- ggplot2::ggplot(
-  newplot2_dataC,
+figure2$plotC <- ggplot2::ggplot(
+  figure2$dataC,
   ggplot2::aes(
     y = Persistence,
     x = Intervention,
