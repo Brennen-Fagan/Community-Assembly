@@ -1,3 +1,9 @@
+# Setup: ######################################################################
+
+source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
+source("TimeSpaceAndTimeSeries-10i-PreparationsPersistence.R")
+
+### 3 Supplement: #############################################################
 newplot3_bs <- ggplot2::ggplot(
   newplot3_dataB,
   ggplot2::aes(

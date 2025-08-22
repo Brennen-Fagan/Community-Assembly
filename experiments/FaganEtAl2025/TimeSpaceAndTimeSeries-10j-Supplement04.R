@@ -1,3 +1,9 @@
+# Setup: ######################################################################
+
+source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
+source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
+
+### 12 Supplement: ############################################################
 ##### bs1: ####################################################################
 newplot4_bs <- diversitiesRichness |> tidytable::filter(
   NicheDistance == defaultNicheDistance,

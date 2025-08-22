@@ -1,3 +1,9 @@
+# Setup: ######################################################################
+
+source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
+source("TimeSpaceAndTimeSeries-10i-PreparationsTimeBC.R")
+
+### 11 Supplement: ############################################################
 ##### Turnover related statistics: ############################################
 # Problem here: data is bimodal, so central tendency isn't quite catching the
 # right information.

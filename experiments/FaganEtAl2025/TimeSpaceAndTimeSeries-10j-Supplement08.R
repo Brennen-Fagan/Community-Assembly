@@ -1,3 +1,10 @@
+# Setup: ######################################################################
+
+
+source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
+source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
+
+### 7 Supplement: #############################################################
 ##### 5s Idea 2: ##############################################################
 # Another interesting option: we plot vertical kde's for each intervention at
 # "-1", 10, 100, 200, and 400 time units from the intervention across all sims

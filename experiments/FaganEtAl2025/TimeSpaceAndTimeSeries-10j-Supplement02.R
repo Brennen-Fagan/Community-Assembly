@@ -7,7 +7,6 @@ source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 supplement2 <- list()
 
 ### 2 Supplement: #############################################################
-
 supplement2$dataA <- diversitiesRichness |> tidytable::filter(
   SpeciesPreferences == "100% 0",
   NicheDistance == defaultNicheDistance,

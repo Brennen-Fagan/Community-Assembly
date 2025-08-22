@@ -1,3 +1,10 @@
+# Setup: ######################################################################
+
+
+source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
+source("TimeSpaceAndTimeSeries-10i-PreparationsPersistence.R")
+
+### 8 Supplement: #############################################################
 ##### Examine the difference in distributions of sizes visually. ##############
 newplot6_Data <- Pers |> tidytable::filter(
   NicheDistance == defaultNicheDistance,

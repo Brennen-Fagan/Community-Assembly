@@ -1,3 +1,10 @@
+# Setup: ######################################################################
+
+
+source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
+source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
+
+### 9 Supplement: #############################################################
 # newplot2_a_time <- 25000
 newplot7_Spec <- diversitiesRichness |> tidytable::select(c(
   # Which network:
