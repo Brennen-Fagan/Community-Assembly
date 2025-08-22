@@ -2,13 +2,14 @@
 
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsTimeBC.R")
+supplement12 <- list()
 
-### 11 Supplement: ############################################################
+### 12 Supplement: ############################################################
 ##### Turnover related statistics: ############################################
 # Problem here: data is bimodal, so central tendency isn't quite catching the
 # right information.
 
-load("diversitiesFlattened9a9_subset4TimeBC.RData")
+# load("diversitiesFlattened9a9_subset4TimeBC.RData")
 
 # newplot5_dataB <- diversitiesAll %>% newplot5_filtration(
 # ) %>% tidytable::filter(

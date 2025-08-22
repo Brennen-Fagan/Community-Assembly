@@ -4,7 +4,9 @@
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsPersistence.R")
 
-### 8 Supplement: #############################################################
+supplement9 <- list()
+
+### 9 Supplement: #############################################################
 ##### Examine the difference in distributions of sizes visually. ##############
 newplot6_Data <- Pers |> tidytable::filter(
   NicheDistance == defaultNicheDistance,
@@ -65,6 +67,6 @@ newplot_6b <- ggplot2::ggplot(
 newplot6 <- ggarrange(newplot_6a, newplot_6b)
 ggplot2::ggsave(
   newplot6,
-  filename = "Figure6s_Prototype1.png", # Uniform(0, 1)
+  filename = "Figure_supplement9_v1.png", # Uniform(0, 1)
   units = "cm", width = 20*3, height = 20*2
 )

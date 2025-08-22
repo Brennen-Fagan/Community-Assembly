@@ -3,9 +3,36 @@
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsPersistence.R")
 
+supplement3 <- list()
+
 ### 3 Supplement: #############################################################
-newplot3_bs <- ggplot2::ggplot(
-  newplot3_dataB,
+supplement3$dataB <- Pers |> tidytable::filter(
+  SpeciesPreferences != "100% 0",
+  NicheDistance == defaultNicheDistance,
+  Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
+  PoolPatchSeed %in% basePoolPatchSeeds
+) |> tidytable::filter(
+  In < Stop, Out > Start # Not things outside of [Start, Stop]
+) |> tidytable::mutate(
+  # Shorten intervals for equivalent comparisons.
+  InType = ifelse(In < Start, "Persistent", InType),
+  OutType = ifelse(Out > Stop, "Persistent", OutType),
+  In = ifelse(In < Start, Start, In),
+  Out = ifelse(Out > Stop, Stop, Out),
+  Persistence = Out - In
+) |> tidytable::group_by(
+  Species, Environment, SpeciesType, Size, ReproductionRate, Speed,
+  Affinity, AffinityBins,
+  PoolPatch:InterventionNicheDistance,
+  Intervention, SpeciesPreferences, Start, Stop
+) |> tidytable::summarise( # Sum over Appearances.
+  Persistence = sum(Persistence),
+  .groups = "drop"
+)
+
+##### Plot: ###################################################################
+supplement3$plot <- ggplot2::ggplot(
+  supplement3$dataB,
   ggplot2::aes(
     y = Persistence,
     x = Intervention,
@@ -13,6 +40,7 @@ newplot3_bs <- ggplot2::ggplot(
     group = interaction(Intervention, SpeciesType, AffinityBins),
     fill = SpeciesType
   )
+  ###### Background Annotation: ###############################################
 ) + ggplot2::geom_rect(
   data = data.frame(
     1 # 1 rectangle per row, so dummy df to prevent overplotting
@@ -23,9 +51,11 @@ newplot3_bs <- ggplot2::ggplot(
   fill = "grey",
   alpha = 0.2,
   inherit.aes = FALSE
+  ####### Core Plot: ##########################################################
 ) + ggplot2::geom_violin(
   position = ggplot2::position_dodge(0.9), show.legend = FALSE,
   scale = "count", draw_quantiles = 0.5
+  ###### Annotation: ##########################################################
 ) + ggplot2::scale_color_manual(
   values = colorPalette,
   name = "Habitat Land-use"
@@ -64,12 +94,5 @@ newplot3_bs <- ggplot2::ggplot(
   )
 )
 
-# newplot3 <- ggpubr::ggarrange(
-#   plotlist = list(
-#     newplot3_a,
-#     newplot3_b
-#   ), nrow = 2, widths = c(0.5, 0.5)
-# )
-
-ggplot2::ggsave(plot = newplot3_bs, filename = "Figure3s1_Prototype2.png",
+ggplot2::ggsave(plot = supplement3$plot, filename = "Figure_supplement3_v1.png",
                 units = "cm", width = 6.5*6, height = 6.5*2)

@@ -4,7 +4,9 @@
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 
-### 7 Supplement: #############################################################
+supplement8 <- list()
+
+### 8 Supplement: #############################################################
 ##### 5s Idea 2: ##############################################################
 # Another interesting option: we plot vertical kde's for each intervention at
 # "-1", 10, 100, 200, and 400 time units from the intervention across all sims
@@ -215,6 +217,6 @@ ggplot2::ggsave(
   ) + ggplot2::xlab(
     "Land-use Type"
   ),
-  filename = "Figure5s4_Prototype1.png", # Uniform(0, 1)
+  filename = "Figure_supplement8_v1.png", # Uniform(0, 1)
   units = "cm", width = 10*3, height = 10*2
 )

@@ -55,7 +55,6 @@ figure2$dataA <- diversitiesRichness |> tidytable::filter(
   is.na(Subset)
 )
 
-
 figure2$indices <- figure2$graph$networks$Index |> tidytable::filter(
   SpeciesPreferences == "100% 0",
   NicheDistance == defaultNicheDistance,

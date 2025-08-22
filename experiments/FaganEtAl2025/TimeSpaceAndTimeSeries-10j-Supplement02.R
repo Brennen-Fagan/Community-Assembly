@@ -124,5 +124,5 @@ supplement2$plot <- ggpubr::ggarrange(
   ), nrow = 1, widths = c(0.5, 0.4)
 )
 
-ggplot2::ggsave(plot = supplement2$plot, filename = "Figure2s1_Prototype3.png",
+ggplot2::ggsave(plot = supplement2$plot, filename = "Figure_supplement2_v1.png",
                 units = "cm", width = 6.5*3, height = 6.5*2)

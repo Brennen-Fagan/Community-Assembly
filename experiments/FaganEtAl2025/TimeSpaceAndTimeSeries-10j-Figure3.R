@@ -34,12 +34,10 @@ figure3$dataB <- Pers |> tidytable::filter(
   Out = ifelse(Out > Stop, Stop, Out),
   Persistence = Out - In
 ) |> tidytable::group_by(
-  Species, Environment, SpeciesType, Size, ReproductionRate, Speed, AffinityBins,
-  PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, Events, EventsSeed,
-  InitialConditions, InitialConditionsSeed, DispersalParam, NicheDistance,
-  Affinity, AffinitySeed, InterventionPatchType, InterventionPatchSeed,
-  InterventionTimeType, InterventionTimeSeed, InterventionDispersal,
-  InterventionNicheDistance, Intervention, SpeciesAffinity, Start, Stop
+  Species, Environment, SpeciesType, Size, ReproductionRate, Speed,
+  Affinity, AffinityBins,
+  PoolPatch:InterventionNicheDistance,
+  Intervention, SpeciesPreferences, Start, Stop
 ) |> tidytable::summarise( # Sum over Appearances.
   Persistence = sum(Persistence),
   .groups = "drop"

@@ -3,7 +3,9 @@
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 
-### 4 Supplement: #############################################################
+supplement5 <- list()
+
+### 5 Supplement: #############################################################
 ##### bs2: ####################################################################
 newplot4_bs2 <- diversitiesRichness |> tidytable::filter(
   NicheDistance == defaultNicheDistance,
@@ -89,5 +91,5 @@ newplot4_bs2 <- diversitiesRichness |> tidytable::filter(
   # panel.border = ggplot2::element_rect(linetype = "solid", fill = NA)
 )
 
-ggplot2::ggsave(plot = newplot4_bs2, filename = "Figure4s2_Prototype1.png",
+ggplot2::ggsave(plot = newplot4_bs2, filename = "Figure_supplement5_v1.png",
                 units = "cm", width = 6.5*5, height = 6.5*4)

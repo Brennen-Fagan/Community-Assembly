@@ -21,9 +21,8 @@ library(RMTRCode2) # Personal
 library(ggplot2)   # Plotting
 library(ggpubr)    # Combining Plots
 library(tidytable) # Data Manipulation
-# library(tidygraph)
-# library(ggraph)
-# library(ggforce)
+library(tidygraph) # Graph Manipulations
+library(ggraph)    # Graph Plotting
 
 # WISOTT: What it says on the tin.
 source("TimeSpaceAndTimeSeries-10-Dictionaries.R") # Defines IDs
