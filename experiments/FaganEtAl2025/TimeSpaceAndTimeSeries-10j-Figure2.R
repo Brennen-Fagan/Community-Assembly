@@ -6,6 +6,7 @@
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsPersistence.R")
+source(file.path("R", "flattenDiversity.R")) # Req'd by below
 source(file.path("R", "generateNetworks.R")) # To create inset graphs.
 
 # This is better as an environment, but that's more opaque.
@@ -33,7 +34,7 @@ figure2$graph$specification <- diversitiesRichness |> tidytable::select(c(
   # Ease of Use
   "SpeciesPreferences", "Intervention"
 )) |> tidytable::filter(
-  SpeciesAffinity == "100% 0",
+  SpeciesPreferences == "100% 0",
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.5)", "(1)"),
   PoolPatchSeed %in% figure2$graph$seed,

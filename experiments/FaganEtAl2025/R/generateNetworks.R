@@ -1,7 +1,7 @@
 generateNetworks <- function(
   Specification,
-  dIS = diversitiesInterventionStrings,
-  aDO = affinityDictionaryOrigin
+  dIS = interventionStrings,
+  aDO = speciesAffinityDictionaryOrigin
 ) {
   # Goal: Pass data.frame, return list of networks where a network corresponds
   #       to a row of the data.frame.
@@ -97,7 +97,7 @@ generateNetworks <- function(
     div <- get(div)
     flattenDiversity(div) |> dplyr::left_join(
       dIS,
-      by = c("Affinity", "PoolPatch", "InterventionPatchType"),
+      by = c("PatchAffinity", "PoolPatch", "InterventionPatchType"),
       multiple = "all"
     ) |> dplyr::mutate(# First Number in the Second Group (split = _)
       PoolPatchSeed =
@@ -105,8 +105,8 @@ generateNetworks <- function(
              pattern = ".*?((?<=_)[0-9]+).*", # Capture a group, and everything.
              replacement = "\\1", # Replace it with just the captured group.
              perl = TRUE),
-      SpeciesAffinity = aDO$SpeciesAffinities[as.numeric(Affinity)]
-    ) |> changeAffinityLevels()
+      SpeciesPreferences = aDO$SpeciesAffinities[as.numeric(SpeciesAffinity)]
+    ) |> changePreferencesLevels()
   })
   names(targetDivsU) <- targetDivsUN
 
