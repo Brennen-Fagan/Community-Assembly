@@ -12,7 +12,7 @@ source(file.path("R", "generateNetworks.R")) # To create inset graphs.
 # This is better as an environment, but that's more opaque.
 figure2 <- list(
   graph = list(
-    seed = "1",
+    seed = "2", # "11", "17", "2"!,
     time = 25000
   )
 )
@@ -80,12 +80,9 @@ figure2$dataC <- Pers |> tidytable::filter(
   Out = ifelse(Out > Stop, Stop, Out),
   Persistence = Out - In
 ) |> tidytable::group_by(
-  Species, Environment, SpeciesType, Size, ReproductionRate, Speed, AffinityBins,
-  PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, Events, EventsSeed,
-  InitialConditions, InitialConditionsSeed, DispersalParam, NicheDistance,
-  Affinity, AffinitySeed, InterventionPatchType, InterventionPatchSeed,
-  InterventionTimeType, InterventionTimeSeed, InterventionDispersal,
-  InterventionNicheDistance, Intervention, SpeciesAffinity, Start, Stop
+  Species:Affinity, AffinityBins,
+  PoolPatch:InterventionNicheDistance,
+  Intervention, SpeciesPreferences, Start, Stop
 ) |> tidytable::summarise( # Sum over Appearances.
   Persistence = sum(Persistence),
   .groups = "drop"

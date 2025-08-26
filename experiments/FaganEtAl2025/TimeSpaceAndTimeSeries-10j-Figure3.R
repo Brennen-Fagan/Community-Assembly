@@ -4,7 +4,7 @@
 
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
-source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
+source("TimeSpaceAndTimeSeries-10i-PreparationsPersistence.R")
 
 figure3 <- list()
 

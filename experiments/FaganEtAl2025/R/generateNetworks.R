@@ -296,7 +296,7 @@ generateNetworks <- function(
         cbind(
           Time = env$Row$Time,
           env$Diversity[
-            1, c("PoolPatchSeed", "SpeciesAffinity",
+            1, c("PoolPatchSeed", "SpeciesPreferences",
                  "NicheDistance", "Intervention")]
         )
     )

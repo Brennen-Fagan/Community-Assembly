@@ -1,4 +1,14 @@
 # Settings / Parameters: ######################################################
+# Try to make this more efficient when running multiple images in a single
+# session. This function only assigns if the lhs does not exist yet.
+`%assign%` <- function(lhs, rhs) {
+  lhs <- substitute(lhs)
+  env <- parent.frame()
+  if (!exists(lhs, envir = env)) {
+    assign(deparse(lhs), rhs, envir = env)
+  }
+}
+
 # Required for interventionStrings and endTimes, which have downstream deps.
 if (!exists("ColExt")) {
   load("ColExt10a1_flat.RData")
@@ -9,12 +19,12 @@ options(bitmapType = "cairo")
 
 # Grey interval that we compute over, usually after intervention (~50%)
 # If second number is less than 1, we lose persistent species.
-end <- c(0.602, 0.9045) # Aiming for 20000 - 30000. These go ~0.0003% away.
+endprops %assign% c(0.602, 0.9045) # Aiming for 20000 - 30000. ~0.0003% away.
 
-defaultNicheDistance <- "5" # "3"::2, "5"::5, "7"::10
+defaultNicheDistance %assign% "5" # "3"::2, "5"::5, "7"::10
 
-richnessYMax <- 42
-basePoolPatchSeeds <- as.character(1:44)
+richnessYMax %assign% 42
+basePoolPatchSeeds %assign% as.character(1:44)
 
 # Common Libraries / Functions: ###############################################
 library(RMTRCode2) # Personal
@@ -35,7 +45,7 @@ source(file.path("R", "plotMeanAndInner.R")) # WISOTT for Value over Time.
 source(file.path("R", "unifyAffinityBins.R")) # Make intervals consistent.
 
 # Resources: ##################################################################
-interventionMatrix <- matrix(c(
+interventionMatrix %assign% matrix(c(
   "(0)", "(0)->(0.25)", "(0)->(0.5)", "(0)->(0.75)", "(0)->(1)",
   "(0.25)->(0)", "(0.25)", "(0.25)->(0.5)", "(0.25)->(0.75)", "(0.25)->(1)",
   "(0.5)->(0)", "(0.5)->(0.25)", "(0.5)", "(0.5)->(0.75)", "(0.5)->(1)",
@@ -45,9 +55,9 @@ interventionMatrix <- matrix(c(
 byrow = TRUE, nrow = 5)
 
 ### colors: ###################################################################
-colorPalette <- sapply(interventionMatrix, colorPaletteAlg)
+colorPalette %assign% sapply(interventionMatrix, colorPaletteAlg)
 
-linetypePalette <- c(
+linetypePalette %assign% c(
   "100% 0" = "solid",
   "50% 0, 50% 1" = "longdash",
   "Uniform(0, 1)" = "dotdash"
@@ -55,7 +65,7 @@ linetypePalette <- c(
 
 ### renames: ##################################################################
 # For presentation (i.e., "Arrival" is a working term, but not 100% accurate.)
-externalNames <- c(
+externalNames %assign% c(
   "Arrival"         = "Colonisation",
   "Failed Arrival"  = "Failure",
   "Present"         = "Present",
@@ -68,7 +78,7 @@ externalNames <- c(
 
 ### Strings: ##################################################################
 # Enhance readability, from 9g TablePlots
-interventionStrings <- ColExt |> tidytable::select(
+interventionStrings %assign% (ColExt |> tidytable::select(
   PatchAffinity, PoolPatch, InterventionPatchType
 ) |> tidytable::distinct(
 ) |> tidytable::mutate(
@@ -76,12 +86,12 @@ interventionStrings <- ColExt |> tidytable::select(
     FUN = interventionNamingScheme,
     PatchAffinity, PoolPatch, InterventionPatchType
   ))
-)
+))
 
 ### End times: #################################################################
 # Work out the end times so we can truncate the simulations
 # so that we are making sure our comparisons are equivalent.
-endTimes <- ColExt |> tidytable::rename(
+endTimes %assign% (ColExt |> tidytable::rename(
   DispersalParam = Dispersal
 ) |> tidytable::filter(
   EventType == "EndOfSimulation"
@@ -103,9 +113,9 @@ endTimes <- ColExt |> tidytable::rename(
   ExtraN = tidytable::n(),
   .groups = "drop"
 ) |> tidytable::mutate( # In the plots:
-  Start = end[1] * Times, # Neglect anything with an out time before this.
-  Stop = end[2] * Times # Neglect anything with an in time after this.
-)
+  Start = endprops[1] * Times, # Neglect anything with an out time before this.
+  Stop = endprops[2] * Times # Neglect anything with an in time after this.
+))
 
 stopifnot(all(abs(na.omit(endTimes$ExtraS)) < 0.1)) # Should be ~ 1e-11.
 # Example Debugged:
@@ -125,7 +135,7 @@ stopifnot(all(abs(na.omit(endTimes$ExtraS)) < 0.1)) # Should be ~ 1e-11.
 # )
 
 endTimes <- endTimes |> tidytable::select(
-  -ExtraMn, ExtraS, ExtraN
+  -ExtraMn, -ExtraS, -ExtraN
 )
 
 # Verify as we load that the intervention times are calc'd correctedly.
