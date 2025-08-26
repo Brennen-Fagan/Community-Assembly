@@ -35,30 +35,17 @@ figure4$dataB <- diversitiesRichness |> tidytable::filter(
   Time
 ) |> tidytable::filter(
   InterventionInitial != InterventionFinal,
-  Time == Time[1] | Time == Time[2]
+  Time %in% c(Time[1:30])
 ) |> tidytable::summarise(
-  Time = Time[2] - Time[1],
-  Value = Value[2] - Value[1],
+  Time = Time - Time[1],
+  Value = Value - Value[1],
   Method = "Temporal",
-  Weight = 1, # for loess in geom_smooth
   .groups = "drop"
-) |> tidytable::right_join(
-  tidytable::expand(
-    diversitiesRichness,
-    tidytable::nesting(
-      SpeciesPreferences, Intervention,
-      InterventionInitial, InterventionFinal,
-      Subset
-    )
-  ) |> tidytable::filter(Subset %in% c("Basal_0", "Consumer_0"))
-) |> tidytable::mutate(
-  Time = ifelse(is.na(Time), 0, Time),
-  Value = ifelse(is.na(Value), 0, Value),
-  Weight = ifelse(is.na(Weight), 1e9, Weight), # Unclear has an effect.
-  SpeciesPreferences = ifelse(is.na(SpeciesPreferences),
-                              "100% 0", SpeciesPreferences)
 ) |> tidytable::filter(
   InterventionInitial == "(0.5)"
+) |> tidytable::mutate(
+  Weight = ifelse(Time < 1e-6, 1e9, 1), # loess in geom_smooth to anchor to 0.
+  Alpha = ifelse(Time <= 10, 0.1, 0)
 )
 
 ##### a: ######################################################################
@@ -113,7 +100,8 @@ figure4$plotB <- ggplot2::ggplot(
       color = Intervention
   )
 ) + ggplot2::geom_point(
-  show.legend = FALSE
+  show.legend = FALSE,
+  mapping = ggplot2::aes(alpha = Alpha)
 ) + ggplot2::geom_smooth(
   show.legend = FALSE,
   ggplot2::aes(weight = Weight),
@@ -132,6 +120,8 @@ figure4$plotB <- ggplot2::ggplot(
 ) + ggplot2::scale_color_manual(
   values = colorPalette,
   name = "Habitat Land-use"
+) + ggplot2::scale_alpha(
+  range = c(0, 0.1)
 ) + ggplot2::facet_grid(
   factor(Subset, levels = c("Consumer_0", "Basal_0"),
          labels = c("Consumer", "Basal"), ordered = TRUE) ~ .
@@ -153,7 +143,7 @@ figure4$smoothsB <- ggplot2::ggplot_build(
 )$data[[2]] |> dplyr::group_by(
   group
 ) |> dplyr::filter(
-  x == max(x)
+  x == x[min(abs(x - 10)) == abs(x - 10)]
 ) |> dplyr::ungroup(
 ) |> dplyr::mutate(
   Subset = rev(levels(factor(figure4$dataB$Subset)))[PANEL],
@@ -165,7 +155,7 @@ figure4$smoothsB <- ggplot2::ggplot_build(
 
 figure4$plotB <-
   figure4$plotB + ggplot2::coord_cartesian(
-    xlim = c(0, 14), clip = "off"
+    xlim = c(0, 14)#, clip = "off"
   ) + ggplot2::geom_segment(
     data = figure4$smoothsB,
     mapping = ggplot2::aes(x = x+1, y = yshift, xend = x, yend = y,

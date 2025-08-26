@@ -174,11 +174,23 @@ figure3$insetA <- ggplot2::ggplot(
 figure3$insetB <- ggplot2::ggplot(
   figure3$dataB |> tidytable::filter(SpeciesPreferences == "Uniform(0, 1)"),
   ggplot2::aes(
-    x = AffinityBins,
+    x = Affinity,
     weight = Persistence,
-    fill = Intervention
+    fill = Intervention,
+    group = Intervention
   )
-) + ggplot2::geom_bar(
+  #   # ECDF's not very clear here, and we'd need to recompute to get it proper
+  #   # (weights not included by default).
+  # ) + ggplot2::stat_ecdf(
+  #   geom = "step",
+  # Density Plot: I think better?
+) + ggplot2::geom_density(
+  adjust = 1/2,
+  # # Histogram: Okay
+  # ) + ggplot2::geom_histogram(
+  #   bins = 100
+  # # Bar Chart: Okay
+  # ) + ggplot2::geom_bar(
   show.legend = FALSE
 ) + ggplot2::facet_grid(
   . ~ Intervention
