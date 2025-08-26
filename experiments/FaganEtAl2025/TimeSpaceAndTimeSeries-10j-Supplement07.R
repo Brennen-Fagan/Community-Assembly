@@ -1,5 +1,6 @@
 # Setup: ######################################################################
-
+# Overview of all interventions for species preferences Uniform(0, 1).
+# Looking specifically at short term responses.
 
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
@@ -8,38 +9,6 @@ supplement7 <- list()
 
 ### 7 Supplement: #############################################################
 ##### bs4: ####################################################################
-newplot4_dataBS4 <- diversitiesRichness |> tidytable::filter(
-  NicheDistance == defaultNicheDistance,
-  (PoolPatchSeed %in% as.character(343:386)),
-  Metric == "Alpha Hill:0",
-  # InterventionInitial %in% c("(0)", "(1)"),
-  SpeciesPreferences == "Uniform(0, 1)",
-  !is.na(Subset)
-) |> tidytable::left_join(
-  endTimes |> dplyr::select(-Times)
-) |> tidytable::group_by(
-  SpeciesPreferences, Intervention, PoolPatchSeed,
-  InterventionInitial, InterventionFinal, Subset
-) |> tidytable::arrange(
-  Time
-) |> tidytable::filter(
-  InterventionInitial != InterventionFinal,
-  Time == Time[1] | Time == Time[2]
-) |> tidytable::summarise(
-  Time = Time[2] - Time[1],
-  Value = Value[2] - Value[1],
-  Method = "Temporal",
-  Weight = 1, # for loess in geom_smooth
-  AffinityBins = gsub(pattern = "(Basal|Consumer)[_]", replacement = "",
-                      x = Subset, perl = TRUE),
-  SpeciesGuild = gsub(pattern = "(?=_).+", replacement = "",
-                      x = Subset, perl = TRUE),
-  .groups = "drop"
-  #####
-) |> unifyAffinityBins(
-) |> tidytable::mutate(
-  Subset = paste0(SpeciesGuild, "_", AffinityBins)
-)
 
 newplot4_bs4 <- newplot4_dataBS4 |> tidytable::right_join(
   tidytable::expand(
@@ -68,6 +37,43 @@ newplot4_bs4 <- newplot4_dataBS4 |> tidytable::right_join(
   InterventionInitial != InterventionFinal,
   InterventionInitial == "(0.5)"
 ) |> ggplot2::ggplot(
+  ...
+)
+
+supplement7$dataA <- diversitiesRichness |> tidytable::filter(
+  NicheDistance == defaultNicheDistance,
+  PoolPatchSeed %in% basePoolPatchSeeds,
+  Metric == "Alpha Hill:0",
+  SpeciesPreferences == "Uniform(0, 1)",
+  !is.na(Subset),
+  InterventionInitial != InterventionFinal,
+  InterventionInitial == "(0.5)"
+) |> tidytable::group_by(
+  SpeciesPreferences, Intervention, PoolPatchSeed,
+  InterventionInitial, InterventionFinal, Subset
+) |> tidytable::arrange(
+  Time
+) |> tidytable::filter(
+  InterventionInitial != InterventionFinal,
+  Time %in% c(Time[1:20])
+) |> tidytable::summarise(
+  Time = Time - Time[1],
+  Value = Value - Value[1],
+  Method = "Temporal",
+  AffinityBins = gsub(pattern = "(Basal|Consumer)[_]", replacement = "",
+                      x = Subset, perl = TRUE),
+  SpeciesGuild = gsub(pattern = "(?=_).+", replacement = "",
+                      x = Subset, perl = TRUE),
+  .groups = "drop"
+) |> unifyAffinityBins(
+) |> tidytable::mutate(
+  Subset = paste0(SpeciesGuild, "_", AffinityBins),
+  Weight = ifelse(Time < 1e-6, 1e2, 1), # loess in geom_smooth to anchor to 0.
+  Alpha = ifelse(Time <= 10, 0.1, 0)
+)
+
+supplement7$plotA <- ggplot2::ggplot(
+  supplement7$dataA,
   aes(x = Time, y = Value,
       group = interaction(SpeciesPreferences, Intervention),
       # color = InterventionInitial
@@ -75,15 +81,17 @@ newplot4_bs4 <- newplot4_dataBS4 |> tidytable::right_join(
       color = Intervention
   )
 ) + ggplot2::geom_hline(
-  yintercept = 0, color = "black"
+  yintercept = 0, color = "black", linetype = "dashed"
 ) + ggplot2::geom_point(
-  show.legend = FALSE
+  show.legend = FALSE,
+  mapping = ggplot2::aes(alpha = Alpha)
 ) + ggplot2::geom_smooth(
   # show.legend = FALSE,
   ggplot2::aes(weight = Weight),
-  method = "loess",
-  formula = "y~x",
-  show.legend = FALSE
+  # method = "loess",
+  # formula = "y~x",
+  show.legend = FALSE,
+  color = "black"
 ) + ggplot2::theme_minimal(
 ) + ggplot2::labs(
   title = "Short Time Scales",
@@ -95,6 +103,8 @@ newplot4_bs4 <- newplot4_dataBS4 |> tidytable::right_join(
 ) + ggplot2::scale_color_manual(
   values = colorPalette,
   name = "Habitat Land-use"
+) + ggplot2::scale_alpha(
+  range = c(0, 0.1)
 ) + ggplot2::facet_grid(
   InterventionInitial +
     factor(Subset#,
@@ -108,7 +118,11 @@ newplot4_bs4 <- newplot4_dataBS4 |> tidytable::right_join(
   # strip.text.x = ggplot2::element_blank()
   plot.background = ggplot2::element_rect(linetype = "solid")
   # panel.border = ggplot2::element_rect(linetype = "solid", fill = NA)
+) + ggplot2::coord_cartesian(
+  xlim = c(0, 10),
+  # ylim = c(-5, 0)
 )
 
-ggplot2::ggsave(plot = newplot4_bs4, filename = "Figure_supplement7_v1.png",
-                units = "cm", width = 6.5*5, height = 6.5*4)
+ggplot2::ggsave(plot = supplement7$plotA,
+                filename = "Figure_supplement7_v1.png",
+                units = "cm", width = 6.5*5, height = 6.5*5)

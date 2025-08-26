@@ -1,5 +1,6 @@
 # Setup: ######################################################################
-
+# Overview of all interventions for species preferences 50% 0, 50% 1.
+# Looking specifically at short term responses.
 
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
@@ -8,15 +9,12 @@ supplement6 <- list()
 
 ### 6 Supplement: #############################################################
 ##### bs3: ####################################################################
-newplot4_bs3 <- diversitiesRichness |> tidytable::filter(
+supplement6$dataA <- diversitiesRichness |> tidytable::filter(
   NicheDistance == defaultNicheDistance,
-  (PoolPatchSeed %in% as.character(343:386)),
+  PoolPatchSeed %in% basePoolPatchSeeds,
   Metric == "Alpha Hill:0",
-  # InterventionInitial %in% c("(0)", "(1)"),
   SpeciesPreferences == "50% 0, 50% 1",
   !is.na(Subset)
-) |> tidytable::left_join(
-  endTimes |> dplyr::select(-Times)
 ) |> tidytable::group_by(
   SpeciesPreferences, Intervention, PoolPatchSeed,
   InterventionInitial, InterventionFinal, Subset
@@ -24,36 +22,19 @@ newplot4_bs3 <- diversitiesRichness |> tidytable::filter(
   Time
 ) |> tidytable::filter(
   InterventionInitial != InterventionFinal,
-  Time == Time[1] | Time == Time[2]
+  Time %in% c(Time[1:50])
 ) |> tidytable::summarise(
-  Time = Time[2] - Time[1],
-  Value = Value[2] - Value[1],
+  Time = Time - Time[1],
+  Value = Value - Value[1],
   Method = "Temporal",
-  Weight = 1, # for loess in geom_smooth
   .groups = "drop"
-) |> tidytable::right_join(
-  tidytable::expand(
-    diversitiesRichness,
-    tidytable::nesting(
-      SpeciesPreferences, Intervention, # SpeciesAffinity not working???
-      InterventionInitial, InterventionFinal,
-      Subset
-    )
-  )
-  # ) |> tidytable::filter(Subset %in% c("Basal_0", "Consumer_0"))
 ) |> tidytable::mutate(
-  Time = ifelse(is.na(Time), 0, Time),
-  Value = ifelse(is.na(Value), 0, Value),
-  Weight = ifelse(is.na(Weight), 1e9, Weight), # Unclear has an effect.
-  SpeciesPreferences =
-    ifelse(is.na(SpeciesPreferences), "50% 0, 50% 1", SpeciesPreferences)
-) |> tidytable::filter(
-  # InterventionInitial %in% c("(0)", "(1)")
-  Subset %in% c("Basal_0", "Consumer_0",
-                "Basal_1", "Consumer_1"),
-  !is.na(InterventionInitial), !is.na(InterventionFinal),
-  InterventionInitial != InterventionFinal
-) |> ggplot2::ggplot(
+  Weight = ifelse(Time < 1e-6, 1e2, 1), # loess in geom_smooth to anchor to 0.
+  Alpha = ifelse(Time <= 10, 0.1, 0)
+)
+
+supplement6$plotA <- ggplot2::ggplot(
+  supplement6$dataA,
   aes(x = Time, y = Value,
       group = interaction(SpeciesPreferences, Intervention),
       # color = InterventionInitial
@@ -61,15 +42,17 @@ newplot4_bs3 <- diversitiesRichness |> tidytable::filter(
       color = Intervention
   )
 ) + ggplot2::geom_hline(
-  yintercept = 0, color = "black"
+  yintercept = 0, color = "black", linetype = "dashed"
 ) + ggplot2::geom_point(
-  show.legend = FALSE
+  show.legend = FALSE,
+  mapping = ggplot2::aes(alpha = Alpha)
 ) + ggplot2::geom_smooth(
   # show.legend = FALSE,
   ggplot2::aes(weight = Weight),
-  method = "loess",
-  formula = "y~x",
-  show.legend = FALSE
+  # method = "loess",
+  # formula = "y~x",
+  show.legend = FALSE,
+  color = "black"
 ) + ggplot2::theme_minimal(
 ) + ggplot2::labs(
   title = "Short Time Scales",
@@ -81,6 +64,8 @@ newplot4_bs3 <- diversitiesRichness |> tidytable::filter(
 ) + ggplot2::scale_color_manual(
   values = colorPalette,
   name = "Habitat Land-use"
+) + ggplot2::scale_alpha(
+  range = c(0, 0.1)
 ) + ggplot2::facet_grid(
   InterventionInitial +
     factor(Subset, levels = c("Consumer_0", "Basal_0",
@@ -92,7 +77,11 @@ newplot4_bs3 <- diversitiesRichness |> tidytable::filter(
   # strip.text.x = ggplot2::element_blank()
   plot.background = ggplot2::element_rect(linetype = "solid")
   # panel.border = ggplot2::element_rect(linetype = "solid", fill = NA)
+) + ggplot2::coord_cartesian(
+  xlim = c(0, 10),
+  ylim = c(-12, 0)
 )
 
-ggplot2::ggsave(plot = newplot4_bs3, filename = "Figure_supplement6_v1.png",
+ggplot2::ggsave(plot = supplement6$plotA,
+                filename = "Figure_supplement6_v1.png",
                 units = "cm", width = 6.5*5, height = 6.5*4)

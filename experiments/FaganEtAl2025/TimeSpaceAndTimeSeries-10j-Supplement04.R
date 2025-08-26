@@ -61,6 +61,8 @@ supplement4$plotA <- ggplot2::ggplot(
 ) + ggplot2::scale_color_manual(
   values = colorPalette,
   name = "Habitat Land-use"
+) + ggplot2::scale_alpha(
+  range = c(0, 0.1)
 ) + ggplot2::facet_grid(
   InterventionInitial +
     factor(Subset, levels = c("Consumer_0", "Basal_0"),
