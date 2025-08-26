@@ -172,7 +172,7 @@ figure2$plotA <- plotMeanAndInner(
 ) + ggplot2::geom_segment( # Arrows to the boxes.
   data = data.frame(
     x = figure2$graph$time+250,
-    y = c(10, 22, 39),
+    y = c(12, 26, 35),
     xend = 30500,
     yend = c(11, 22, 36),
     Intervention = c("(0)", "(0.5)", "(1)")

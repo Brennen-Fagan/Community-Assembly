@@ -1,10 +1,10 @@
 plotMeanAndInner <- function(
   data, CIs = c(0.5, 0.95),
-  facets = as.formula(Intervention ~ SpeciesAffinity)
+  facets = as.formula(Intervention ~ SpeciesPreferences)
 ) {
   # Correct for a problem with how to handle NAs by converting to strings
   data$Subset <- ifelse(is.na(data$Subset), "NA", data$Subset)
-  
+
   # Create base with particular attention to grouping structure.
   baseplot <- ggplot2::ggplot(
     data,
@@ -12,12 +12,12 @@ plotMeanAndInner <- function(
       x = Time, y = Value,
       group = interaction(
         Subset,
-        Intervention, InterventionInitial, InterventionFinal, SpeciesAffinity
+        Intervention, InterventionInitial, InterventionFinal, SpeciesPreferences
       ),
-      color = Intervention, fill = Intervention, linetype = SpeciesAffinity
+      color = Intervention, fill = Intervention, linetype = SpeciesPreferences
     )
   )
-  
+
   # Plot each CI overlaid. Overlaying => the innermost have the darkest alpha.
   for (CI in CIs) {
     baseplot <- baseplot + ggplot2::geom_ribbon(
@@ -25,7 +25,7 @@ plotMeanAndInner <- function(
         Time = round(Time, digits = -2)
       ) |> tidytable::group_by(
         Time, Subset,
-        Intervention, InterventionInitial, InterventionFinal, SpeciesAffinity
+        Intervention, InterventionInitial, InterventionFinal, SpeciesPreferences
       ) |> tidytable::summarise(
         top = quantile(Value, probs = CI+(1-CI)/2, na.rm = TRUE),
         bot = quantile(Value, probs = (1-CI)-(1-CI)/2, na.rm = TRUE)
@@ -33,7 +33,7 @@ plotMeanAndInner <- function(
         x = Time, ymin = bot, ymax = top,
         group = interaction(
           Subset,
-          Intervention, InterventionInitial, InterventionFinal, SpeciesAffinity
+          Intervention, InterventionInitial, InterventionFinal, SpeciesPreferences
         ),
         fill = Intervention,
         color = Intervention
@@ -41,14 +41,14 @@ plotMeanAndInner <- function(
       alpha = 0.25, linewidth = 0.25 #, linetype = "dotted"
     )
   }
-  
+
   # Add an average line and handle the meta-details.
   baseplot <- baseplot + ggplot2::geom_line(
     data = data |> tidytable::mutate(
       Time = round(Time, digits = -2)
     ) |> tidytable::group_by(
       Time, Subset,
-      Intervention, InterventionInitial, InterventionFinal, SpeciesAffinity
+      Intervention, InterventionInitial, InterventionFinal, SpeciesPreferences
     ) |> tidytable::summarise(
       Value = mean(Value, na.rm = TRUE)
     )
@@ -65,6 +65,6 @@ plotMeanAndInner <- function(
     color = if (length(CIs)>0) {"none"} else {"legend"},
     fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
   )
-  
+
   return(baseplot)
 }

@@ -117,8 +117,13 @@ endTimes %assign% (ColExt |> tidytable::rename(
   Stop = endprops[2] * Times # Neglect anything with an in time after this.
 ))
 
-stopifnot(all(abs(na.omit(endTimes$ExtraS)) < 0.1)) # Should be ~ 1e-11.
-# Example Debugged:
+if ("ExtraS" %in% colnames(endTimes)) {# Prevent from triggering on repeat
+  stopifnot(all(abs(na.omit(endTimes$ExtraS)) < 0.1)) # Should be ~ 1e-11.
+  endTimes <- endTimes |> tidytable::select(
+    -ExtraMn, -ExtraS, -ExtraN
+  )
+}
+# Example Debugged if there is a problem:
 # ColExt |> tidytable::rename(
 #   DispersalParam = Dispersal
 # ) |> tidytable::filter(
@@ -134,8 +139,5 @@ stopifnot(all(abs(na.omit(endTimes$ExtraS)) < 0.1)) # Should be ~ 1e-11.
 #   Times
 # )
 
-endTimes <- endTimes |> tidytable::select(
-  -ExtraMn, -ExtraS, -ExtraN
-)
 
 # Verify as we load that the intervention times are calc'd correctedly.
