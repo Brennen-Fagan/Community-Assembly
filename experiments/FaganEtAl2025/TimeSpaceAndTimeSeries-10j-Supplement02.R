@@ -47,9 +47,9 @@ supplement2$plotA <- plotMeanAndInner(
   data = data.frame(
     1 # 1 rectangle per row, so dummy df to prevent overplotting
   ),
-  xmin = min(newplot2_dataA$Start),
-  xmax = max(newplot2_dataA$Stop),
-  ymin = 0, ymax = max(newplot2_dataA$Value),
+  xmin = min(supplement2$dataA$Start),
+  xmax = max(supplement2$dataA$Stop),
+  ymin = 0, ymax = max(supplement2$dataA$Value),
   fill = "grey",
   alpha = 0.2,
   inherit.aes = FALSE

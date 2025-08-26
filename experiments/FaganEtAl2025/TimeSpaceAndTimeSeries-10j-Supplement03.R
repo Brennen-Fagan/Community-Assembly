@@ -1,4 +1,5 @@
 # Setup: ######################################################################
+# Figure 3's corresponding persistences (i.e., Fig 2c but for Fig 3).
 
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsPersistence.R")

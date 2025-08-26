@@ -7,8 +7,6 @@ source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 
 figure4 <- list()
 
-#TODO: Make sure that we can get the regressions through the origin.
-
 # Main Plots: #################################################################
 ### Plot 4:####################################################################
 figure4$dataA <- diversitiesRichness |> tidytable::filter(
@@ -26,8 +24,6 @@ figure4$dataB <- diversitiesRichness |> tidytable::filter(
   InterventionInitial == "(0.5)",
   SpeciesPreferences == "100% 0",
   !is.na(Subset)
-) |> tidytable::left_join(
-  endTimes |> dplyr::select(-Times)
 ) |> tidytable::group_by(
   SpeciesPreferences, Intervention, PoolPatchSeed,
   InterventionInitial, InterventionFinal, Subset
@@ -41,8 +37,6 @@ figure4$dataB <- diversitiesRichness |> tidytable::filter(
   Value = Value - Value[1],
   Method = "Temporal",
   .groups = "drop"
-) |> tidytable::filter(
-  InterventionInitial == "(0.5)"
 ) |> tidytable::mutate(
   Weight = ifelse(Time < 1e-6, 1e9, 1), # loess in geom_smooth to anchor to 0.
   Alpha = ifelse(Time <= 10, 0.1, 0)
