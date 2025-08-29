@@ -1,46 +1,54 @@
 # Setup: ######################################################################
-
+# Whereas Supplement 9 asks what is going on with the species, we now want to
+# ask what we can do to generalise the interactions between the species
+# Effectively, we are taking a flux-like approach: how much total "effect" is
+# being had in different parts of the foodweb if we reduce it to a line along
+# the sizes? So every new edge is a step up, every loss of an edge is a step
+# down. Because of size-structure, we shouldn't lose any edges until there are
+# consumers, so the maximum location is trivial. Rather, we are focusing on the
+# general shape.
 
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
+source(file.path("R", "flattenDiversity.R")) # Req'd by below
+source(file.path("R", "generateNetworks.R")) # To create inset graphs.
 
 supplement10 <- list()
+supplement10$graph$time <- 25000
 
 ### 10 Supplement: ############################################################
-# newplot2_a_time <- 25000
-newplot7_Spec <- diversitiesRichness |> tidytable::select(c(
+supplement10$graph$specification <- diversitiesRichness |> tidytable::select(c(
   # Which network:
   "Time", "Environment1",
   # Which File (Base):
   "PoolPatch", "PoolPatchSeed", "Interactions", "InteractionsSeed",
   "Events", "EventsSeed", "InitialConditions", "InitialConditionsSeed",
-  "Dispersal", "NicheDistance", "Affinity", "AffinitySeed",
+  "Dispersal", "NicheDistance", "SpeciesAffinity", "SpeciesAffinitySeed",
+  "PatchAffinity", "PatchAffinitySeed",
   # Which File (Intervention):
   "InterventionPatchType", "InterventionPatchSeed", "InterventionTimeType",
   "InterventionTimeSeed", "InterventionDispersal", "InterventionNicheDistance",
   # Ease of Use
   "SpeciesPreferences", "Intervention"
 )) |> tidytable::filter(
-  (
-    SpeciesPreferences == "100% 0" &
-      NicheDistance == defaultNicheDistance &
-      Intervention %in% c("(0)", "(0.5)", "(1)") &
-      PoolPatchSeed %in% as.character(343:386) &
-      Time == newplot2_a_time
-    # ) | (
-
-  )
+  SpeciesPreferences == "100% 0",
+  NicheDistance == defaultNicheDistance,
+  Intervention %in% c("(0)", "(0.5)", "(1)"),
+  PoolPatchSeed %in% basePoolPatchSeeds,
+  Time == supplement10$graph$time
 ) |> tidytable::distinct(
 )
 
-newplot7_Nets <- generateNetworks(newplot7_Spec)
+supplement10$graph$networks <-
+  generateNetworks(supplement10$graph$specification,
+                   Date = "2025-07-30")
 
 # Scratch work for what we are trying to do upon getting to v10.
-exampleNetworks$Index |> split(
-  1:nrow(exampleNetworks$Index)
+supplement10$graph$networks$Index |> split(
+  1:nrow(supplement10$graph$networks$Index)
 ) |> tidytable::map_dfr(
   .f = function(spec) {
-    env <- exampleNetworks$Envs[[spec$ID]]
+    env <- supplement10$graph$networks$Envs[[spec$ID]]
     edges <- env$trophics$EdgeVertexLists[[1]][[1]]$Edges |> tidytable::select(
       from, to, effectActual
     ) |> tidytable::mutate(
@@ -64,6 +72,8 @@ exampleNetworks$Index |> split(
       spec
     )
   }
+) |> tidytable::filter(
+  from != to
 ) |> tidytable::rowwise(
 ) |> tidytable::mutate(
   InSize = min(fromSize, toSize),
@@ -87,7 +97,8 @@ exampleNetworks$Index |> split(
 ) |> tidytable::mutate(
   Total = cumsum(Total)
 ) |> ggplot2::ggplot(
-  ggplot2::aes(x = Size, y = Total, color = Intervention)
+  ggplot2::aes(x = Size, y = Total, color = Intervention,
+               group = interaction(Intervention, PoolPatchSeed))
 ) + ggplot2::geom_line(
 ) + ggplot2::scale_color_manual(
   values = colorPalette
@@ -95,3 +106,4 @@ exampleNetworks$Index |> split(
 ) + ggplot2::geom_vline(
   xintercept = 0.1
 )
+

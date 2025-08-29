@@ -4,7 +4,7 @@
 # plot the contours.
 
 # Too many graphs to do all at once; need to do multiple runs.
-targetPrefIndex <- 2
+targetPrefIndex <- 3
 targetPref <-
   c("100% 0", "50% 0, 50% 1", "Uniform(0, 1)")[targetPrefIndex]
 

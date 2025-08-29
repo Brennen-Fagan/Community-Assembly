@@ -1,5 +1,12 @@
 # Setup: ######################################################################
+# Plot histograms of the sizes (effectively, pdes) and cdfs of the sizes via the
+# probability of having observed a given species at a random time for a given
+# intervention combination and pool preference configuration. The result is that
+# the systems each cluster slightly differently but that, after long times, the
+# initial state doesn't matter and the symmetries emerge naturally.
 
+# Note: the persistences are used to account for the variable times that species
+# are present for.
 
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsPersistence.R")

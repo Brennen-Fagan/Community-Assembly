@@ -1,7 +1,8 @@
 generateNetworks <- function(
   Specification,
   dIS = interventionStrings,
-  aDO = speciesAffinityDictionaryOrigin
+  aDO = speciesAffinityDictionaryOrigin,
+  Date = NULL
 ) {
   # Goal: Pass data.frame, return list of networks where a network corresponds
   #       to a row of the data.frame.
@@ -38,7 +39,14 @@ generateNetworks <- function(
     full.names = TRUE
   )
 
-  targetFiles <- dir(unlist(targetDirs), pattern = "(Sim|Int)", full.names = T)
+  targetDirs <- unlist(targetDirs)
+
+  if (!is.null(Date)) {
+    targetDirs <- grep(pattern = Date, x = targetDirs,
+                       fixed = TRUE, value = TRUE)
+  }
+
+  targetFiles <- dir(targetDirs, pattern = "(Sim|Int)", full.names = T)
 
   ### Retrieval Base: ##########################################################
   targetFiles <- lapply(
