@@ -8,13 +8,9 @@ supplement9 <- list()
 
 ### 9 Supplement: #############################################################
 ##### Examine the difference in distributions of sizes visually. ##############
-newplot6_Data <- Pers |> tidytable::filter(
+supplement9$data <- Pers |> tidytable::filter(
   NicheDistance == defaultNicheDistance,
-  (PoolPatchSeed %in% as.character(343:386)),
-  # SpeciesPreferences == "100% 0",
-  # SpeciesPreferences == "50% 0, 50% 1",
-  # SpeciesPreferences == "Uniform(0, 1)",
-  # InterventionInitial == InterventionFinal,
+  PoolPatchSeed %in% basePoolPatchSeeds,
   Stop > In, Start < Out
 ) |> tidytable::group_by(
   Intervention, InterventionInitial, InterventionFinal, Size, SpeciesPreferences
@@ -27,16 +23,11 @@ newplot6_Data <- Pers |> tidytable::filter(
   Weight = Weight / sum(Weight)
 ) |> dplyr::ungroup(
 )
-newplot_6a <- ggplot2::ggplot(
-  newplot6_Data,
+supplement9$plotA <- ggplot2::ggplot(
+  supplement9$data,
   ggplot2::aes(x = Size, y = Weight, color = Intervention)
 ) + ggplot2::geom_col(
   show.legend = FALSE
-  # ) + ggplot2::geom_line(
-  #   data = ~ .x |> dplyr::arrange(Size) |> dplyr::group_by(
-  #     SpeciesPreferences, Intervention, InterventionInitial, InterventionFinal
-  #   ) |> dplyr::mutate(Weight = cumsum(Weight)),
-  #   show.legend = FALSE
 ) + ggplot2::facet_grid(
   SpeciesPreferences + InterventionInitial ~ InterventionFinal
 ) + ggplot2::scale_color_manual(
@@ -45,11 +36,9 @@ newplot_6a <- ggplot2::ggplot(
 ) + ggplot2::geom_vline(
   xintercept = 0.1
 )
-newplot_6b <- ggplot2::ggplot(
-  newplot6_Data,
+supplement9$plotB <- ggplot2::ggplot(
+  supplement9$data,
   ggplot2::aes(x = Size, y = Weight, color = Intervention)
-  # ) + ggplot2::geom_col(
-  #   show.legend = FALSE
 ) + ggplot2::geom_line(
   data = ~ .x |> dplyr::arrange(Size) |> dplyr::group_by(
     SpeciesPreferences, Intervention, InterventionInitial, InterventionFinal
@@ -64,9 +53,9 @@ newplot_6b <- ggplot2::ggplot(
   xintercept = 0.1
 )
 
-newplot6 <- ggarrange(newplot_6a, newplot_6b)
+supplement9$plot <- ggarrange(supplement9$plotA, supplement9$plotB)
 ggplot2::ggsave(
-  newplot6,
-  filename = "Figure_supplement9_v1.png", # Uniform(0, 1)
+  supplement9$plot,
+  filename = "Figure_supplement9_v1.png",
   units = "cm", width = 20*3, height = 20*2
 )

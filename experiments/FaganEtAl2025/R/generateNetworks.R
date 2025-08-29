@@ -38,7 +38,7 @@ generateNetworks <- function(
     full.names = TRUE
   )
 
-  targetFiles <- dir(targetDirs, pattern = "(Sim|Int)", full.names = T)
+  targetFiles <- dir(unlist(targetDirs), pattern = "(Sim|Int)", full.names = T)
 
   ### Retrieval Base: ##########################################################
   targetFiles <- lapply(

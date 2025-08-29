@@ -1,57 +1,75 @@
 # Setup: ######################################################################
+# Plot the generalisation of Figure 5 by comparing and contrasting size KDEs.
+# For the Uniform case, 2-D is needed to properly convey the shift, so we also
+# plot the contours.
 
+# Too many graphs to do all at once; need to do multiple runs.
+targetPrefIndex <- 2
+targetPref <-
+  c("100% 0", "50% 0, 50% 1", "Uniform(0, 1)")[targetPrefIndex]
 
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
+source(file.path("R", "flattenDiversity.R")) # Req'd by below
+source(file.path("R", "generateNetworks.R")) # To create inset graphs.
+load("TSTS_Interventions_10a1.RData")
 
 supplement8 <- list()
 
 ### 8 Supplement: #############################################################
-##### 5s Idea 2: ##############################################################
-# Another interesting option: we plot vertical kde's for each intervention at
-# "-1", 10, 100, 200, and 400 time units from the intervention across all sims
-# with that land-use/intervention and species affinity setup. Then, *inside the
-# kde's* we plot all of points with little-no sizes along the axis (or maybe
-# along the edge of the kde?). More imporantly, we plot the *edges* with a fixed
-# alpha and size so that we can see the spread of interactions across the kdes.
-
 ####### Mockup 1: #############################################################
-newplot5_as_Specification <- diversitiesRichness |> tidytable::filter(
+supplement8$graph$specification <- diversitiesRichness |> tidytable::filter(
   NicheDistance == defaultNicheDistance,
-  (PoolPatchSeed %in% as.character(343:386)),
+  PoolPatchSeed %in% basePoolPatchSeeds,
   Metric == "Alpha Hill:0",
-  # SpeciesPreferences == "100% 0",
-  # SpeciesPreferences == "50% 0, 50% 1",
-  SpeciesPreferences == "Uniform(0, 1)",
+  SpeciesPreferences == targetPref,
   Intervention %in% c("(0)->(0.5)", "(0.5)->(0)"),
   is.na(Subset)
+) |> tidytable::left_join(
+  InterventionTimes |> tidytable::select(
+    TimeIntervention, PoolPatch:PatchAffinitySeed
+  ),
+  by = c("PoolPatch", "PoolPatchSeed", "Interactions",
+         "InteractionsSeed", "Events",
+         "EventsSeed", "InitialConditions",
+         "InitialConditionsSeed", "Dispersal",
+         "NicheDistance", "SpeciesAffinity",
+         "SpeciesAffinitySeed", "PatchAffinity",
+         "PatchAffinitySeed")
+) |> tidytable::mutate(
+  TimeSinceIntervention = Time - TimeIntervention
 ) |> tidytable::group_by(
   PoolPatch:InterventionFinal
 ) |> tidytable::filter(
-  Time %% 1 != 0 | # I.e., time recorded just before the intervention!
-    dplyr::lag(Time) %% 1 != 0 | # First time after the intervention (v9 !!)
-    dplyr::lag(Time, n = 11) %% 1 != 0 | # 10 * 10 + 1 time steps
-    dplyr::lag(Time, n = 21) %% 1 != 0 |
-    dplyr::lag(Time, n = 41) %% 1 != 0
+  TimeSinceIntervention < 0 | # time recorded before the intervention
+    abs(TimeSinceIntervention - 20) < 1e-6 | # time 20 CTUs after.
+    round((TimeSinceIntervention - 200)/10) == 0 | # time ~200 CTUs after
+    round((TimeSinceIntervention - 500)/10) == 0 | # time ~500 CTUs after
+    round((TimeSinceIntervention - 900)/10) == 0  # time ~900 CTUs after
+) |> tidytable::arrange(
+  TimeSinceIntervention
 ) |> tidytable::mutate(
-  Time2 = tidytable::case_when(
-    Time %% 1 != 0 ~ -1,
-    dplyr::lag(Time) %% 1 != 0 ~ 10,
-    dplyr::lag(Time, n = 2) %% 1 != 0 ~ 100,
-    dplyr::lag(Time, n = 3) %% 1 != 0 ~ 200,
-    dplyr::lag(Time, n = 4) %% 1 != 0 ~ 400
-  )
+  TimeLabel = tidytable::case_when(
+    TimeSinceIntervention < 0 ~ "Pre-Intervention",
+    dplyr::lag(TimeSinceIntervention) < 0 ~ "20 CTUs",
+    dplyr::lag(TimeSinceIntervention, n = 2) < 0 ~ "~200 CTUs",
+    dplyr::lag(TimeSinceIntervention, n = 3) < 0 ~ "~500 CTUs",
+    dplyr::lag(TimeSinceIntervention, n = 4) < 0 ~ "~900 CTUs"
+  ),
+  TimeLabel = factor(TimeLabel, levels = c(
+    "Pre-Intervention", "20 CTUs", "~200 CTUs", "~500 CTUs", "~900 CTUs"
+  ), ordered = TRUE)
 ) |> tidytable::ungroup(
 )
 
-newplot5_as_Networks <- generateNetworks(newplot5_as_Specification)
+supplement8$graph$networks <- generateNetworks(supplement8$graph$specification)
 
-newplot5_kdes <- lapply(
-  newplot5_as_Networks$Envs, function(e) {
+supplement8$kdes <- lapply(
+  supplement8$graph$networks$Envs, function(e) {
     e$trophics$EdgeVertexLists[[1]][[1]]$Vertices |> tidytable::select(
       node, Type, Size, N
     ) |> cbind(
-      e$Row |> tidytable::select(Time, Time2, PoolPatch:InterventionFinal)
+      e$Row |> tidytable::select(Time, TimeLabel, PoolPatch:InterventionFinal)
     ) |> tidytable::mutate(
       AffinityVals = e$result$Ellipsis$Affinity$SpeciesAffinities[
         as.numeric(substring(node, 2))
@@ -59,100 +77,17 @@ newplot5_kdes <- lapply(
     )
   }
 ) |> tidytable::bind_rows(
-  # ) |> tidytable::group_by(
-  #   PoolPatch:InterventionFinal
-  # ) |> tidytable::arrange(
-  #   Time
-  # ) |> tidytable::mutate( # fix for having not done it ahead of time...
-  #   Time2 = tidytable::case_when(
-  #     Time == unique(Time)[1] ~ -1,
-  #     Time == unique(Time)[2] ~ 10,
-  #     Time == unique(Time)[3] ~ 100,
-  #     Time == unique(Time)[4] ~ 200,
-  #     Time == unique(Time)[5] ~ 400
-  #   )
-  # ) |> tidytable::ungroup(
 )
 
-# newplot5_graph <- lapply(newplot5_as_Networks$Envs, function(e)
-#   e$graphs[[1]] %N>% select(
-#     node, Type, Size
-#   ) %N>% mutate(
-#     e$Row |> select(Time, PoolPatch:InterventionFinal)
-#   ) %E>% mutate(
-#     e$Row |> select(Time, PoolPatch:InterventionFinal)
-#   )
-# ) |> tidygraph::bind_graphs(
-# ) %N>% tidygraph::group_by( # Only supports manual specification
-#   PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, Events,
-#   EventsSeed, InitialConditions, InitialConditionsSeed, Dispersal,
-#   NicheDistance, Affinity, AffinitySeed, InterventionPatchType,
-#   InterventionPatchSeed, InterventionTimeType, InterventionTimeSeed,
-#   InterventionDispersal, InterventionNicheDistance, Intervention,
-#   SpeciesPreferences, InterventionInitial, InterventionFinal
-# ) %N>% tidygraph::arrange(
-#   Time
-# ) %N>% tidygraph::mutate( # fix for having not done it ahead of time...
-#   Time2 = dplyr::case_when(
-#     Time == unique(Time)[1] ~ -1,
-#     Time == unique(Time)[2] ~ 10,
-#     Time == unique(Time)[3] ~ 100,
-#     Time == unique(Time)[4] ~ 200,
-#     Time == unique(Time)[5] ~ 400
-#   )
-# ) %N>% tidygraph::ungroup(
-# ) %E>% tidygraph::group_by( # Only supports manual specification
-#   PoolPatch, PoolPatchSeed, Interactions, InteractionsSeed, Events,
-#   EventsSeed, InitialConditions, InitialConditionsSeed, Dispersal,
-#   NicheDistance, Affinity, AffinitySeed, InterventionPatchType,
-#   InterventionPatchSeed, InterventionTimeType, InterventionTimeSeed,
-#   InterventionDispersal, InterventionNicheDistance, Intervention,
-#   SpeciesPreferences, InterventionInitial, InterventionFinal
-# ) %E>% tidygraph::arrange(
-#   Time
-# ) %E>% tidygraph::mutate( # fix for having not done it ahead of time...
-#   Time2 = dplyr::case_when(
-#     Time == unique(Time)[1] ~ -1,
-#     Time == unique(Time)[2] ~ 10,
-#     Time == unique(Time)[3] ~ 100,
-#     Time == unique(Time)[4] ~ 200,
-#     Time == unique(Time)[5] ~ 400
-#   )
-# ) %E>% tidygraph::ungroup(
-# )
-
-# ggraph::ggraph(
-#   ggraph::create_layout(newplot5_graph, "manual",
-#                         y = newplot5_graph %N>% tidygraph::pull(Size), x = -0.5)
-ggplot2::ggplot(
+supplement8$PlotDensity <- ggplot2::ggplot(
 ) + ggplot2::geom_density(
-  data = newplot5_kdes,
+  data = supplement8$kdes,
   mapping = ggplot2::aes(
     y = Size, fill = Type, color = Intervention
   ),
   trim = TRUE
-  # ) + ggplot2::geom_rug(
-  #   ggplot2::aes(color = Type)
-  # ) + ggraph::geom_edge_arc(
-  #   mapping = aes(
-  #     color = Type,
-  #     #color = node1.Type, # but then exploit+ between consumers is orange.
-  #     linetype = Type,
-  #     alpha = log10(effectNormalised),
-  #     end_cap = circle(2, 'pt')
-  #   ),
-  #   arrow = arrow(length = unit(2, 'mm')),
-  #   alpha = 0.2,
-  #   show.legend = FALSE
-  # ) + ggraph::geom_node_point(
-  #   mapping = aes(
-  #     color = Type
-  #   ),
-  #   show.legend = FALSE
-  #   # ) + ggplot2::geom_hline(
-  #   #   yintercept = -1, linetype = "dashed", color = "black"
 ) + ggplot2::facet_grid(
-  Intervention + SpeciesPreferences ~ Time2
+  Intervention + SpeciesPreferences ~ TimeLabel
 ) + ggplot2::scale_y_log10(
 ) + ggplot2::scale_color_manual(
   values = colorPalette,
@@ -163,60 +98,47 @@ ggplot2::ggplot(
 )
 
 ggplot2::ggsave(
-  ggplot2::ggplot(
-  ) + ggplot2::geom_density(
-    data = newplot5_kdes,
-    mapping = ggplot2::aes(
-      y = Size, fill = Type, color = Intervention
-    ),
-    trim = TRUE
-  ) + ggplot2::facet_grid(
-    Intervention + SpeciesPreferences ~ Time2
-  ) + ggplot2::scale_y_log10(
-  ) + ggplot2::scale_color_manual(
-    values = colorPalette,
-    name = "Habitat Land-use"
-  ) + ggplot2::scale_fill_manual(
-    values = c("Basal" = "darkgreen", "Consumer" = "burlywood4")
-  ) + ggplot2::theme_minimal(
-  ),
-  # filename = "Figure5s1_Prototype1.png", # 100% 0
-  # filename = "Figure5s2_Prototype1.png", # 50% 0, 50% 1
-  filename = "Figure5s3_Prototype1.png", # Uniform(0, 1)
+  supplement8$PlotDensity,
+  filename = paste0("Figure_supplement8_v1_", targetPrefIndex, "_Dens.png"),
   units = "cm", width = 6.5*3, height = 6.5*2
 )
 
-ggplot2::ggsave(
-  ggplot2::ggplot(
-  ) + ggplot2::geom_density_2d(
-    # ) + ggplot2::geom_bin_2d(
-    data = newplot5_kdes,
-    mapping = ggplot2::aes(
-      x = AffinityVals, y = Size,
-      # fill = Type,
-      color = Intervention,
-      group = interaction(Type, Intervention)
-    ),
-    # bins = 10
-    alpha = 0.4,
-    contour_var = "count",
-    adjust = 0.7
-    # trim = TRUE
-  ) + ggplot2::geom_hline(
-    yintercept = 0.1, color = "red", show.legend = FALSE
-  ) + ggplot2::facet_grid(
-    Intervention + SpeciesPreferences ~ Time2
-  ) + ggplot2::scale_y_log10(
-  ) + ggplot2::scale_color_manual(
-    values = colorPalette,
-    name = "Habitat Land-use"
-  ) + ggplot2::scale_fill_manual(
-    values = c("Basal" = "darkgreen", "Consumer" = "burlywood4")
-    # ) + ggplot2::scale_fill_viridis_c(
-  ) + ggplot2::theme_minimal(
-  ) + ggplot2::xlab(
-    "Land-use Type"
-  ),
-  filename = "Figure_supplement8_v1.png", # Uniform(0, 1)
-  units = "cm", width = 10*3, height = 10*2
-)
+if (targetPref != "100% 0") {
+  supplement8$PlotContour <-
+    ggplot2::ggplot(
+    ) + ggplot2::geom_density_2d(
+      # ) + ggplot2::geom_bin_2d(
+      data = supplement8$kdes,
+      mapping = ggplot2::aes(
+        x = AffinityVals, y = Size,
+        # fill = Type,
+        color = Intervention,
+        group = interaction(Type, Intervention)
+      ),
+      # bins = 10
+      alpha = 0.4,
+      contour_var = "count",
+      adjust = 0.7
+      # trim = TRUE
+    ) + ggplot2::geom_hline(
+      yintercept = 0.1, color = "red", show.legend = FALSE
+    ) + ggplot2::facet_grid(
+      Intervention + SpeciesPreferences ~ TimeLabel
+    ) + ggplot2::scale_y_log10(
+    ) + ggplot2::scale_color_manual(
+      values = colorPalette,
+      name = "Habitat Land-use"
+    ) + ggplot2::scale_fill_manual(
+      values = c("Basal" = "darkgreen", "Consumer" = "burlywood4")
+      # ) + ggplot2::scale_fill_viridis_c(
+    ) + ggplot2::theme_minimal(
+    ) + ggplot2::xlab(
+      "Land-use Type"
+    )
+
+  ggplot2::ggsave(
+    supplement8$PlotContour,
+    filename = paste0("Figure_supplement8_v1_", targetPrefIndex, "_Contour.png"),
+    units = "cm", width = 10*3, height = 10*2
+  )
+}
