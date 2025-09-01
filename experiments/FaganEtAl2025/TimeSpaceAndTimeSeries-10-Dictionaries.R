@@ -1,3 +1,6 @@
+# Define all of the use cases that we are considering and provide a base case
+# for usage in the simulations.
+
 library(dplyr)
 
 basecase <- data.frame(
@@ -22,9 +25,12 @@ basecase <- data.frame(
 
 # Pool-Patch: #################################################################
 poolpatchDictionaryOrigin <- expand.grid(
+  # Designate number of species (relative).
   BasalConsumerRatio = c(1/3, 1/2, 2/3, 1),
   NSpecies = floor(10^c(1, 1.5, 1.75, 2, 2.15, log10(200), log10(300))),
+  # Designate how the species vary.
   PoolFunction = "RMTRCode2::LawMorton1996_species",
+  # Call to function looks like:
   # PoolParameters = c(
   #   paste("Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1)",
   #         "LogBodySize = c(-2, -1, -1, 0)", sep = "; ")
@@ -32,17 +38,21 @@ poolpatchDictionaryOrigin <- expand.grid(
   PoolK1InteractionEffectiveness = 10^c(-2, -1.5, -1, -0.5),
   PoolK2ConsumerSizeAdvantage = 10^c(1, 1.5),
   PoolK3ConsumerPredationRange = 10^c(-1.5, -1, -0.5, log10(0.5), 0),
-  PoolK4ConsumerEfficiency = c(0.05, 0.1, 0.15, 0.2),
-  PoolK5BasalBiomass = c(30, 100, 300),
-  PoolK6CoefOfVariation = c(0.01, 0.1, 0.2),
+  PoolK4ConsumerEfficiency = c(0.05, 0.1, 0.15, 0.2), # ~% energy gain.
+  PoolK5BasalBiomass = c(30, 100, 300), # without species interactions.
+  PoolK6CoefOfVariation = c(0.01, 0.1, 0.2), # Amount of noise added.
+  # Body sizes, min and maximum on a log scale.
   PoolBasalLogBodySize = c("c(-2, -1)", "c(-2, 0)", "c(-3, -1)"),
   PoolConsumerLogBodySize = c("c(-1, 0)", "c(-1, 0.5)", "c(-1, 1)", "c(-1, 2)"),
   PoolDispersalSpeed = 1, # Value divided by DispersalResistance to get current.
+  # Numbers are "nice": o, o-o, o<o-o>o, o<o-o-o-o>o, o<o-o-o-o-o>o.
+  #                               o-o      o-o-o-o      o-o-o-o-o
   NumberEnvironments = c(1, 2, 6, 10, 12),
   stringsAsFactors = FALSE
 ) %>% dplyr::mutate(ID = dplyr::row_number())
 
 # Dynamics: ###################################################################
+# Mostly same parameters as above, but we do permit them to vary to be safe.
 dynamicsDictionaryOrigin <- expand.grid(
   InteractionFunction = "RMTRCode2::LawMorton1996_CommunityMat",
   # InteractionParameters = "Parameters = c(0.01, 10, 0.5, 0.2, 100, 0.1)",
@@ -52,6 +62,7 @@ dynamicsDictionaryOrigin <- expand.grid(
   InteractionK4ConsumerEfficiency = c(0.05, 0.1, 0.15, 0.2),
   InteractionK5BasalBiomass = c(30, 100, 300),
   InteractionK6CoefOfVariation = c(0, 0.01, 0.1, 0.2),
+  # When do we call a level of abundance computationally extirpated?
   InteractionEliminationThreshold = 10^c(-7, -6, -5, -4, -3),
   DynamicsFunction = "RMTRCode2::PerCapitaDynamics_Type1",
   stringsAsFactors = FALSE
@@ -63,7 +74,8 @@ eventsDictionaryOrigin <- expand.grid(
   EventsNumberMultiplier = c(1, 2, 10, 20), # I.e. how many more events
   ImmigrationMultiplier = c(0.1, 1, 10), # Mult. is on rate and number.
   ImmigrationFunction = "RMTRCode2::ArrivalFUN_Example2",
-  ColonizationPropaguleSize = c(0.0004, 0.004, 0.04, 0.4, 4), # Initial abundance on Colonize.
+  # Initial abundance on Colonize.
+  ColonizationPropaguleSize = c(0.0004, 0.004, 0.04, 0.4, 4),
   ExtirpationMultiplier = c(0.1, 1, 10), # Frequency multiplier
   ExtirpationFunction = "RMTRCode2::ExtinctFUN_Example2",
   ExtirpationProportion = c(1, 0.9, 0), # Proportion of population removed.
@@ -72,6 +84,9 @@ eventsDictionaryOrigin <- expand.grid(
 
 # Initial Conditions: #########################################################
 initialConditionsDictionaryOrigin <- rbind(
+  # We ended up only using ab nihilo ICs, but did consider alternatives.
+  # Note in particular that one could in theory end up in non-sequentially
+  # assemblable states with alternatives ICs.
   data.frame(Species = "None", Method = NA, Argument = NA,
              stringsAsFactors = FALSE),
   data.frame(Species = c("Basal", "All"),
@@ -86,6 +101,7 @@ initialConditionsDictionaryOrigin <- rbind(
 ) %>% dplyr::mutate(ID = dplyr::row_number())
 
 # Dispersal: ##################################################################
+# Multi-patch systems, how do we connect them?
 # Note: ID is not the row number, because access is via:
 # dispersalDictionaryOrigin[ifelse(is.na(dispersalDictionaryChoice),
 #                           1, dispersalDictionaryChoice + 2), ]
@@ -102,6 +118,8 @@ dispersalDictionaryOrigin <- dispersalDictionaryOrigin %>% dplyr::mutate(
 )
 
 # Distance/Intensity/Affinity Effect: #########################################
+# I.e., what is the repercussion of well-/poor-adaptation.
+# rho.a.b.c.dist(x,y) = a^(b - c * dist(x, y)).
 distanceDictionaryOrigin <- data.frame(
   rhofunction = c( # Take patch and species affinities as vector arguments.
     "rho.noop", # Just returns 1.
@@ -158,7 +176,7 @@ interventionPatchDictionaryOrigin <- expand.grid(
     # If numeric, it takes it as a fixed set of affinities.
     # If non-numeric, it attempts to treat the string as a function name.
     # In the latter case, it provides ONLY NumberEnvironments as an argument.
-    
+
     "rep_0", #               Patch {0} affinities.
     "rep_0.25", #            Patch {0.25} affinities.
     "rep_0.5", #             Patch {0.5} affinities.
@@ -178,6 +196,7 @@ interventionPatchDictionaryOrigin <- expand.grid(
     0 # First
   ),
   InterventionPercentage = c(
+    # I.e., how many patches as a fraction(!) should be affected.
     1/3,
     0.5,
     2/3,
@@ -191,8 +210,8 @@ interventionTimeDictionaryOrigin <- data.frame(
   # Time1, Time2; called by eval(str2lang(X)) where X is the string below
   #               and "loaded" is the file that is loaded.
   Time1 = c(
-    "median(loaded$Events$Times)",
-    "quantile(loaded$Events$Times, p = 0.25)",
+    "median(loaded$Events$Times)", # default, two ideas of "middle".
+    "quantile(loaded$Events$Times, p = 0.25)", # random inter-quartile range
     "quantile(loaded$Events$Times, p = 0.05)" # for early/long run.
   ),
   Time2 = c(
