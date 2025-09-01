@@ -1,3 +1,4 @@
+# Last checked 2025/09/01.
 # Now with added Invadability.
 
 # Problems with X11
@@ -17,6 +18,9 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(patchwork)
+
+pathRfunctions <- file.path("..", "R")
+source(file.path(pathRfunctions, "GammaOverAlpha.R"))
 
 # Plotting parameters.
 time_grouping_size <- 20 # Used for initial filtering down of data, median.
@@ -585,7 +589,7 @@ ggplot2::ggsave(
 )
 
 ## Alpha Gamma Space Plots: ####################################################
-concludingplotdata_target <- DiversitiesAlphaGamma%>% dplyr::filter(
+concludingplotdata_target <- DiversitiesAlphaGamma %>% dplyr::filter(
   Space %in% c("1", "1000", "1e+06", "1e+09"),
   Neutral %in% c("1, 0.1", "1, 1", "0.1, 1"),
   Pool == "0, 0, 0, 0", Noise == "1"
