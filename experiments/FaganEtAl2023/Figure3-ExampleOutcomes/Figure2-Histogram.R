@@ -1,12 +1,13 @@
 # Histogram, saved at 260 width by 320 height
 # follows on from loading a PoolMats.RData object.
-# Intended for usage with 
+# Intended for usage with
 #    Data_2022-09-16/MNA-ExampleOutcome-PoolMats-Env10.RData
+library(ggplot2)
 
 tosave <- ggplot2::ggplot(
-  Pool, 
+  Pool,
   ggplot2::aes(
-    x = Size, 
+    x = Size,
     fill = Type
   )
 ) + ggplot2::geom_histogram(
@@ -19,16 +20,16 @@ tosave <- ggplot2::ggplot(
 ) + ggplot2::ylab(
   "   Count"
 ) + ggplot2::theme(
-  legend.position = -c(0.25, 0.15), 
-  legend.title = ggplot2::element_blank(), 
-  legend.box.background = ggplot2::element_blank(), 
-  legend.background = ggplot2::element_blank(), 
+  legend.position = -c(0.25, 0.15),
+  legend.title = ggplot2::element_blank(),
+  legend.box.background = ggplot2::element_blank(),
+  legend.background = ggplot2::element_blank(),
   legend.spacing.x = ggplot2::unit(0.01, 'cm')
 )
 
 ggplot2::ggsave(
-    tosave,
-    "Pool-260x320.png",
-    units = "px",
-    width = 260, height = 320, dpi = 300
+  plot = tosave,
+  filename = "Pool-260x320.png",
+  units = "px",
+  width = 260, height = 320, dpi = 100
 )
