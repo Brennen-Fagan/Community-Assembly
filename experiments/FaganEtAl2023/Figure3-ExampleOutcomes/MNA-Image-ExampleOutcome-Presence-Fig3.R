@@ -11,12 +11,20 @@ library(tidyr)        # Data Pivotting
 library(ggplot2)      # 2-D Plot
 library(gridExtra)
 
+
+
 # Problems with X11
 options(bitmapType = "cairo")
 
 by_for_thinning <- 100 # time steps
 divide_time_by <- 1E4 # time units
 burn_in <- 1E4 # time units
+
+pathRfunctions <- file.path("..", "R")
+source(file.path(pathRfunctions, "Calculate_Diversity.R"))
+source(file.path(pathRfunctions, "Calculate_Species.R"))
+source(file.path(pathRfunctions, "load_safe.R"))
+source(file.path(pathRfunctions, "load_safe_thin.R"))
 
 # Implementation: ##############################################################
 
@@ -90,22 +98,21 @@ SpeciesPresence <-  sapply(
   }
 )
 
-Properties <- strsplit(names(SpeciesPresence), '-',
+Properties <- gsub(pattern = ".RData", replacement = "",
+                   x = names(SpeciesPresence), fixed = TRUE)
+Properties <- strsplit(Properties, '-',
                        fixed = TRUE)
-# 1st Chunk: Name, Discard
-# 2nd Chunk: Iteration + Distance
-# 3rd Chunk: Result or Extinction Rate (or Arrival?)
-# 4th Chunk: Number of Environments
-# 5th Chunk: Space Type + .RData
+Properties <- lapply(Properties,
+                     function(x) if (length(x) < 10) {c(x, NA)} else {x})
 # Note the mix of Keyword and Location Structure (oops).
-# Note also that this strsplit character is a bad decision and should be changed for next time. (D'oh.)
 # (E.g. Dates DD-MM-YYYY, Decimals 1.35e-05.)
 Properties <- data.frame(
   do.call(rbind, Properties),
   stringsAsFactors = FALSE
 )
-names(Properties)[1:6] <- c(
-  "MNA", "IterANDRate", "Modifier", "EnvNum", "Space", "DistAND.RData"
+names(Properties)[1:10] <- c(
+  "PathMNA", "ExampleExtProp", "Result", "EnvNum", "Space",
+  "Distance", "Imm", "Ext", "ExtProp", "MaybeSubset"
 )
 
 Properties$FullName <- names(SpeciesPresence)
@@ -118,34 +125,26 @@ patternString <- "((?>[a-zA-Z]+)(?=[0-9eE]))\\K"
 # Split strings. Some of the trick will be to introduce
 # a character to make the separation around. We use "_".
 Properties <- Properties %>% dplyr::mutate(
-  IterANDRate = gsub(pattern = patternString,
+  ExtProp = gsub(pattern = patternString,
                      replacement = "_",
-                     x = IterANDRate, perl = TRUE),
-  Modifier = gsub(pattern = patternString,
-                  replacement = "_",
-                  x = Modifier, perl = TRUE),
+                     x = ExtProp, perl = TRUE),
   EnvNum = gsub(pattern = patternString,
                 replacement = "_",
                 x = EnvNum, perl = TRUE)
 ) %>% tidyr::separate(
-  IterANDRate, into = c("Iter", "Rate"),
-  sep = "[_]", fill = "right"
-) %>% tidyr::separate(
-  Modifier, into = c("Modifier", "ModIntensity"),
+  ExtProp, into = c("ExtProp", "ExtProportion"),
   sep = "[_]", fill = "right"
 ) %>% tidyr::separate(
   EnvNum, into = c("Env", "Environments"),
   sep = "[_]"
-) %>% tidyr::separate(
-  DistAND.RData, into = c("Distance", ".RData"),
-  sep = "[.]"
 ) %>% dplyr::select(
-  -MNA, -.RData, -Env
+  -PathMNA, -ExampleExtProp, -Result, -Env, -ExtProp, -MaybeSubset
 ) %>% dplyr::mutate(
   Distance = dplyr::case_when(
     is.na(Distance) ~ "1e+00",
     TRUE ~ Distance
   )
+) %>% dplyr::distinct(
 )
 
 Diversity <- lapply(1:length(Diversity),
@@ -194,7 +193,9 @@ SpeciesPresence$SizeID <-
   ]
 
 SpeciesPresence <- SpeciesPresence %>% dplyr::group_by(
-  Modifier, ModIntensity, Space, Distance,
+  # Modifier, ModIntensity,
+  Imm, Ext, ExtProportion,
+  Space, Distance,
   Species, Time, SizeID
 ) %>% dplyr::summarise(
   Count = n(), .groups = "drop"
@@ -224,7 +225,10 @@ DiversityRibbons <- Diversity %>% dplyr::filter(
   !(Environment %in% c("Mean", "Gamma")),
   Measurement == "Richness" | Measurement == "Jaccard"
 ) %>%  dplyr::group_by(
-  Time, Iter, Distance, Modifier, ModIntensity, Environments, Space, Dispersal,
+  Time, #Iter,
+  Distance,
+  Imm, Ext, ExtProportion,
+  Environments, Space, Dispersal,
   Measurement
   # Pool, Noise, Neutral, Space
 ) %>% dplyr::summarise(
@@ -239,7 +243,10 @@ DiversityRibbons_Gamma <- Diversity %>% dplyr::filter(
   (Environment %in% c("Gamma")),
   Measurement == "Richness"
 ) %>%  dplyr::group_by(
-  Time, Iter, Distance, Modifier, ModIntensity, Environments, Space, Dispersal,
+  Time, #Iter,
+  Distance,
+  Imm, Ext, ExtProportion,
+  Environments, Space, Dispersal,
   Measurement
   # Pool, Noise, Neutral, Space
 ) %>% dplyr::summarise(
