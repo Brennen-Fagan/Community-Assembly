@@ -1,11 +1,13 @@
+# Define a wrapper function to more easily keep track of the inputs from the
+# dictionary combinations.
+
 # Libraries: ##################################################################
 library(RMTRCode2)
 library(dplyr)
 library(Matrix)
 
 # Directory Functions and Objects: ############################################
-directory <- "." # Should be "VariantExperiments"
-# source(file.path(directory, "TimeSpaceAndTimeSeries-0-Functions.R"))
+directory <- "." # Should be "FaganEtAl2025"
 source(file.path(directory, "TimeSpaceAndTimeSeries-10-Dictionaries.R"))
 
 # Function Definition: ########################################################
@@ -43,11 +45,12 @@ simulationWrapper <- function(
   errorIfSaveExists = FALSE
 ) {
   #  Parameters: ##############################################################
+  # Intelligent defaults and downstream parameter handling.
   params <- list(
     EliminationThreshold = 10^-4, # Below which species are removed.
     ArrivalDensity =  4 * 10 ^ 3 * 10^-4, # Traill et al. 2007: MULTIPLIED BY ET.
-    MaximumTimeStep = 5, # Maximum time solver can proceed without elimination. # From 1
-    BetweenEventSteps = 2, # Number of steps to reach next event to smooth. # From 10
+    MaximumTimeStep = 5, # Maximum time solver can proceed without elimination.
+    BetweenEventSteps = 2, # Number of steps to reach next event to smooth.
     Date = Sys.Date() # Label for the folders
   )
   namespold <- names(params)
@@ -59,6 +62,8 @@ simulationWrapper <- function(
   }
 
   # Dictionaries: #############################################################
+  # Match the provided entry values to the actual dictionary entries.
+  # Initialise the random number generator factories while we are at it.
   poolpatchDictionary <-
     poolpatchDictionaryOrigin[poolpatchDictionaryChoice, ] %>% dplyr::mutate(
       Basals = ceiling((1 - (1 + BasalConsumerRatio)^(-1)) * NSpecies),
@@ -118,6 +123,8 @@ simulationWrapper <- function(
   patchAffinitySeedIndex <- indexFactory()
 
   # Edit params: ##############################################################
+  # Brief the user if they sent in values that overwrite the old defaults
+  # without invoking the parameters arguments.
   if ("InteractionEliminationThreshold" %in% names(dynamicsDictionary)) {
     warning(paste0("Overwriting Elimination Threshold with: ",
                    dynamicsDictionary$InteractionEliminationThreshold))
@@ -132,6 +139,7 @@ simulationWrapper <- function(
   }
 
   # Files: ####################################################################
+  # Organise the file names and folders to make tracking of outputs easier.
   partialID <- paste0(
     # PARAMETERS:
     poolpatchDictionaryChoice, "-", # Bundle Inter-Simulation Constants.
@@ -171,7 +179,7 @@ simulationWrapper <- function(
     patchAffinitySeedChoice
   )
 
-
+  # Make sure that the call has the intended consequences.
   if(saveResults) {
     datfile <- file.path(
       datfolder,
@@ -189,6 +197,8 @@ simulationWrapper <- function(
     }
   }
 
+  # Save some time and processing power for creating the shared resources.
+  # (This seems to default to parallel and uncapped on research servers???)
   datfile_ppd <- file.path(
     datfolder,
     paste0(
@@ -204,6 +214,7 @@ simulationWrapper <- function(
   }
 
   # Pools and Interaction Matrices: ###########################################
+  # Safely load or create and save the shared resources.
   if (exists("datfile_ppd_envir")) {
     # Pool, InteractionMatrices, DynamicsFunction, CharacteristicRate,
     Pool <- datfile_ppd_envir$Pool
@@ -211,6 +222,8 @@ simulationWrapper <- function(
     DynamicsFunction <- datfile_ppd_envir$DynamicsFunction
     CharacteristicRate <- datfile_ppd_envir$CharacteristicRate
   } else {
+    # For each: set a random seed, establish a temporary environment, and run
+    # the appropriate function.
     id <- poolpatchSeedIndex()
     Pool <- with(poolpatchDictionary, {
       do.call(what = retrieveFunction(PoolFunction),
@@ -277,10 +290,6 @@ simulationWrapper <- function(
                            InteractionK4ConsumerEfficiency,
                            InteractionK5BasalBiomass,
                            InteractionK6CoefOfVariation)
-          # !!!callMeMaybe2(InteractionParameters)
-          # # !!! suggested by Bing Chat. Not obvious @me how it evaluates the list.
-          # # Prompt 'R purrr, using a list of arguments to partialize a function'.
-          # # 2024/01/19
         ),
         seed = withRandom(runif(id)[id] * 1e8, seed = dynamicsSeed)
       )}
@@ -306,7 +315,8 @@ simulationWrapper <- function(
     }
   }
 
-  # Affinities are no longer a part of the pool-patch framework.
+  # Affinities are not a part of the pool-patch framework.
+  # Instead, we assign afterwards to allow us to vary them independently.
   id <- speciesAffinitySeedIndex()
   SpeciesAffinities <- with(speciesAffinityDictionary, {
     if(!is.na(as.numeric(substr(SpeciesAffinities, 1, 1)))) {
