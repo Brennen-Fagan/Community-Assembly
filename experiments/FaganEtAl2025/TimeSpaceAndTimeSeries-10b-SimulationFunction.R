@@ -349,7 +349,7 @@ simulationWrapper <- function(
     }
   }), nrow = poolpatchDictionary$NumberEnvironments)
 
-  # Events: #####################################################################
+  # Events: ####################################################################
   EventsEach <- with(poolpatchDictionary, {
     retrieveFunction(eventsDictionary$EventsFunction)(
       NumberEnvironments, Basals + Consumers
@@ -390,7 +390,7 @@ simulationWrapper <- function(
   )
   rprime <-
     rep(Pool$ReproductionRate, poolpatchDictionary$NumberEnvironments) *
-    mapply(
+    mapply(# simultaneously 1st entries, then 2nd entries, etc.
       grid$pool,
       grid$patch,
       FUN = function(i, j) {
@@ -401,6 +401,7 @@ simulationWrapper <- function(
       }
     ) ^ sign(rep(Pool$ReproductionRate, poolpatchDictionary$NumberEnvironments))
 
+  # Implement the logistic carrying capacity functionally.
   if (!is.null(logisticCarryingCapacity)) {
     if ("basal" %in% tolower(names(logisticCarryingCapacity))) {
       if ("consumer" %in% tolower(names(logisticCarryingCapacity))) {
@@ -438,8 +439,10 @@ simulationWrapper <- function(
     }
   }
 
+  # Different handling is needed depending on if arguments are functions.
+  # (Could functionalise the calls, but that introduces overhead on each call.)
   if (is.function(rprime)) {
-    # Calculate rprime using Parms$Patch
+    # Calculate rprime using Parms$Patch (i.e., within patch)
     if (is.function(InteractionMatrices$Mats[[1]])) {
       # Calculate and combine interaction matrices on the fly.
       PerCapitaDynamics <- DynamicsFunction(
@@ -537,6 +540,7 @@ simulationWrapper <- function(
       }))
 
   # Run Simulation: ###########################################################
+  # This calls the original wrapper that just wraps the solver engine & times.
   result <- RMTRCode2::MultipleNumericalAssembly_Dispersal(
     Pool = Pool,
     PopulationInitial = popInitial,
