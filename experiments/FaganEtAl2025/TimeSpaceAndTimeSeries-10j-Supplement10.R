@@ -9,7 +9,7 @@
 # general shape.
 
 # Too many graphs to do all at once; need to do multiple runs.
-targetPrefIndex <- 2
+targetPrefIndex <- 3
 targetPref <-
   c("100% 0", "50% 0, 50% 1", "Uniform(0, 1)")[targetPrefIndex]
 
@@ -49,7 +49,8 @@ supplement10$graph$networks <-
                    Date = "2025-07-30")
 
 # Scratch work for what we are trying to do upon getting to v10.
-supplement10$plot <- supplement10$graph$networks$Index |> split(
+supplement10$plot <-
+  supplement10$graph$networks$Index |> split(
   1:nrow(supplement10$graph$networks$Index)
 ) |> tidytable::map_dfr(
   .f = function(spec) {
@@ -99,16 +100,27 @@ supplement10$plot <- supplement10$graph$networks$Index |> split(
 ) |> tidytable::arrange(
   Size
 ) |> tidytable::group_by(
-  # PoolPatchSeed,
+  PoolPatchSeed,
   SpeciesPreferences, NicheDistance, Intervention
 ) |> tidytable::mutate(
-  Total = cumsum(Total)/length(unique(PoolPatchSeed)) # Average 'Flux'
+  Total =
+    round(cumsum(Total)/length(unique(PoolPatchSeed)), 12) # Average 'Flux'
+  # Round to prevent extremely small negatives negatives.
 ) |> ggplot2::ggplot(
   ggplot2::aes(x = Size, y = Total, color = Intervention,
-               group = Intervention
-               # group = interaction(Intervention, PoolPatchSeed)
+               # group = Intervention
+               group = interaction(Intervention, PoolPatchSeed)
   )
 ) + ggplot2::geom_step(
+  show.legend = FALSE,
+  alpha = 0.2
+) + ggplot2::stat_smooth(
+  ggplot2::aes(x = Size, y = Total, color = Intervention),
+  inherit.aes = FALSE,
+  method = "gam",
+  method.args = list(
+    family = mgcv::nb()
+  ),
   show.legend = FALSE
 ) + ggplot2::facet_wrap(
   .~SpeciesPreferences
@@ -118,7 +130,8 @@ supplement10$plot <- supplement10$graph$networks$Index |> split(
 ) + ggplot2::geom_vline(
   xintercept = 0.1
 ) + ggplot2::ylab(
-  "Averaged Effect Flux"
+  # "Averaged Effect Flux"
+  "Effect Flux"
 ) + ggplot2::theme_minimal(
 )
 
