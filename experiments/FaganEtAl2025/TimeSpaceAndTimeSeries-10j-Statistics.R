@@ -134,7 +134,10 @@ supplementStatistics$STAT$turnover <-
 # positive richness changes in 3% of land-use change scenarios, compared to no
 # change in 26% and declines in 71% of land-use change scenarios."
 
-supplementStatistics$STAT$shortTermLoss <-
+# ABOVE NEEDS TO BE ADJUSTED IN THE TEXT, e.g. we're not reaching the 26%.
+# supplementStatistics$STAT$shortTermLoss
+
+supplementStatistics$shortTermLoss <-
   diversitiesRichness |> tidytable::filter(
     PoolPatchSeed %in% basePoolPatchSeeds,
     NicheDistance == defaultNicheDistance,
@@ -173,7 +176,7 @@ supplementStatistics$STAT$shortTermLoss <-
   )
 
 supplementStatistics$PLOT$shortTermLoss <-
-  supplementStatistics$STAT$shortTermLoss |> tidytable::pivot_longer(
+  supplementStatistics$shortTermLoss |> tidytable::pivot_longer(
     cols = Neg:Pos, names_to = "Type", values_to = "Counts"
   ) |> tidytable::mutate(
   Percentage = Counts / Total * 100,
@@ -193,11 +196,26 @@ supplementStatistics$PLOT$shortTermLoss <-
   values = colorPalette
 )
 
+# Too fine to examine inside of R. Need to magnify further.
 ggplot2::ggsave(
   plot = supplementStatistics$PLOT$shortTermLoss,
   filename = "Figure_supplementStatistics_ShortTermLoss.png",
   height = 200, width = 200, units = "cm", limitsize = FALSE
 )
+
+# Take some slices so we end up with something more writable in a paper.
+supplementStatistics$STAT$shortTermLoss <-
+  # 3 times for each of the 3 preferences with each of the 3 statistics.
+  supplementStatistics$shortTermLoss |> tidytable::filter(
+    TimeSinceIntervention %in% c(10, 20, 50)
+  ) |> tidytable::group_by(
+    SpeciesPreferences, TimeSinceIntervention
+  ) |> tidytable::summarise(
+    Total = sum(Total),
+    Neg = sum(Neg),
+    Zero = sum(Zero),
+    Pos = sum(Pos)
+  )
 
 # #############################################################################
 
