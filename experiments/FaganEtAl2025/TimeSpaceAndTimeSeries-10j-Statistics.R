@@ -115,18 +115,98 @@ supplementStatistics$STAT$turnover <-
 
 # Long term richness changes between different adaptation scenarios: ##########
 # "The result is an overall reduction in richness, even in comparison to the
-# extreme adaptation case (Figure 2), with an expected loss of 3.8 species
-# (standard error 0.046), but this depends on the strength of the
+# extreme adaptation case (Figure 2), with an expected loss of 3.96 species
+# (standard error 0.317), but this depends on the strength of the
 # species-habitat interaction."
 
 # This is comparing between Uniform(0, 1) and 100% 0 in (0).
 
+supplementStatistics$diff_1000_5050 <-
+  diversitiesRichness |> tidytable::filter(
+    PoolPatchSeed %in% basePoolPatchSeeds,
+    NicheDistance == defaultNicheDistance,
+    Intervention %in% c("(0)"),
+    Time > Start, Time < Stop, # Not things outside of [Start, Stop]
+    is.na(Subset),
+    SpeciesPreferences %in% c("100% 0", "50% 0, 50% 1")
+  ) |> tidytable::group_by(
+    Time, PoolPatchSeed
+  ) |> tidytable::mutate(
+    Value = ifelse(SpeciesPreferences == "100% 0", # Reference
+                   -Value, Value)
+  ) |> tidytable::summarise(
+    Value = sum(Value)
+  )
+
+supplementStatistics$STAT$diff_1000_5050 <- list(
+  summary(supplementStatistics$diff_1000_5050$Value),
+  sd(supplementStatistics$diff_1000_5050$Value),
+  nlme::lme(
+    data = supplementStatistics$diff_1000_5050,
+    fixed = Value ~ 1, # Time, # Time ~ little to no effect.
+    random = ~ 1 | PoolPatchSeed, # Nat. Variation in Intercept
+    correlation = nlme::corAR1(form = ~ Time | PoolPatchSeed)
+  ) |> summary()
+)
+
 # "While there is some evidence of an edge effect in the land-use preferences --
-# intermediate land-use had ~0.6 more species (differences of 0.621 and 0.629
-# with standard errors of 0.0250 and 0.0248) -- the differences are otherwise
+# intermediate land-use had ~0.6-0.7 more species (differences of 0.59 and 0.73
+# with standard errors of 0.17 and 0.13) -- the differences are otherwise
 # minor in other traits."
 
 # This is comparing amongst Uniform(0, 1): (0.5) - (0) and (0.5) - (1).
+
+supplementStatistics$diff_unif_5v0 <- tidytable::left_join(
+  diversitiesRichness |> tidytable::filter(
+    PoolPatchSeed %in% basePoolPatchSeeds,
+    NicheDistance == defaultNicheDistance,
+    Intervention %in% c("(0)", "(1)"),
+    Time > Start, Time < Stop, # Not things outside of [Start, Stop]
+    is.na(Subset),
+    SpeciesPreferences %in% c("Uniform(0, 1)")
+  ) |> tidytable::rename(
+    Value1 = Value,
+    Preferences1 = SpeciesPreferences,
+    Intervention1 = Intervention
+  ),
+  diversitiesRichness |> tidytable::filter(
+    PoolPatchSeed %in% basePoolPatchSeeds,
+    NicheDistance == defaultNicheDistance,
+    Intervention %in% c("(0.5)"),
+    Time > Start, Time < Stop, # Not things outside of [Start, Stop]
+    is.na(Subset),
+    SpeciesPreferences %in% c("Uniform(0, 1)")
+  ) |> tidytable::rename(
+    Value2 = Value,
+    Preferences2 = SpeciesPreferences
+  ) |> tidytable::select(
+    -tidytable::starts_with("Intervention"),
+    -PatchAffinity, -PatchAffinitySeed, -Start, -Stop
+  )
+) |> tidytable::mutate(
+  Value = round(Value2 - Value1, 4), # Prevent numerical errors
+  Group = paste(Intervention1, PoolPatchSeed)
+)
+
+supplementStatistics$STAT$diff_unif_5v0 <-
+  supplementStatistics$diff_unif_5v0 |> dplyr::group_by(
+    Intervention1
+  ) |> dplyr::group_map(
+    .f = function(values, key) {
+      list(
+        key,
+        summary(values$Value),
+        sd(values$Value),
+        nlme::lme(
+          data = values,
+          fixed = Value ~ 1, # Time, # Time ~ little to no effect.
+          random = ~ 1 | Group, # Nat. Variation in Intercept
+          correlation = nlme::corAR1(form = ~ Time | Group)
+        ) |> summary()
+      )
+    }
+  )
+
 
 # "While a positive increase in richness across simulations [with land-use
 # change] can be consistently detected, the effect is small, approximately 0.5
