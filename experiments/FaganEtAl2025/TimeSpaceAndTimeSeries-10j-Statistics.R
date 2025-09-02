@@ -118,6 +118,28 @@ supplementStatistics$STAT$turnover <-
 
 #TODO!!!
 
+# Long term richness changes between different adaptation scenarios: ##########
+# "The result is an overall reduction in richness, even in comparison to the
+# extreme adaptation case (Figure 2), with an expected loss of 3.8 species
+# (standard error 0.046), but this depends on the strength of the
+# species-habitat interaction."
+
+# "While there is some evidence of an edge effect in the land-use preferences --
+# intermediate land-use had ~0.6 more species (differences of 0.621 and 0.629
+# with standard errors of 0.0250 and 0.0248) -- the differences are otherwise
+# minor in other traits."
+
+# "While a positive increase in richness across simulations [with land-use
+# change] can be consistently detected, the effect is small, approximately 0.5
+# species compared to states that naturally vary on average by between ... and
+# ... species."
+
+# Short term richness changes during land-use change: #########################
+# "Across the full set of parameter combinations discussed here, we observe
+# positive richness changes in 3% of land-use change scenarios, compared to no
+# change in 26% and declines in 71% of land-use change scenarios."
+
+
 # #############################################################################
 
 # diversitiesRichness |> tidytable::filter(
