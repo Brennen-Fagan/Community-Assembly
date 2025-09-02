@@ -102,11 +102,6 @@ supplementStatistics$STAT$turnover <-
               data.frame(rbind((summary(value$Value)))),
             skewness = moments::skewness(value$Value),
             kurtosis = moments::kurtosis(value$Value)
-           # sum(value$Value == 0),
-           # sum(value$Value < 0)
-           # fitdistrplus::fitdist(value$Value + 1e-12, distr = "beta",
-           #                       start = list(shape1 = 1, shape2 = 5))
-           # ) # As nice as a beta would be, the 0's cause numerical problems.
       )
     }
   )
@@ -139,6 +134,70 @@ supplementStatistics$STAT$turnover <-
 # positive richness changes in 3% of land-use change scenarios, compared to no
 # change in 26% and declines in 71% of land-use change scenarios."
 
+supplementStatistics$STAT$shortTermLoss <-
+  diversitiesRichness |> tidytable::filter(
+    PoolPatchSeed %in% basePoolPatchSeeds,
+    NicheDistance == defaultNicheDistance,
+    Metric == "Alpha Hill:0",
+    InterventionInitial != InterventionFinal,
+    is.na(Subset)
+  ) |> tidytable::group_by(
+    SpeciesPreferences, Intervention, InterventionInitial, InterventionFinal,
+    PoolPatchSeed
+  ) |> tidytable::arrange(
+    Time
+  ) |> tidytable::summarise(
+    # InterventionChange = abs(
+    #   as.numeric(gsub(InterventionInitial, pattern = "[(]|[)]", replacement = ""))
+    #   - as.numeric(gsub(InterventionFinal, pattern = "[(]|[)]", replacement = ""))
+    # ),
+    Time = round(Time - Time[2], digits = 4), # Make numerically safe.
+    # Note the different conventions to make analysis easier
+    PostIntervention = Time != Time[1],
+    ValueDiffPreIntervention = round(Value - Value[1]), # Make numerically safe.
+    .groups = "drop"
+  ) |> tidytable::rename(
+    TimeSinceIntervention = Time
+  ) |> tidytable::filter(
+    TimeSinceIntervention <= 51,
+    TimeSinceIntervention == floor(TimeSinceIntervention)
+  ) |> tidytable::group_by(
+    SpeciesPreferences, Intervention, InterventionInitial, InterventionFinal,
+    TimeSinceIntervention
+  ) |> tidytable::summarise(
+    # Across PoolPatchSeeds
+    Total = tidytable::n(),
+    Neg = sum(ValueDiffPreIntervention < 0),
+    Zero = sum(ValueDiffPreIntervention == 0),
+    Pos = sum(ValueDiffPreIntervention > 0)
+  )
+
+supplementStatistics$PLOT$shortTermLoss <-
+  supplementStatistics$STAT$shortTermLoss |> tidytable::pivot_longer(
+    cols = Neg:Pos, names_to = "Type", values_to = "Counts"
+  ) |> tidytable::mutate(
+  Percentage = Counts / Total * 100,
+  Text = paste0(formatC(Percentage, digits = 1, format = "f"), "%")
+  ) |> ggplot2::ggplot(
+  ggplot2::aes(x = TimeSinceIntervention, color = Intervention,
+               group = interaction(Type, Intervention, SpeciesPreferences))
+) + ggplot2::geom_line(
+  ggplot2::aes(y = Percentage, linetype = Type),
+  show.legend = TRUE
+) + ggplot2::geom_text(
+  ggplot2::aes(y = Percentage, label = Text),
+  show.legend = FALSE
+) + ggplot2::facet_grid(
+  SpeciesPreferences + InterventionInitial ~ InterventionFinal
+) + ggplot2::scale_color_manual(
+  values = colorPalette
+)
+
+ggplot2::ggsave(
+  plot = supplementStatistics$PLOT$shortTermLoss,
+  filename = "Figure_supplementStatistics_ShortTermLoss.png",
+  height = 200, width = 200, units = "cm", limitsize = FALSE
+)
 
 # #############################################################################
 
