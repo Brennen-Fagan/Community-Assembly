@@ -70,12 +70,12 @@ supplementStatistics$inout <- tidytable::bind_rows(
 
 supplementStatistics$STAT$extirpations <-
   supplementStatistics$inout |> tidytable::filter(
-  OutType != "NA", OutType != "Persistent"
-) |> tidytable::group_by(
-  SpeciesPreferences, Intervention, InterventionInitial, InterventionFinal
-) |> tidytable::summarise(
-  Fraction = Average / sum(Average) # /44's cancel out.
-)
+    OutType != "NA", OutType != "Persistent"
+  ) |> tidytable::group_by(
+    SpeciesPreferences, Intervention, InterventionInitial, InterventionFinal
+  ) |> tidytable::summarise(
+    Fraction = Average / sum(Average) # /44's cancel out.
+  )
 
 # Note switch to dplyr to group_modify
 supplementStatistics$STAT$turnover <-
@@ -99,9 +99,9 @@ supplementStatistics$STAT$turnover <-
   ) |> dplyr::group_modify(
     .f = function(value, key) {
       cbind(#key,
-              data.frame(rbind((summary(value$Value)))),
-            skewness = moments::skewness(value$Value),
-            kurtosis = moments::kurtosis(value$Value)
+        data.frame(rbind((summary(value$Value)))),
+        skewness = moments::skewness(value$Value),
+        kurtosis = moments::kurtosis(value$Value)
       )
     }
   )
@@ -119,15 +119,82 @@ supplementStatistics$STAT$turnover <-
 # (standard error 0.046), but this depends on the strength of the
 # species-habitat interaction."
 
+# This is comparing between Uniform(0, 1) and 100% 0 in (0).
+
 # "While there is some evidence of an edge effect in the land-use preferences --
 # intermediate land-use had ~0.6 more species (differences of 0.621 and 0.629
 # with standard errors of 0.0250 and 0.0248) -- the differences are otherwise
 # minor in other traits."
 
+# This is comparing amongst Uniform(0, 1): (0.5) - (0) and (0.5) - (1).
+
 # "While a positive increase in richness across simulations [with land-use
 # change] can be consistently detected, the effect is small, approximately 0.5
 # species compared to states that naturally vary on average by between ... and
 # ... species."
+
+#TODO It's even lower than this. Probably should just delete.
+
+supplementStatistics$baseStrings <- c(
+  # Everything we need to match up the simulations with their natural contrast.
+  "Time", "Environment1", "Environment2", "Metric", "Subset",
+  "PoolPatch", "PoolPatchSeed", "Interactions", "InteractionsSeed",
+  "Events", "EventsSeed", "InitialConditions", "InitialConditionsSeed",
+  "Dispersal", "NicheDistance", "SpeciesAffinity", "SpeciesAffinitySeed",
+  #"PatchAffinity", "PatchAffinitySeed", # These are *starting* states.
+  "SpeciesPreferences", "DispersalParam", "InterventionFinal"
+)
+
+# We pair by the corresponding case without an intervention, which otherwise
+# has all parameters identical to the intervention case (naturally paired).
+# We then take the difference (contrast) and try to "model" the contrasts over
+# the set of interventions and species preferences.
+# (Starting with summary statistics, then linear regression, etc. as needed.)
+supplementStatistics$interventionContrast <- tidytable::left_join(
+  # Cases with intervention
+  diversitiesRichness |> tidytable::filter(
+    PoolPatchSeed %in% basePoolPatchSeeds,
+    NicheDistance == defaultNicheDistance,
+    InterventionInitial != InterventionFinal,
+    Time > Start, Time < Stop, # Not things outside of [Start, Stop]
+    is.na(Subset)
+  ) |> tidytable::rename(
+    ValueIntervention = Value
+  ),
+  # Join to cases without intervention by ENDING state (NOT INITIAL)
+  diversitiesRichness |> tidytable::filter(
+    PoolPatchSeed %in% basePoolPatchSeeds,
+    NicheDistance == defaultNicheDistance,
+    InterventionInitial == InterventionFinal,
+    Time > Start, Time < Stop, # Not things outside of [Start, Stop]
+    is.na(Subset)
+  ) |> tidytable::select(
+    Time:SpeciesAffinitySeed, SpeciesPreferences, DispersalParam,
+    InterventionFinal
+  ) |> tidytable::rename(
+    ValueNoIntervention = Value
+  ),
+  by = supplementStatistics$baseStrings
+) |> tidytable::mutate(
+  Value = ValueIntervention - ValueNoIntervention,
+  Time = Time - 20000 # Scale so that it's time since start of comparison.
+  # Switch to dplyr for group_map
+) |> dplyr::group_by(
+  SpeciesPreferences, InterventionFinal
+) |> dplyr::group_map(
+  .f = function(values, key) {
+    list(
+      key,
+      summary(values$Value),
+      nlme::lme(
+        data = values,
+        fixed = Value ~ Time, # Time ~ little to no effect.
+        random = ~ 1 | Intervention/PoolPatchSeed, # Nat. Variation in Intercept
+        correlation = nlme::corAR1(form = ~ Time | Intervention/PoolPatchSeed)
+      )
+    )
+  }
+)
 
 # Short term richness changes during land-use change: #########################
 # "Across the full set of parameter combinations discussed here, we observe
@@ -179,22 +246,22 @@ supplementStatistics$PLOT$shortTermLoss <-
   supplementStatistics$shortTermLoss |> tidytable::pivot_longer(
     cols = Neg:Pos, names_to = "Type", values_to = "Counts"
   ) |> tidytable::mutate(
-  Percentage = Counts / Total * 100,
-  Text = paste0(formatC(Percentage, digits = 1, format = "f"), "%")
+    Percentage = Counts / Total * 100,
+    Text = paste0(formatC(Percentage, digits = 1, format = "f"), "%")
   ) |> ggplot2::ggplot(
-  ggplot2::aes(x = TimeSinceIntervention, color = Intervention,
-               group = interaction(Type, Intervention, SpeciesPreferences))
-) + ggplot2::geom_line(
-  ggplot2::aes(y = Percentage, linetype = Type),
-  show.legend = TRUE
-) + ggplot2::geom_text(
-  ggplot2::aes(y = Percentage, label = Text),
-  show.legend = FALSE
-) + ggplot2::facet_grid(
-  SpeciesPreferences + InterventionInitial ~ InterventionFinal
-) + ggplot2::scale_color_manual(
-  values = colorPalette
-)
+    ggplot2::aes(x = TimeSinceIntervention, color = Intervention,
+                 group = interaction(Type, Intervention, SpeciesPreferences))
+  ) + ggplot2::geom_line(
+    ggplot2::aes(y = Percentage, linetype = Type),
+    show.legend = TRUE
+  ) + ggplot2::geom_text(
+    ggplot2::aes(y = Percentage, label = Text),
+    show.legend = FALSE
+  ) + ggplot2::facet_grid(
+    SpeciesPreferences + InterventionInitial ~ InterventionFinal
+  ) + ggplot2::scale_color_manual(
+    values = colorPalette
+  )
 
 # Too fine to examine inside of R. Need to magnify further.
 ggplot2::ggsave(
