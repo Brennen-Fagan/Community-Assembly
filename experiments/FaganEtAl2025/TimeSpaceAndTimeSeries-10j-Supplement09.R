@@ -63,6 +63,6 @@ supplement9$plotB <- ggplot2::ggplot(
 supplement9$plot <- ggarrange(supplement9$plotA, supplement9$plotB)
 ggplot2::ggsave(
   supplement9$plot,
-  filename = "Figure_supplement9_v1.png",
+  filename = "Figure_supplement9_v1.pdf",
   units = "cm", width = 20*3, height = 20*2
 )

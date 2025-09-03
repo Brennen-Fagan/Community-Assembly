@@ -174,5 +174,5 @@ figure4$plot <- ggpubr::ggarrange(
   arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc"))
 )
 
-ggplot2::ggsave(plot = figure4$plot, filename = "Figure4_Prototype3.png",
+ggplot2::ggsave(plot = figure4$plot, filename = "Figure4_Prototype3.pdf",
                 units = "cm", width = 6.5*3, height = 6.5*2)

@@ -217,5 +217,5 @@ figure3$plot <- ggpubr::ggarrange(
   ), nrow = 1
 )
 
-ggplot2::ggsave(plot = figure3$plot, filename = "Figure3_Prototype7.png",
+ggplot2::ggsave(plot = figure3$plot, filename = "Figure3_Prototype7.pdf",
                 units = "cm", width = 6.5*3, height = 6.5*2)

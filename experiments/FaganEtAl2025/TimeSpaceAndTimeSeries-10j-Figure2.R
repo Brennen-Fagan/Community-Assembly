@@ -311,5 +311,5 @@ figure2$plot <- figure2$plot + ggplot2::annotate(
   arrow = arrow(length = unit(0.03, "npc"))
 )
 
-ggplot2::ggsave(plot = figure2$plot, filename = "Figure2_Prototype7.png",
+ggplot2::ggsave(plot = figure2$plot, filename = "Figure2_Prototype7.pdf",
                 units = "cm", width = 6.5*3, height = 6.5*2)

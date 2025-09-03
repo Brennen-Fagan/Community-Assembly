@@ -196,6 +196,6 @@ figure5$plot <-
     x = 0.2, y = 0.745, xend = 0.2, yend = 0
   )
 
-ggplot2::ggsave(plot = figure5$plot, filename = "Figure5_Prototype3.png",
+ggplot2::ggsave(plot = figure5$plot, filename = "Figure5_Prototype3.pdf",
                 units = "cm", width = 6.5*3, height = 6.5*2)
 

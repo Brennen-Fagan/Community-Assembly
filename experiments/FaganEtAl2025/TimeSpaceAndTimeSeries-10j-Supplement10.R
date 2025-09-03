@@ -137,7 +137,7 @@ supplement10$plot <-
 
 ggplot2::ggsave(
   plot = supplement10$plot,
-  filename = paste0("Figure_supplement10_v1_", targetPrefIndex, ".png"),
+  filename = paste0("Figure_supplement10_v1_", targetPrefIndex, ".pdf"),
   units = "cm", width = 6.5*3, height = 6.5*2
 )
 

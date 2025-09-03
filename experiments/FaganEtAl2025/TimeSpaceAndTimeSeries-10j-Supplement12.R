@@ -48,6 +48,6 @@ supplement12$plot <- ggplot2::ggplot(
 
 ggplot2::ggsave(
   supplement12$plot,
-  filename = "Figure_supplement12_v1.png",
+  filename = "Figure_supplement12_v1.pdf",
   units = "cm", width = 20*3, height = 20*2
 )

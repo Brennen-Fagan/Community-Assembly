@@ -346,7 +346,7 @@ supplementStatistics$PLOT$shortTermLoss <-
 # Too fine to examine inside of R. Need to magnify further.
 ggplot2::ggsave(
   plot = supplementStatistics$PLOT$shortTermLoss,
-  filename = "Figure_supplementStatistics_ShortTermLoss.png",
+  filename = "Figure_supplementStatistics_ShortTermLoss.pdf",
   height = 200, width = 200, units = "cm", limitsize = FALSE
 )
 

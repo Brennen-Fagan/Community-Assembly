@@ -95,6 +95,6 @@ supplement11$plot <- ggplot2::ggplot(
 
 ggplot2::ggsave(
   supplement11$plot,
-  filename = "Figure_supplement11_v1.png",
+  filename = "Figure_supplement11_v1.pdf",
   units = "cm", width = 20*3, height = 20*2
 )

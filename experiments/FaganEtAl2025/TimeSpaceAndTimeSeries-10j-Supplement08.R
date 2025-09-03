@@ -99,7 +99,7 @@ supplement8$PlotDensity <- ggplot2::ggplot(
 
 ggplot2::ggsave(
   supplement8$PlotDensity,
-  filename = paste0("Figure_supplement8_v1_", targetPrefIndex, "_Dens.png"),
+  filename = paste0("Figure_supplement8_v1_", targetPrefIndex, "_Dens.pdf"),
   units = "cm", width = 6.5*3, height = 6.5*2
 )
 
@@ -138,7 +138,7 @@ if (targetPref != "100% 0") {
 
   ggplot2::ggsave(
     supplement8$PlotContour,
-    filename = paste0("Figure_supplement8_v1_", targetPrefIndex, "_Contour.png"),
+    filename = paste0("Figure_supplement8_v1_", targetPrefIndex, "_Contour.pdf"),
     units = "cm", width = 10*3, height = 10*2
   )
 }
