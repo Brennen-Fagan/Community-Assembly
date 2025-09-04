@@ -54,10 +54,6 @@ allLibraryPaths <- .libPaths()
 library(dplyr)
 library(RMTRCode2)
 library(betapart) # Dependency for the diversity calculation
-
-# source("TimeSpaceAndTimeSeries-0-Functions.R") # Abundance metrics.
-source(file.path("R", "Calculate_Species.R"))
-
 library(parallel)
 library(iterators)
 library(doParallel)
@@ -242,7 +238,8 @@ Diversity <- foreach::foreach(
 
           if ("Size" %in% names(x_pool))
             # Note the (-)1 is there to preserve (resp., remove) the times.
-            sizes_subset <- x_pool$Size[idcolumns[-1]]
+            # For the same reason, offset the order for indexing into the pool.
+            sizes_subset <- x_pool$Size[idcolumns[-1] - 1]
 
           Diversities <- calculateDiversityMetrics(
             abundance = loaded_subset$Abundance,
