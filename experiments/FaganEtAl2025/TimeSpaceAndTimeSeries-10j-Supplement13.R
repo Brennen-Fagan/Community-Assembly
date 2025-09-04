@@ -36,7 +36,7 @@ supplement13$plot <- plotMeanAndInner(
   color = ggplot2::guide_legend(ncol = 5),
   fill = ggplot2::guide_legend(ncol = 5)
 ) + ggplot2::coord_cartesian(
-  xlim = c(0, 30000), ylim = c(0, supplement13$yMax), expand = FALSE
+  xlim = c(0, 30000), ylim = c(0, supplement13$yMax), expand = TRUE
   ####### Annotations: ########################################################
 ) + ggplot2::geom_rect(
   data = data.frame(

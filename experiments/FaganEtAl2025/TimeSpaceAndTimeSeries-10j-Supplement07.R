@@ -8,38 +8,6 @@ source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 supplement7 <- list()
 
 ### 7 Supplement: #############################################################
-##### bs4: ####################################################################
-
-newplot4_bs4 <- newplot4_dataBS4 |> tidytable::right_join(
-  tidytable::expand(
-    newplot4_dataBS4,
-    tidytable::nesting(
-      SpeciesPreferences, Intervention, # SpeciesPreferences not working???
-      InterventionInitial, InterventionFinal,
-      Subset
-    )
-  )
-  # ) |> tidytable::filter(Subset %in% c("Basal_0", "Consumer_0"))
-) |> tidytable::mutate(
-  Time = ifelse(is.na(Time), 0, Time),
-  Value = ifelse(is.na(Value), 0, Value),
-  Weight = ifelse(is.na(Weight), 1e9, Weight), # Unclear has an effect.
-  SpeciesPreferences =
-    ifelse(is.na(SpeciesPreferences), "Uniform(0, 1)", SpeciesPreferences)
-) |> tidytable::filter(
-  # InterventionInitial %in% c("(0)", "(1)")
-  Subset %in% c("Basal_(0, 0.2]", "Consumer_(0, 0.2]",
-                "Basal_(0.2, 0.4]", "Consumer_(0.2, 0.4]",
-                "Basal_(0.4, 0.6]", "Consumer_(0.4, 0.6]",
-                "Basal_(0.6, 0.8]", "Consumer_(0.6, 0.8]",
-                "Basal_(0.8, 1]", "Consumer_(0.8, 1]"),
-  !is.na(InterventionInitial), !is.na(InterventionFinal),
-  InterventionInitial != InterventionFinal,
-  InterventionInitial == "(0.5)"
-) |> ggplot2::ggplot(
-  ...
-)
-
 supplement7$dataA <- diversitiesRichness |> tidytable::filter(
   NicheDistance == defaultNicheDistance,
   PoolPatchSeed %in% basePoolPatchSeeds,
@@ -119,7 +87,7 @@ supplement7$plotA <- ggplot2::ggplot(
   plot.background = ggplot2::element_rect(linetype = "solid")
   # panel.border = ggplot2::element_rect(linetype = "solid", fill = NA)
 ) + ggplot2::coord_cartesian(
-  xlim = c(0, 10),
+  xlim = c(0, 10)#,
   # ylim = c(-5, 0)
 )
 
