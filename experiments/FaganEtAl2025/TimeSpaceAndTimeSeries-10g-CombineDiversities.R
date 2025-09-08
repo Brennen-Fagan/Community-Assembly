@@ -1,14 +1,18 @@
 
 datfolders <- dir(pattern = "TSTS_Simulations_.+2025-07-30")
+#datfolders <- dir(pattern = "TSTS_Simulations_.+2025-09-04")
 
-overwrite <- FALSE # TRUE
+overwrite <- TRUE # FALSE # TRUE
 
 prefix <- "diversitiesFlattened10"
+suffix <- "2025-07-30"
+#suffix <- "2025-09-04"
 
 # Libraries: ##################################################################
 source("TimeSpaceAndTimeSeries-10-Dictionaries.R")
 source('TimeSpaceAndTimeSeries-0-Functions.R')
 library(tidytable)
+#library(RMTRCode2)
 
 # functions: ##################################################################
 
@@ -85,13 +89,15 @@ for (datfolder in datfolders) {
   gc()
 }
 
+print("files checked")
+
 diversitiesAll <- NULL
 for (datfolder in datfolders) {
   datfolderID <- paste0(
     strsplit(datfolder, split = "_")[[1]][-c(1:2)],
     collapse = "_")
 
-  filestring <- paste0(prefix, "_", datfolderID,".RData")
+  filestring <- paste0(prefix, "_", datfolderID, ".RData")
 
   stopifnot(file.exists(filestring))
 
@@ -118,18 +124,30 @@ for (datfolder in datfolders) {
   gc()
 }
 
+print("divAll computed")
+
 # The all-in-one file.
-save(diversitiesAll, file = paste0(prefix,"a1_subset.RData"))
+save(diversitiesAll, file = paste0(prefix, "a1_", suffix, ".RData"))
+
+print("divAll saved")
 
 diversitiesRichness <- diversitiesAll %>% tidytable::filter(
   Metric == "Alpha Hill:0"
 )
 
-save(diversitiesRichness, file = paste0(prefix,"a1_subsetRichness.RData"))
+print("divR computed")
+
+save(diversitiesRichness, file = paste0(prefix, "a1_", suffix, "_Richness.RData"))
 rm(diversitiesRichness); gc()
+
+print("divR saved")
 
 diversitiesTimeBC <- diversitiesAll %>% tidytable::filter(
   grepl(x = Metric, pattern = "TimeBrayCurtis")
 )
 
-save(diversitiesTimeBC, file = paste0(prefix,"a1_subsetTimeBC.RData"))
+print("divBC computed")
+
+save(diversitiesTimeBC, file = paste0(prefix, "a1_", suffix, "_TimeBC.RData"))
+
+print("divBC saved")

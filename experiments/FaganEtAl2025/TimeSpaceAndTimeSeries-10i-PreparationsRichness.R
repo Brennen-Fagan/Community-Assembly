@@ -2,7 +2,8 @@
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 
 if (!exists("diversitiesRichness")) {
-  load("diversitiesFlattened10a1_subsetRichness.RData")
+  load("diversitiesFlattened10a1_2025-07-30_Richness.RData")
+  # load("diversitiesFlattened10a1_2025-09-04_Richness.RData")
 
   diversitiesRichness <- diversitiesRichness |> changePreferencesLevels(
   ) |> changeInterventionLevels(
