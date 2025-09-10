@@ -70,8 +70,8 @@ supplement14$plot <- plotMeanAndInner(
   legend.position = "right"
 )
 
-ggplot2::ggsave(plot = supplement14$plot, 
-                filename = paste0("figure_supplement14_v1_",
+ggplot2::ggsave(plot = supplement14$plot,
+                filename = paste0("Figure_supplement14_v1_",
                                   supplement14$preferences,
                                   ".pdf"),
                 units = "cm", width = 6.5*9, height = 6.5*2)

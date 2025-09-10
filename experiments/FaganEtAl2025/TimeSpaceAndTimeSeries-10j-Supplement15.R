@@ -32,7 +32,7 @@ supplement15$data <- supplement15$data |> tidytable::select(
   -Left, -Right
 ) |> tidytable::pivot_wider(
   names_from = Guild, values_from = Value
-) 
+)
 
 supplement15$dataAverage <- supplement15$data |> tidytable::group_by(
   Environment1:AffinityBins
@@ -44,11 +44,11 @@ supplement15$dataAverage <- supplement15$data |> tidytable::group_by(
 ##### a: ######################################################################
 ####### Core Plot: ############################################################
 supplement15$plotAverage <- ggplot2::ggplot(
-  supplement15$dataAverage, 
+  supplement15$dataAverage,
   ggplot2::aes(
-    x = Basal, 
-    y = Consumer, 
-    color = Intervention, 
+    x = Basal,
+    y = Consumer,
+    color = Intervention,
     shape = AffinityBins
   )
 ) + ggplot2::geom_point(
@@ -73,10 +73,10 @@ supplement15$plotAverage <- ggplot2::ggplot(
 )
 
 supplement15$plotAveragePath <- ggplot2::ggplot(
-  supplement15$dataAverage |> tidytable::arrange(InterventionFinal), 
+  supplement15$dataAverage |> tidytable::arrange(InterventionFinal),
   ggplot2::aes(
-    x = Basal, 
-    y = Consumer, 
+    x = Basal,
+    y = Consumer,
     color = InterventionInitial,
     group = interaction(PoolPatchSeed, InterventionInitial,
                         AffinityBins, SpeciesPreferences),
@@ -105,13 +105,13 @@ supplement15$plotAveragePath <- ggplot2::ggplot(
 ) + ggplot2::guides(color = "none")
 
 supplement15$plotConsumer <- ggplot2::ggplot(
-  supplement15$data |> tidytable::arrange(Time), 
+  supplement15$data |> tidytable::arrange(Time),
   ggplot2::aes(
-    x = Time, 
-    y = Consumer, 
-    color = Intervention, 
+    x = Time,
+    y = Consumer,
+    color = Intervention,
     linetype = AffinityBins,
-    group = interaction(PoolPatchSeed, AffinityBins, 
+    group = interaction(PoolPatchSeed, AffinityBins,
                         Intervention, SpeciesPreferences)
   )
 ) + ggplot2::geom_line(
@@ -132,13 +132,13 @@ supplement15$plotConsumer <- ggplot2::ggplot(
 )
 
 supplement15$plotBasal <- ggplot2::ggplot(
-  supplement15$data |> tidytable::arrange(Time), 
+  supplement15$data |> tidytable::arrange(Time),
   ggplot2::aes(
-    x = Time, 
-    y = Basal, 
-    color = Intervention, 
+    x = Time,
+    y = Basal,
+    color = Intervention,
     linetype = AffinityBins,
-    group = interaction(PoolPatchSeed, AffinityBins, 
+    group = interaction(PoolPatchSeed, AffinityBins,
                         Intervention, SpeciesPreferences)
   )
 ) + ggplot2::geom_line(
@@ -158,20 +158,20 @@ supplement15$plotBasal <- ggplot2::ggplot(
     )
 )
 
-ggplot2::ggsave(plot = supplement15$plotAverage, 
-                filename = paste0("figure_supplement15_v1A_",
+ggplot2::ggsave(plot = supplement15$plotAverage,
+                filename = paste0("Figure_supplement15_v1A_",
                                   supplement15$preferences,
                                   ".pdf"),
                 units = "cm", width = 6.5*9, height = 6.5*9)
 
-ggplot2::ggsave(plot = supplement15$plotBasal, 
-                filename = paste0("figure_supplement15_v1B_",
+ggplot2::ggsave(plot = supplement15$plotBasal,
+                filename = paste0("Figure_supplement15_v1B_",
                                   supplement15$preferences,
                                   ".pdf"),
                 units = "cm", width = 6.5*9, height = 6.5*9)
 
-ggplot2::ggsave(plot = supplement15$plotConsumer, 
-                filename = paste0("figure_supplement15_v1C_",
+ggplot2::ggsave(plot = supplement15$plotConsumer,
+                filename = paste0("Figure_supplement15_v1C_",
                                   supplement15$preferences,
                                   ".pdf"),
                 units = "cm", width = 6.5*9, height = 6.5*9)
