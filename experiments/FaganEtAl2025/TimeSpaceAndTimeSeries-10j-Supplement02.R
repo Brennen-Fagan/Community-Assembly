@@ -7,7 +7,7 @@ source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
 
 supplement2 <- list()
 supplement2$preferences <- 1
-supplement2$initial <- 6
+supplement2$initial <- 1
 
 ### 2 Supplement: #############################################################
 supplement2$dataA <- diversitiesRichness |> tidytable::filter(
@@ -25,9 +25,9 @@ supplement2$dataA <- diversitiesRichness |> tidytable::filter(
     c("(0.5)"),
     c("(0.75)"),
     c("(1)")
-    ),
+  ),
   if(supplement2$initial == 1) {
-         InterventionInitial == InterventionFinal
+    InterventionInitial == InterventionFinal
   } else {
     InterventionFinal %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)")
   },
@@ -78,21 +78,27 @@ supplement2$dataC <- with(supplement2, {
     Start <= Time, Time <= Stop
   ) |> tidytable::pivot_wider(
     names_from = Metric, values_from = Value
-  ) |> tidytable::mutate(
-    `Average Abundance` =
-      ifelse(`Alpha Hill:0` > 0, `Alpha Abundance` / `Alpha Hill:0`, 0)
-  ) |> tidytable::group_by(
-    # Average over relevant times
-    Environment1:DispersalParam, Guild
-  ) |> tidytable::summarise(
-    `Average Abundance` = mean(`Average Abundance`)
+    # ) |> tidytable::mutate(
+    #   `Average Abundance` =
+    #     ifelse(`Alpha Hill:0` > 0, `Alpha Abundance` / `Alpha Hill:0`, 0)
+    # ) |> tidytable::group_by(
+    #   # Average over relevant times
+    #   Environment1:DispersalParam, Guild
+    # ) |> tidytable::summarise(
+    #   `Average Abundance` = mean(`Average Abundance`)
   )
 }) # 44 replicates, 5 treatments, 2 guilds, 1 2 or 5 affinity bins.
 
 ##### a: ######################################################################
+# Richness through time for each guild.
 supplement2$plotA <- plotMeanAndInner(
   # rbind(
-  supplement2$dataA,
+  supplement2$dataA |> tidytable::group_by(
+    PoolPatchSeed, Intervention, InterventionInitial, InterventionFinal,
+    SpeciesPreferences, Subset, Guild, Time
+  ) |> tidytable::summarise(
+    Value = sum(Value) # Overall richness across guilds at a time
+  ) ,
   # |> tidytable::filter(
   # Intervention %in% c("(0)", "(0.5)", "(1)")
   # ),
@@ -116,7 +122,8 @@ supplement2$plotA <- plotMeanAndInner(
   color = ggplot2::guide_legend(ncol = 5),
   fill = ggplot2::guide_legend(ncol = 5)
 ) + ggplot2::coord_cartesian(
-  xlim = c(0, 31000), ylim = c(0, richnessYMax), expand = FALSE
+  xlim = c(0, 31000),# ylim = c(0, richnessYMax),
+  expand = FALSE
 ) + ggplot2::geom_rect(
   data = data.frame(
     1 # 1 rectangle per row, so dummy df to prevent overplotting
@@ -137,14 +144,20 @@ supplement2$plotA <- plotMeanAndInner(
 )
 
 ##### b: ######################################################################
+# Total richness averaged through time for each guild.
 supplement2$plotB <- ggplot2::ggplot(
   supplement2$dataA |> tidytable::filter(
     Time > Start, Time < Stop
   ) |> tidytable::group_by(
     PoolPatchSeed, Intervention, InterventionFinal,
+    SpeciesPreferences, Subset, Guild, Time
+  ) |> tidytable::summarise(
+    Value = sum(Value) # Overall richness across guilds at a time
+  ) |> tidytable::group_by(
+    PoolPatchSeed, Intervention, InterventionFinal,
     SpeciesPreferences, Subset, Guild
   ) |> tidytable::summarise(
-    Value = mean(Value)
+    Value = mean(Value) # Average richness over time.
   ),
   ggplot2::aes(
     x = InterventionFinal,
@@ -173,6 +186,30 @@ supplement2$plotB <- ggplot2::ggplot(
                 Value = mean(Value),
                 .groups = "drop"),
   color = "black", group = 1
+) + ggplot2::geom_line(
+  # Summarise as above, but for each individual species preference
+  # (so we don't need to total).
+  data = supplement2$dataA |> tidytable::filter(
+    Time > Start, Time < Stop
+  ) |> tidytable::group_by(
+    # Average across times
+    PoolPatchSeed, Intervention, InterventionFinal,
+    SpeciesPreferences, Subset, Guild, AffinityBins
+  ) |> tidytable::summarise(
+    Value = mean(Value), .groups = "drop"
+  ) |> tidytable::group_by(
+    Intervention, InterventionFinal, Subset, Guild, AffinityBins
+  ) |> tidytable::summarise(
+    # Average across simulations.
+    Value = mean(Value), .groups = "drop"
+  ),
+  color = "grey50",
+  mapping = ggplot2::aes(
+    x = InterventionFinal,
+    y = Value,
+    linetype = AffinityBins,
+    group = interaction(AffinityBins, Subset, Guild)
+  )
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat's Land-use"
@@ -188,21 +225,29 @@ supplement2$plotB <- ggplot2::ggplot(
   color = "none",
   fill = "none"
 ) + ggplot2::coord_cartesian(
-  ylim = c(0, richnessYMax), expand = FALSE
+  ylim = c(0, NA),
+  expand = FALSE
 ) + ggplot2::facet_grid(
   factor(Subset, levels = c("Consumer", "Basal"),
          labels = c("Consumer", "Basal"), ordered = TRUE) ~ .
 )
 
 ##### c: ######################################################################
+# Total abundance averaged through time for each guild.
 supplement2$plotC <- ggplot2::ggplot(
   supplement2$dataB |> tidytable::filter(
     Time > Start, Time < Stop
   ) |> tidytable::group_by(
     PoolPatchSeed, Intervention, InterventionFinal,
+    SpeciesPreferences, Subset, Guild, Time
+  ) |> tidytable::summarise(
+    Value = sum(Value) # Overall value across guilds at a time
+  ) |> tidytable::group_by(
+    PoolPatchSeed, Intervention, InterventionFinal,
     SpeciesPreferences, Subset, Guild
   ) |> tidytable::summarise(
-    Value = mean(Value)
+    Value = mean(Value) # Average values over time.
+    # Present across simulations
   ),
   ggplot2::aes(
     x = InterventionFinal,
@@ -223,6 +268,30 @@ supplement2$plotC <- ggplot2::ggplot(
                 Value = mean(Value),
                 .groups = "drop"),
   color = "black", group = 1
+) + ggplot2::geom_line(
+  # Summarise as above, but for each individual species preference
+  # (so we don't need to total).
+  data = supplement2$dataB |> tidytable::filter(
+    Time > Start, Time < Stop
+  ) |> tidytable::group_by(
+    # Average across times
+    PoolPatchSeed, Intervention, InterventionFinal,
+    SpeciesPreferences, Subset, Guild, AffinityBins
+  ) |> tidytable::summarise(
+    Value = mean(Value), .groups = "drop"
+  ) |> tidytable::group_by(
+    Intervention, InterventionFinal, Subset, Guild, AffinityBins
+  ) |> tidytable::summarise(
+    # Average across simulations.
+    Value = mean(Value), .groups = "drop"
+  ),
+  color = "grey50",
+  mapping = ggplot2::aes(
+    x = InterventionFinal,
+    y = Value,
+    linetype = AffinityBins,
+    group = interaction(AffinityBins, Subset, Guild)
+  )
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat's Land-use"
@@ -248,8 +317,24 @@ supplement2$plotC <- ggplot2::ggplot(
 )
 
 ##### d: ######################################################################
+# Average abundance averaged through time for each guild.
 supplement2$plotD <- ggplot2::ggplot(
-  supplement2$dataC,
+  supplement2$dataC |> tidytable::group_by(
+    # For each time, collect total abundance and richness across affinity bins.
+    Environment1:DispersalParam, Guild, Time
+  ) |> tidytable::summarise(
+    `Alpha Abundance` = sum(`Alpha Abundance`),
+    `Alpha Hill:0` = sum(`Alpha Hill:0`)
+  ) |> tidytable::mutate(
+    # Then calculate average abundance at that time
+    `Average Abundance` =
+      ifelse(`Alpha Hill:0` > 0, `Alpha Abundance` / `Alpha Hill:0`, 0)
+  ) |> tidytable::group_by(
+    # Average over relevant times
+    Environment1:DispersalParam, Guild
+  ) |> tidytable::summarise(
+    `Average Abundance` = mean(`Average Abundance`)
+  ),
   ggplot2::aes(
     x = InterventionFinal,
     y = `Average Abundance`,
@@ -267,6 +352,37 @@ supplement2$plotD <- ggplot2::ggplot(
                 `Average Abundance` = mean(`Average Abundance`),
                 .groups = "drop"),
   color = "black", group = 1
+) + ggplot2::geom_line(
+  # Summarise as above, but for each individual species preference
+  # (so we don't need to total).
+  data = supplement2$dataC |> tidytable::group_by(
+    # For each time, collect total abundance and richness across affinity bins.
+    Environment1:DispersalParam, Guild, AffinityBins, Time
+  ) |> tidytable::summarise(
+    `Alpha Abundance` = sum(`Alpha Abundance`),
+    `Alpha Hill:0` = sum(`Alpha Hill:0`)
+  ) |> tidytable::mutate(
+    # Then calculate average abundance at that time
+    `Average Abundance` =
+      ifelse(`Alpha Hill:0` > 0, `Alpha Abundance` / `Alpha Hill:0`, 0)
+  ) |> tidytable::group_by(
+    # Average over relevant times
+    Environment1:DispersalParam, Guild, AffinityBins
+  ) |> tidytable::summarise(
+    `Average Abundance` = mean(`Average Abundance`)
+  ) |> tidytable::group_by(
+    # Average across simulations.
+    Intervention, InterventionFinal, Subset, Guild, AffinityBins
+  ) |> tidytable::summarise(
+    `Average Abundance` = mean(`Average Abundance`), .groups = "drop"
+  ),
+  color = "grey50",
+  mapping = ggplot2::aes(
+    x = InterventionFinal,
+    y = `Average Abundance`,
+    linetype = AffinityBins,
+    group = interaction(AffinityBins, Subset, Guild)
+  )
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat's Land-use"
