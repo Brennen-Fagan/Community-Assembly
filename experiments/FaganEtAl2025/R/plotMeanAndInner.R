@@ -1,5 +1,5 @@
 plotMeanAndInner <- function(
-  data, CIs = c(0.5, 0.95),
+  data, CIs = c(0.5, 0.95), digits = -2,
   facets = as.formula(Intervention ~ SpeciesPreferences)
 ) {
   # Correct for a problem with how to handle NAs by converting to strings
@@ -22,7 +22,7 @@ plotMeanAndInner <- function(
   for (CI in CIs) {
     baseplot <- baseplot + ggplot2::geom_ribbon(
       data = data |> tidytable::mutate(
-        Time = round(Time, digits = -2)
+        Time = round(Time, digits = digits)
       ) |> tidytable::group_by(
         Time, Subset,
         Intervention, InterventionInitial, InterventionFinal, SpeciesPreferences
@@ -45,7 +45,7 @@ plotMeanAndInner <- function(
   # Add an average line and handle the meta-details.
   baseplot <- baseplot + ggplot2::geom_line(
     data = data |> tidytable::mutate(
-      Time = round(Time, digits = -2)
+      Time = round(Time, digits = digits)
     ) |> tidytable::group_by(
       Time, Subset,
       Intervention, InterventionInitial, InterventionFinal, SpeciesPreferences
