@@ -6,7 +6,12 @@ source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 
 figure4 <- list()
-figure4$baseCase <- "(0.5)"
+figure4$baseCaseVersion <- 1
+
+figure4$baseCase <- switch(
+  figure4$baseCaseVersion,
+  "(0)", "(0.5)", "(1)"
+)
 
 # Main Plots: #################################################################
 ### Plot 4:####################################################################
@@ -41,7 +46,7 @@ figure4$interventionTimes <- diversitiesRichness |> tidytable::filter(
 ) |> tidytable::summarise(
   Time = min(
     Time[round(Time, 6)!=round(min(Time), 6)]
-    ), # Not min(Time) but the next time.
+  ), # Not min(Time) but the next time.
   .groups = "drop"
 )
 
@@ -111,7 +116,9 @@ figure4$plotA <- plotMeanAndInner(
     # We want to appear in the legend but not on the plot!
     figure4$dataA |> tidytable::filter(
       PoolPatchSeed == "1",
-      Intervention %in% c("(0.5)->(0)", "(0.5)->(1)"),
+      Intervention %in% paste0(
+        figure4$baseCase, "->", c("(0)", "(0.5)", "(1)")
+      ),
       abs(Time - 20000) == min(abs(Time - 20000))
     ) |> tidytable::mutate(
       Value = -100
@@ -149,7 +156,12 @@ figure4$plotA <- plotMeanAndInner(
 figure4$plotB <- ggplot2::ggplot(
   figure4$dataA |> tidytable::filter(
     Time >= figure4$rangeXMin[1]-10, Time <= figure4$rangeXMin[2]+10,
-    Intervention %in% c("(0.5)->(0)", figure4$baseCase, "(0.5)->(1)")
+    Intervention %in% c(
+      figure4$baseCase,
+      paste0(
+        figure4$baseCase, "->", c("(0)", "(0.5)", "(1)")
+      )
+    )
   ),
   ggplot2::aes(
     x = Time, y = Value,
@@ -181,12 +193,8 @@ figure4$plotB <- ggplot2::ggplot(
 figure4$plotC <- plotMeanAndInner(
   rbind(
     figure4$dataA |> tidytable::filter(
-      Intervention %in% c(
-        #"(0)",
-        "(0.5)->(0)", 
-        # "(0.5)"#, 
-        "(0.5)->(1)"
-        #"(1)"
+      Intervention %in% paste0(
+        figure4$baseCase, "->", c("(0)", "(0.5)", "(1)")
       )
     ) |> tidytable::group_by(
       SpeciesPreferences, Intervention, PoolPatchSeed,
@@ -240,16 +248,16 @@ figure4$plotC <- plotMeanAndInner(
 ) + ggplot2::coord_cartesian(
   xlim = c(0, figure4$rangeXMax[1]-1),
   ylim = c(0, richnessYMax), expand = FALSE
-  ) + ggplot2::geom_rect(
-    data = data.frame(
-      1 # 1 rectangle per row, so dummy df to prevent overplotting
-    ),
-    xmin = 0,
-    xmax = 5000,
-    ymin = 0, ymax = richnessYMax,
-    fill = "grey",
-    alpha = 0.4,
-    inherit.aes = FALSE
+) + ggplot2::geom_rect(
+  data = data.frame(
+    1 # 1 rectangle per row, so dummy df to prevent overplotting
+  ),
+  xmin = 0,
+  xmax = 5000,
+  ymin = 0, ymax = richnessYMax,
+  fill = "grey",
+  alpha = 0.4,
+  inherit.aes = FALSE
 ) + ggplot2::labs(
   tag = "c)"
 ) + ggplot2::theme(
@@ -343,7 +351,13 @@ figure4$plot <- ggpubr::ggarrange(
   ncol = 1, common.legend = TRUE, heights = c(0.4, 0.6)
 )
 
-ggplot2::ggsave(plot = figure4$plot, filename = "Figure4_Prototype4.pdf",
+ggplot2::ggsave(plot = figure4$plot, 
+                filename = paste0(
+                  "Figure4_Prototype4_", figure4$baseCaseVersion, ".pdf"
+                ),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure4$plot, filename = "Figure4_Prototype4.png",
+ggplot2::ggsave(plot = figure4$plot, 
+                filename = paste0(
+                  "Figure4_Prototype4_", figure4$baseCaseVersion, ".png"
+                ),
                 units = "cm", width = 6.5*3, height = 6.5*2)
