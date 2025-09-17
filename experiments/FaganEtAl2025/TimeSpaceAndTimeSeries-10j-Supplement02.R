@@ -6,7 +6,7 @@ source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
 
 supplement2 <- list()
-supplement2$preferences <- 1
+supplement2$preferences <- 2
 supplement2$initial <- 1
 
 ### 2 Supplement: #############################################################
@@ -118,9 +118,9 @@ supplement2$plotA <- plotMeanAndInner(
 ) + ggplot2::labs(
   y = "Richness"
 ) + ggplot2::guides(
-  linetype = "none",
-  color = ggplot2::guide_legend(ncol = 5),
-  fill = ggplot2::guide_legend(ncol = 5)
+  linetype = "none", color = "none", fill = "none"
+  # color = ggplot2::guide_legend(ncol = 5),
+  # fill = ggplot2::guide_legend(ncol = 5)
 ) + ggplot2::coord_cartesian(
   xlim = c(0, 31000),# ylim = c(0, richnessYMax),
   expand = FALSE
@@ -137,7 +137,8 @@ supplement2$plotA <- plotMeanAndInner(
 ) + ggplot2::labs(
   tag = "a)"
 ) + ggplot2::theme(
-  legend.position = c(0.5, 0.9),
+  # legend.position = c(0.5, 0.9),
+  legend.position = "none",
   plot.tag.position = c(0.025, 1)
 ) + ggplot2::scale_x_continuous(
   breaks = (0:3)*10000
@@ -221,9 +222,9 @@ supplement2$plotB <- ggplot2::ggplot(
 ) + ggplot2::labs(
   y = "(Avg. over Time) Richness",
   x = "Habitat's Land-use"
-) + ggplot2::guides(
-  color = "none",
-  fill = "none"
+# ) + ggplot2::guides(
+#   color = "none",
+#   fill = "none"
 ) + ggplot2::coord_cartesian(
   ylim = c(0, NA),
   expand = FALSE
@@ -306,9 +307,9 @@ supplement2$plotC <- ggplot2::ggplot(
 ) + ggplot2::labs(
   y = "(Avg. over Time) Total Abundance (Density)",
   x = "Habitat's Land-use"
-) + ggplot2::guides(
-  color = "none",
-  fill = "none"
+# ) + ggplot2::guides(
+#   color = "none",
+#   fill = "none"
 ) + ggplot2::facet_grid(
   factor(Subset, levels = c("Consumer", "Basal"),
          labels = c("Consumer", "Basal"), ordered = TRUE) ~ .,
@@ -397,9 +398,9 @@ supplement2$plotD <- ggplot2::ggplot(
 ) + ggplot2::labs(
   y = "(Avg. over Time and Species) Abundance (Density)",
   x = "Habitat's Land-use"
-) + ggplot2::guides(
-  color = "none",
-  fill = "none"
+# ) + ggplot2::guides(
+#   color = "none",
+#   fill = "none"
 ) + ggplot2::facet_grid(
   factor(Subset, levels = c("Consumer", "Basal"),
          labels = c("Consumer", "Basal"), ordered = TRUE) ~ .,
@@ -426,4 +427,10 @@ ggplot2::ggsave(plot = supplement2$plot,
                   "Figure_supplement2_v4_",
                   supplement2$preferences, "-", supplement2$initial,
                   ".pdf"),
+                units = "cm", width = 6.5*5, height = 6.5*2)
+ggplot2::ggsave(plot = supplement2$plot,
+                filename = paste0(
+                  "Figure_supplement2_v4_",
+                  supplement2$preferences, "-", supplement2$initial,
+                  ".png"),
                 units = "cm", width = 6.5*5, height = 6.5*2)
