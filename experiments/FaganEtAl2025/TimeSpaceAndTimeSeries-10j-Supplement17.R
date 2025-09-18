@@ -86,15 +86,22 @@ supplement17$dataC <- diversitiesAbund |> tidytable::filter(
   Metric == "Alpha Abundance",
   !is.na(Subset), # Basals and Consumers
   InterventionInitial == supplement17$baseCase,
-  InterventionFinal %in% c("(0)", "(0.5)", "(1)")
-) |> tidytable::group_by(
-  SpeciesPreferences, Intervention, PoolPatchSeed,
-  InterventionInitial, InterventionFinal, Subset
-) |> tidytable::arrange(
-  Time
-) |> tidytable::filter(
+  InterventionFinal %in% c("(0)", "(0.5)", "(1)"),
   InterventionInitial != InterventionFinal#,
   # Time %in% c(Time[1:140]) # 30 is 1:10, 12:20:2, 23:50:3, 100 gets to 600
+) |> tidytable::separate(
+  Subset, into = c("Guild", "AffinityBins"), sep = "_"
+  # ) |> unifyAffinityBins(# Strictly unnecessary here.
+) |> tidytable::group_by(
+  SpeciesPreferences, Intervention, PoolPatchSeed,
+  InterventionInitial, InterventionFinal, Time, Guild
+) |> tidytable::summarise( # Across AffinityBins
+  Value = sum(Value)
+) |> tidytable::group_by(
+  SpeciesPreferences, Intervention, PoolPatchSeed,
+  InterventionInitial, InterventionFinal, Guild
+) |> tidytable::arrange(
+  Time
 ) |> tidytable::summarise(
   Time = Time - Time[2],
   Value = Value - Value[2],
@@ -103,13 +110,7 @@ supplement17$dataC <- diversitiesAbund |> tidytable::filter(
   # ) |> tidytable::filter(
   #   Time <= 1100
 ) |> tidytable::mutate(
-  Weight = ifelse(Time < 1e-6, 1e9, 1), # loess in geom_smooth to anchor to 0.
-  Alpha = ifelse(Time <= 10, 0.1, 0)
-) |> tidytable::separate_wider_delim(
-  Subset, delim = "_", names = c("Guild", "AffinityBins")
-) |> unifyAffinityBins(
-) |> tidytable::mutate(
-  Subset = paste0(Guild, "_", AffinityBins)
+  Weight = ifelse(Time < 1e-6 & Time > 1e-6, 1e9, 1)
 )
 
 supplement17$rangeXMax <- supplement17$dataB |> tidytable::group_by(
@@ -330,10 +331,28 @@ supplement17$plotD <- ggplot2::ggplot(
     )
   ) |> tidytable::group_by(
     SpeciesPreferences, Intervention, InterventionInitial, InterventionFinal,
-    Subset, Time, Method, Alpha
+    Guild, Time, Method
   ) |> tidytable::summarise(
     Value = mean(Value)
   ),
+  show.legend = FALSE
+) + ggplot2::geom_line(
+  data = function(x) x |> tidytable::filter(
+    abs(Time - round(Time)) < 1e-6 | Time >= 55
+  ) |> tidytable::mutate(
+    Time = tidytable::case_when(
+      Time <= 50 ~ round(Time, 0),
+      Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
+      Time < 16350 ~ round(Time, -2),
+      TRUE ~ Time
+    )
+  ) |> tidytable::group_by(
+    SpeciesPreferences, Intervention, InterventionInitial, InterventionFinal,
+    Guild, Time, Method
+  ) |> tidytable::summarise(
+    Value = mean(Value)
+  ),
+  color = "black", linetype = "dotted",
   show.legend = FALSE
   ###### Annotation: ##########################################################
 ) + ggplot2::theme_minimal(
@@ -350,7 +369,7 @@ supplement17$plotD <- ggplot2::ggplot(
   values = colorPalette,
   name = "Habitat Land-use"
 ) + ggplot2::facet_grid(
-  Subset ~ .
+  factor(Guild, levels = c("Consumer", "Basal"), ordered = TRUE) ~ .
 ) + ggplot2::theme(
   plot.background = ggplot2::element_rect(linetype = "solid")
 ) + ggplot2::coord_cartesian(
@@ -383,11 +402,11 @@ supplement17$plot <- ggpubr::ggarrange(
 
 ggplot2::ggsave(plot = supplement17$plot,
                 filename = paste0(
-                  "Figure_supplement17_v1_", supplement17$baseCaseVersion, ".pdf"
+                  "Figure_supplement17_v2_", supplement17$baseCaseVersion, ".pdf"
                 ),
                 units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(plot = supplement17$plot,
                 filename = paste0(
-                  "Figure_supplement17_v1_", supplement17$baseCaseVersion, ".png"
+                  "Figure_supplement17_v2_", supplement17$baseCaseVersion, ".png"
                 ),
                 units = "cm", width = 6.5*3, height = 6.5*2)

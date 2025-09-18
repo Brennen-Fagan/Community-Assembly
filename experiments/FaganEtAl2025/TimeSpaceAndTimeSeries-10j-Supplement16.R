@@ -103,7 +103,8 @@ supplement16$dataC <- diversitiesRichness |> tidytable::filter(
   # ) |> tidytable::filter(
   #   Time <= 1100
 ) |> tidytable::mutate(
-  Weight = ifelse(Time == 1e-6, 1e9, 1) # loess in geom_smooth to anchor to 0.
+  Weight = ifelse(Time < 1e-6 & Time > 1e-6, 1e9, 1)
+  # loess in geom_smooth to anchor to 0.
 )
 
 supplement16$rangeXMax <- supplement16$dataB |> tidytable::group_by(
