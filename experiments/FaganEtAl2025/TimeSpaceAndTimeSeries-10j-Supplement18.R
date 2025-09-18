@@ -52,9 +52,9 @@ supplement18$dataA <- diversitiesAbund |> tidytable::filter(
   Time = Time - InterventionTime
 ) |> tidytable::filter(
   Time > -50
-) %>% tidytable::separate(
+) |> tidytable::separate(
   Subset, into = c("Guild", "AffinityBins"), sep = "_"
-) %>% unifyAffinityBins(
+) |> unifyAffinityBins(
 )
 
 supplement18$dataB <- diversitiesRichness |> tidytable::filter(
@@ -73,9 +73,9 @@ supplement18$dataB <- diversitiesRichness |> tidytable::filter(
   Time = Time - InterventionTime
 ) |> tidytable::filter(
   Time > -50
-) %>% tidytable::separate(
+) |> tidytable::separate(
   Subset, into = c("Guild", "AffinityBins"), sep = "_"
-) %>% unifyAffinityBins(
+) |> unifyAffinityBins(
 )
 
 # Plot: #######################################################################
