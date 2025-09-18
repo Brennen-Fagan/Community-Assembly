@@ -116,6 +116,57 @@ supplement16$rangeXMax <- supplement16$dataB |> tidytable::group_by(
 ) |> range(
 )
 
+supplement16$dataD <- diversitiesRichness |> tidytable::filter(
+  SpeciesPreferences == supplement16$basePreference,
+  NicheDistance == defaultNicheDistance,
+  PoolPatchSeed %in% basePoolPatchSeeds,
+  Metric == "Alpha Hill:0",
+  !is.na(Subset), # Basals and Consumers
+  InterventionInitial == supplement16$baseCase,
+  InterventionFinal %in% c("(0)", "(0.5)", "(1)"),
+  InterventionInitial != InterventionFinal
+) |> tidytable::mutate(
+  Time = round(Time, 6) # Avoid numerical problems
+) |> tidytable::separate(
+  Subset, into = c("Guild", "AffinityBins"), sep = "_"
+  # ) |> unifyAffinityBins(# Strictly unnecessary here.
+) |> tidytable::group_by(
+  PoolPatch, SpeciesPreferences, Intervention, PoolPatchSeed,
+  InterventionInitial, InterventionFinal, Time, Guild
+) |> tidytable::summarise( # Across AffinityBins
+  ValueIntervention = sum(Value)
+) |> tidytable::left_join(
+  diversitiesRichness |> tidytable::filter(
+    SpeciesPreferences == supplement16$basePreference,
+    NicheDistance == defaultNicheDistance,
+    PoolPatchSeed %in% basePoolPatchSeeds,
+    Metric == "Alpha Hill:0",
+    !is.na(Subset), # Basals and Consumers
+    Intervention == supplement16$baseCase
+  )  |> tidytable::mutate(
+    Time = round(Time, 6) # Avoid numerical problems
+  ) |> tidytable::separate(
+    Subset, into = c("Guild", "AffinityBins"), sep = "_"
+    # ) |> unifyAffinityBins(# Strictly unnecessary here.
+  ) |> tidytable::group_by(
+    PoolPatch, SpeciesPreferences, PoolPatchSeed,
+    InterventionInitial, Time, Guild
+  ) |> tidytable::summarise( # Across AffinityBins
+    ValueBase = sum(Value)
+  ),
+  by = c("PoolPatch", "SpeciesPreferences", "PoolPatchSeed",
+         "InterventionInitial", "Time", "Guild")
+) |> tidytable::left_join(
+  supplement16$interventionTimes |> tidytable::rename(
+    InterventionTime = Time
+  ),
+  by = c("PoolPatch", "PoolPatchSeed")
+) |> tidytable::mutate(
+  Time = Time - InterventionTime,
+  Value = ValueIntervention - ValueBase,
+  Method = "Counterfactual"
+)
+
 ##### a: ######################################################################
 supplement16$plotA <- plotMeanAndInner(
   rbind(

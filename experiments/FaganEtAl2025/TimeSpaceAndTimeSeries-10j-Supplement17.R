@@ -6,7 +6,7 @@ source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
 
 supplement17 <- list()
-supplement17$baseCaseVersion <- 2
+supplement17$baseCaseVersion <- 5
 
 supplement17$baseCase <-
   rep(c("(0)", "(0.5)", "(1)"), 3)[
@@ -120,6 +120,57 @@ supplement17$rangeXMax <- supplement17$dataB |> tidytable::group_by(
 ) |> tidytable::pull(
   Time
 ) |> range(
+)
+
+supplement17$dataD <- diversitiesAbund |> tidytable::filter(
+  SpeciesPreferences == supplement17$basePreference,
+  NicheDistance == defaultNicheDistance,
+  PoolPatchSeed %in% basePoolPatchSeeds,
+  Metric == "Alpha Abundance",
+  !is.na(Subset), # Basals and Consumers
+  InterventionInitial == supplement17$baseCase,
+  InterventionFinal %in% c("(0)", "(0.5)", "(1)"),
+  InterventionInitial != InterventionFinal
+) |> tidytable::mutate(
+  Time = round(Time, 6) # Avoid numerical problems
+) |> tidytable::separate(
+  Subset, into = c("Guild", "AffinityBins"), sep = "_"
+  # ) |> unifyAffinityBins(# Strictly unnecessary here.
+) |> tidytable::group_by(
+  PoolPatch, SpeciesPreferences, Intervention, PoolPatchSeed,
+  InterventionInitial, InterventionFinal, Time, Guild
+) |> tidytable::summarise( # Across AffinityBins
+  ValueIntervention = sum(Value)
+) |> tidytable::left_join(
+  diversitiesAbund |> tidytable::filter(
+    SpeciesPreferences == supplement17$basePreference,
+    NicheDistance == defaultNicheDistance,
+    PoolPatchSeed %in% basePoolPatchSeeds,
+    Metric == "Alpha Abundance",
+    !is.na(Subset), # Basals and Consumers
+    Intervention == supplement17$baseCase
+  )  |> tidytable::mutate(
+    Time = round(Time, 6) # Avoid numerical problems
+  ) |> tidytable::separate(
+    Subset, into = c("Guild", "AffinityBins"), sep = "_"
+    # ) |> unifyAffinityBins(# Strictly unnecessary here.
+  ) |> tidytable::group_by(
+    PoolPatch, SpeciesPreferences, PoolPatchSeed,
+    InterventionInitial, Time, Guild
+  ) |> tidytable::summarise( # Across AffinityBins
+    ValueBase = sum(Value)
+  ),
+  by = c("PoolPatch", "SpeciesPreferences", "PoolPatchSeed",
+         "InterventionInitial", "Time", "Guild")
+) |> tidytable::left_join(
+  supplement17$interventionTimes |> tidytable::rename(
+    InterventionTime = Time
+  ),
+  by = c("PoolPatch", "PoolPatchSeed")
+) |> tidytable::mutate(
+  Time = round(Time - InterventionTime, 6),
+  Value = ValueIntervention - ValueBase, # Avoid numerical problems
+  Method = "Counterfactual"
 )
 
 ##### a: ######################################################################

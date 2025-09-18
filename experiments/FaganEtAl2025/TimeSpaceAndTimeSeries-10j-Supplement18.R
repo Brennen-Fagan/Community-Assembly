@@ -109,8 +109,8 @@ supplement18$plotA <- ggplot2::ggplot(
       group = interaction(SpeciesPreferences, Intervention),
       color = Intervention
   )
-) + ggplot2::geom_point(
-  show.legend = FALSE, alpha = 0.02
+# ) + ggplot2::geom_point(
+#   show.legend = FALSE, alpha = 0.02
 ) + ggplot2::geom_line(
   data = function(x) x |> tidytable::filter(
     abs(Time - round(Time)) < 1e-6 | Time >= 55
@@ -169,7 +169,8 @@ supplement18$plotA <- ggplot2::ggplot(
   transform = "log1p"
 ) + ggplot2::scale_y_log10(
 ) + ggplot2::coord_cartesian(
-  xlim = c(0, 10000) # Not sure why, but instability after 10000
+  xlim = c(0, 16000),
+  expand = FALSE # Instability after 16000 because sims start ending.
 )
 
 supplement18$plotB <- ggplot2::ggplot(
@@ -202,8 +203,8 @@ supplement18$plotB <- ggplot2::ggplot(
       group = interaction(SpeciesPreferences, Intervention),
       color = Intervention
   )
-) + ggplot2::geom_point(
-  show.legend = FALSE, alpha = 0.02
+# ) + ggplot2::geom_point(
+#   show.legend = FALSE, alpha = 0.02
 ) + ggplot2::geom_line(
   data = function(x) x |> tidytable::filter(
     abs(Time - round(Time)) < 1e-6 | Time >= 55
@@ -262,28 +263,29 @@ supplement18$plotB <- ggplot2::ggplot(
   transform = "log1p"
 # ) + ggplot2::scale_y_log10(
 ) + ggplot2::coord_cartesian(
-  xlim = c(0, 10000) # Not sure why, but instability after 10000
+  xlim = c(0, 16000),
+  expand = FALSE # Instability after 16000 because sims start ending.
 )
 
 
 ggplot2::ggsave(plot = supplement18$plotA,
                 filename = paste0(
-                  "Figure_supplement18_v1_a.pdf"
+                  "Figure_supplement18_v2_a.pdf"
                 ),
                 units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(plot = supplement18$plotA,
                 filename = paste0(
-                  "Figure_supplement18_v1_a.png"
+                  "Figure_supplement18_v2_a.png"
                 ),
                 units = "cm", width = 6.5*3, height = 6.5*2)
 
 ggplot2::ggsave(plot = supplement18$plotB,
                 filename = paste0(
-                  "Figure_supplement18_v1_b.pdf"
+                  "Figure_supplement18_v2_b.pdf"
                 ),
                 units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(plot = supplement18$plotB,
                 filename = paste0(
-                  "Figure_supplement18_v1_b.png"
+                  "Figure_supplement18_v2_b.png"
                 ),
                 units = "cm", width = 6.5*3, height = 6.5*2)
