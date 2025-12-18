@@ -14,7 +14,8 @@ figure2 <- list(
   graph = list(
     seed = "2", # "11", "17", "2"!,
     time = 25000
-  )
+  ),
+  pref = "Uniform(0, 1)"
 )
 
 figure2$graph$specification <- diversitiesRichness |> tidytable::select(c(
@@ -34,7 +35,7 @@ figure2$graph$specification <- diversitiesRichness |> tidytable::select(c(
   # Ease of Use
   "SpeciesPreferences", "Intervention"
 )) |> tidytable::filter(
-  SpeciesPreferences == "100% 0",
+  SpeciesPreferences == figure2$pref,
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.5)", "(1)"),
   PoolPatchSeed %in% figure2$graph$seed,
@@ -42,13 +43,14 @@ figure2$graph$specification <- diversitiesRichness |> tidytable::select(c(
 ) |> tidytable::distinct(
 )
 
-figure2$graph$networks <- generateNetworks(figure2$graph$specification)
+figure2$graph$networks <- generateNetworks(figure2$graph$specification,
+                                           Date = "2025-07-30")
 
 # Main Plots: #################################################################
 ### Plot 2:####################################################################
 # a=>b&c
 figure2$dataA <- diversitiesRichness |> tidytable::filter(
-  SpeciesPreferences == "100% 0",
+  SpeciesPreferences == figure2$pref,
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
   PoolPatchSeed %in% basePoolPatchSeeds,
@@ -57,7 +59,7 @@ figure2$dataA <- diversitiesRichness |> tidytable::filter(
 )
 
 figure2$indices <- figure2$graph$networks$Index |> tidytable::filter(
-  SpeciesPreferences == "100% 0",
+  SpeciesPreferences == figure2$pref,
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.5)", "(1)"),
   PoolPatchSeed %in% basePoolPatchSeeds
@@ -66,7 +68,7 @@ figure2$indices <- figure2$graph$networks$Index |> tidytable::filter(
 )
 
 figure2$dataC <- Pers |> tidytable::filter(
-  SpeciesPreferences == "100% 0",
+  SpeciesPreferences == figure2$pref,
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
   PoolPatchSeed %in% basePoolPatchSeeds
@@ -311,5 +313,5 @@ figure2$plot <- figure2$plot + ggplot2::annotate(
   arrow = arrow(length = unit(0.03, "npc"))
 )
 
-ggplot2::ggsave(plot = figure2$plot, filename = "Figure2_Prototype7.pdf",
+ggplot2::ggsave(plot = figure2$plot, filename = "Figure2_Prototype7-unif.pdf",
                 units = "cm", width = 6.5*3, height = 6.5*2)
