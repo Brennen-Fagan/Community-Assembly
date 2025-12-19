@@ -5,7 +5,8 @@
 
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
-source("TimeSpaceAndTimeSeries-10i-PreparationsPersistence.R")
+source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
+# source("TimeSpaceAndTimeSeries-10i-PreparationsPersistence.R")
 source(file.path("R", "flattenDiversity.R")) # Req'd by below
 source(file.path("R", "generateNetworks.R")) # To create inset graphs.
 
@@ -15,7 +16,7 @@ figure2 <- list(
     seed = "2", # "11", "17", "2"!,
     time = 25000
   ),
-  pref = "Uniform(0, 1)"
+  pref = "100% 0"#"Uniform(0, 1)"
 )
 
 figure2$graph$specification <- diversitiesRichness |> tidytable::select(c(
@@ -67,28 +68,38 @@ figure2$indices <- figure2$graph$networks$Index |> tidytable::filter(
   Intervention
 )
 
-figure2$dataC <- Pers |> tidytable::filter(
+
+figure2$dataC <- diversitiesAbund |> tidytable::filter(
   SpeciesPreferences == figure2$pref,
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
-  PoolPatchSeed %in% basePoolPatchSeeds
-) |> tidytable::filter(
-  In < Stop, Out > Start # Not things outside of [Start, Stop]
-) |> tidytable::mutate(
-  # Shorten intervals for equivalent comparisons.
-  InType = ifelse(In < Start, "Persistent", InType),
-  OutType = ifelse(Out > Stop, "Persistent", OutType),
-  In = ifelse(In < Start, Start, In),
-  Out = ifelse(Out > Stop, Stop, Out),
-  Persistence = Out - In
-) |> tidytable::group_by(
-  Species:Affinity, AffinityBins,
-  PoolPatch:InterventionNicheDistance,
-  Intervention, SpeciesPreferences, Start, Stop
-) |> tidytable::summarise( # Sum over Appearances.
-  Persistence = sum(Persistence),
-  .groups = "drop"
+  PoolPatchSeed %in% basePoolPatchSeeds,
+  Metric == "Alpha Abundance",
+  is.na(Subset)
 )
+
+# figure2$dataC <- Pers |> tidytable::filter(
+#   SpeciesPreferences == figure2$pref,
+#   NicheDistance == defaultNicheDistance,
+#   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
+#   PoolPatchSeed %in% basePoolPatchSeeds
+# ) |> tidytable::filter(
+#   In < Stop, Out > Start # Not things outside of [Start, Stop]
+# ) |> tidytable::mutate(
+#   # Shorten intervals for equivalent comparisons.
+#   InType = ifelse(In < Start, "Persistent", InType),
+#   OutType = ifelse(Out > Stop, "Persistent", OutType),
+#   In = ifelse(In < Start, Start, In),
+#   Out = ifelse(Out > Stop, Stop, Out),
+#   Persistence = Out - In
+# ) |> tidytable::group_by(
+#   Species:Affinity, AffinityBins,
+#   PoolPatch:InterventionNicheDistance,
+#   Intervention, SpeciesPreferences, Start, Stop
+# ) |> tidytable::summarise( # Sum over Appearances.
+#   Persistence = sum(Persistence),
+#   .groups = "drop"
+# )
 
 ##### a: ######################################################################
 ####### Core Plot: ############################################################
@@ -168,7 +179,7 @@ figure2$plotA <- plotMeanAndInner(
   xmin = min(figure2$dataA$Start),
   xmax = max(figure2$dataA$Stop),
   ymin = 0, ymax = richnessYMax,
-  fill = "grey",
+  fill = "grey30", color = "black",
   alpha = 0.2,
   inherit.aes = FALSE
 ) + ggplot2::geom_segment( # Arrows to the boxes.
@@ -185,8 +196,8 @@ figure2$plotA <- plotMeanAndInner(
   inherit.aes = FALSE,
   arrow = arrow(length = unit(0.03, "npc"))
 ) + ggplot2::annotate(
-  "text", x = 36500, y = c(16, 38), size = 3, lineheight = 0.7,
-  label = c("Fully\nAdapted", "Poorly\nAdapted")
+  "text", x = 36700, y = c(16, 38), size = 3, lineheight = 0.7,
+  label = c("Well\nAdapted", "Poorly\nAdapted")
 ) + ggplot2::labs(
   tag = "a)"
 ) + ggplot2::theme(
@@ -213,21 +224,21 @@ figure2$plotB <- ggplot2::ggplot(
 ) + ggplot2::coord_cartesian(
   ylim = c(0, richnessYMax), expand = FALSE
   ###### Background Annotation: ###############################################
-) + ggplot2::geom_rect(
-  data = data.frame(
-    1 # 1 rectangle per row, so dummy df to prevent overplotting
-  ),
-  xmin = 0,
-  xmax = 6,
-  ymin = 0, ymax = richnessYMax,
-  fill = "grey",
-  alpha = 0.2,
-  inherit.aes = FALSE
+# ) + ggplot2::geom_rect(
+#   data = data.frame(
+#     1 # 1 rectangle per row, so dummy df to prevent overplotting
+#   ),
+#   xmin = 0,
+#   xmax = 6,
+#   ymin = 0, ymax = richnessYMax,
+#   fill = "grey", color = "black",
+#   alpha = 0.2,
+#   inherit.aes = FALSE
   ####### Core Plot: ##########################################################
 ) + ggplot2::geom_violin(
   position = ggplot2::position_dodge(0.9)
 ) + ggplot2::geom_boxplot(
-  notch = TRUE, outlier.size = 0,
+  notch = TRUE, outlier.size = 1,
   position = ggplot2::position_dodge(0.9),
   width = 0.28
   # ) + ggplot2::geom_jitter(
@@ -237,81 +248,123 @@ figure2$plotB <- ggplot2::ggplot(
   color = "black", group = 1
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
-  name = "Habitat's Land-use"
+  name = "Habitat Type"
 ) + ggplot2::labs(
   tag = "b)"
   ####### Annotations: ########################################################
 ) + ggplot2::theme_minimal(
 ) + ggplot2::theme(
-  plot.tag.position = c(0.05, 0.95)
+  plot.tag.position = c(0.05, 0.95),
+  panel.border = ggplot2::element_rect(
+    fill = NA, color = "black"
+  ),
+  panel.background = ggplot2::element_rect(
+    fill = "grey86"
+  )
 ) + ggplot2::labs(
   y = "Avg. Richness",
-  x = "Habitat's Land-use"
+  x = "Habitat Type"
 ) + ggplot2::guides(
   color = "none",
   fill = "none"
 ) + ggplot2::annotate(
-  "text", x = c(1.5, 4.5), y = 5, label = c("Well\nAdapted", "Poorly\nAdapted")
+  "text", x = c(1.5, 4.5), y = 5, label = c("Well\nAdapted", "Poorly\nAdapted"),
+  size = 3
 )
 
 ##### c: ######################################################################
+figure2$rangeC <- figure2$dataC |> tidytable::filter(
+  Time > Start, Time < Stop
+) |> tidytable::group_by(
+  PoolPatchSeed, Intervention, SpeciesAffinity
+) |> tidytable::summarise(
+  Value = mean(Value)
+) |> tidytable::pull(Value) |> range()
+
 figure2$plotC <- ggplot2::ggplot(
-  figure2$dataC,
-  ggplot2::aes(
-    y = Persistence,
-    x = Intervention,
-    color = Intervention,
-    group = interaction(Intervention, SpeciesType),
-    fill = SpeciesType
-  )
-  ###### Background Annotation: ###############################################
-) + ggplot2::geom_rect(
-  data = data.frame(
-    1 # 1 rectangle per row, so dummy df to prevent overplotting
+  figure2$dataC |> tidytable::filter(
+    Time > Start, Time < Stop
+  ) |> tidytable::group_by(
+    PoolPatchSeed, Intervention, SpeciesAffinity
+  ) |> tidytable::summarise(
+    Value = mean(Value)
   ),
-  xmin = 0,
-  xmax = 6,
-  ymin = -Inf, ymax = Inf,
-  fill = "grey",
-  alpha = 0.2,
-  inherit.aes = FALSE
+  ggplot2::aes(
+    x = Intervention,
+    y = Value,
+    color = Intervention
+  )
+) + ggplot2::coord_cartesian(
+  expand = FALSE
+  ###### Background Annotation: ###############################################
+# ) + ggplot2::theme(
+# ) + ggplot2::geom_rect(
+#   data = data.frame(
+#     1 # 1 rectangle per row, so dummy df to prevent overplotting
+#   ),
+#   xmin = 0.5,
+#   xmax = 5.5,
+#   ymin = figure2$rangeC[1],
+#   ymax = figure2$rangeC[2],
+#   fill = "grey", color = "black",
+#   alpha = 0.2,
+#   inherit.aes = FALSE
   ####### Core Plot: ##########################################################
 ) + ggplot2::geom_violin(
-  position = ggplot2::position_dodge(0.9), show.legend = FALSE,
-  scale = "count", draw_quantiles = 0.5, linewidth = 1.3
+  position = ggplot2::position_dodge(0.9)
+) + ggplot2::geom_boxplot(
+  notch = TRUE, outlier.size = 1,
+  position = ggplot2::position_dodge(0.9),
+  width = 0.28
+  # ) + ggplot2::geom_jitter(
+  #   alpha = 0.25
+) + ggplot2::geom_line(
+  data = ~ summarise(group_by(.x, Intervention), Value = mean(Value)),
+  color = "black", group = 1
 ) + ggplot2::scale_color_manual(
-  values = colorPalette,
-  name = "Habitat Land-use"
-) + ggplot2::scale_fill_manual(
-  values = c("darkgreen", "burlywood4")
-) + ggplot2::scale_y_log10(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat Type"
+) + ggplot2::labs(
+  tag = "c)"
+  ####### Annotations: ########################################################
 ) + ggplot2::theme_minimal(
-) + ggplot2::labs(
-  tag = "c)", x = "Habitat"
 ) + ggplot2::theme(
-  plot.tag.position = c(0.05, 0.95)
-) + ggplot2::facet_grid(
-  factor(SpeciesType, levels = c("Consumer", "Basal"), ordered = TRUE) ~ .
-) + ggplot2::scale_x_discrete(
-  breaks = c("(0)", "(0.5)", "(1)")
+  plot.tag.position = c(0.05, 0.95),
+  panel.border = ggplot2::element_rect(
+    fill = NA, color = "black"
+  ),
+  panel.background = ggplot2::element_rect(
+    fill = "grey86"
+  )
 ) + ggplot2::labs(
-  x = "Habitat's Land-use"
+  y = "Avg. Total Abundance (Log Scale)",
+  x = "Habitat Type"
+) + ggplot2::guides(
+  color = "none",
+  fill = "none"
+) + ggplot2::annotate(
+  "text", x = c(1.5, 4.5), y = 3e3, label = c("Well\nAdapted", "Poorly\nAdapted"),
+  size = 3
+) + ggplot2::scale_y_log10(
 )
 
+##### Combine: ################################################################
 figure2$plot <- ggpubr::ggarrange(
   plotlist = list(
     figure2$plotA,
     figure2$plotB,
     figure2$plotC
-  ), nrow = 1, widths = c(0.5, 0.27, 0.23)
+  ), nrow = 1, widths = c(0.5, 0.25, 0.25), common.legend = TRUE
 )
 
 figure2$plot <- figure2$plot + ggplot2::annotate(
   "curve",
-  x = 0.35, y = 0.97, xend = c(0.57, 0.87), yend = 0.97,
+  x = 0.35, y = 0.905, xend = c(0.56, 0.84), yend = 0.905,
   curvature = -0.075,
   arrow = arrow(length = unit(0.03, "npc"))
 )
 
-ggplot2::ggsave(plot = figure2$plot, filename = "Figure2_Prototype7-unif.pdf",
+ggplot2::ggsave(plot = figure2$plot, filename = "Figure2_Prototype8.pdf",
+                units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(plot = figure2$plot, filename = "Figure2_Prototype8.png",
                 units = "cm", width = 6.5*3, height = 6.5*2)
