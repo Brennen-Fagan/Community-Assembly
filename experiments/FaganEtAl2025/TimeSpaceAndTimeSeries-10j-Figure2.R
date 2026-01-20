@@ -78,31 +78,8 @@ figure2$dataC <- diversitiesAbund |> tidytable::filter(
   is.na(Subset)
 )
 
-# figure2$dataC <- Pers |> tidytable::filter(
-#   SpeciesPreferences == figure2$pref,
-#   NicheDistance == defaultNicheDistance,
-#   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
-#   PoolPatchSeed %in% basePoolPatchSeeds
-# ) |> tidytable::filter(
-#   In < Stop, Out > Start # Not things outside of [Start, Stop]
-# ) |> tidytable::mutate(
-#   # Shorten intervals for equivalent comparisons.
-#   InType = ifelse(In < Start, "Persistent", InType),
-#   OutType = ifelse(Out > Stop, "Persistent", OutType),
-#   In = ifelse(In < Start, Start, In),
-#   Out = ifelse(Out > Stop, Stop, Out),
-#   Persistence = Out - In
-# ) |> tidytable::group_by(
-#   Species:Affinity, AffinityBins,
-#   PoolPatch:InterventionNicheDistance,
-#   Intervention, SpeciesPreferences, Start, Stop
-# ) |> tidytable::summarise( # Sum over Appearances.
-#   Persistence = sum(Persistence),
-#   .groups = "drop"
-# )
-
 ##### a: ######################################################################
-####### Core Plot: ############################################################
+# Richness through time across simulations, showing stability and separation.
 figure2$plotA <- plotMeanAndInner(
   rbind(
     figure2$dataA |> tidytable::filter(
@@ -122,7 +99,10 @@ figure2$plotA <- plotMeanAndInner(
     PoolPatchSeed == figure2$graph$seed,
     Intervention %in% c("(0)", "(0.5)", "(1)"),
     abs(Time - figure2$graph$time) == min(abs(Time - figure2$graph$time))
-  )}
+  )},
+  mapping = ggplot2::aes(fill = Intervention),
+  shape = 21,
+  color = "black"
 ) + ggplot2::labs(
   y = "Richness"
 ) + ggplot2::guides(
@@ -130,82 +110,20 @@ figure2$plotA <- plotMeanAndInner(
   color = ggplot2::guide_legend(ncol = 5),
   fill = ggplot2::guide_legend(ncol = 5)
 ) + ggplot2::coord_cartesian(
-  xlim = c(0, 40000), ylim = c(0, richnessYMax), expand = FALSE
-  ####### Insets: #############################################################
-) + ggplot2::annotation_custom(
-  ggplot2::ggplotGrob(
-    figure2$graph$networks$Envs[[
-      figure2$indices$ID[1]
-      ]]$singletonGraphs[[1]] +
-      ggplot2::theme_void(
-      ) + ggplot2::theme(
-        plot.background = ggplot2::element_rect(fill = "white")
-      ) + ggplot2::coord_cartesian(
-        xlim = c(NA, NA), ylim = c(-2, 0.5)
-      ) # Easiest to probably just not worry about comparing between.
-  ),
-  xmin = 30500, xmax = 40000, ymin = 7, ymax = 17
-) + ggplot2::annotation_custom(
-  ggplot2::ggplotGrob(
-    figure2$graph$networks$Envs[[
-      figure2$indices$ID[2]
-      ]]$singletonGraphs[[1]] +
-      ggplot2::theme_void(
-      ) + ggplot2::theme(
-        plot.background = ggplot2::element_rect(fill = "white")
-      ) + ggplot2::coord_cartesian(
-        xlim = c(NA, NA), ylim = c(-2, 0.5)
-      ) # Easiest to probably just not worry about comparing between.
-  ),
-  xmin = 30500, xmax = 40000, ymin = 18, ymax = 28
-) + ggplot2::annotation_custom(
-  ggplot2::ggplotGrob(
-    figure2$graph$networks$Envs[[
-      figure2$indices$ID[3]
-      ]]$singletonGraphs[[1]] +
-      ggplot2::theme_void(
-      ) + ggplot2::theme(
-        plot.background = ggplot2::element_rect(fill = "white")
-      ) + ggplot2::coord_cartesian(
-        xlim = c(NA, NA), ylim = c(-2, 0.5)
-      ) # Easiest to probably just not worry about comparing between.
-  ),
-  xmin = 30500, xmax = 40000, ymin = 29, ymax = 39
-  ####### Annotations: ########################################################
-) + ggplot2::geom_rect(
-  data = data.frame(
-    1 # 1 rectangle per row, so dummy df to prevent overplotting
-  ),
-  xmin = min(figure2$dataA$Start),
-  xmax = max(figure2$dataA$Stop),
-  ymin = 0, ymax = richnessYMax,
-  fill = "grey30", color = "black",
-  alpha = 0.2,
-  inherit.aes = FALSE
-) + ggplot2::geom_segment( # Arrows to the boxes.
-  data = data.frame(
-    x = figure2$graph$time+250,
-    y = c(12, 26, 35),
-    xend = 30500,
-    yend = c(11, 22, 36),
-    Intervention = c("(0)", "(0.5)", "(1)")
-  ),
-  mapping = ggplot2::aes(
-    x = x, y = y, xend = xend, yend = yend, color = Intervention
-  ),
-  inherit.aes = FALSE,
-  arrow = arrow(length = unit(0.03, "npc"))
-) + ggplot2::annotate(
-  "text", x = 36700, y = c(16, 38), size = 3, lineheight = 0.7,
-  label = c("Well\nAdapted", "Poorly\nAdapted")
-) + ggplot2::labs(
-  tag = "a)"
+  xlim = c(0, 30000), ylim = c(0, richnessYMax), expand = FALSE
 ) + ggplot2::theme(
   legend.position = c(0.5, 0.09),
-  plot.tag.position = c(0.025, 0.95)
+  plot.tag.position = c(0.025, 0.95),
+  axis.text.x = ggplot2::element_text(hjust = 1)
 ) + ggplot2::scale_x_continuous(
   breaks = (0:3)*10000
 )
+
+##### b: ######################################################################
+# Example networks from different scenarios of the same simulation, showing
+# effects of the current habitat type through time on network shape.
+# Previously, these were independent panels, but I'm switching to a facet_wrap.
+
 
 ##### b: ######################################################################
 figure2$plotB <- ggplot2::ggplot(
@@ -364,7 +282,13 @@ figure2$plot <- figure2$plot + ggplot2::annotate(
   arrow = arrow(length = unit(0.03, "npc"))
 )
 
-ggplot2::ggsave(plot = figure2$plot, filename = "Figure2_Prototype8.pdf",
+ggplot2::ggsave(plot = figure2$plot, filename = file.path(dirImages, "Figure2_Prototype9.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plot, filename = "Figure2_Prototype8.png",
+ggplot2::ggsave(plot = figure2$plot, filename = file.path(dirImages, "Figure2_Prototype9.png"),
+                units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(plot = figure2$plotA, filename = file.path(dirImages, "Figure2A_Prototype9.pdf"),
+                units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(plot = figure2$plotB, filename = file.path(dirImages, "Figure2B_Prototype9.pdf"),
+                units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(plot = figure2$plotC, filename = file.path(dirImages, "Figure2C_Prototype9.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
