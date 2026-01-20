@@ -276,6 +276,56 @@ supplementStatistics$interventionContrast <- tidytable::left_join(
   }
 )
 
+# Try it with brms in case we can get a stronger structure or signal here.
+supplementStatistics$interventionContrast2 <- tidytable::left_join(
+  # Cases with intervention
+  diversitiesRichness |> tidytable::filter(
+    PoolPatchSeed %in% basePoolPatchSeeds,
+    NicheDistance == defaultNicheDistance,
+    InterventionInitial != InterventionFinal,
+    Time > Start, Time < Stop, # Not things outside of [Start, Stop]
+    is.na(Subset)
+  ) |> tidytable::rename(
+    ValueIntervention = Value
+  ),
+  # Join to cases without intervention by ENDING state (NOT INITIAL)
+  diversitiesRichness |> tidytable::filter(
+    PoolPatchSeed %in% basePoolPatchSeeds,
+    NicheDistance == defaultNicheDistance,
+    InterventionInitial == InterventionFinal,
+    Time > Start, Time < Stop, # Not things outside of [Start, Stop]
+    is.na(Subset)
+  ) |> tidytable::select(
+    Time:SpeciesAffinitySeed, SpeciesPreferences, DispersalParam,
+    InterventionFinal
+  ) |> tidytable::rename(
+    ValueNoIntervention = Value
+  ),
+  by = supplementStatistics$baseStrings
+) |> tidytable::mutate(
+  Value = ValueIntervention - ValueNoIntervention,
+  Time = Time - 20000 # Scale so that it's time since start of comparison.
+  # Switch to dplyr for group_map
+) |> dplyr::group_by(
+  SpeciesPreferences, InterventionFinal
+) |> dplyr::group_map(
+  .f = function(values, key) {
+    list(
+      key,
+      summary(values$Value),
+      brms::brm(
+        brms::brmsformula(
+          Value ~ Time + (1 + Time|Intervention) + (1|PoolPatchSeed) +
+            arma(p = 1, q = 1, gr = UID)
+        ),
+        data = values |> tidytable::mutate(
+          UID = interaction(Intervention, PoolPatchSeed)
+        ), cores = 4
+      )
+    )
+  }
+)
+
 # Short term richness changes during land-use change: #########################
 # "Across the full set of parameter combinations discussed here, we observe
 # positive richness changes in 3% of land-use change scenarios, compared to no
@@ -289,7 +339,7 @@ supplementStatistics$shortTermLoss <-
     PoolPatchSeed %in% basePoolPatchSeeds,
     NicheDistance == defaultNicheDistance,
     Metric == "Alpha Hill:0",
-    InterventionInitial != InterventionFinal,
+    InterventionInitial != InterventionFinal, # might be useful to look at no change as well.
     is.na(Subset)
   ) |> tidytable::group_by(
     SpeciesPreferences, Intervention, InterventionInitial, InterventionFinal,
@@ -297,10 +347,10 @@ supplementStatistics$shortTermLoss <-
   ) |> tidytable::arrange(
     Time
   ) |> tidytable::summarise(
-    # InterventionChange = abs(
-    #   as.numeric(gsub(InterventionInitial, pattern = "[(]|[)]", replacement = ""))
-    #   - as.numeric(gsub(InterventionFinal, pattern = "[(]|[)]", replacement = ""))
-    # ),
+    InterventionChange = abs(
+      as.numeric(gsub(InterventionInitial, pattern = "[(]|[)]", replacement = ""))
+      - as.numeric(gsub(InterventionFinal, pattern = "[(]|[)]", replacement = ""))
+    ),
     Time = round(Time - Time[2], digits = 4), # Make numerically safe.
     # Note the different conventions to make analysis easier
     PostIntervention = Time != Time[1],
@@ -313,7 +363,7 @@ supplementStatistics$shortTermLoss <-
     TimeSinceIntervention == floor(TimeSinceIntervention)
   ) |> tidytable::group_by(
     SpeciesPreferences, Intervention, InterventionInitial, InterventionFinal,
-    TimeSinceIntervention
+    TimeSinceIntervention, InterventionChange
   ) |> tidytable::summarise(
     # Across PoolPatchSeeds
     Total = tidytable::n(),
@@ -346,23 +396,34 @@ supplementStatistics$PLOT$shortTermLoss <-
 # Too fine to examine inside of R. Need to magnify further.
 ggplot2::ggsave(
   plot = supplementStatistics$PLOT$shortTermLoss,
+  # filename = "Figure_supplementStatistics_ShortTermLoss.png",
+  # height = 200, width = 200, units = "cm", limitsize = FALSE
   filename = "Figure_supplementStatistics_ShortTermLoss.pdf",
-  height = 200, width = 200, units = "cm", limitsize = FALSE
+  height = 100, width = 100, units = "cm", limitsize = FALSE
 )
 
 # Take some slices so we end up with something more writable in a paper.
 supplementStatistics$STAT$shortTermLoss <-
   # 3 times for each of the 3 preferences with each of the 3 statistics.
-  supplementStatistics$shortTermLoss |> tidytable::filter(
-    TimeSinceIntervention %in% c(10, 20, 50)
+  supplementStatistics$shortTermLoss df_ShortTermChanges |> tidytable::filter(
+    TimeSinceIntervention %in% c(1, 10, 20, 50)
   ) |> tidytable::group_by(
-    SpeciesPreferences, TimeSinceIntervention
+    TimeSinceIntervention
   ) |> tidytable::summarise(
     Total = sum(Total),
     Neg = sum(Neg),
-    Zero = sum(Zero),
+    Zero = sum(Zero) ,
     Pos = sum(Pos)
   )
+
+# # A tidytable: 5 × 5
+# TimeSinceIntervention Total   Neg  Zero   Pos
+# <dbl> <int> <int> <int> <int>
+#   1                     1  2640  1108  1471    61
+# 2                     5  2640  1963   592    85
+# 3                    10  2640  2148   394    98
+# 4                    20  2640  2178   281   181
+# 5                    50  2640  2091   250   299
 
 # #############################################################################
 
