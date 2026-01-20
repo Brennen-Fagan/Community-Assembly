@@ -2,7 +2,8 @@ generateNetworks <- function(
   Specification,
   dIS = interventionStrings,
   aDO = speciesAffinityDictionaryOrigin,
-  Date = NULL
+  Date = NULL,
+  split = TRUE
 ) {
   # Goal: Pass data.frame, return list of networks where a network corresponds
   #       to a row of the data.frame.
@@ -288,28 +289,47 @@ generateNetworks <- function(
   })
 
   #### Plot
-  targetEnvs <- lapply(targetEnvs, function(env) {
-    timelist <- env$graphs
-    env$singletonGraphs <- lapply(env$graphs, function(patchgraph) {
-      plotGraph(patchgraph, mainLayout = env$layout)
+  if (split) {
+    # Plot individually, then provide access information.
+    targetEnvs <- lapply(targetEnvs, function(env) {
+      timelist <- env$graphs
+      env$singletonGraphs <- lapply(env$graphs, function(patchgraph) {
+        plotGraph(patchgraph, mainLayout = env$layout)
+      })
+      return(env)
     })
-    return(env)
-  })
 
-  targetEnvsIndex <- do.call(
-    rbind,
-    lapply(
-      targetEnvs,
-      function(env)
-        cbind(
-          Time = env$Row$Time,
-          env$Diversity[
-            1, c("PoolPatchSeed", "SpeciesPreferences",
-                 "NicheDistance", "Intervention")]
-        )
+    targetEnvsIndex <- do.call(
+      rbind,
+      lapply(
+        targetEnvs,
+        function(env)
+          cbind(
+            Time = env$Row$Time,
+            env$Diversity[
+              1, c("PoolPatchSeed", "SpeciesPreferences",
+                   "NicheDistance", "Intervention")]
+          )
+      )
     )
-  )
-  targetEnvsIndex <- cbind(ID = 1:nrow(targetEnvsIndex), targetEnvsIndex)
+    targetEnvsIndex <- cbind(ID = 1:nrow(targetEnvsIndex), targetEnvsIndex)
+  } else {
+    # Combine the graph, and perform preliminary plotting, but allow user to
+    # decide on, e.g., how to facet the plot.
+    # Probably more efficient to work from layout?
+    combinedGraph <- lapply(targetEnvs, function(env) {
+      # Work from graphs instead of EVlists so that we're in a better format.
+      labeledGraphs <- lapply(seq_along(env$graphs),
+                         function(i, g, r)
+                           g[[i]] %N>% mutate(r[i, ]) %E>% mutate(r[i, ]),
+                         g = env$graphs, r = env$Row)
+      # Combine inside (across patches, time),
+      # then combine outside (across runs).
+      labeledGraphs <- tidygraph::bind_graphs(labeledGraphs)
+      return(labeledGraphs)
+    })
+    combinedGraph <- tidygraph::bind_graphs(combinedGraph)
+  }
 
   return(list(
     Index = targetEnvsIndex,
