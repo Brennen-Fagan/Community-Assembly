@@ -45,7 +45,7 @@ figure2$graph$specification <- diversitiesRichness |> tidytable::select(c(
 )
 
 figure2$graph$networks <- generateNetworks(figure2$graph$specification,
-                                           Date = "2025-07-30")
+                                           Date = "2025-07-30", split = FALSE)
 
 # Main Plots: #################################################################
 ### Plot 2:####################################################################
@@ -122,11 +122,17 @@ figure2$plotA <- plotMeanAndInner(
 ##### b: ######################################################################
 # Example networks from different scenarios of the same simulation, showing
 # effects of the current habitat type through time on network shape.
-# Previously, these were independent panels, but I'm switching to a facet_wrap.
+# Previously, these were independent panels, but I'm switching to a facets.
+figure2$plotB <- figure2$graph$networks$Plot + ggplot2::facet_grid(
+  Intervention ~ .
+  ) + ggplot2::theme(
+    axis.title.x = ggplot2::element_blank(),
+    axis.text.x = ggplot2::element_blank()
+  )
 
-
-##### b: ######################################################################
-figure2$plotB <- ggplot2::ggplot(
+##### c: ######################################################################
+# Richness varies with land-use type for our fixed land-use preference (0).
+figure2$plotC <- ggplot2::ggplot(
   figure2$dataA |> tidytable::filter(
     Time > Start, Time < Stop
   ) |> tidytable::group_by(
@@ -141,18 +147,6 @@ figure2$plotB <- ggplot2::ggplot(
   )
 ) + ggplot2::coord_cartesian(
   ylim = c(0, richnessYMax), expand = FALSE
-  ###### Background Annotation: ###############################################
-# ) + ggplot2::geom_rect(
-#   data = data.frame(
-#     1 # 1 rectangle per row, so dummy df to prevent overplotting
-#   ),
-#   xmin = 0,
-#   xmax = 6,
-#   ymin = 0, ymax = richnessYMax,
-#   fill = "grey", color = "black",
-#   alpha = 0.2,
-#   inherit.aes = FALSE
-  ####### Core Plot: ##########################################################
 ) + ggplot2::geom_violin(
   position = ggplot2::position_dodge(0.9)
 ) + ggplot2::geom_boxplot(
@@ -167,18 +161,8 @@ figure2$plotB <- ggplot2::ggplot(
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat Type"
-) + ggplot2::labs(
-  tag = "b)"
   ####### Annotations: ########################################################
 ) + ggplot2::theme_minimal(
-) + ggplot2::theme(
-  plot.tag.position = c(0.05, 0.95),
-  panel.border = ggplot2::element_rect(
-    fill = NA, color = "black"
-  ),
-  panel.background = ggplot2::element_rect(
-    fill = "grey86"
-  )
 ) + ggplot2::labs(
   y = "Avg. Richness",
   x = "Habitat Type"
@@ -190,16 +174,9 @@ figure2$plotB <- ggplot2::ggplot(
   size = 3
 )
 
-##### c: ######################################################################
-figure2$rangeC <- figure2$dataC |> tidytable::filter(
-  Time > Start, Time < Stop
-) |> tidytable::group_by(
-  PoolPatchSeed, Intervention, SpeciesAffinity
-) |> tidytable::summarise(
-  Value = mean(Value)
-) |> tidytable::pull(Value) |> range()
-
-figure2$plotC <- ggplot2::ggplot(
+##### d: ######################################################################
+# Abundance has a complex relationship with land-use type for fixed preference.
+figure2$plotD <- ggplot2::ggplot(
   figure2$dataC |> tidytable::filter(
     Time > Start, Time < Stop
   ) |> tidytable::group_by(
@@ -214,20 +191,6 @@ figure2$plotC <- ggplot2::ggplot(
   )
 ) + ggplot2::coord_cartesian(
   expand = FALSE
-  ###### Background Annotation: ###############################################
-# ) + ggplot2::theme(
-# ) + ggplot2::geom_rect(
-#   data = data.frame(
-#     1 # 1 rectangle per row, so dummy df to prevent overplotting
-#   ),
-#   xmin = 0.5,
-#   xmax = 5.5,
-#   ymin = figure2$rangeC[1],
-#   ymax = figure2$rangeC[2],
-#   fill = "grey", color = "black",
-#   alpha = 0.2,
-#   inherit.aes = FALSE
-  ####### Core Plot: ##########################################################
 ) + ggplot2::geom_violin(
   position = ggplot2::position_dodge(0.9)
 ) + ggplot2::geom_boxplot(
@@ -243,18 +206,6 @@ figure2$plotC <- ggplot2::ggplot(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat Type"
 ) + ggplot2::labs(
-  tag = "c)"
-  ####### Annotations: ########################################################
-) + ggplot2::theme_minimal(
-) + ggplot2::theme(
-  plot.tag.position = c(0.05, 0.95),
-  panel.border = ggplot2::element_rect(
-    fill = NA, color = "black"
-  ),
-  panel.background = ggplot2::element_rect(
-    fill = "grey86"
-  )
-) + ggplot2::labs(
   y = "Avg. Total Abundance (Log Scale)",
   x = "Habitat Type"
 ) + ggplot2::guides(
@@ -265,6 +216,9 @@ figure2$plotC <- ggplot2::ggplot(
   size = 3
 ) + ggplot2::scale_y_log10(
 )
+
+##### e: ######################################################################
+# Richness and abundance co-vary for our scenarios.
 
 ##### Combine: ################################################################
 figure2$plot <- ggpubr::ggarrange(

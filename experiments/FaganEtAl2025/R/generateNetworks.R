@@ -197,10 +197,18 @@ generateNetworks <- function(
   # Should be easy from here out?
   # May need to handle rearrangement at the end to make sure promise above kept.
 
+  # Make it easier to pick out which pool a species is from.
+
   targetEnvs <- lapply(targetEnvs, function(env) {
     env$graphs <- lapply(env$trophics$EdgeVertexLists[[1]], function(patch) {
       tidygraph::tbl_graph(
-        nodes = patch$Vertices, edges = patch$Edges
+        nodes = patch$Vertices |> mutate(
+          node = paste(node, env$Pool$partialID, sep = "_")
+          ),
+        edges = patch$Edges |> mutate(
+          from = paste(from, env$Pool$partialID, sep = "_"),
+          to = paste(to, env$Pool$partialID, sep = "_")
+          )
       )
     })
     return(env)
@@ -238,7 +246,7 @@ generateNetworks <- function(
         Components = tidygraph::graph_component_count(),
         Nodes = tidygraph::graph_order(),
         NotSingletons = Components != Nodes
-      ) %>% pull(NotSingletons))[1]
+      ) %>% pull(NotSingletons))[1] # Note, all same (so all(...) is equivalent).
       ) {
         # need to undirect again (because recording can be either direction?)
         env_undirected <- tidygraph::to_undirected(env_undirected)
@@ -250,7 +258,9 @@ generateNetworks <- function(
           types = targetPoolsU[[i]]$Pool$Type[
             env_undirected %N>% tidygraph::pull(
               node
-            ) |> substring(2) |> as.numeric()
+            ) |> substring(2) |> sub( # Extract only first number
+              pattern = "_.+", replacement = ""
+              ) |> as.numeric()
             ] == "Basal")
       } else {
         layout <- ggraph::create_layout(env_undirected, "auto")
@@ -270,7 +280,7 @@ generateNetworks <- function(
   # Adjust for meaningful x and y instead if possible.
   targetEnvs <- lapply(targetEnvs, function(env) {
     l <- env$layout
-    l_indices <- as.numeric(gsub("s", "", l$node))
+    l_indices <- as.numeric(sub("_.+", "", gsub("s", "", l$node)))
     affs <- env$result$Ellipsis$Affinity$SpeciesAffinities
     if (length(unique(affs)) < 4) {
       # l$x <- affs[l_indices] + l$x/length(unique(affs)) # retain some structure
@@ -299,20 +309,9 @@ generateNetworks <- function(
       return(env)
     })
 
-    targetEnvsIndex <- do.call(
-      rbind,
-      lapply(
-        targetEnvs,
-        function(env)
-          cbind(
-            Time = env$Row$Time,
-            env$Diversity[
-              1, c("PoolPatchSeed", "SpeciesPreferences",
-                   "NicheDistance", "Intervention")]
-          )
-      )
+    retval <- list(
+      Envs = targetEnvs
     )
-    targetEnvsIndex <- cbind(ID = 1:nrow(targetEnvsIndex), targetEnvsIndex)
   } else {
     # Combine the graph, and perform preliminary plotting, but allow user to
     # decide on, e.g., how to facet the plot.
@@ -329,10 +328,37 @@ generateNetworks <- function(
       return(labeledGraphs)
     })
     combinedGraph <- tidygraph::bind_graphs(combinedGraph)
+
+    combinedLayout <- bind_rows(lapply(targetEnvs, function(env) {
+      env$layout
+    })) |> distinct()
+
+    combinedPlot <- plotGraph(
+      combinedGraph, mainLayout = combinedLayout, legends = TRUE
+    )
+
+    retval <- list(
+      Envs = targetEnvs,
+      Plot = combinedPlot
+    )
   }
 
-  return(list(
-    Index = targetEnvsIndex,
-    Envs = targetEnvs
-  ))
+  targetEnvsIndex <- do.call(
+    rbind,
+    lapply(
+      targetEnvs,
+      function(env)
+        cbind(
+          Time = env$Row$Time,
+          env$Diversity[
+            1, c("PoolPatchSeed", "SpeciesPreferences",
+                 "NicheDistance", "Intervention")]
+        )
+    )
+  )
+  targetEnvsIndex <- cbind(ID = 1:nrow(targetEnvsIndex), targetEnvsIndex)
+
+  retval$Index <- targetEnvsIndex
+
+  return(retval)
 }
