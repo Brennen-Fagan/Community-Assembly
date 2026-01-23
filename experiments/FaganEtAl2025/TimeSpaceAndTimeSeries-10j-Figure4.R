@@ -41,11 +41,11 @@ figure4$lustring <- switch(
 # (If done correctly, the set-up as of 23/01/2026 means there will be
 # round numbers from 1:10, evens from 12:20, and then by 3s 20:50.)
 figure4$interventionTimes <- diversitiesRichness |> tidytable::filter(
-  SpeciesPreferences == "100% 0",
+  SpeciesPreferences == figure4$pref,
   NicheDistance == defaultNicheDistance,
   PoolPatchSeed %in% basePoolPatchSeeds,
   Metric == "Alpha Hill:0",
-  !is.na(Subset), # Basals and Consumers
+  is.na(Subset), # Won't matter, so less data
   InterventionInitial != InterventionFinal
 ) |> tidytable::select(
   PoolPatch, PoolPatchSeed, Time
@@ -121,9 +121,74 @@ figure4$plotA <- plotMeanAndInner(
 # Summarised time-series plot for short time scale richness ratio.
 # Note this should be Consumer / Basal (because Consumers sometimes -> 0).
 
+figure4$plotC <- plotMeanAndInner(
+  figure4$data |> tidytable::filter(
+    !is.na(Subset), # Not overall values
+    Metric == "Richness",
+    Time > -0.01, Time < 51, Time == round(Time) # Avoid singletons.
+  ) |> tidytable::separate_wider_delim(
+    delim = "_", cols = Subset, names = c("Trophic", "Pref")
+  ) |> tidytable::pivot_wider(
+    names_from = Trophic, values_from = Value
+  ) |> tidytable::group_by(
+    Intervention, InterventionInitial, InterventionFinal, 
+    SpeciesPreferences, Pref
+  ) |> tidytable::mutate(
+    Value = Consumer/Basal,
+    Subset = NA
+  ), CIs = 0.75, facets = as.formula(. ~ Pref),
+  digits = 0
+) + ggplot2::labs(
+  x = "Time Since Intervention",
+  y = "Richness (Cons./Basal)"
+) + ggplot2::guides(
+  linetype = "none"#,
+  # color = ggplot2::guide_legend(ncol = 5),
+  # fill = ggplot2::guide_legend(ncol = 5)
+) + ggplot2::coord_cartesian(
+  expand = FALSE
+) + ggplot2::theme(
+  # legend.position = c(0.5, 0.09),
+  plot.tag.position = c(0.025, 0.95),
+  axis.text.x = ggplot2::element_text(hjust = 1)
+)
+
 ##### d: ######################################################################
 # Summarised time-series plot for short time scale abundance ratio.
 # Note this should be Consumer / Basal (because Consumers sometimes -> 0).
+
+figure4$plotD <- plotMeanAndInner(
+  figure4$data |> tidytable::filter(
+    !is.na(Subset), # Not overall values
+    Metric == "Abundance",
+    Time > -0.01, Time < 51, Time == round(Time) # Avoid singletons.
+  ) |> tidytable::separate_wider_delim(
+    delim = "_", cols = Subset, names = c("Trophic", "Pref")
+  ) |> tidytable::pivot_wider(
+    names_from = Trophic, values_from = Value
+  ) |> tidytable::group_by(
+    Intervention, InterventionInitial, InterventionFinal, 
+    SpeciesPreferences, Pref
+  ) |> tidytable::mutate(
+    Value = Consumer/Basal,
+    Subset = NA
+  ), CIs = 0.75, facets = as.formula(. ~ Pref),
+  digits = 0
+) + ggplot2::labs(
+  x = "Time Since Intervention",
+  y = "Abundance (Log10(Cons./Basal))"
+) + ggplot2::guides(
+  linetype = "none"#,
+  # color = ggplot2::guide_legend(ncol = 5),
+  # fill = ggplot2::guide_legend(ncol = 5)
+) + ggplot2::coord_cartesian(
+  expand = FALSE
+) + ggplot2::theme(
+  # legend.position = c(0.5, 0.09),
+  plot.tag.position = c(0.025, 0.95),
+  axis.text.x = ggplot2::element_text(hjust = 1)
+) + ggplot2::scale_y_log10(
+)
 
 ##### SUPPLEMENT: #############################################################
 # Short-long term transition for richness and abundance on log(1+Time) scale
