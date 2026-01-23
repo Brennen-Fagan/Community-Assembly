@@ -5,8 +5,6 @@
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
-source(file.path("R", "flattenDiversity.R")) # Req'd by below
-source(file.path("R", "generateNetworks.R")) # To create inset graphs.
 
 library(patchwork) # for the custom insets.
 
@@ -151,13 +149,13 @@ figure3$plot <- figure3$plotA + patchwork::inset_element(
   0.7, 0.15, 1, 0.45
 )
 
-ggplot2::ggsave(plot = figure2$plot, filename = file.path(dirImages, "Figure3_Prototype8.pdf"),
+ggplot2::ggsave(plot = figure3$plot, filename = file.path(dirImages, "Figure3_Prototype8.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plot, filename = file.path(dirImages, "Figure3_Prototype8.png"),
+ggplot2::ggsave(plot = figure3$plot, filename = file.path(dirImages, "Figure3_Prototype8.png"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotA, filename = file.path(dirImages, "Figure3A_Prototype8.pdf"),
+ggplot2::ggsave(plot = figure3$plotA, filename = file.path(dirImages, "Figure3A_Prototype8.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotB, filename = file.path(dirImages, "Figure3B_Prototype8.pdf"),
+ggplot2::ggsave(plot = figure3$plotB, filename = file.path(dirImages, "Figure3B_Prototype8.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotC, filename = file.path(dirImages, "Figure3C_Prototype8.pdf"),
+ggplot2::ggsave(plot = figure3$plotC, filename = file.path(dirImages, "Figure3C_Prototype8.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
