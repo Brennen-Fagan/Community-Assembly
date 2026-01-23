@@ -222,14 +222,14 @@ figure2$plotD <- ggplot2::ggplot(
   name = "Habitat Type"
 ) + ggplot2::theme_minimal(
 ) + ggplot2::labs(
-  y = "Avg. Total Abundance (Log Scale)",
+  y = "Avg. Total Abundance (Log)",
   x = "Habitat Type"
 ) + ggplot2::guides(
   color = "none",
   fill = "none"
-) + ggplot2::annotate(
-  "text", x = c(1.5, 4.5), y = 3e3, label = c("Well\nAdapted", "Poorly\nAdapted"),
-  size = 3
+# ) + ggplot2::annotate(
+#   "text", x = c(1.5, 4.5), y = 3e3, label = c("Well\nAdapted", "Poorly\nAdapted"),
+#   size = 3
 ) + ggplot2::scale_y_log10(
 )
 
@@ -255,7 +255,7 @@ figure2$plotE <- ggplot2::ggplot(
   name = "Habitat Type"
 ) + ggplot2::theme_minimal(
 ) + ggplot2::labs(
-  x = "Avg. Total Abundance (Log Scale)",
+  x = "Avg. Total Abundance (Log)",
   y = "Richness"
 ) + ggplot2::guides(
   color = "none",
