@@ -50,13 +50,36 @@ figure2$graph$networks <- generateNetworks(figure2$graph$specification,
 # Main Plots: #################################################################
 ### Plot 2:####################################################################
 # a=>b&c
-figure2$dataA <- diversitiesRichness |> tidytable::filter(
-  SpeciesPreferences == figure2$pref,
-  NicheDistance == defaultNicheDistance,
-  Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
-  PoolPatchSeed %in% basePoolPatchSeeds,
-  Metric == "Alpha Hill:0",
-  is.na(Subset)
+figure2$data <- dplyr::full_join(
+  diversitiesRichness |> tidytable::filter(
+    SpeciesPreferences == figure2$pref,
+    NicheDistance == defaultNicheDistance,
+    Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
+    PoolPatchSeed %in% basePoolPatchSeeds,
+    Metric == "Alpha Hill:0",
+    is.na(Subset)
+  ) |> tidytable::pivot_wider(
+    names_from = Metric, values_from = Value
+  ),
+  diversitiesAbund |> tidytable::filter(
+    SpeciesPreferences == figure2$pref,
+    NicheDistance == defaultNicheDistance,
+    Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
+    PoolPatchSeed %in% basePoolPatchSeeds,
+    Metric == "Alpha Abundance",
+    is.na(Subset)
+  ) |> tidytable::pivot_wider(
+    names_from = Metric, values_from = Value
+  ),
+  by = dplyr::join_by(
+    Time, Environment1, Environment2, Subset, PoolPatch, PoolPatchSeed,
+    Interactions, InteractionsSeed, Events, EventsSeed,
+    InitialConditions, InitialConditionsSeed, Dispersal, NicheDistance,
+    SpeciesAffinity, SpeciesAffinitySeed, PatchAffinity, PatchAffinitySeed,
+    InterventionPatchType, InterventionPatchSeed, InterventionTimeType,
+    InterventionTimeSeed, InterventionDispersal, InterventionNicheDistance,
+    Intervention, SpeciesPreferences, InterventionInitial, InterventionFinal,
+    DispersalParam, Start, Stop)
 )
 
 figure2$indices <- figure2$graph$networks$Index |> tidytable::filter(
@@ -68,31 +91,23 @@ figure2$indices <- figure2$graph$networks$Index |> tidytable::filter(
   Intervention
 )
 
-
-figure2$dataC <- diversitiesAbund |> tidytable::filter(
-  SpeciesPreferences == figure2$pref,
-  NicheDistance == defaultNicheDistance,
-  Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
-  PoolPatchSeed %in% basePoolPatchSeeds,
-  Metric == "Alpha Abundance",
-  is.na(Subset)
-)
-
 ##### a: ######################################################################
 # Richness through time across simulations, showing stability and separation.
 figure2$plotA <- plotMeanAndInner(
   rbind(
-    figure2$dataA |> tidytable::filter(
+    figure2$data |> tidytable::filter(
       Intervention %in% c("(0)", "(0.5)", "(1)")
     ),
     # We want to appear in the legend but not on the plot!
-    figure2$dataA |> tidytable::filter(
+    figure2$data |> tidytable::filter(
       PoolPatchSeed == figure2$graph$seed,
       Intervention %in% c("(0.25)", "(0.75)"),
       abs(Time - figure2$graph$time) == min(abs(Time - figure2$graph$time))
     ) |> tidytable::mutate(
-      Value = -100 # coord_cartesian will eliminate these points.
+      `Alpha Hill:0` = -100 # coord_cartesian will eliminate these points.
     )
+  ) |> tidytable::rename(
+    Value = `Alpha Hill:0`
   ), CIs = 0.75, facets = as.formula(. ~ .)
 ) + ggplot2::geom_point(
   data = function(x) {x |> tidytable::filter(
@@ -133,12 +148,12 @@ figure2$plotB <- figure2$graph$networks$Plot + ggplot2::facet_grid(
 ##### c: ######################################################################
 # Richness varies with land-use type for our fixed land-use preference (0).
 figure2$plotC <- ggplot2::ggplot(
-  figure2$dataA |> tidytable::filter(
+  figure2$data |> tidytable::filter(
     Time > Start, Time < Stop
   ) |> tidytable::group_by(
     PoolPatchSeed, Intervention, SpeciesAffinity
   ) |> tidytable::summarise(
-    Value = mean(Value)
+    Value = mean(`Alpha Hill:0`)
   ),
   ggplot2::aes(
     x = Intervention,
@@ -177,12 +192,12 @@ figure2$plotC <- ggplot2::ggplot(
 ##### d: ######################################################################
 # Abundance has a complex relationship with land-use type for fixed preference.
 figure2$plotD <- ggplot2::ggplot(
-  figure2$dataC |> tidytable::filter(
+  figure2$data |> tidytable::filter(
     Time > Start, Time < Stop
   ) |> tidytable::group_by(
     PoolPatchSeed, Intervention, SpeciesAffinity
   ) |> tidytable::summarise(
-    Value = mean(Value)
+    Value = mean(`Alpha Abundance`)
   ),
   ggplot2::aes(
     x = Intervention,
