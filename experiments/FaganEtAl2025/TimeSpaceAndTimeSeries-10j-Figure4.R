@@ -16,6 +16,7 @@ figure4 <- list(
   pref = "100% 0", #"Uniform(0, 1)"
   luinitl = "(0.5)", # Land Use INITiaL
   lufinal = c("(0)", "(0.5)", "(1)") # Land Use FINAL
+  # lufinal = c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)") # Land Use FINAL
 )
 
 figure4$prefstring <- switch(
@@ -176,7 +177,7 @@ figure4$plotD <- plotMeanAndInner(
   digits = 0
 ) + ggplot2::labs(
   x = "Time Since Intervention",
-  y = "Abundance (Log10(Cons./Basal))"
+  y = "Abundance (Cons./Basal)"
 ) + ggplot2::guides(
   linetype = "none"#,
   # color = ggplot2::guide_legend(ncol = 5),
@@ -194,5 +195,15 @@ figure4$plotD <- plotMeanAndInner(
 # Short-long term transition for richness and abundance on log(1+Time) scale
 # expecting to hit the ratios as well as the base values.
 
+##### Combine: ################################################################
+figure4$plot <- ggpubr::ggarrange(
+  plotlist = list(
+    figure4$plotA,
+    ggpubr::ggarrange(plotlist = list(
+      figure4$plotC + ggplot2::theme(legend.position = "none"),
+      figure4$plotD + ggplot2::theme(legend.position = "none")
+    ), ncol = 1)
+  ), nrow = 1, common.legend = TRUE
+)
 
 #4prototype5
