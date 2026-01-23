@@ -8,6 +8,8 @@ source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
 source(file.path("R", "flattenDiversity.R")) # Req'd by below
 source(file.path("R", "generateNetworks.R")) # To create inset graphs.
 
+library(patchwork) # for the custom insets.
+
 # This is better as an environment, but that's more opaque.
 figure3 <- list(
   pref = "100% 0"#"Uniform(0, 1)"
@@ -34,9 +36,9 @@ figure3$data <- tidytable::bind_rows(
     !is.na(Subset)
   )
 ) |> tidytable::mutate(
-  Subset = factor(Subset, levels = c("Consumer_0", "Basal_0"), 
+  Subset = factor(Subset, levels = c("Consumer_0", "Basal_0"),
                   labels = c("Consumer", "Basal"), ordered = TRUE),
-  Metric = factor(Metric, levels = c("Alpha Hill:0", "Alpha Abundance"), 
+  Metric = factor(Metric, levels = c("Alpha Hill:0", "Alpha Abundance"),
                   labels = c("Richness", "Abundance"), ordered = TRUE)
 ) |> tidytable::filter(
   Time > Start, Time < Stop
@@ -64,9 +66,9 @@ figure3$plotA <- ggplot2::ggplot(
   # ) + ggplot2::geom_jitter(
   #   alpha = 0.25
 ) + ggplot2::geom_line(
-  data = ~ summarise(group_by(.x, Intervention, Metric, Subset), 
+  data = ~ summarise(group_by(.x, Intervention, Metric, Subset),
                      Value = mean(Value), # Avg. over sims.
-                     .groups = "drop"), 
+                     .groups = "drop"),
   color = "black", group = 1
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
@@ -137,12 +139,16 @@ figure3$plotC <- ggplot2::ggplot(
 )
 
 ##### Combine: ################################################################
-figure3$plot <- figure3$plotA + ggplot2::annotation_custom(
-  grob = ggplot2::ggplotGrob(figure3$plotB),
-  xmin = , xmax = , ymin = , ymax = 
-) + ggplot2::annotation_custom(
-  grob = ggplot2::ggplotGrob(figure3$plotC),
-  xmin = , xmax = , ymin = , ymax = 
+figure3$plot <- figure3$plotA + patchwork::inset_element(
+  figure3$plotB + ggplot2::theme(
+    panel.background = ggplot2::element_rect(fill = "white")
+    ),
+  0.00, 0.35, 0.30, 0.65
+) + patchwork::inset_element(
+  figure3$plotC + ggplot2::theme(
+    panel.background = ggplot2::element_rect(fill = "white")
+  ),
+  0.7, 0.15, 1, 0.45
 )
 
 ggplot2::ggsave(plot = figure2$plot, filename = file.path(dirImages, "Figure3_Prototype8.pdf"),
