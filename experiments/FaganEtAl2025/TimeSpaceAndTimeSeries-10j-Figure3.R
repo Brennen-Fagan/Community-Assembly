@@ -33,23 +33,23 @@ figure3$data <- tidytable::bind_rows(
     Metric == "Alpha Abundance",
     !is.na(Subset)
   )
+) |> tidytable::mutate(
+  Subset = factor(Subset, levels = c("Consumer_0", "Basal_0"), 
+                  labels = c("Consumer", "Basal"), ordered = TRUE),
+  Metric = factor(Metric, levels = c("Alpha Hill:0", "Alpha Abundance"), 
+                  labels = c("Richness", "Abundance"), ordered = TRUE)
+) |> tidytable::filter(
+  Time > Start, Time < Stop
+) |> tidytable::group_by(
+  PoolPatchSeed, Intervention, SpeciesAffinity, Metric, Subset
+) |> tidytable::summarise(
+  Value = mean(Value), .groups = "drop"
 )
 
 ##### Core: ###################################################################
 # 2x2 facet plot of violins over LU, Richness - Abundance vs Consumer - Basal.
 figure3$plotA <- ggplot2::ggplot(
-  figure3$data |> tidytable::filter(
-    Time > Start, Time < Stop
-  ) |> tidytable::group_by(
-    PoolPatchSeed, Intervention, SpeciesAffinity, Metric, Subset
-  ) |> tidytable::summarise(
-    Value = mean(Value), .groups = "drop"
-  ) |> tidytable::mutate(
-    Subset = factor(Subset, levels = c("Consumer_0", "Basal_0"), 
-           labels = c("Consumer", "Basal"), ordered = TRUE),
-    Metric = factor(Metric, levels = c("Alpha Hill:0", "Alpha Abundance"), 
-             labels = c("Richness", "Abundance"), ordered = TRUE)
-  ),
+  figure3$data,
   ggplot2::aes(
     x = Intervention,
     y = Value,
@@ -80,6 +80,61 @@ figure3$plotA <- ggplot2::ggplot(
   scales = "free"
 )
 
+##### B: ######################################################################
+# Basal and Consumer Richness co-vary for our scenarios.
+# Note separate from Abundance to have two separate grobs to inset.
+figure3$plotB <- ggplot2::ggplot(
+  figure3$data |> tidytable::filter(
+    Metric == "Richness"
+    ) |> tidytable::pivot_wider(
+    names_from = Subset, values_from = Value
+  ),
+  ggplot2::aes(
+    x = Basal,
+    y = Consumer,
+    color = Intervention
+  )
+) + ggplot2::geom_point(
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat Type"
+) + ggplot2::theme_minimal(
+) + ggplot2::labs(
+  x = "Basal Richness",
+  y = "Consumer Richness"
+) + ggplot2::guides(
+  color = "none",
+  fill = "none"
+  # ) + ggplot2::scale_x_log10(
+)
+
+##### C: ######################################################################
+# Basal and Consumer Abundance co-vary for our scenarios.
+# Note separate from Richness to have two separate grobs to inset.
+figure3$plotC <- ggplot2::ggplot(
+  figure3$data |> tidytable::filter(
+    Metric == "Abundance"
+  ) |> tidytable::pivot_wider(
+    names_from = Subset, values_from = Value
+  ),
+  ggplot2::aes(
+    x = Basal,
+    y = Consumer,
+    color = Intervention
+  )
+) + ggplot2::geom_point(
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat Type"
+) + ggplot2::theme_minimal(
+) + ggplot2::labs(
+  x = "Basal Abundance",
+  y = "Consumer Abundance"
+) + ggplot2::guides(
+  color = "none",
+  fill = "none"
+  # ) + ggplot2::scale_x_log10(
+)
 
 ##### Combine: ################################################################
 figure3$plot <- figure3$plotA + ggplot2::annotation_custom(
