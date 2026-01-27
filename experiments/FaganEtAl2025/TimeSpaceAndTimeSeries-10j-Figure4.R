@@ -128,16 +128,17 @@ figure4$plotC <- plotMeanAndInner(
     Metric == "Richness",
     Time > -0.01, Time < 51, Time == round(Time) # Avoid singletons.
   ) |> tidytable::separate_wider_delim(
-    delim = "_", cols = Subset, names = c("Trophic", "Pref")
+    delim = "_", cols = Subset, names = c("Guild", "AffinityBins")
+  ) |> unifyAffinityBins( # if many preference types.
   ) |> tidytable::pivot_wider(
-    names_from = Trophic, values_from = Value
+    names_from = Guild, values_from = Value
   ) |> tidytable::group_by(
     Intervention, InterventionInitial, InterventionFinal, 
-    SpeciesPreferences, Pref
+    SpeciesPreferences, AffinityBins
   ) |> tidytable::mutate(
     Value = Consumer/Basal,
     Subset = NA
-  ), CIs = 0.75, facets = as.formula(. ~ Pref),
+  ), CIs = 0.75, facets = as.formula(. ~ AffinityBins),
   digits = 0
 ) + ggplot2::labs(
   x = "Time Since Intervention",
@@ -164,16 +165,17 @@ figure4$plotD <- plotMeanAndInner(
     Metric == "Abundance",
     Time > -0.01, Time < 51, Time == round(Time) # Avoid singletons.
   ) |> tidytable::separate_wider_delim(
-    delim = "_", cols = Subset, names = c("Trophic", "Pref")
+    delim = "_", cols = Subset, names = c("Guild", "AffinityBins")
+  ) |> unifyAffinityBins( # if many preference types.
   ) |> tidytable::pivot_wider(
-    names_from = Trophic, values_from = Value
+    names_from = Guild, values_from = Value
   ) |> tidytable::group_by(
     Intervention, InterventionInitial, InterventionFinal, 
-    SpeciesPreferences, Pref
+    SpeciesPreferences, AffinityBins
   ) |> tidytable::mutate(
     Value = Consumer/Basal,
     Subset = NA
-  ), CIs = 0.75, facets = as.formula(. ~ Pref),
+  ), CIs = 0.75, facets = as.formula(. ~ AffinityBins),
   digits = 0
 ) + ggplot2::labs(
   x = "Time Since Intervention",
