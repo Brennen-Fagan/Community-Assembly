@@ -1,5 +1,7 @@
 # Setup: ######################################################################
 # Plot of the effects of intervention overall as a set of heatmaps.
+# Quite a bit of reproduction of effort from Figure 4, but for a different
+# set of data.
 
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
@@ -7,7 +9,8 @@ source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
 
 figure5 <- list(
   pref = "100% 0", #"Uniform(0, 1)"
-  heatmapTimes = c(10, 10000)
+  heatmapTimes = c(10, 10000),
+  emphasise = c("(0.5)", "(0.5)->(0)", "(0.5)->(1)")
 )
 
 # Main Plots: #################################################################
@@ -147,18 +150,92 @@ figure5$dataBCSummary <- figure5$dataBase |> tidytable::filter(
   Average = mean(Value)
 ) 
 
+##### FUNCTION: ###############################################################
+# Different Scales mean we have to separate out the data, so we define a 
+# function to perform the plotting repeatedly/consistently.
+plotTextHeatmap <- function(data, legendName, legendtrans = "identity") {
+  ggplot2::ggplot(
+    data,
+    ggplot2::aes(
+      x = InterventionInitial,
+      y = InterventionFinal,
+      fill = Average
+    )
+  ) + ggplot2::geom_tile(
+    width = 1, height = 1, color = NA
+  ) + ggplot2::geom_tile(
+    data = function(x) x |> tidytable::filter(Emphasis),
+    fill = NA, color = "black", linewidth = 1
+  ) + ggplot2::geom_text(
+    ggplot2::aes(label = Average)
+  ) + ggplot2::facet_grid(
+    Metric ~ Time
+  ) + ggplot2::scale_fill_viridis_c(
+    transform = legendtrans
+  ) + ggplot2::theme_minimal(
+  ) + ggplot2::labs(
+    fill = legendName,
+    x = "Initial Habitat Type",
+    y = "Final Habitat Type"
+  )
+}
 
-##### b: ######################################################################
-# HEATMAPS: B Richness, B Abundance, 
-# B Richness guild Ratio, B Abundance guild Ratio,
-# B Richness time Difference, B Abundance time Difference
-figure4$plotBR <- ggplot2::ggplot(
-  figure4$dataOverallSummary |> tidytable::filter(
-    Time %in% figure4$heatmapTimes
+##### KEY: ####################################################################
+# HEATMAPS: Richness, Abundance, 
+# Richness guild Ratio, Abundance guild Ratio,
+# Richness time Difference, Abundance time Difference
+
+figure5$plotR <- plotTextHeatmap(
+    figure5$dataOverallSummary |> tidytable::filter(
+      Metric == "Richness", Time != 0
+    ) |> tidytable::mutate(
+    Emphasis = Intervention %in% figure5$emphasise,
+    Average = signif(Average, digits = 2)
+  ),
+  "Richness"
+)
+figure5$plotRR <- plotTextHeatmap(
+  figure5$dataBCSummary |> tidytable::filter(
+    Metric == "Richness", Time != 0
+  ) |> tidytable::mutate(
+    Emphasis = Intervention %in% figure5$emphasise,
+    Average = signif(Average, digits = 2)
+  ),
+  "Richness Ratio"
+)
+figure5$plotA <- plotTextHeatmap(
+  figure5$dataOverallSummary |> tidytable::filter(
+    Metric == "Abundance", Time != 0
+  ) |> tidytable::mutate(
+    Emphasis = Intervention %in% figure5$emphasise,
+    Average = signif(Average, digits = 2)
+  ),
+  "Abundance", "log10"
+)
+figure5$plotAR <- plotTextHeatmap(
+  figure5$dataBCSummary |> tidytable::filter(
+    Metric == "Abundance", Time != 0
+  ) |> tidytable::mutate(
+    Emphasis = Intervention %in% figure5$emphasise,
+    Average = signif(Average, digits = 2)
+  ),
+  "Abundance Ratio", "log10"
+)
+
+
+figure5$plotRD <- plotTextHeatmap(
+  figure5$dataOverallSummary |> tidytable::filter(
+    Metric == "Abundance", Time != 0
+  ) |> tidytable::mutate(
+    Emphasis = Intervention %in% figure5$emphasise,
+    Average = signif(Average, digits = 2)
   )
 )
-figure4$plotBA
-figure4$plotBRR
-figure4$plotBAR
-figure4$plotBRD
-figure4$plotBAD
+figure5$plotAD <- plotTextHeatmap(
+  figure5$dataBCSummary |> tidytable::filter(
+    Metric == "Abundance", Time != 0
+  ) |> tidytable::mutate(
+    Emphasis = Intervention %in% figure5$emphasise,
+    Average = signif(Average, digits = 2)
+  )
+)
