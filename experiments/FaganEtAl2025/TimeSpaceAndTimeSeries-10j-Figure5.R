@@ -280,3 +280,55 @@ figure5$plotAD <- plotTextHeatmap(
 ) + ggplot2::scale_fill_distiller(
   type = "div", palette = "BrBG"
 )
+
+
+##### Combine: ################################################################
+figure5$plotRichness <- ggpubr::ggarrange(
+  plotlist = list(
+    figure5$plotR,
+    figure5$plotRR
+  ), nrow = 2
+)
+figure5$plotSupplement <- ggpubr::ggarrange(
+  plotlist = list(
+    figure5$plotA,
+    figure5$plotAR
+  ), nrow = 2
+)
+
+ggplot2::ggsave(
+  plot = figure5$plotRichness, 
+  filename = file.path(dirImages, "Figure5_Prototype4.pdf"),
+  units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(
+  plot = figure5$plotRichness, 
+  filename = file.path(dirImages, "Figure5_Prototype4.png"),
+  units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(
+  plot = figure5$plotSupplement, 
+  filename = file.path(dirImages, "Figure5S_Prototype4.pdf"),
+  units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(
+  plot = figure5$plotR, 
+  filename = file.path(dirImages, "Figure5R_Prototype4.pdf"),
+  units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(
+  plot = figure5$plotRR, 
+  filename = file.path(dirImages, "Figure5RR_Prototype4.pdf"),
+  units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(
+  plot = figure5$plotA, 
+  filename = file.path(dirImages, "Figure5A_Prototype4.pdf"),
+  units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(
+  plot = figure5$plotAR, 
+  filename = file.path(dirImages, "Figure5AR_Prototype4.pdf"),
+  units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(
+  plot = figure5$plotAD, 
+  filename = file.path(dirImages, "Figure5AD_Prototype4.pdf"),
+  units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(
+  plot = figure5$plotRD, 
+  filename = file.path(dirImages, "Figure5RD_Prototype4.pdf"),
+  units = "cm", width = 6.5*3, height = 6.5*2)
