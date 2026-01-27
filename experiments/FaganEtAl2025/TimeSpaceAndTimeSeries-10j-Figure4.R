@@ -13,6 +13,7 @@ source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
 
 # This is better as an environment, but that's more opaque.
 figure4 <- list(
+  CI = 0.75,
   pref = "100% 0", #"Uniform(0, 1)"
   luinitl = "(0.5)", # Land Use INITiaL
   lufinal = c("(0)", "(0.5)", "(1)") # Land Use FINAL
@@ -25,12 +26,12 @@ figure4$prefstring <- switch(
   "50% 0, 50% 1" = "_5050",
   "Uniform(0, 1)" = "_Unif"
 )
-figure4$lustring <- switch(
+figure4$lustring <- paste0(switch(
   figure4$luinitl,
   "(0)" = "0",
   "(0.5)" = "", # Base Case
   "(1)" = "1"
-)
+), "to", length(figure4$lufinal))
 
 # Main Plots: #################################################################
 ### Plot 4: ###################################################################
@@ -59,7 +60,7 @@ figure4$interventionTimes <- diversitiesRichness |> tidytable::filter(
   .groups = "drop"
 )
 
-figure4$data <- tidytable::bind_rows(
+figure4$dataBase <- tidytable::bind_rows(
   diversitiesRichness |> tidytable::filter(
     SpeciesPreferences == figure4$pref,
     NicheDistance == defaultNicheDistance,
@@ -88,31 +89,146 @@ figure4$data <- tidytable::bind_rows(
                   labels = c("Richness", "Abundance"), ordered = TRUE),
   Time = Time - InterventionTime
 ) |> tidytable::filter(
-  Time > -1000, Time < 15000
+  Time > -1000, Time < 15000,
+  # Avoid singletons.
+  abs(Time - round(Time)) < 1e-6 | Time >= 55 | Time < 0 
 )
+
+# Why to the level of summary? Because the PlotMeanAndInner function
+# isn't built to handle the multiple resolutions that we have in the
+# actual data, which makes it harder to portray the data accurately.
+figure4$dataOverallSummary <- figure4$dataBase |> tidytable::filter(
+  Metric %in% c("Richness", "Abundance"),
+  is.na(Subset) # Not overall values
+) |> tidytable::mutate(
+  Time = tidytable::case_when( # Create groupings for times.
+    Time < -50 ~ round(Time, -2),
+    Time < 0 ~ -25, # In the last bin before regime change.
+    Time <= 50 ~ round(Time, 0),
+    Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
+    Time < 16350 ~ round(Time, -2),
+    TRUE ~ Time
+  )
+) |> tidytable::group_by(
+  # Average Over the now grouped times to make each sim equally weighted.
+  # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
+  # simple and match each other with the seeds. More complicated set-ups
+  # will want to adjust the groupings here.
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  PoolPatchSeed, SpeciesPreferences, Time
+) |> tidytable::summarise(
+  Value = median(Value), .groups = "drop"
+) |> tidytable::group_by(
+  # Average across simulations
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  SpeciesPreferences, Time
+) |> tidytable::summarise(
+  Lower = quantile(Value, p = (1 - figure4$CI) + (1 - figure4$CI)/2),
+  Average = mean(Value),
+  Upper = quantile(Value, p = figure4$CI + (1 - figure4$CI)/2)
+) 
+
+figure4$dataBCSummary <- figure4$dataBase |> tidytable::filter(
+  Metric %in% c("Richness", "Abundance"),
+  !is.na(Subset) # Not overall values
+) |> tidytable::separate_wider_delim(
+  delim = "_", cols = Subset, names = c("Guild", "AffinityBins")
+) |> unifyAffinityBins( # if many preference types.
+) |> tidytable::pivot_wider(
+  names_from = Guild, values_from = Value
+) |> tidytable::mutate(
+  Time = tidytable::case_when( # Create groupings for times.
+    Time < -50 ~ round(Time, -2),
+    Time < 0 ~ -25, # In the last bin before regime change.
+    Time <= 50 ~ round(Time, 0),
+    Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
+    Time < 16350 ~ round(Time, -2),
+    TRUE ~ Time
+  ),
+  Subset = NA,
+  Value = Consumer/Basal
+) |> tidytable::group_by(
+  # Average Over the now grouped times to make each sim equally weighted.
+  # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
+  # simple and match each other with the seeds. More complicated set-ups
+  # will want to adjust the groupings here.
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  PoolPatchSeed, SpeciesPreferences, AffinityBins, Time
+) |> tidytable::summarise(
+  Value = median(Value), .groups = "drop"
+) |> tidytable::group_by(
+  # Average across simulations
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  SpeciesPreferences, AffinityBins, Time
+) |> tidytable::summarise(
+  Lower = quantile(Value, p = (1 - figure4$CI) + (1 - figure4$CI)/2),
+  Average = mean(Value),
+  Upper = quantile(Value, p = figure4$CI + (1 - figure4$CI)/2)
+) 
+
+figure4$dataBCSupplement <- figure4$dataBase |> tidytable::filter(
+  Metric %in% c("Richness", "Abundance"),
+  !is.na(Subset) # Not overall values
+) |> tidytable::separate_wider_delim(
+  delim = "_", cols = Subset, names = c("Guild", "AffinityBins")
+) |> unifyAffinityBins( # if many preference types.
+) |> tidytable::mutate(
+  Time = tidytable::case_when( # Create groupings for times.
+    Time < -50 ~ round(Time, -2),
+    Time < 0 ~ -25, # In the last bin before regime change.
+    Time <= 50 ~ round(Time, 0),
+    Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
+    Time < 16350 ~ round(Time, -2),
+    TRUE ~ Time
+  ),
+  Subset = NA
+) |> tidytable::group_by(
+  # Average Over the now grouped times to make each sim equally weighted.
+  # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
+  # simple and match each other with the seeds. More complicated set-ups
+  # will want to adjust the groupings here.
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  PoolPatchSeed, SpeciesPreferences, Guild, AffinityBins, Time
+) |> tidytable::summarise(
+  Value = median(Value), .groups = "drop"
+) |> tidytable::group_by(
+  # Average across simulations
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  SpeciesPreferences, Guild, AffinityBins, Time
+) |> tidytable::summarise(
+  Lower = quantile(Value, p = (1 - figure4$CI) + (1 - figure4$CI)/2),
+  Average = mean(Value),
+  Upper = quantile(Value, p = figure4$CI + (1 - figure4$CI)/2)
+) 
 
 ##### a: ######################################################################
 # Summarised time-series plot for overall richness.
-figure4$plotA <- plotMeanAndInner(
-    figure4$data |> tidytable::filter(
-      Metric == "Richness", is.na(Subset)
-    ), CIs = 0.75, facets = as.formula(. ~ .),
-    digits = -2 # Due to temporal resolution of the data, above -2 we can't 
-    # see the trends (not aggregated enough) but at -2, we can't see the
-    # connection (the downward jump, because too aggregated).
+figure4$plotA <- ggplot2::ggplot(
+  figure4$dataOverallSummary |> tidytable::filter(
+    Metric == "Richness"
+  ),
+  aes(x = Time, y = Average,
+      color = Intervention,
+      fill = Intervention
+  )
+) + ggplot2::geom_vline(
+  xintercept = 0, color = "black"
+) + ggplot2::geom_line(
+) + ggplot2::geom_ribbon(
+  ggplot2::aes(ymin = Lower, ymax = Upper),
+  alpha = 0.25, linewidth = 0.25
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat's Land-use"
+) + ggplot2::theme_minimal(
+) + ggplot2::guides(
+  fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
 ) + ggplot2::labs(
   x = "Time Since Intervention",
   y = "Richness"
-) + ggplot2::guides(
-  linetype = "none",
-  color = ggplot2::guide_legend(ncol = 5),
-  fill = ggplot2::guide_legend(ncol = 5)
 ) + ggplot2::coord_cartesian(
-  xlim = c(-1000, 15000), ylim = c(0, richnessYMax), expand = FALSE
-) + ggplot2::theme(
-  legend.position = c(0.5, 0.09),
-  plot.tag.position = c(0.025, 0.95),
-  axis.text.x = ggplot2::element_text(hjust = 1)
+  ylim = c(0, richnessYMax),
+  expand = FALSE 
 )
 
 ##### b: ######################################################################
@@ -120,77 +236,63 @@ figure4$plotA <- plotMeanAndInner(
 
 ##### c: ######################################################################
 # Summarised time-series plot for short time scale richness ratio.
-# Note this should be Consumer / Basal (because Consumers sometimes -> 0).
+# Note this should be Consumer / Basal (because Consumers often -> 0).
 
-figure4$plotC <- plotMeanAndInner(
-  figure4$data |> tidytable::filter(
-    !is.na(Subset), # Not overall values
+figure4$plotC <- ggplot2::ggplot(
+  figure4$dataBCSummary |> tidytable::filter(
     Metric == "Richness",
-    Time > -0.01, Time < 51, Time == round(Time) # Avoid singletons.
-  ) |> tidytable::separate_wider_delim(
-    delim = "_", cols = Subset, names = c("Guild", "AffinityBins")
-  ) |> unifyAffinityBins( # if many preference types.
-  ) |> tidytable::pivot_wider(
-    names_from = Guild, values_from = Value
-  ) |> tidytable::group_by(
-    Intervention, InterventionInitial, InterventionFinal, 
-    SpeciesPreferences, AffinityBins
-  ) |> tidytable::mutate(
-    Value = Consumer/Basal,
-    Subset = NA
-  ), CIs = 0.75, facets = as.formula(. ~ AffinityBins),
-  digits = 0
+    Time > -200, Time < 100
+  ),
+  aes(x = Time, y = Average,
+      color = Intervention,
+      fill = Intervention
+  )
+) + ggplot2::geom_vline(
+  xintercept = 0, color = "black"
+) + ggplot2::geom_line(
+) + ggplot2::geom_ribbon(
+  ggplot2::aes(ymin = Lower, ymax = Upper),
+  alpha = 0.25, linewidth = 0.25
+) + ggplot2::coord_cartesian(
+  xlim = c(0, 50)
 ) + ggplot2::labs(
   x = "Time Since Intervention",
   y = "Richness (Cons./Basal)"
-) + ggplot2::guides(
-  linetype = "none"#,
-  # color = ggplot2::guide_legend(ncol = 5),
-  # fill = ggplot2::guide_legend(ncol = 5)
-) + ggplot2::coord_cartesian(
-  expand = FALSE
-) + ggplot2::theme(
-  # legend.position = c(0.5, 0.09),
-  plot.tag.position = c(0.025, 0.95),
-  axis.text.x = ggplot2::element_text(hjust = 1)
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat's Land-use"
+) + ggplot2::theme_minimal(
 )
 
 ##### d: ######################################################################
 # Summarised time-series plot for short time scale abundance ratio.
-# Note this should be Consumer / Basal (because Consumers sometimes -> 0).
+# Note this should be Consumer / Basal (because Consumers often -> 0).
 
-figure4$plotD <- plotMeanAndInner(
-  figure4$data |> tidytable::filter(
-    !is.na(Subset), # Not overall values
+figure4$plotD <- ggplot2::ggplot(
+  figure4$dataBCSummary |> tidytable::filter(
     Metric == "Abundance",
-    Time > -0.01, Time < 51, Time == round(Time) # Avoid singletons.
-  ) |> tidytable::separate_wider_delim(
-    delim = "_", cols = Subset, names = c("Guild", "AffinityBins")
-  ) |> unifyAffinityBins( # if many preference types.
-  ) |> tidytable::pivot_wider(
-    names_from = Guild, values_from = Value
-  ) |> tidytable::group_by(
-    Intervention, InterventionInitial, InterventionFinal, 
-    SpeciesPreferences, AffinityBins
-  ) |> tidytable::mutate(
-    Value = Consumer/Basal,
-    Subset = NA
-  ), CIs = 0.75, facets = as.formula(. ~ AffinityBins),
-  digits = 0
+    Time > -200, Time < 100
+  ),
+  aes(x = Time, y = Average,
+      color = Intervention,
+      fill = Intervention
+  )
+) + ggplot2::geom_vline(
+  xintercept = 0, color = "black"
+) + ggplot2::geom_line(
+) + ggplot2::geom_ribbon(
+  ggplot2::aes(ymin = Lower, ymax = Upper),
+  alpha = 0.25, linewidth = 0.25
+) + ggplot2::coord_cartesian(
+  xlim = c(0, 50)
 ) + ggplot2::labs(
   x = "Time Since Intervention",
   y = "Abundance (Cons./Basal)"
-) + ggplot2::guides(
-  linetype = "none"#,
-  # color = ggplot2::guide_legend(ncol = 5),
-  # fill = ggplot2::guide_legend(ncol = 5)
-) + ggplot2::coord_cartesian(
-  expand = FALSE
-) + ggplot2::theme(
-  # legend.position = c(0.5, 0.09),
-  plot.tag.position = c(0.025, 0.95),
-  axis.text.x = ggplot2::element_text(hjust = 1)
 ) + ggplot2::scale_y_log10(
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat's Land-use"
+) + ggplot2::theme_minimal(
 )
 
 ##### SUPPLEMENT: #############################################################
