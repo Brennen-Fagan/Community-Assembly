@@ -67,7 +67,7 @@ figure4$dataBase <- tidytable::bind_rows(
     InterventionInitial == figure4$luinitl,
     InterventionFinal %in% figure4$lufinal,
     PoolPatchSeed %in% basePoolPatchSeeds,
-    Metric == "Alpha Hill:0" 
+    Metric == "Alpha Hill:0"
     # Need all subsets
   ),
   diversitiesAbund |> tidytable::filter(
@@ -76,13 +76,13 @@ figure4$dataBase <- tidytable::bind_rows(
     InterventionInitial == figure4$luinitl,
     InterventionFinal %in% figure4$lufinal,
     PoolPatchSeed %in% basePoolPatchSeeds,
-    Metric == "Alpha Abundance" 
+    Metric == "Alpha Abundance"
     # Need all subsets
   )
 ) |> tidytable::left_join(
   figure4$interventionTimes |> tidytable::rename(
     InterventionTime = Time
-  ), 
+  ),
   by = c("PoolPatch", "PoolPatchSeed")
 ) |> tidytable::mutate(
   Metric = factor(Metric, levels = c("Alpha Hill:0", "Alpha Abundance"),
@@ -91,7 +91,7 @@ figure4$dataBase <- tidytable::bind_rows(
 ) |> tidytable::filter(
   Time > -1000, Time < 15000,
   # Avoid singletons.
-  abs(Time - round(Time)) < 1e-6 | Time >= 55 | Time < 0 
+  abs(Time - round(Time)) < 1e-6 | Time >= 55 | Time < 0
 )
 
 # Why to the level of summary? Because the PlotMeanAndInner function
@@ -126,7 +126,7 @@ figure4$dataOverallSummary <- figure4$dataBase |> tidytable::filter(
   Lower = quantile(Value, p = (1 - figure4$CI) + (1 - figure4$CI)/2),
   Average = mean(Value),
   Upper = quantile(Value, p = figure4$CI + (1 - figure4$CI)/2)
-) 
+)
 
 # Ratios need to be handled slightly differently due to consumer/basal
 # resulting in row changes.
@@ -172,7 +172,7 @@ figure4$dataBCSummary <- figure4$dataBase |> tidytable::filter(
   Lower = quantile(Value, p = (1 - figure4$CI) + (1 - figure4$CI)/2),
   Average = mean(Value),
   Upper = quantile(Value, p = figure4$CI + (1 - figure4$CI)/2)
-) 
+)
 
 # Same idea as the overall case, but split by guild.
 figure4$dataBCSupplement <- figure4$dataBase |> tidytable::filter(
@@ -208,7 +208,7 @@ figure4$dataBCSupplement <- figure4$dataBase |> tidytable::filter(
   Lower = quantile(Value, p = (1 - figure4$CI) + (1 - figure4$CI)/2),
   Average = mean(Value),
   Upper = quantile(Value, p = figure4$CI + (1 - figure4$CI)/2)
-) 
+)
 
 # As in dataBCSummary, but broken up by AffinityBins
 figure4$dataBCSupplement2 <- figure4$dataBase |> tidytable::filter(
@@ -247,7 +247,7 @@ figure4$dataBCSupplement2 <- figure4$dataBase |> tidytable::filter(
   Lower = quantile(Value, p = (1 - figure4$CI) + (1 - figure4$CI)/2),
   Average = mean(Value),
   Upper = quantile(Value, p = figure4$CI + (1 - figure4$CI)/2)
-) 
+)
 
 ##### a: ######################################################################
 # Summarised time-series plot for overall richness.
@@ -276,7 +276,7 @@ figure4$plotA <- ggplot2::ggplot(
   y = "Richness"
 ) + ggplot2::coord_cartesian(
   ylim = c(0, richnessYMax),
-  expand = FALSE 
+  expand = FALSE
 )
 
 ##### b: ######################################################################
@@ -299,7 +299,7 @@ figure4$plotB <- ggplot2::ggplot(
   ggplot2::aes(ymin = Lower, ymax = Upper),
   alpha = 0.25, linewidth = 0.25
 ) + ggplot2::coord_cartesian(
-  xlim = c(0, 50)
+  xlim = c(0, 50), expand = FALSE
 ) + ggplot2::labs(
   x = "Time Since Intervention",
   y = "Richness (Cons./Basal)"
@@ -309,7 +309,7 @@ figure4$plotB <- ggplot2::ggplot(
 ) + ggplot2::theme_minimal(
 )
 
-##### d: ######################################################################
+##### c: ######################################################################
 # Summarised time-series plot for short time scale abundance ratio.
 # Note this should be Consumer / Basal (because Consumers often -> 0).
 
@@ -329,7 +329,7 @@ figure4$plotC <- ggplot2::ggplot(
   ggplot2::aes(ymin = Lower, ymax = Upper),
   alpha = 0.25, linewidth = 0.25
 ) + ggplot2::coord_cartesian(
-  xlim = c(0, 50)
+  xlim = c(0, 50), expand = FALSE
 ) + ggplot2::labs(
   x = "Time Since Intervention",
   y = "Abundance (Cons./Basal)"
@@ -370,9 +370,9 @@ figure4$SupplementRichness <- ggplot2::ggplot(
   x = "Time Since Intervention",
   y = "Richness"
 ) + ggplot2::coord_cartesian(
-  expand = FALSE 
+  expand = FALSE
 ) + ggplot2::facet_grid(
-  factor(Guild, levels = c("Consumer", "Basal"), ordered = TRUE) ~ 
+  factor(Guild, levels = c("Consumer", "Basal"), ordered = TRUE) ~
     AffinityBins, scales = "free"
 ) + ggplot2::scale_x_continuous(
   breaks = c(0, 1, 10, 100, 1000, 10000),
@@ -405,9 +405,9 @@ figure4$SupplementAbundance <- ggplot2::ggplot(
   x = "Time Since Intervention",
   y = "Abundance"
 ) + ggplot2::coord_cartesian(
-  expand = FALSE 
+  expand = FALSE
 ) + ggplot2::facet_grid(
-  factor(Guild, levels = c("Consumer", "Basal"), ordered = TRUE) ~ 
+  factor(Guild, levels = c("Consumer", "Basal"), ordered = TRUE) ~
     AffinityBins, scales = "free"
 ) + ggplot2::scale_x_continuous(
   breaks = c(0, 1, 10, 100, 1000, 10000),
@@ -441,9 +441,9 @@ figure4$SupplementRichnessRatio <- ggplot2::ggplot(
   x = "Time Since Intervention",
   y = "Richness (Cons./Basal)"
 ) + ggplot2::coord_cartesian(
-  expand = FALSE 
+  expand = FALSE
 ) + ggplot2::facet_grid(
-  . ~ 
+  . ~
     AffinityBins, scales = "free"
 ) + ggplot2::scale_x_continuous(
   breaks = c(0, 1, 10, 100, 1000, 10000),
@@ -476,7 +476,7 @@ figure4$SupplementAbundanceRatio <- ggplot2::ggplot(
   x = "Time Since Intervention",
   y = "Abundance (Cons./Basal)"
 ) + ggplot2::coord_cartesian(
-  expand = FALSE 
+  expand = FALSE
 ) + ggplot2::facet_grid(
   . ~ AffinityBins, scales = "free"
 ) + ggplot2::scale_x_continuous(
@@ -504,12 +504,12 @@ figure4$ext <- c(".png", rep(".pdf", 8))
 
 for (fnum in 1:(2+3+4)) {
   with(figure4, ggplot2::ggsave(
-    plot = switch(fnum, 
-                  plot, plot, 
+    plot = switch(fnum,
+                  plot, plot,
                   plotA, plotB, plotC,
                   SupplementRichness, SupplementAbundance,
                   SupplementRichnessRatio, SupplementAbundanceRatio),
-    filename = file.path(dirImages, 
+    filename = file.path(dirImages,
                          paste0(prefix, ids[fnum], iter, suffix, ext[fnum])),
     units = "cm", width = 6.5*3, height = 6.5*2)
   )
