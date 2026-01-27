@@ -86,7 +86,7 @@ figure5$dataOverallSummary <- figure5$dataBase |> tidytable::filter(
     TRUE ~ Time
   )
 ) |> tidytable::filter(
-  Time %in% figure5$heatmapTimes
+  Time %in% c(0, figure5$heatmapTimes)
 ) |> tidytable::group_by(
   # Average Over the now grouped times to make each sim equally weighted.
   # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
@@ -135,7 +135,7 @@ figure5$dataBCSummary <- figure5$dataBase |> tidytable::filter(
   Subset = NA,
   Value = Consumer/Basal
 ) |> tidytable::filter(
-  Time %in% figure5$heatmapTimes
+  Time %in% c(0, figure5$heatmapTimes)
 ) |> tidytable::group_by(
   # Average Over the now grouped times to make each sim equally weighted.
   Intervention, InterventionInitial, InterventionFinal, Metric,
@@ -171,7 +171,7 @@ plotTextHeatmap <- function(data, legendName, legendtrans = "identity") {
   ) + ggplot2::facet_grid(
     Metric ~ Time
   ) + ggplot2::scale_fill_viridis_c(
-    transform = legendtrans
+    transform = legendtrans, begin = 0.1
   ) + ggplot2::theme_minimal(
   ) + ggplot2::labs(
     fill = legendName,
@@ -186,9 +186,9 @@ plotTextHeatmap <- function(data, legendName, legendtrans = "identity") {
 # Richness time Difference, Abundance time Difference
 
 figure5$plotR <- plotTextHeatmap(
-    figure5$dataOverallSummary |> tidytable::filter(
-      Metric == "Richness", Time != 0
-    ) |> tidytable::mutate(
+  figure5$dataOverallSummary |> tidytable::filter(
+    Metric == "Richness", Time != 0
+  ) |> tidytable::mutate(
     Emphasis = Intervention %in% figure5$emphasise,
     Average = signif(Average, digits = 2)
   ),
@@ -201,7 +201,7 @@ figure5$plotRR <- plotTextHeatmap(
     Emphasis = Intervention %in% figure5$emphasise,
     Average = signif(Average, digits = 2)
   ),
-  "Richness Ratio"
+  "Richness\nRatio"
 )
 figure5$plotA <- plotTextHeatmap(
   figure5$dataOverallSummary |> tidytable::filter(
@@ -219,23 +219,64 @@ figure5$plotAR <- plotTextHeatmap(
     Emphasis = Intervention %in% figure5$emphasise,
     Average = signif(Average, digits = 2)
   ),
-  "Abundance Ratio", "log10"
+  "Abundance\nRatio", "log10"
 )
 
 
 figure5$plotRD <- plotTextHeatmap(
   figure5$dataOverallSummary |> tidytable::filter(
-    Metric == "Abundance", Time != 0
+    Metric == "Richness"
+  ) |> dplyr::mutate(
+    Time = paste("Time", Time)
+  ) |> tidytable::pivot_wider(
+    names_from = Time, values_from = Average
+  ) |> tidytable::rename(
+    "Initial" = `Time 0`
   ) |> tidytable::mutate(
     Emphasis = Intervention %in% figure5$emphasise,
-    Average = signif(Average, digits = 2)
-  )
+    tidytable::across(
+      tidytable::starts_with("Time"),
+      function(x, init) signif(x - init, digits = 2),
+      init = Initial
+    )
+  ) |> tidytable::pivot_longer(
+    names_to = "Time", values_to = "Average", # Works because division by same
+    # number in both fractions, so we can rearrange numerators for equiv.
+    cols = tidytable::starts_with("Time")
+  ) |> tidytable::mutate(
+    # Remove the "Time" tag for consistency
+    Time = as.numeric(substring(Time, first = 5))
+  ),
+  "Richness\nDifference"
+) + ggplot2::scale_fill_distiller(
+  type = "div", palette = "BrBG"
 )
+
 figure5$plotAD <- plotTextHeatmap(
-  figure5$dataBCSummary |> tidytable::filter(
-    Metric == "Abundance", Time != 0
+  figure5$dataOverallSummary |> tidytable::filter(
+    Metric == "Abundance"
+  ) |> dplyr::mutate(
+    Time = paste("Time", Time)
+  ) |> tidytable::pivot_wider(
+    names_from = Time, values_from = Average
+  ) |> tidytable::rename(
+    "Initial" = `Time 0`
   ) |> tidytable::mutate(
     Emphasis = Intervention %in% figure5$emphasise,
-    Average = signif(Average, digits = 2)
-  )
+    tidytable::across(
+      tidytable::starts_with("Time"),
+      function(x, init) signif(x - init, digits = 2),
+      init = Initial
+    )
+  ) |> tidytable::pivot_longer(
+    names_to = "Time", values_to = "Average", # Works because division by same
+    # number in both fractions, so we can rearrange numerators for equiv.
+    cols = tidytable::starts_with("Time")
+  ) |> tidytable::mutate(
+    # Remove the "Time" tag for consistency
+    Time = as.numeric(substring(Time, first = 5))
+  ),
+  "Abundance\nDifference"
+) + ggplot2::scale_fill_distiller(
+  type = "div", palette = "BrBG"
 )
