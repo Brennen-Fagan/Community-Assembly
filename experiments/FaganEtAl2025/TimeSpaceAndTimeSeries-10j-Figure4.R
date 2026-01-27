@@ -16,9 +16,8 @@ figure4 <- list(
   CI = 0.75,
   pref = "100% 0", #"Uniform(0, 1)"
   luinitl = "(0.5)", # Land Use INITiaL
-  lufinal = c("(0)", "(0.5)", "(1)"), # Land Use FINAL
-  # lufinal = c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"), # Land Use FINAL
-  heatmapTimes = c(10, 10000)
+  lufinal = c("(0)", "(0.5)", "(1)") # Land Use FINAL
+  # lufinal = c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)") # Land Use FINAL
 )
 
 figure4$prefstring <- switch(
@@ -281,22 +280,10 @@ figure4$plotA <- ggplot2::ggplot(
 )
 
 ##### b: ######################################################################
-# HEATMAPS: B Richness, B Abundance, 
-# B Richness guild Ratio, B Abundance guild Ratio,
-# B Richness time Difference, B Abundance time Difference
-figure4$plotBR
-figure4$plotBA
-figure4$plotBRR
-figure4$plotBAR
-figure4$plotBRD
-figure4$plotBAD
-
-
-##### c: ######################################################################
 # Summarised time-series plot for short time scale richness ratio.
 # Note this should be Consumer / Basal (because Consumers often -> 0).
 
-figure4$plotC <- ggplot2::ggplot(
+figure4$plotB <- ggplot2::ggplot(
   figure4$dataBCSummary |> tidytable::filter(
     Metric == "Richness",
     Time > -200, Time < 100
@@ -326,7 +313,7 @@ figure4$plotC <- ggplot2::ggplot(
 # Summarised time-series plot for short time scale abundance ratio.
 # Note this should be Consumer / Basal (because Consumers often -> 0).
 
-figure4$plotD <- ggplot2::ggplot(
+figure4$plotC <- ggplot2::ggplot(
   figure4$dataBCSummary |> tidytable::filter(
     Metric == "Abundance",
     Time > -200, Time < 100
@@ -503,8 +490,8 @@ figure4$plot <- ggpubr::ggarrange(
   plotlist = list(
     figure4$plotA,
     ggpubr::ggarrange(plotlist = list(
-      figure4$plotC + ggplot2::theme(legend.position = "none"),
-      figure4$plotD + ggplot2::theme(legend.position = "none")
+      figure4$plotB + ggplot2::theme(legend.position = "none"),
+      figure4$plotC + ggplot2::theme(legend.position = "none")
     ), ncol = 1)
   ), nrow = 1, common.legend = TRUE
 )
@@ -512,14 +499,14 @@ figure4$plot <- ggpubr::ggarrange(
 figure4$suffix <- paste0("_", figure4$prefstring, "_", figure4$lustring)
 figure4$prefix <- "Figure4"
 figure4$iter <- "_Prototype5"
-figure4$ids <- c("", "", "A", "B", "C", "D", "SR", "SA", "SRR", "SAR")
-figure4$ext <- c(".png", rep(".pdf", 9))
+figure4$ids <- c("", "", "A", "B", "C", "SR", "SA", "SRR", "SAR")
+figure4$ext <- c(".png", rep(".pdf", 8))
 
-for (fnum in 1:(2+4+4)) {
+for (fnum in 1:(2+3+4)) {
   with(figure4, ggplot2::ggsave(
     plot = switch(fnum, 
                   plot, plot, 
-                  plotA, plotB, plotC, plotD,
+                  plotA, plotB, plotC,
                   SupplementRichness, SupplementAbundance,
                   SupplementRichnessRatio, SupplementAbundanceRatio),
     filename = file.path(dirImages, 
