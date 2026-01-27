@@ -16,8 +16,9 @@ figure4 <- list(
   CI = 0.75,
   pref = "100% 0", #"Uniform(0, 1)"
   luinitl = "(0.5)", # Land Use INITiaL
-  lufinal = c("(0)", "(0.5)", "(1)") # Land Use FINAL
-  # lufinal = c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)") # Land Use FINAL
+  lufinal = c("(0)", "(0.5)", "(1)"), # Land Use FINAL
+  # lufinal = c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"), # Land Use FINAL
+  heatmapTimes = c(10, 10000)
 )
 
 figure4$prefstring <- switch(
@@ -128,7 +129,90 @@ figure4$dataOverallSummary <- figure4$dataBase |> tidytable::filter(
   Upper = quantile(Value, p = figure4$CI + (1 - figure4$CI)/2)
 ) 
 
+# Ratios need to be handled slightly differently due to consumer/basal
+# resulting in row changes.
 figure4$dataBCSummary <- figure4$dataBase |> tidytable::filter(
+  Metric %in% c("Richness", "Abundance"),
+  !is.na(Subset) # Not overall values
+) |> tidytable::separate_wider_delim(
+  delim = "_", cols = Subset, names = c("Guild", "AffinityBins")
+) |> unifyAffinityBins( # if many preference types.
+) |> tidytable::group_by(
+  # Aggregate Over the AffinityBins.
+  # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
+  # simple and match each other with the seeds. More complicated set-ups
+  # will want to adjust the groupings here.
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  PoolPatchSeed, SpeciesPreferences, Guild, Time
+) |> tidytable::summarise(
+  Value = sum(Value)
+) |> tidytable::pivot_wider(
+  names_from = Guild, values_from = Value
+) |> tidytable::mutate(
+  Time = tidytable::case_when( # Create groupings for times.
+    Time < -50 ~ round(Time, -2),
+    Time < 0 ~ -25, # In the last bin before regime change.
+    Time <= 50 ~ round(Time, 0),
+    Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
+    Time < 16350 ~ round(Time, -2),
+    TRUE ~ Time
+  ),
+  Subset = NA,
+  Value = Consumer/Basal
+) |> tidytable::group_by(
+  # Average Over the now grouped times to make each sim equally weighted.
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  PoolPatchSeed, SpeciesPreferences, Time
+) |> tidytable::summarise(
+  Value = median(Value), .groups = "drop"
+) |> tidytable::group_by(
+  # Average across simulations
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  SpeciesPreferences, Time
+) |> tidytable::summarise(
+  Lower = quantile(Value, p = (1 - figure4$CI) + (1 - figure4$CI)/2),
+  Average = mean(Value),
+  Upper = quantile(Value, p = figure4$CI + (1 - figure4$CI)/2)
+) 
+
+# Same idea as the overall case, but split by guild.
+figure4$dataBCSupplement <- figure4$dataBase |> tidytable::filter(
+  Metric %in% c("Richness", "Abundance"),
+  !is.na(Subset) # Not overall values
+) |> tidytable::separate_wider_delim(
+  delim = "_", cols = Subset, names = c("Guild", "AffinityBins")
+) |> unifyAffinityBins( # if many preference types.
+) |> tidytable::mutate(
+  Time = tidytable::case_when( # Create groupings for times.
+    Time < -50 ~ round(Time, -2),
+    Time < 0 ~ -25, # In the last bin before regime change.
+    Time <= 50 ~ round(Time, 0),
+    Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
+    Time < 16350 ~ round(Time, -2),
+    TRUE ~ Time
+  ),
+  Subset = NA
+) |> tidytable::group_by(
+  # Average Over the now grouped times to make each sim equally weighted.
+  # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
+  # simple and match each other with the seeds. More complicated set-ups
+  # will want to adjust the groupings here.
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  PoolPatchSeed, SpeciesPreferences, Guild, AffinityBins, Time
+) |> tidytable::summarise(
+  Value = median(Value), .groups = "drop"
+) |> tidytable::group_by(
+  # Average across simulations
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  SpeciesPreferences, Guild, AffinityBins, Time
+) |> tidytable::summarise(
+  Lower = quantile(Value, p = (1 - figure4$CI) + (1 - figure4$CI)/2),
+  Average = mean(Value),
+  Upper = quantile(Value, p = figure4$CI + (1 - figure4$CI)/2)
+) 
+
+# As in dataBCSummary, but broken up by AffinityBins
+figure4$dataBCSupplement2 <- figure4$dataBase |> tidytable::filter(
   Metric %in% c("Richness", "Abundance"),
   !is.na(Subset) # Not overall values
 ) |> tidytable::separate_wider_delim(
@@ -166,41 +250,6 @@ figure4$dataBCSummary <- figure4$dataBase |> tidytable::filter(
   Upper = quantile(Value, p = figure4$CI + (1 - figure4$CI)/2)
 ) 
 
-figure4$dataBCSupplement <- figure4$dataBase |> tidytable::filter(
-  Metric %in% c("Richness", "Abundance"),
-  !is.na(Subset) # Not overall values
-) |> tidytable::separate_wider_delim(
-  delim = "_", cols = Subset, names = c("Guild", "AffinityBins")
-) |> unifyAffinityBins( # if many preference types.
-) |> tidytable::mutate(
-  Time = tidytable::case_when( # Create groupings for times.
-    Time < -50 ~ round(Time, -2),
-    Time < 0 ~ -25, # In the last bin before regime change.
-    Time <= 50 ~ round(Time, 0),
-    Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
-    Time < 16350 ~ round(Time, -2),
-    TRUE ~ Time
-  ),
-  Subset = NA
-) |> tidytable::group_by(
-  # Average Over the now grouped times to make each sim equally weighted.
-  # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
-  # simple and match each other with the seeds. More complicated set-ups
-  # will want to adjust the groupings here.
-  Intervention, InterventionInitial, InterventionFinal, Metric,
-  PoolPatchSeed, SpeciesPreferences, Guild, AffinityBins, Time
-) |> tidytable::summarise(
-  Value = median(Value), .groups = "drop"
-) |> tidytable::group_by(
-  # Average across simulations
-  Intervention, InterventionInitial, InterventionFinal, Metric,
-  SpeciesPreferences, Guild, AffinityBins, Time
-) |> tidytable::summarise(
-  Lower = quantile(Value, p = (1 - figure4$CI) + (1 - figure4$CI)/2),
-  Average = mean(Value),
-  Upper = quantile(Value, p = figure4$CI + (1 - figure4$CI)/2)
-) 
-
 ##### a: ######################################################################
 # Summarised time-series plot for overall richness.
 figure4$plotA <- ggplot2::ggplot(
@@ -232,7 +281,16 @@ figure4$plotA <- ggplot2::ggplot(
 )
 
 ##### b: ######################################################################
-# HEATMAPS
+# HEATMAPS: B Richness, B Abundance, 
+# B Richness guild Ratio, B Abundance guild Ratio,
+# B Richness time Difference, B Abundance time Difference
+figure4$plotBR
+figure4$plotBA
+figure4$plotBRR
+figure4$plotBAR
+figure4$plotBRD
+figure4$plotBAD
+
 
 ##### c: ######################################################################
 # Summarised time-series plot for short time scale richness ratio.
@@ -371,7 +429,7 @@ figure4$SupplementAbundance <- ggplot2::ggplot(
 )
 
 figure4$SupplementRichnessRatio <- ggplot2::ggplot(
-  figure4$dataBCSummary |> tidytable::filter(
+  figure4$dataBCSupplement2 |> tidytable::filter(
     Metric == "Richness"
   ),
   aes(x = Time, y = Average,
@@ -406,7 +464,7 @@ figure4$SupplementRichnessRatio <- ggplot2::ggplot(
 )
 
 figure4$SupplementAbundanceRatio <- ggplot2::ggplot(
-  figure4$dataBCSummary |> tidytable::filter(
+  figure4$dataBCSupplement2 |> tidytable::filter(
     Metric == "Abundance"
   ),
   aes(x = Time, y = Average,
