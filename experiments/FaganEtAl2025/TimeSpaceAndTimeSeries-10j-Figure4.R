@@ -123,9 +123,9 @@ figure4$dataOverallSummary <- figure4$dataBase |> tidytable::filter(
   Intervention, InterventionInitial, InterventionFinal, Metric,
   SpeciesPreferences, Time
 ) |> tidytable::summarise(
-  Lower = quantile(Value, p = (1 - figure4$CI) + (1 - figure4$CI)/2),
+  Lower = quantile(Value, p = (1 - figure4$CI) + (1 - figure4$CI)/2, na.rm = TRUE),
   Average = mean(Value),
-  Upper = quantile(Value, p = figure4$CI + (1 - figure4$CI)/2)
+  Upper = quantile(Value, p = figure4$CI + (1 - figure4$CI)/2, na.rm = TRUE)
 )
 
 # Ratios need to be handled slightly differently due to consumer/basal
@@ -169,9 +169,9 @@ figure4$dataBCSummary <- figure4$dataBase |> tidytable::filter(
   Intervention, InterventionInitial, InterventionFinal, Metric,
   SpeciesPreferences, Time
 ) |> tidytable::summarise(
-  Lower = quantile(Value, p = (1 - figure4$CI) + (1 - figure4$CI)/2),
+  Lower = quantile(Value, p = (1 - figure4$CI) + (1 - figure4$CI)/2, na.rm = TRUE),
   Average = mean(Value),
-  Upper = quantile(Value, p = figure4$CI + (1 - figure4$CI)/2)
+  Upper = quantile(Value, p = figure4$CI + (1 - figure4$CI)/2, na.rm = TRUE)
 )
 
 # Same idea as the overall case, but split by guild.
@@ -205,9 +205,9 @@ figure4$dataBCSupplement <- figure4$dataBase |> tidytable::filter(
   Intervention, InterventionInitial, InterventionFinal, Metric,
   SpeciesPreferences, Guild, AffinityBins, Time
 ) |> tidytable::summarise(
-  Lower = quantile(Value, p = (1 - figure4$CI) + (1 - figure4$CI)/2),
+  Lower = quantile(Value, p = (1 - figure4$CI) + (1 - figure4$CI)/2, na.rm = TRUE),
   Average = mean(Value),
-  Upper = quantile(Value, p = figure4$CI + (1 - figure4$CI)/2)
+  Upper = quantile(Value, p = figure4$CI + (1 - figure4$CI)/2, na.rm = TRUE)
 )
 
 # As in dataBCSummary, but broken up by AffinityBins
@@ -244,9 +244,9 @@ figure4$dataBCSupplement2 <- figure4$dataBase |> tidytable::filter(
   Intervention, InterventionInitial, InterventionFinal, Metric,
   SpeciesPreferences, AffinityBins, Time
 ) |> tidytable::summarise(
-  Lower = quantile(Value, p = (1 - figure4$CI) + (1 - figure4$CI)/2),
+  Lower = quantile(Value, p = (1 - figure4$CI) + (1 - figure4$CI)/2, na.rm = TRUE),
   Average = mean(Value),
-  Upper = quantile(Value, p = figure4$CI + (1 - figure4$CI)/2)
+  Upper = quantile(Value, p = figure4$CI + (1 - figure4$CI)/2, na.rm = TRUE)
 )
 
 ##### a: ######################################################################
