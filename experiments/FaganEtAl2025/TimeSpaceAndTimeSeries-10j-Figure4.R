@@ -451,4 +451,21 @@ figure4$plot <- ggpubr::ggarrange(
   ), nrow = 1, common.legend = TRUE
 )
 
-#4prototype5
+figure4$suffix <- paste0("_", figure4$prefstring, "_", figure4$lustring)
+figure4$prefix <- "Figure4"
+figure4$iter <- "_Prototype5"
+figure4$ids <- c("", "", "A", "B", "C", "D", "SR", "SA", "SRR", "SAR")
+figure4$ext <- c(".png", rep(".pdf", 9))
+
+for (fnum in 1:(2+4+4)) {
+  with(figure4, ggplot2::ggsave(
+    plot = switch(fnum, 
+                  plot, plot, 
+                  plotA, plotB, plotC, plotD,
+                  SupplementRichness, SupplementAbundance,
+                  SupplementRichnessRatio, SupplementAbundanceRatio),
+    filename = file.path(dirImages, 
+                         paste0(prefix, ids[fnum], iter, suffix, ext[fnum])),
+    units = "cm", width = 6.5*3, height = 6.5*2)
+  )
+}
