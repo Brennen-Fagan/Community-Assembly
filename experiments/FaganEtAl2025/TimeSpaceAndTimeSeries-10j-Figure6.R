@@ -5,6 +5,7 @@
 
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
+source("TimeSpaceAndTimeSeries-10i-PreparationsPersistence.R")
 library(ggbreak)
 
 # This is better as an environment, but that's more opaque.
@@ -25,6 +26,32 @@ figure6$dataRich <- diversitiesRichness |> tidytable::filter(
   is.na(Subset)
 )
 
+# Persistence data: why? Because we're using persistence as a weight, followed
+# with by species aggregation. That way approximately we are picking a random
+# simulation, a random time, and then a random species, the plot shows the
+# probability we would get a certain land-use preference out. 
+figure6$dataPers <- Pers |> tidytable::filter(
+  SpeciesPreferences %in% figure6$pref,
+  NicheDistance == defaultNicheDistance,
+  Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
+  PoolPatchSeed %in% basePoolPatchSeeds
+) |> tidytable::filter(
+  In < Stop, Out > Start # Not things outside of [Start, Stop]
+) |> tidytable::mutate(
+  # Shorten intervals for equivalent comparisons.
+  InType = ifelse(In < Start, "Persistent", InType),
+  OutType = ifelse(Out > Stop, "Persistent", OutType),
+  In = ifelse(In < Start, Start, In),
+  Out = ifelse(Out > Stop, Stop, Out),
+  Persistence = Out - In
+) |> tidytable::group_by(
+  Species, Environment, SpeciesType, Size, ReproductionRate, Speed,
+  Affinity, AffinityBins,
+  PoolPatch:InterventionNicheDistance,
+  Intervention, SpeciesPreferences, Start, Stop
+) |> tidytable::summarise( # Sum over Appearances.
+  Persistence = sum(Persistence),
+  .groups = "drop"
 )
 
 ##### a: ######################################################################
@@ -35,7 +62,7 @@ figure6$plotA <- plotMeanAndInner(
       Intervention %in% c("(0)", "(0.5)", "(1)")
     ),
     # We want to appear in the legend but not on the plot!
-    figure6$data |> tidytable::filter(
+    figure6$dataRich |> tidytable::filter(
       PoolPatchSeed == figure6$dataRich$PoolPatchSeed[1],
       Intervention %in% c("(0.25)", "(0.75)"),
       abs(Time - 10000) == min(abs(Time - 10000))
@@ -51,8 +78,7 @@ figure6$plotA <- plotMeanAndInner(
   fill = ggplot2::guide_legend(ncol = 5)
 ) + ggplot2::theme(
   legend.position = c(0.5, 0.09),
-  plot.tag.position = c(0.025, 0.95),
-  axis.text.x = ggplot2::element_text(hjust = 1)
+  plot.tag.position = c(0.025, 0.95)
 ) + ggplot2::scale_x_continuous(
   breaks = (0:3)*10000
 ) + ggbreak::scale_x_break(
@@ -134,3 +160,41 @@ figure6$plotC <- ggplot2::ggplot(
   SpeciesPreferences ~ .
 )
 
+##### b: Insets ###############################################################
+figure6$insetB <- ggplot2::ggplot(
+  figure6$dataPers |> tidytable::filter(SpeciesPreferences == "50% 0, 50% 1"),
+  ggplot2::aes(
+    x = AffinityBins,
+    weight = Persistence,
+    fill = Intervention
+  )
+) + ggplot2::geom_bar(
+  show.legend = FALSE
+) + ggplot2::facet_grid(
+  . ~ Intervention
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat Type"
+) + ggplot2::theme_void(
+) + ggplot2::theme(
+  panel.background = ggplot2::element_rect(fill = "white")
+) + ggplot2::coord_cartesian(
+  expand = FALSE
+)
+figure6$insetC <- ggplot2::ggplot(
+  figure6$dataPers |> tidytable::filter(SpeciesPreferences == "Uniform(0, 1)"),
+  ggplot2::aes(
+    x = Affinity,
+                units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(plot = figure6$plot, filename = file.path(dirImages, "Figure6_Prototype1.png"),
+                units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(plot = figure6$plotA, filename = file.path(dirImages, "Figure6A_Prototype1.pdf"),
+                units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(plot = figure6$plotB, filename = file.path(dirImages, "Figure6B_Prototype1.pdf"),
+                units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(plot = figure6$plotC, filename = file.path(dirImages, "Figure6C_Prototype1.pdf"),
+                units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(plot = figure6$insetB, filename = file.path(dirImages, "Figure6BInset_Prototype1.pdf"),
+                units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(plot = figure6$insetC, filename = file.path(dirImages, "Figure6CInset_Prototype1.pdf"),
+                units = "cm", width = 6.5*3, height = 6.5*2)
