@@ -29,7 +29,7 @@ figure6$dataRich <- diversitiesRichness |> tidytable::filter(
 # Persistence data: why? Because we're using persistence as a weight, followed
 # with by species aggregation. That way approximately we are picking a random
 # simulation, a random time, and then a random species, the plot shows the
-# probability we would get a certain land-use preference out. 
+# probability we would get a certain land-use preference out.
 figure6$dataPers <- Pers |> tidytable::filter(
   SpeciesPreferences %in% figure6$pref,
   NicheDistance == defaultNicheDistance,
@@ -83,6 +83,8 @@ figure6$plotA <- plotMeanAndInner(
   breaks = (0:3)*10000
 ) + ggbreak::scale_x_break(
   c(5000, 20000), expand = FALSE
+) + ggplot2::scale_y_continuous(
+  ylim = c(0, richnessYMax)
 )
 
 ##### b: Violins ##############################################################
@@ -185,6 +187,46 @@ figure6$insetC <- ggplot2::ggplot(
   figure6$dataPers |> tidytable::filter(SpeciesPreferences == "Uniform(0, 1)"),
   ggplot2::aes(
     x = Affinity,
+    weight = Persistence,
+    fill = Intervention,
+    group = Intervention
+  )
+) + ggplot2::geom_density(
+  adjust = 1/2,
+  show.legend = FALSE
+) + ggplot2::facet_grid(
+  . ~ Intervention
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat Type"
+) + ggplot2::theme_void(
+) + ggplot2::theme(
+  panel.background = ggplot2::element_rect(fill = "white")
+) + ggplot2::coord_cartesian(
+  expand = FALSE
+)
+
+##### Combine: ################################################################
+figure6$plot <- ggpubr::ggarrange(
+  plotlist = list(
+    figure6$plotA, # github.com/YuLab-SMU/ggbreak/issues/36 to fix.
+    ggpubr::ggarrange(
+      plotlist = list(
+        figure6$plotB + ggplot2::annotation_custom(
+          ggplot2::ggplotGrob(figure6$insetB),
+          xmin = 0.55, xmax = 5.45, ymin = 30, ymax = 40
+        ),
+        figure6$plotC + ggplot2::annotation_custom(
+          ggplot2::ggplotGrob(figure6$insetC),
+          xmin = 0.55, xmax = 5.45, ymin = 30, ymax = 40
+        )
+      ), ncol = 1
+    )
+  ),
+  nrow = 1, common.legend = TRUE
+)
+
+ggplot2::ggsave(plot = figure6$plot, filename = file.path(dirImages, "Figure6_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(plot = figure6$plot, filename = file.path(dirImages, "Figure6_Prototype1.png"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
