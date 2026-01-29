@@ -79,12 +79,12 @@ figure6$plotA <- plotMeanAndInner(
 ) + ggplot2::theme(
   legend.position = c(0.5, 0.09),
   plot.tag.position = c(0.025, 0.95)
+) + ggplot2::coord_cartesian(
+  ylim = c(0, richnessYMax)
 ) + ggplot2::scale_x_continuous(
   breaks = (0:3)*10000
 ) + ggbreak::scale_x_break(
   c(5000, 20000), expand = FALSE
-) + ggplot2::scale_y_continuous(
-  ylim = c(0, richnessYMax)
 )
 
 ##### b: Violins ##############################################################
@@ -230,7 +230,7 @@ ggplot2::ggsave(plot = figure6$plot, filename = file.path(dirImages, "Figure6_Pr
                 units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(plot = figure6$plot, filename = file.path(dirImages, "Figure6_Prototype1.png"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure6$plotA, filename = file.path(dirImages, "Figure6A_Prototype1.pdf"),
+ggplot2::ggsave(plot = print(figure6$plotA), filename = file.path(dirImages, "Figure6A_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(plot = figure6$plotB, filename = file.path(dirImages, "Figure6B_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
