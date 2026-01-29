@@ -121,8 +121,8 @@ figure2$plotA <- plotMeanAndInner(
   y = "Richness"
 ) + ggplot2::guides(
   linetype = "none",
-  color = ggplot2::guide_legend(ncol = 5),
-  fill = ggplot2::guide_legend(ncol = 5)
+  color = ggplot2::guide_legend(ncol = 5, title = "Habitat Type"),
+  fill = ggplot2::guide_legend(ncol = 5, title = "Habitat Type")
 ) + ggplot2::coord_cartesian(
   xlim = c(0, 30000), ylim = c(0, richnessYMax), expand = FALSE
 ) + ggplot2::theme(
@@ -287,7 +287,7 @@ ggplot2::ggsave(plot = figure2$plotB, filename = file.path(dirImages, "Figure2B_
                 units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(plot = figure2$plotC, filename = file.path(dirImages, "Figure2C_Prototype9.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotB, filename = file.path(dirImages, "Figure2D_Prototype9.pdf"),
+ggplot2::ggsave(plot = figure2$plotD, filename = file.path(dirImages, "Figure2D_Prototype9.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotC, filename = file.path(dirImages, "Figure2E_Prototype9.pdf"),
+ggplot2::ggsave(plot = figure2$plotE, filename = file.path(dirImages, "Figure2E_Prototype9.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
