@@ -7,6 +7,8 @@ source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
 
+library(colorspace) # for diverging color scales with midpoint control.
+
 figure5 <- list(
   pref = "100% 0", #"Uniform(0, 1)"
   heatmapTimes = c(10, 10000),
@@ -45,20 +47,20 @@ figure5$dataBase <- tidytable::bind_rows(
     SpeciesPreferences == figure5$pref,
     NicheDistance == defaultNicheDistance,
     PoolPatchSeed %in% basePoolPatchSeeds,
-    Metric == "Alpha Hill:0" 
+    Metric == "Alpha Hill:0"
     # Need all subsets
   ),
   diversitiesAbund |> tidytable::filter(
     SpeciesPreferences == figure5$pref,
     NicheDistance == defaultNicheDistance,
     PoolPatchSeed %in% basePoolPatchSeeds,
-    Metric == "Alpha Abundance" 
+    Metric == "Alpha Abundance"
     # Need all subsets
   )
 ) |> tidytable::left_join(
   figure5$interventionTimes |> tidytable::rename(
     InterventionTime = Time
-  ), 
+  ),
   by = c("PoolPatch", "PoolPatchSeed")
 ) |> tidytable::mutate(
   Metric = factor(Metric, levels = c("Alpha Hill:0", "Alpha Abundance"),
@@ -67,7 +69,7 @@ figure5$dataBase <- tidytable::bind_rows(
 ) |> tidytable::filter(
   Time > -1000, Time < 15000,
   # Avoid singletons.
-  abs(Time - round(Time)) < 1e-6 | Time >= 55 | Time < 0 
+  abs(Time - round(Time)) < 1e-6 | Time >= 55 | Time < 0
 )
 
 # Why to the level of summary? Because the PlotMeanAndInner function
@@ -102,7 +104,7 @@ figure5$dataOverallSummary <- figure5$dataBase |> tidytable::filter(
   SpeciesPreferences, Time
 ) |> tidytable::summarise(
   Average = mean(Value)
-) 
+)
 
 # Ratios need to be handled slightly differently due to consumer/basal
 # resulting in row changes.
@@ -148,10 +150,10 @@ figure5$dataBCSummary <- figure5$dataBase |> tidytable::filter(
   SpeciesPreferences, Time
 ) |> tidytable::summarise(
   Average = mean(Value)
-) 
+)
 
 ##### FUNCTION: ###############################################################
-# Different Scales mean we have to separate out the data, so we define a 
+# Different Scales mean we have to separate out the data, so we define a
 # function to perform the plotting repeatedly/consistently.
 plotTextHeatmap <- function(data, legendName, legendtrans = "identity") {
   ggplot2::ggplot(
@@ -181,7 +183,7 @@ plotTextHeatmap <- function(data, legendName, legendtrans = "identity") {
 }
 
 ##### KEY: ####################################################################
-# HEATMAPS: Richness, Abundance, 
+# HEATMAPS: Richness, Abundance,
 # Richness guild Ratio, Abundance guild Ratio,
 # Richness time Difference, Abundance time Difference
 
@@ -248,8 +250,8 @@ figure5$plotRD <- plotTextHeatmap(
     Time = as.numeric(substring(Time, first = 5))
   ),
   "Richness\nDifference"
-) + ggplot2::scale_fill_distiller(
-  type = "div", palette = "BrBG"
+) + colorspace::scale_fill_continuous_diverging(
+  palette = "Green-Brown", mid = 0
 )
 
 figure5$plotAD <- plotTextHeatmap(
@@ -277,8 +279,8 @@ figure5$plotAD <- plotTextHeatmap(
     Time = as.numeric(substring(Time, first = 5))
   ),
   "Abundance\nDifference"
-) + ggplot2::scale_fill_distiller(
-  type = "div", palette = "BrBG"
+) + colorspace::scale_fill_continuous_diverging(
+  palette = "Green-Brown", mid = 0
 )
 
 
@@ -297,38 +299,38 @@ figure5$plotSupplement <- ggpubr::ggarrange(
 )
 
 ggplot2::ggsave(
-  plot = figure5$plotRichness, 
+  plot = figure5$plotRichness,
   filename = file.path(dirImages, "Figure5_Prototype4.pdf"),
   units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(
-  plot = figure5$plotRichness, 
+  plot = figure5$plotRichness,
   filename = file.path(dirImages, "Figure5_Prototype4.png"),
   units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(
-  plot = figure5$plotSupplement, 
+  plot = figure5$plotSupplement,
   filename = file.path(dirImages, "Figure5S_Prototype4.pdf"),
   units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(
-  plot = figure5$plotR, 
+  plot = figure5$plotR,
   filename = file.path(dirImages, "Figure5R_Prototype4.pdf"),
   units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(
-  plot = figure5$plotRR, 
+  plot = figure5$plotRR,
   filename = file.path(dirImages, "Figure5RR_Prototype4.pdf"),
   units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(
-  plot = figure5$plotA, 
+  plot = figure5$plotA,
   filename = file.path(dirImages, "Figure5A_Prototype4.pdf"),
   units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(
-  plot = figure5$plotAR, 
+  plot = figure5$plotAR,
   filename = file.path(dirImages, "Figure5AR_Prototype4.pdf"),
   units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(
-  plot = figure5$plotAD, 
+  plot = figure5$plotAD,
   filename = file.path(dirImages, "Figure5AD_Prototype4.pdf"),
   units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(
-  plot = figure5$plotRD, 
+  plot = figure5$plotRD,
   filename = file.path(dirImages, "Figure5RD_Prototype4.pdf"),
   units = "cm", width = 6.5*3, height = 6.5*2)
