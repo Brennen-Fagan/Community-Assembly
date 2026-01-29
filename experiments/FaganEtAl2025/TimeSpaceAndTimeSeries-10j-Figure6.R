@@ -209,7 +209,7 @@ figure6$insetC <- ggplot2::ggplot(
 ##### Combine: ################################################################
 figure6$plot <- ggpubr::ggarrange(
   plotlist = list(
-    figure6$plotA, # github.com/YuLab-SMU/ggbreak/issues/36 to fix.
+    print(figure6$plotA), # github.com/YuLab-SMU/ggbreak/issues/36 to fix.
     ggpubr::ggarrange(
       plotlist = list(
         figure6$plotB + ggplot2::annotation_custom(
