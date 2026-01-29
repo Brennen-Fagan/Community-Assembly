@@ -267,7 +267,7 @@ figure4$plotA <- ggplot2::ggplot(
   alpha = 0.25, linewidth = 0.25
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
-  name = "Habitat's Land-use"
+  name = "Habitat Type"
 ) + ggplot2::theme_minimal(
 ) + ggplot2::guides(
   fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
@@ -305,7 +305,7 @@ figure4$plotB <- ggplot2::ggplot(
   y = "Richness (Cons./Basal)"
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
-  name = "Habitat's Land-use"
+  name = "Habitat Type"
 ) + ggplot2::theme_minimal(
 )
 
@@ -336,7 +336,7 @@ figure4$plotC <- ggplot2::ggplot(
 ) + ggplot2::scale_y_log10(
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
-  name = "Habitat's Land-use"
+  name = "Habitat Type"
 ) + ggplot2::theme_minimal(
 )
 
@@ -362,7 +362,7 @@ figure4$SupplementRichness <- ggplot2::ggplot(
   alpha = 0.25, linewidth = 0.25
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
-  name = "Habitat's Land-use"
+  name = "Habitat Type"
 ) + ggplot2::theme_minimal(
 ) + ggplot2::guides(
   fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
@@ -397,7 +397,7 @@ figure4$SupplementAbundance <- ggplot2::ggplot(
   alpha = 0.25, linewidth = 0.25
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
-  name = "Habitat's Land-use"
+  name = "Habitat Type"
 ) + ggplot2::theme_minimal(
 ) + ggplot2::guides(
   fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
@@ -433,7 +433,7 @@ figure4$SupplementRichnessRatio <- ggplot2::ggplot(
   alpha = 0.25, linewidth = 0.25
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
-  name = "Habitat's Land-use"
+  name = "Habitat Type"
 ) + ggplot2::theme_minimal(
 ) + ggplot2::guides(
   fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
@@ -468,7 +468,7 @@ figure4$SupplementAbundanceRatio <- ggplot2::ggplot(
   alpha = 0.25, linewidth = 0.25
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
-  name = "Habitat's Land-use"
+  name = "Habitat Type"
 ) + ggplot2::theme_minimal(
 ) + ggplot2::guides(
   fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
