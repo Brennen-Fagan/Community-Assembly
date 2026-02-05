@@ -10,7 +10,6 @@ plotGraph <- function(graph, mainLayout, legends = FALSE) {
   ) + ggraph::geom_edge_diagonal(
     mapping = aes(
       color = Type,
-      #color = node1.Type, # but then exploit+ between consumers is orange.
       linetype = Type,
       alpha = log10(effectNormalised),
       end_cap = circle(node2.nodesize+2, 'pt')
@@ -27,7 +26,7 @@ plotGraph <- function(graph, mainLayout, legends = FALSE) {
     #   yintercept = -1, linetype = "dashed", color = "black"
   ) + theme_minimal(
   ) + ylab(
-    "Log10(Size)"
+    "Size" # "Log10(Size)"
   ) + xlab(
     "Land-use Preference"
   ) + scale_color_manual(
@@ -36,20 +35,20 @@ plotGraph <- function(graph, mainLayout, legends = FALSE) {
     values =
       c("Exploit+" = "darkgreen", "Exploit-" = "burlywood4")
     # c("Basal" = "darkgreen", "Consumer" = "burlywood4")
-    
+  ) + ggplot2::scale_y_log10(
   ) + scale_size(
-    range = c(0.5, 4)
+    range = c(0.5, 4) # size of the resulting points, not the inputs.
     # limits = c(10^-5, 10^5)#, trans = "log10"
   ) + coord_cartesian(
-    x = c(0, 1), y = c(-2, 0.5),
+    x = c(0, 1), y = 10^c(-2, 0.5),
     clip = "off"
   )
-  
+
   # if (!legends) {
   #   obj <- obj + ggplot2::theme(
   #     legend.position = "none"
   #   )
   # }
-  
+
   return(obj)
 }

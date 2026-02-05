@@ -293,7 +293,9 @@ generateNetworks <- function(
     } else {
       l$x <- affs[l_indices] # should be enough variation to enable visualisation
     }
-    l$y <- log10(env$Pool$Pool$Size[l_indices])
+    l$y <- #log10( # we'll apply the scale_y_log10() instead.
+      env$Pool$Pool$Size[l_indices]
+      #)
     env$layout <- l
     return(env)
   })
