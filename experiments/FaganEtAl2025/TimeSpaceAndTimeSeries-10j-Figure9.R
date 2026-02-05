@@ -4,8 +4,8 @@ source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 
 figure9 <- list(
   # pref = "100% 0",
-  # pref = "50% 0, 50% 1",
-  pref = "Uniform(0, 1)",
+  pref = "50% 0, 50% 1",
+  # pref = "Uniform(0, 1)",
   luinitl = c("(0)", "(0.5)", "(1)"), # Land Use INITiaL
   lufinal = c("(0)", "(0.5)", "(1)") # Land Use FINAL
   # luinitl = c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
@@ -55,11 +55,11 @@ figure9$data <- diversitiesRichness |> tidytable::filter(
 ) |> tidytable::left_join(
   figure9$interventionTimes |> tidytable::rename(
     InterventionTime = Time
-  ), 
+  ),
   by = c("PoolPatch", "PoolPatchSeed")
 ) |> tidytable::filter(
   # Make sure we get from InterventionTime forwards, but note num. error.
-  round(Time - InterventionTime, digits = 10) >= 0 
+  round(Time - InterventionTime, digits = 10) >= 0
 ) |> tidytable::mutate(
   Metric = factor(Metric, levels = c("Alpha Hill:0", "Alpha Abundance"),
                   labels = c("Richness", "Abundance"), ordered = TRUE),
@@ -92,9 +92,9 @@ figure9$data <- diversitiesRichness |> tidytable::filter(
 )
 
 # ggplot2::ggplot(
-#   figure9$data, 
+#   figure9$data,
 #   ggplot2::aes(
-#     x = TimeSinceIntervention, y = Value, 
+#     x = TimeSinceIntervention, y = Value,
 #     color = Intervention, group = interaction(Intervention, PoolPatchSeed))
 # ) + ggplot2::geom_line(alpha = 0.1) + ggplot2::facet_grid(
 #   InterventionInitial ~ InterventionFinal
@@ -128,8 +128,13 @@ figure9$plot <- ggplot2::ggplot(
   ggplot2::aes(x = TimeSinceIntervention, color = Intervention,
                y = (100 - Percentage)/100, # for Complement
                group = interaction(Type, Intervention, SpeciesPreferences))
-) + ggplot2::geom_vline(
-  xintercept = c(0, 10, 10000)
+# ) + ggplot2::geom_vline(
+#   xintercept = c(0, 10, 10000)
+) + ggplot2::geom_text(
+  data = data.frame(text = c("Short (t = 10)", "Long (t = 10000)"),
+                    x = c(10, 10000), y = 0.25),
+  ggplot2::aes(label = text, x = x, y = y), angle = 90,
+  inherit.aes = FALSE
 ) + ggplot2::geom_line(
 ) + ggplot2::geom_point(
   alpha = 0.2, shape = 21 # open circles
@@ -137,17 +142,15 @@ figure9$plot <- ggplot2::ggplot(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat Type"
 ) + ggplot2::theme_minimal(
-) + ggplot2::facet_grid(
-  InterventionInitial ~ InterventionFinal
+# ) + ggplot2::facet_grid(
+#   InterventionInitial ~ InterventionFinal
 ) + ggplot2::scale_x_continuous(
   transform = "log1p", breaks = c(0, 1, 10, 100, 1000, 10000), expand = c(0, 0)
 ) + ggplot2::scale_y_continuous(
   labels = scales::percent
 ) + ggplot2::labs(
   x = "Time Since Intervention",
-  y = "Percentage with at least pre-intervention richness"
-) + ggplot2::theme(
-  axis.text.x = ggplot2::element_text(hjust = 1)
+  y = expression(Delta ~ "Richness" >= 0)
 )
 
 ##### Save: ###################################################################
@@ -157,24 +160,24 @@ figure9$prefix <- "Figure9"
 figure9$iter <- "_Prototype1"
 figure9$ext <- c(".png", ".pdf")
 
-with(figure9, 
+with(figure9,
      ggplot2::ggsave(
-       plot = plot, 
+       plot = plot,
        filename = file.path(dirImages, paste0(
          prefix, iter, suffix, ext[1]
        )),
        units = "cm", width = 6.5*3, height = 6.5*2)
 )
-with(figure9, 
+with(figure9,
      ggplot2::ggsave(
-       plot = plot, 
+       plot = plot,
        filename = file.path(dirImages, paste0(
          prefix, iter, suffix, ext[2]
        )),
        units = "cm", width = 6.5*3, height = 6.5*2)
 )
 
-# 
+#
 # # Take some slices so we end up with something more writable in a paper.
 # supplementStatistics$STAT$shortTermLoss <-
 #   # 3 times for each of the 3 preferences with each of the 3 statistics.
