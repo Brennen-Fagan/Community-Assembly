@@ -104,6 +104,14 @@ figure5$dataOverallSummary <- figure5$dataBase |> tidytable::filter(
   SpeciesPreferences, Time
 ) |> tidytable::summarise(
   Average = mean(Value)
+) |> dplyr::mutate( # Change labelling, dplyr for conversion (can't in dt)
+  Time = factor(
+    Time, levels = c(0, range(figure5$heatmapTimes)),
+    labels = c("Time 0", paste0(
+      c("Short (t = ", "Long (t = "),
+      range(figure5$heatmapTimes), ")"
+    ))
+  )
 )
 
 # Ratios need to be handled slightly differently due to consumer/basal
@@ -150,6 +158,14 @@ figure5$dataBCSummary <- figure5$dataBase |> tidytable::filter(
   SpeciesPreferences, Time
 ) |> tidytable::summarise(
   Average = mean(Value)
+) |> dplyr::mutate( # Change labelling, dplyr for conversion (can't in dt)
+  Time = factor(
+    Time, levels = c(0, range(figure5$heatmapTimes)),
+    labels = c("Time 0", paste0(
+      c("Short (t = ", "Long (t = "),
+      range(figure5$heatmapTimes), ")"
+    ))
+  )
 )
 
 ##### FUNCTION: ###############################################################
@@ -189,7 +205,7 @@ plotTextHeatmap <- function(data, legendName, legendtrans = "identity") {
 
 figure5$plotR <- plotTextHeatmap(
   figure5$dataOverallSummary |> tidytable::filter(
-    Metric == "Richness", Time != 0
+    Metric == "Richness", Time != "Time 0"
   ) |> tidytable::mutate(
     Emphasis = Intervention %in% figure5$emphasise,
     Average = signif(Average, digits = 2)
@@ -198,7 +214,7 @@ figure5$plotR <- plotTextHeatmap(
 )
 figure5$plotRR <- plotTextHeatmap(
   figure5$dataBCSummary |> tidytable::filter(
-    Metric == "Richness", Time != 0
+    Metric == "Richness", Time != "Time 0"
   ) |> tidytable::mutate(
     Emphasis = Intervention %in% figure5$emphasise,
     Average = signif(Average, digits = 2)
@@ -207,7 +223,7 @@ figure5$plotRR <- plotTextHeatmap(
 )
 figure5$plotA <- plotTextHeatmap(
   figure5$dataOverallSummary |> tidytable::filter(
-    Metric == "Abundance", Time != 0
+    Metric == "Abundance", Time != "Time 0"
   ) |> tidytable::mutate(
     Emphasis = Intervention %in% figure5$emphasise,
     Average = signif(Average, digits = 2)
@@ -216,7 +232,7 @@ figure5$plotA <- plotTextHeatmap(
 )
 figure5$plotAR <- plotTextHeatmap(
   figure5$dataBCSummary |> tidytable::filter(
-    Metric == "Abundance", Time != 0
+    Metric == "Abundance", Time != "Time 0"
   ) |> tidytable::mutate(
     Emphasis = Intervention %in% figure5$emphasise,
     Average = signif(Average, digits = 2)
@@ -228,8 +244,6 @@ figure5$plotAR <- plotTextHeatmap(
 figure5$plotRD <- plotTextHeatmap(
   figure5$dataOverallSummary |> tidytable::filter(
     Metric == "Richness"
-  ) |> dplyr::mutate(
-    Time = paste("Time", Time)
   ) |> tidytable::pivot_wider(
     names_from = Time, values_from = Average
   ) |> tidytable::rename(
@@ -237,17 +251,23 @@ figure5$plotRD <- plotTextHeatmap(
   ) |> tidytable::mutate(
     Emphasis = Intervention %in% figure5$emphasise,
     tidytable::across(
-      tidytable::starts_with("Time"),
+      tidytable::contains("t = "),
       function(x, init) signif(x - init, digits = 2),
       init = Initial
     )
   ) |> tidytable::pivot_longer(
     names_to = "Time", values_to = "Average", # Works because division by same
     # number in both fractions, so we can rearrange numerators for equiv.
-    cols = tidytable::starts_with("Time")
-  ) |> tidytable::mutate(
-    # Remove the "Time" tag for consistency
-    Time = as.numeric(substring(Time, first = 5))
+    cols = tidytable::contains("t = ")
+  ) |> tidytable::mutate( # Fix ordering
+    TimeString = regmatches(Time, regexpr("[0-9]+", Time)), # Extract t vals.
+    Time = factor(
+      Time,
+      levels = unique(Time)[
+        order(as.numeric(TimeString))
+        ],
+      ordered = TRUE
+    )
   ),
   "Richness\nDifference"
 ) + colorspace::scale_fill_continuous_diverging(
@@ -257,8 +277,6 @@ figure5$plotRD <- plotTextHeatmap(
 figure5$plotAD <- plotTextHeatmap(
   figure5$dataOverallSummary |> tidytable::filter(
     Metric == "Abundance"
-  ) |> dplyr::mutate(
-    Time = paste("Time", Time)
   ) |> tidytable::pivot_wider(
     names_from = Time, values_from = Average
   ) |> tidytable::rename(
@@ -266,17 +284,23 @@ figure5$plotAD <- plotTextHeatmap(
   ) |> tidytable::mutate(
     Emphasis = Intervention %in% figure5$emphasise,
     tidytable::across(
-      tidytable::starts_with("Time"),
+      tidytable::contains("t = "),
       function(x, init) signif(x - init, digits = 2),
       init = Initial
     )
   ) |> tidytable::pivot_longer(
     names_to = "Time", values_to = "Average", # Works because division by same
     # number in both fractions, so we can rearrange numerators for equiv.
-    cols = tidytable::starts_with("Time")
-  ) |> tidytable::mutate(
-    # Remove the "Time" tag for consistency
-    Time = as.numeric(substring(Time, first = 5))
+    cols = tidytable::contains("t = ")
+  ) |> tidytable::mutate( # Fix ordering
+    TimeString = regmatches(Time, regexpr("[0-9]+", Time)), # Extract t vals.
+    Time = factor(
+      Time,
+      levels = unique(Time)[
+        order(as.numeric(TimeString))
+        ],
+      ordered = TRUE
+    )
   ),
   "Abundance\nDifference"
 ) + colorspace::scale_fill_continuous_diverging(
