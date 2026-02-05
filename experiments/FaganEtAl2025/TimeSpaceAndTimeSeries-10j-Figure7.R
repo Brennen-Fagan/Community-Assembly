@@ -90,7 +90,7 @@ figure7$dataBase <- tidytable::bind_rows(
                   labels = c("Richness", "Abundance"), ordered = TRUE),
   Time = Time - InterventionTime
 ) |> tidytable::filter(
-  Time > -1000, Time < 15000,
+  Time < 15000, # Need the start for the inset.
   # Avoid singletons.
   abs(Time - round(Time)) < 1e-6 | Time >= 55 | Time < 0
 )
@@ -99,6 +99,7 @@ figure7$dataBase <- tidytable::bind_rows(
 # isn't built to handle the multiple resolutions that we have in the
 # actual data, which makes it harder to portray the data accurately.
 figure7$dataOverallSummary <- figure7$dataBase |> tidytable::filter(
+  Time > -1000,
   Metric %in% c("Richness", "Abundance"),
   is.na(Subset) # Not overall values
 ) |> tidytable::mutate(
@@ -132,6 +133,7 @@ figure7$dataOverallSummary <- figure7$dataBase |> tidytable::filter(
 # Ratios need to be handled slightly differently due to consumer/basal
 # resulting in row changes.
 figure7$dataBCSummary <- figure7$dataBase |> tidytable::filter(
+  Time > -1000,
   Metric %in% c("Richness", "Abundance"),
   !is.na(Subset) # Not overall values
 ) |> tidytable::separate_wider_delim(
@@ -177,6 +179,7 @@ figure7$dataBCSummary <- figure7$dataBase |> tidytable::filter(
 
 # Same idea as the overall case, but split by guild.
 figure7$dataBCSupplement <- figure7$dataBase |> tidytable::filter(
+  Time > -1000,
   Metric %in% c("Richness", "Abundance"),
   !is.na(Subset) # Not overall values
 ) |> tidytable::separate_wider_delim(
@@ -213,6 +216,7 @@ figure7$dataBCSupplement <- figure7$dataBase |> tidytable::filter(
 
 # As in dataBCSummary, but broken up by AffinityBins
 figure7$dataBCSupplement2 <- figure7$dataBase |> tidytable::filter(
+  Time > -1000,
   Metric %in% c("Richness", "Abundance"),
   !is.na(Subset) # Not overall values
 ) |> tidytable::separate_wider_delim(
@@ -261,7 +265,7 @@ figure7$plotA <- ggplot2::ggplot(
       fill = Intervention
   )
 ) + ggplot2::geom_vline(
-  xintercept = 0, color = "black"
+  xintercept = 0, color = "black", linetype = "dashed"
 ) + ggplot2::geom_line(
 ) + ggplot2::geom_ribbon(
   ggplot2::aes(ymin = Lower, ymax = Upper),
@@ -275,6 +279,26 @@ figure7$plotA <- ggplot2::ggplot(
 ) + ggplot2::labs(
   x = "Time Since Intervention",
   y = "Richness"
+) + ggplot2::coord_cartesian(
+  ylim = c(0, richnessYMax),
+  expand = FALSE
+)
+
+##### a inset: ################################################################
+figure7$plotAInset <- plotMeanAndInner(
+  figure7$dataBase |> tidytable::filter(
+    Metric == "Richness",
+    is.na(Subset) # Not overall values
+  ) |> tidytable::mutate(
+    Time = Time + InterventionTime
+  ), CIs = 0.75, facets = as.formula(. ~ .)
+) + ggplot2::labs(
+  x = "Time",
+  y = "Richness"
+) + ggplot2::guides(
+  linetype = "none",
+  color = "none", # already covered by the main plot.
+  fill = "none"
 ) + ggplot2::coord_cartesian(
   ylim = c(0, richnessYMax),
   expand = FALSE
@@ -294,7 +318,7 @@ figure7$plotB <- ggplot2::ggplot(
       fill = Intervention
   )
 ) + ggplot2::geom_vline(
-  xintercept = 0, color = "black"
+  xintercept = 0, color = "black", linetype = "dashed"
 ) + ggplot2::geom_line(
 ) + ggplot2::geom_ribbon(
   ggplot2::aes(ymin = Lower, ymax = Upper),
@@ -324,7 +348,7 @@ figure7$plotC <- ggplot2::ggplot(
       fill = Intervention
   )
 ) + ggplot2::geom_vline(
-  xintercept = 0, color = "black"
+  xintercept = 0, color = "black", linetype = "dashed"
 ) + ggplot2::geom_line(
 ) + ggplot2::geom_ribbon(
   ggplot2::aes(ymin = Lower, ymax = Upper),
@@ -354,9 +378,9 @@ figure7$SupplementRichness <- ggplot2::ggplot(
       fill = Intervention
   )
 ) + ggplot2::geom_vline(
-  xintercept = 0, color = "black"
+  xintercept = 0, color = "black", linetype = "dashed"
 ) + ggplot2::geom_hline(
-  yintercept = 0, color = "black"
+  yintercept = 0, color = "black", linetype = "dashed"
 ) + ggplot2::geom_line(
 ) + ggplot2::geom_ribbon(
   ggplot2::aes(ymin = Lower, ymax = Upper),
@@ -389,9 +413,9 @@ figure7$SupplementAbundance <- ggplot2::ggplot(
       fill = Intervention
   )
 ) + ggplot2::geom_vline(
-  xintercept = 0, color = "black"
+  xintercept = 0, color = "black", linetype = "dashed"
 ) + ggplot2::geom_hline(
-  yintercept = 0, color = "black"
+  yintercept = 0, color = "black", linetype = "dashed"
 ) + ggplot2::geom_line(
 ) + ggplot2::geom_ribbon(
   ggplot2::aes(ymin = Lower, ymax = Upper),
@@ -425,9 +449,9 @@ figure7$SupplementRichnessRatio <- ggplot2::ggplot(
       fill = Intervention
   )
 ) + ggplot2::geom_vline(
-  xintercept = 0, color = "black"
+  xintercept = 0, color = "black", linetype = "dashed"
 ) + ggplot2::geom_hline(
-  yintercept = 0, color = "black"
+  yintercept = 0, color = "black", linetype = "dashed"
 ) + ggplot2::geom_line(
 ) + ggplot2::geom_ribbon(
   ggplot2::aes(ymin = Lower, ymax = Upper),
@@ -460,9 +484,9 @@ figure7$SupplementAbundanceRatio <- ggplot2::ggplot(
       fill = Intervention
   )
 ) + ggplot2::geom_vline(
-  xintercept = 0, color = "black"
+  xintercept = 0, color = "black", linetype = "dashed"
 ) + ggplot2::geom_hline(
-  yintercept = 0, color = "black"
+  yintercept = 0, color = "black", linetype = "dashed"
 ) + ggplot2::geom_line(
 ) + ggplot2::geom_ribbon(
   ggplot2::aes(ymin = Lower, ymax = Upper),
@@ -489,25 +513,33 @@ figure7$SupplementAbundanceRatio <- ggplot2::ggplot(
 ##### Combine: ################################################################
 figure7$plot <- ggpubr::ggarrange(
   plotlist = list(
-    figure7$plotA,
+    figure7$plotA + ggplot2::scale_y_continuous(
+      breaks = c(0, 10, 20, 30, 40),
+      labels = c("0", "10", "20", "30", "")
+    ),
     ggpubr::ggarrange(plotlist = list(
       figure7$plotB + ggplot2::theme(legend.position = "none"),
       figure7$plotC + ggplot2::theme(legend.position = "none")
     ), ncol = 1)
   ), nrow = 1, common.legend = TRUE
+) + patchwork::inset_element(
+  figure7$plotAInset + ggplot2::theme(
+    panel.background = ggplot2::element_rect(fill = "white")
+  ),
+  0.00, 0.75, 0.25, 1.00
 )
 
 figure7$suffix <- paste0("_", figure7$prefstring, "_", figure7$lustring)
 figure7$prefix <- "figure7"
 figure7$iter <- "_Prototype1"
-figure7$ids <- c("", "", "A", "B", "C", "SR", "SA", "SRR", "SAR")
-figure7$ext <- c(".png", rep(".pdf", 8))
+figure7$ids <- c("", "", "A", "AInset", "B", "C", "SR", "SA", "SRR", "SAR")
+figure7$ext <- c(".png", rep(".pdf", 9))
 
 for (fnum in 1:(2+3+4)) {
   with(figure7, ggplot2::ggsave(
     plot = switch(fnum,
                   plot, plot,
-                  plotA, plotB, plotC,
+                  plotA, plotAInset, plotB, plotC,
                   SupplementRichness, SupplementAbundance,
                   SupplementRichnessRatio, SupplementAbundanceRatio),
     filename = file.path(dirImages,
