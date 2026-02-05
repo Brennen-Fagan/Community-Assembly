@@ -6,8 +6,6 @@ source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
 
-library(patchwork) # for the custom insets.
-
 # This is better as an environment, but that's more opaque.
 figure3 <- list(
   pref = "100% 0"#"Uniform(0, 1)"
@@ -63,11 +61,11 @@ figure3$plotA <- ggplot2::ggplot(
   width = 0.28
   # ) + ggplot2::geom_jitter(
   #   alpha = 0.25
-# ) + ggplot2::geom_line( # Tracks the mean across sims and habitat types.
-#   data = ~ summarise(group_by(.x, Intervention, Metric, Subset),
-#                      Value = mean(Value), # Avg. over sims.
-#                      .groups = "drop"),
-#   color = "black", group = 1
+  # ) + ggplot2::geom_line( # Tracks the mean across sims and habitat types.
+  #   data = ~ summarise(group_by(.x, Intervention, Metric, Subset),
+  #                      Value = mean(Value), # Avg. over sims.
+  #                      .groups = "drop"),
+  #   color = "black", group = 1
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat Type"
@@ -77,16 +75,19 @@ figure3$plotA <- ggplot2::ggplot(
   fill = "none"
 ) + ggplot2::facet_wrap(
   Subset ~ Metric,
-  scales = "free"
+  scales = "free",
+  labeller = ggplot2::labeller(.multi_line = FALSE)
+) + ggplot2::theme(
+  panel.grid.minor = ggplot2::element_blank()
+) + ggplot2::labs(
+  x = "Habitat Type"
 )
 
 ##### B: ######################################################################
-# Basal and Consumer Richness co-vary for our scenarios.
+# Basal and Consumer Richness And Abundance co-vary for our scenarios.
 # Note separate from Abundance to have two separate grobs to inset.
 figure3$plotB <- ggplot2::ggplot(
-  figure3$data |> tidytable::filter(
-    Metric == "Richness"
-    ) |> tidytable::pivot_wider(
+  figure3$data |> tidytable::pivot_wider(
     names_from = Subset, values_from = Value
   ),
   ggplot2::aes(
@@ -100,62 +101,55 @@ figure3$plotB <- ggplot2::ggplot(
   name = "Habitat Type"
 ) + ggplot2::theme_minimal(
 ) + ggplot2::labs(
-  x = "Basal Richness",
-  y = "Consumer Richness"
+  x = "Basal",
+  y = "Consumer"
 ) + ggplot2::guides(
   color = "none",
   fill = "none"
   # ) + ggplot2::scale_x_log10(
-)
-
-##### C: ######################################################################
-# Basal and Consumer Abundance co-vary for our scenarios.
-# Note separate from Richness to have two separate grobs to inset.
-figure3$plotC <- ggplot2::ggplot(
-  figure3$data |> tidytable::filter(
-    Metric == "Abundance"
-  ) |> tidytable::pivot_wider(
-    names_from = Subset, values_from = Value
-  ),
-  ggplot2::aes(
-    x = Basal,
-    y = Consumer,
-    color = Intervention
-  )
-) + ggplot2::geom_point(
-) + ggplot2::scale_color_manual(
-  values = colorPalette, aesthetics = c("color", "fill"),
-  name = "Habitat Type"
-) + ggplot2::theme_minimal(
-) + ggplot2::labs(
-  x = "Basal Abundance",
-  y = "Consumer Abundance"
-) + ggplot2::guides(
-  color = "none",
-  fill = "none"
-  # ) + ggplot2::scale_x_log10(
+) + ggplot2::facet_wrap(
+  . ~ Metric,
+  scales = "free",
+) + ggplot2::theme(
+  panel.grid.minor = ggplot2::element_blank()
 )
 
 ##### Combine: ################################################################
-figure3$plot <- figure3$plotA + patchwork::inset_element(
-  figure3$plotB + ggplot2::theme(
-    panel.background = ggplot2::element_rect(fill = "white")
+figure3$plotTall <- ggpubr::ggarrange(
+  plotlist = list(
+    figure3$plotA,
+    figure3$plotB
+  ), ncol = 1, heights = c(2/3, 1/3), common.legend = TRUE
+)
+figure3$plotWide <- ggpubr::ggarrange(
+  plotlist = list(
+    figure3$plotA + ggplot2::facet_wrap(
+      Metric ~ Subset,
+      scales = "free", labeller = ggplot2::labeller(.multi_line = FALSE)
     ),
-  0.00, 0.35, 0.30, 0.65
-) + patchwork::inset_element(
-  figure3$plotC + ggplot2::theme(
-    panel.background = ggplot2::element_rect(fill = "white")
-  ),
-  0.7, 0.15, 1, 0.45
+    figure3$plotB + ggplot2::facet_wrap(
+      . ~ Metric,
+      scales = "free",
+      ncol = 1
+      )
+  ), nrow = 1, widths = c(2/3, 1/3), common.legend = TRUE
 )
 
-ggplot2::ggsave(plot = figure3$plot, filename = file.path(dirImages, "Figure3_Prototype8.pdf"),
+ggplot2::ggsave(plot = figure3$plotTall,
+                filename = file.path(dirImages, "Figure3_Prototype9.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure3$plot, filename = file.path(dirImages, "Figure3_Prototype8.png"),
+ggplot2::ggsave(plot = figure3$plotTall,
+                filename = file.path(dirImages, "Figure3_Prototype9.png"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure3$plotA, filename = file.path(dirImages, "Figure3A_Prototype8.pdf"),
+ggplot2::ggsave(plot = figure3$plotWide,
+                filename = file.path(dirImages, "Figure3_Prototype9Wide.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure3$plotB, filename = file.path(dirImages, "Figure3B_Prototype8.pdf"),
+ggplot2::ggsave(plot = figure3$plotWide,
+                filename = file.path(dirImages, "Figure3_Prototype9Wide.png"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure3$plotC, filename = file.path(dirImages, "Figure3C_Prototype8.pdf"),
+ggplot2::ggsave(plot = figure3$plotA,
+                filename = file.path(dirImages, "Figure3A_Prototype9.pdf"),
+                units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(plot = figure3$plotB,
+                filename = file.path(dirImages, "Figure3B_Prototype9.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
