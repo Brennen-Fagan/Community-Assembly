@@ -112,16 +112,19 @@ figure6$plotB <- ggplot2::ggplot(
   name = "Habitat Type"
 ) + ggplot2::theme_minimal(
 ) + ggplot2::theme(
-  plot.tag.position = c(0.01, 1)
+  plot.tag.position = c(0.01, 1),
+  panel.grid.minor = ggplot2::element_blank()
 ) + ggplot2::labs(
   y = "Avg. Richness",
   x = "Habitat Type"
 ) + ggplot2::guides(
   color = "none",
   fill = "none"
+) + ggplot2::scale_y_continuous(
+  breaks = c(0, 10, 20, 30)
 ) + ggplot2::coord_cartesian(
   ylim = c(0, richnessYMax), expand = FALSE
-) + ggplot2::facet_wrap(
+) + ggplot2::facet_grid(
   SpeciesPreferences ~ .
 )
 
@@ -149,16 +152,19 @@ figure6$plotC <- ggplot2::ggplot(
   name = "Habitat Type"
 ) + ggplot2::theme_minimal(
 ) + ggplot2::theme(
-  plot.tag.position = c(0.01, 1)
+  plot.tag.position = c(0.01, 1),
+  panel.grid.minor = ggplot2::element_blank()
 ) + ggplot2::labs(
   y = "Avg. Richness",
   x = "Habitat Type"
 ) + ggplot2::guides(
   color = "none",
   fill = "none"
+) + ggplot2::scale_y_continuous(
+  breaks = c(0, 10, 20, 30)
 ) + ggplot2::coord_cartesian(
   ylim = c(0, richnessYMax), expand = FALSE
-) + ggplot2::facet_wrap(
+) + ggplot2::facet_grid(
   SpeciesPreferences ~ .
 )
 
@@ -214,11 +220,11 @@ figure6$plot <- ggpubr::ggarrange(
       plotlist = list(
         figure6$plotB + ggplot2::annotation_custom(
           ggplot2::ggplotGrob(figure6$insetB),
-          xmin = 0.55, xmax = 5.45, ymin = 30, ymax = 40
+          xmin = 0.55, xmax = 5.45, ymin = 32, ymax = richnessYMax
         ),
         figure6$plotC + ggplot2::annotation_custom(
           ggplot2::ggplotGrob(figure6$insetC),
-          xmin = 0.55, xmax = 5.45, ymin = 30, ymax = 40
+          xmin = 0.55, xmax = 5.45, ymin = 32, ymax = richnessYMax
         )
       ), ncol = 1
     )
