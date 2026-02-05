@@ -274,15 +274,15 @@ figure2$plot <- ggpubr::ggarrange(
       figure2$plotD,
       figure2$plotE
     ), ncol = 1)
-  ), nrow = 1, widths = c(0.3, 0.3, 0.3), common.legend = TRUE
+  ), nrow = 1, widths = c(2/4, 1/4, 1/4), common.legend = TRUE
 )
 
 ggplot2::ggsave(plot = figure2$plot, filename = file.path(dirImages, "Figure2_Prototype9.pdf"),
-                units = "cm", width = 6.5*3, height = 6.5*2)
+                units = "cm", width = 6.5*4, height = 6.5*2)
 ggplot2::ggsave(plot = figure2$plot, filename = file.path(dirImages, "Figure2_Prototype9.png"),
-                units = "cm", width = 6.5*3, height = 6.5*2)
+                units = "cm", width = 6.5*4, height = 6.5*2)
 ggplot2::ggsave(plot = figure2$plotA, filename = file.path(dirImages, "Figure2A_Prototype9.pdf"),
-                units = "cm", width = 6.5*3, height = 6.5*2)
+                units = "cm", width = 6.5*3, height = 6.5*3)
 ggplot2::ggsave(plot = figure2$plotB, filename = file.path(dirImages, "Figure2B_Prototype9.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(plot = figure2$plotC, filename = file.path(dirImages, "Figure2C_Prototype9.pdf"),
