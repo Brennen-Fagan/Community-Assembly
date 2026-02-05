@@ -255,12 +255,14 @@ figure2$plotE <- ggplot2::ggplot(
   name = "Habitat Type"
 ) + ggplot2::theme_minimal(
 ) + ggplot2::labs(
-  x = "Avg. Total Abundance (Log)",
-  y = "Richness"
+  x = "Avg. Total Abundance",
+  y = "Avg. Richness"
 ) + ggplot2::guides(
   color = "none",
   fill = "none"
 # ) + ggplot2::scale_x_log10(
+) + ggplot2::coord_cartesian(
+  ylim = c(0, richnessYMax)
 )
 
 
