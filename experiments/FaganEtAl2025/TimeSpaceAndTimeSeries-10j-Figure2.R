@@ -171,9 +171,9 @@ figure2$plotC <- ggplot2::ggplot(
   width = 0.28
   # ) + ggplot2::geom_jitter(
   #   alpha = 0.25
-) + ggplot2::geom_line(
-  data = ~ summarise(group_by(.x, Intervention), Value = mean(Value)),
-  color = "black", group = 1
+# ) + ggplot2::geom_line( # Tracks the mean across sims and habitat types.
+#   data = ~ summarise(group_by(.x, Intervention), Value = mean(Value)),
+#   color = "black", group = 1
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat Type"
@@ -214,15 +214,15 @@ figure2$plotD <- ggplot2::ggplot(
   width = 0.28
   # ) + ggplot2::geom_jitter(
   #   alpha = 0.25
-) + ggplot2::geom_line(
-  data = ~ summarise(group_by(.x, Intervention), Value = mean(Value)),
-  color = "black", group = 1
+# ) + ggplot2::geom_line( # Tracks the mean across sims and habitat types.
+#   data = ~ summarise(group_by(.x, Intervention), Value = mean(Value)),
+#   color = "black", group = 1
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat Type"
 ) + ggplot2::theme_minimal(
 ) + ggplot2::labs(
-  y = "Avg. Total Abundance (Log)",
+  y = "Avg. Total Abundance",
   x = "Habitat Type"
 ) + ggplot2::guides(
   color = "none",
