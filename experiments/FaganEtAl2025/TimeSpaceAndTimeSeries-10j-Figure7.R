@@ -214,7 +214,10 @@ figure7$dataBCSupplement <- figure7$dataBase |> tidytable::filter(
   Upper = quantile(Value, p = figure7$CI + (1 - figure7$CI)/2, na.rm = TRUE)
 )
 
-# As in dataBCSummary, but broken up by AffinityBins
+# As in dataBCSummary, but not broken up by AffinityBins
+# and used to make ratios of consumers and basals.
+# (We don't do this here because teh plots are unreadable when broken up
+# by AffinityBins; too many types vary between no consumers and no basals.)
 figure7$dataBCSupplement2 <- figure7$dataBase |> tidytable::filter(
   Time > -1000,
   Metric %in% c("Richness", "Abundance"),
@@ -224,6 +227,12 @@ figure7$dataBCSupplement2 <- figure7$dataBase |> tidytable::filter(
 ) |> unifyAffinityBins( # if many preference types.
 ) |> tidytable::pivot_wider(
   names_from = Guild, values_from = Value
+) |> tidytable::group_by( # Combine Across Basals and Consumers.
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  PoolPatchSeed, SpeciesPreferences, Time
+) |> tidytable::summarise(
+  Basal = sum(Basal), Consumer = sum(Consumer),
+  .groups = "drop"
 ) |> tidytable::mutate(
   Time = tidytable::case_when( # Create groupings for times.
     Time < -50 ~ round(Time, -2),
@@ -241,13 +250,13 @@ figure7$dataBCSupplement2 <- figure7$dataBase |> tidytable::filter(
   # simple and match each other with the seeds. More complicated set-ups
   # will want to adjust the groupings here.
   Intervention, InterventionInitial, InterventionFinal, Metric,
-  PoolPatchSeed, SpeciesPreferences, AffinityBins, Time
+  PoolPatchSeed, SpeciesPreferences, Time
 ) |> tidytable::summarise(
   Value = median(Value), .groups = "drop"
 ) |> tidytable::group_by(
   # Average across simulations
   Intervention, InterventionInitial, InterventionFinal, Metric,
-  SpeciesPreferences, AffinityBins, Time
+  SpeciesPreferences, Time
 ) |> tidytable::summarise(
   Lower = quantile(Value, p = (1 - figure7$CI) - (1 - figure7$CI)/2, na.rm = TRUE),
   Average = mean(Value),
@@ -429,8 +438,6 @@ figure7$SupplementAbundance <- ggplot2::ggplot(
 ) + ggplot2::labs(
   x = "Time Since Intervention",
   y = "Abundance"
-) + ggplot2::coord_cartesian(
-  expand = FALSE
 ) + ggplot2::facet_grid(
   factor(Guild, levels = c("Consumer", "Basal"), ordered = TRUE) ~
     AffinityBins, scales = "free"
@@ -438,6 +445,9 @@ figure7$SupplementAbundance <- ggplot2::ggplot(
   breaks = c(0, 1, 10, 100, 1000, 10000),
   transform = "log1p"
 ) + ggplot2::scale_y_log10(
+) + ggplot2::coord_cartesian(
+  expand = FALSE,
+  ylim = c(10^-1, NA)
 )
 
 figure7$SupplementRichnessRatio <- ggplot2::ggplot(
@@ -467,9 +477,8 @@ figure7$SupplementRichnessRatio <- ggplot2::ggplot(
   y = "Richness Ratio"
 ) + ggplot2::coord_cartesian(
   expand = FALSE
-) + ggplot2::facet_grid(
-  . ~
-    AffinityBins, scales = "free"
+# ) + ggplot2::facet_grid(
+#   . ~ AffinityBins, scales = "free"
 ) + ggplot2::scale_x_continuous(
   breaks = c(0, 1, 10, 100, 1000, 10000),
   transform = "log1p"
@@ -502,8 +511,8 @@ figure7$SupplementAbundanceRatio <- ggplot2::ggplot(
   y = "Abundance Ratio"
 ) + ggplot2::coord_cartesian(
   expand = FALSE
-) + ggplot2::facet_grid(
-  . ~ AffinityBins, scales = "free"
+# ) + ggplot2::facet_grid(
+#   . ~ AffinityBins, scales = "free"
 ) + ggplot2::scale_x_continuous(
   breaks = c(0, 1, 10, 100, 1000, 10000),
   transform = "log1p"
