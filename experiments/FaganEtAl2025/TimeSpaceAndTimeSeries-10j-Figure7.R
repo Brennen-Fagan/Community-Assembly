@@ -125,7 +125,7 @@ figure7$dataOverallSummary <- figure7$dataBase |> tidytable::filter(
   Intervention, InterventionInitial, InterventionFinal, Metric,
   SpeciesPreferences, Time
 ) |> tidytable::summarise(
-  Lower = quantile(Value, p = (1 - figure7$CI) + (1 - figure7$CI)/2, na.rm = TRUE),
+  Lower = quantile(Value, p = (1 - figure7$CI) - (1 - figure7$CI)/2, na.rm = TRUE),
   Average = mean(Value),
   Upper = quantile(Value, p = figure7$CI + (1 - figure7$CI)/2, na.rm = TRUE)
 )
@@ -172,7 +172,7 @@ figure7$dataBCSummary <- figure7$dataBase |> tidytable::filter(
   Intervention, InterventionInitial, InterventionFinal, Metric,
   SpeciesPreferences, Time
 ) |> tidytable::summarise(
-  Lower = quantile(Value, p = (1 - figure7$CI) + (1 - figure7$CI)/2, na.rm = TRUE),
+  Lower = quantile(Value, p = (1 - figure7$CI) - (1 - figure7$CI)/2, na.rm = TRUE),
   Average = mean(Value),
   Upper = quantile(Value, p = figure7$CI + (1 - figure7$CI)/2, na.rm = TRUE)
 )
@@ -209,7 +209,7 @@ figure7$dataBCSupplement <- figure7$dataBase |> tidytable::filter(
   Intervention, InterventionInitial, InterventionFinal, Metric,
   SpeciesPreferences, Guild, AffinityBins, Time
 ) |> tidytable::summarise(
-  Lower = quantile(Value, p = (1 - figure7$CI) + (1 - figure7$CI)/2, na.rm = TRUE),
+  Lower = quantile(Value, p = (1 - figure7$CI) - (1 - figure7$CI)/2, na.rm = TRUE),
   Average = mean(Value),
   Upper = quantile(Value, p = figure7$CI + (1 - figure7$CI)/2, na.rm = TRUE)
 )
@@ -249,7 +249,7 @@ figure7$dataBCSupplement2 <- figure7$dataBase |> tidytable::filter(
   Intervention, InterventionInitial, InterventionFinal, Metric,
   SpeciesPreferences, AffinityBins, Time
 ) |> tidytable::summarise(
-  Lower = quantile(Value, p = (1 - figure7$CI) + (1 - figure7$CI)/2, na.rm = TRUE),
+  Lower = quantile(Value, p = (1 - figure7$CI) - (1 - figure7$CI)/2, na.rm = TRUE),
   Average = mean(Value),
   Upper = quantile(Value, p = figure7$CI + (1 - figure7$CI)/2, na.rm = TRUE)
 )
