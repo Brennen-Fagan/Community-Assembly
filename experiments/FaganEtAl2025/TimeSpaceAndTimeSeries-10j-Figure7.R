@@ -327,7 +327,7 @@ figure7$plotB <- ggplot2::ggplot(
   xlim = c(0, 50), expand = FALSE
 ) + ggplot2::labs(
   x = "Time Since Intervention",
-  y = "Richness (Cons./Basal)"
+  y = "Richness Ratio"
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat Type"
@@ -357,7 +357,7 @@ figure7$plotC <- ggplot2::ggplot(
   xlim = c(0, 50), expand = FALSE
 ) + ggplot2::labs(
   x = "Time Since Intervention",
-  y = "Abundance (Cons./Basal)"
+  y = "Abundance Ratio"
 ) + ggplot2::scale_y_log10(
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
@@ -464,7 +464,7 @@ figure7$SupplementRichnessRatio <- ggplot2::ggplot(
   fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
 ) + ggplot2::labs(
   x = "Time Since Intervention",
-  y = "Richness (Cons./Basal)"
+  y = "Richness Ratio"
 ) + ggplot2::coord_cartesian(
   expand = FALSE
 ) + ggplot2::facet_grid(
@@ -499,7 +499,7 @@ figure7$SupplementAbundanceRatio <- ggplot2::ggplot(
   fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
 ) + ggplot2::labs(
   x = "Time Since Intervention",
-  y = "Abundance (Cons./Basal)"
+  y = "Abundance Ratio"
 ) + ggplot2::coord_cartesian(
   expand = FALSE
 ) + ggplot2::facet_grid(
