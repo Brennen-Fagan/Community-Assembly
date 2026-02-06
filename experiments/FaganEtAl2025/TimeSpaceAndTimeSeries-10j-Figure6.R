@@ -170,13 +170,25 @@ figure6$plotC <- ggplot2::ggplot(
 
 ##### b: Insets ###############################################################
 figure6$insetB <- ggplot2::ggplot(
-  figure6$dataPers |> tidytable::filter(SpeciesPreferences == "50% 0, 50% 1"),
+  # Aggregate and normalise weights so that better correspond to probabilities,
+  # see line 29.
+  figure6$dataPers |> tidytable::filter(
+    SpeciesPreferences == "50% 0, 50% 1"
+  ) |> tidytable::group_by(
+    Intervention, AffinityBins
+  ) |> tidytable::summarise(
+    Persistence = sum(Persistence)
+  ) |> tidytable::group_by(
+    Intervention
+  ) |> tidytable::mutate(
+    Persistence = Persistence / sum(Persistence)
+  ),
   ggplot2::aes(
     x = AffinityBins,
-    weight = Persistence,
+    y = Persistence,
     fill = Intervention
   )
-) + ggplot2::geom_bar(
+) + ggplot2::geom_col(
   show.legend = FALSE
 ) + ggplot2::facet_grid(
   . ~ Intervention
@@ -187,7 +199,7 @@ figure6$insetB <- ggplot2::ggplot(
 ) + ggplot2::theme(
   panel.background = ggplot2::element_rect(fill = "white")
 ) + ggplot2::coord_cartesian(
-  expand = FALSE
+  expand = FALSE, ylim = c(0, 1)
 )
 figure6$insetC <- ggplot2::ggplot(
   figure6$dataPers |> tidytable::filter(SpeciesPreferences == "Uniform(0, 1)"),
