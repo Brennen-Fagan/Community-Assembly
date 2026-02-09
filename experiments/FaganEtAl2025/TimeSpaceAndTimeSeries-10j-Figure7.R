@@ -544,7 +544,7 @@ figure7$iter <- "_Prototype1"
 figure7$ids <- c("", "", "A", "AInset", "B", "C", "SR", "SA", "SRR", "SAR")
 figure7$ext <- c(".png", rep(".pdf", 9))
 
-for (fnum in 1:(2+3+4)) {
+for (fnum in 1:(2+4+4)) {
   with(figure7, ggplot2::ggsave(
     plot = switch(fnum,
                   plot, plot,
