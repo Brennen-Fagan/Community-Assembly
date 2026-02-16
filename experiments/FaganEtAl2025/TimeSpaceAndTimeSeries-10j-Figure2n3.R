@@ -1,7 +1,7 @@
 # Setup: ######################################################################
 # Plot of Richness as a function of species preferences and land-use, when
 # species preferences are 100% 0. Also functinally an overview plot of network
-# structure. This version combines aspects of figure 3. 
+# structure. This version combines aspects of figure 3.
 
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
@@ -224,7 +224,7 @@ figure2$plotC <- ggplot2::ggplot(
 ) + ggplot2::theme(
   panel.grid.minor = ggplot2::element_blank()
 ) + ggplot2::annotate(
-  "text", x = c(1.5, 4.5), y = c(30, 15), 
+  "text", x = c(1.5, 4.5), y = c(30, 15),
   label = c("Well\nAdapted", "Poorly\nAdapted"),
   size = 3
 )
@@ -278,50 +278,12 @@ if (figure2$abundlog) {
   figure2$plotD <- figure2$plotD + ggplot2::scale_y_log10()
 }
 
-##### e: ######################################################################
-# Richness and abundance co-vary for our scenarios.
-figure2$plotE <- ggplot2::ggplot(
-  figure2$data |> tidytable::filter(
-    Time > Start, Time < Stop
-  ) |> tidytable::group_by( # Reduce to per run (x44 sims for param combns)
-    PoolPatchSeed, Intervention, SpeciesAffinity
-  ) |> tidytable::summarise(
-    `Alpha Hill:0` = mean(`Alpha Hill:0`),
-    `Alpha Abundance` = mean(`Alpha Abundance`)
-  ),
-  ggplot2::aes(
-    x = `Alpha Abundance`,
-    y = `Alpha Hill:0`,
-    fill = Intervention
-  )
-) + ggplot2::geom_point(
-  shape = 21, color = "white" # circles (21), squares (22), triangles (24)
-) + ggplot2::scale_color_manual(
-  values = colorPalette, aesthetics = c("color", "fill"),
-  name = "Habitat Type"
-) + ggplot2::theme_minimal(
-) + ggplot2::labs(
-  x = "Abundance",
-  y = "Richness"
-) + ggplot2::guides(
-  color = "none",
-  fill = "none"
-) + ggplot2::coord_cartesian(
-  ylim = c(0, richnessYMax),
-  xlim = figure2$abundLimits
-) + ggplot2::theme(
-  panel.grid.minor = ggplot2::element_blank()
-)
-
-if (figure2$abundlog) {
-  figure2$plotE <- figure2$plotE + ggplot2::scale_x_log10()
-}
-
-
 ##### f: ######################################################################
 figure2$plotF <- ggplot2::ggplot(
   figure2$dataBC |> tidytable::filter(
     Metric == "Richness"
+  ) |> tidytable::mutate( # Left-Right ordering, not Top-Bottom
+    Subset = factor(Subset, ordered = TRUE, levels = c("Basal", "Consumer"))
   ),
   ggplot2::aes(
     x = Intervention,
@@ -335,6 +297,20 @@ figure2$plotF <- ggplot2::ggplot(
   notch = TRUE, outlier.size = 1,
   position = ggplot2::position_dodge(0.9),
   width = 0.28
+) + ggplot2::geom_text(
+  data = function(x) {
+    x |> tidytable::mutate(
+      Offset = (max(Value) - min(Value))* 0.08
+    ) |> tidytable::group_by(
+      Intervention, Subset
+    ) |> tidytable::summarise(
+      Value = max(Value) + Offset,
+      Label = substr(Subset, 0, 1),
+      .groups = "drop"
+    )
+  },
+  mapping = ggplot2::aes(label = Label),
+  position = ggplot2::position_dodge(0.9)
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat Type"
@@ -354,6 +330,8 @@ figure2$plotF <- ggplot2::ggplot(
 figure2$plotG <- ggplot2::ggplot(
   figure2$dataBC |> tidytable::filter(
     Metric == "Abundance"
+  ) |> tidytable::mutate( # Left-Right ordering, not Top-Bottom
+    Subset = factor(Subset, ordered = TRUE, levels = c("Basal", "Consumer"))
   ),
   ggplot2::aes(
     x = Intervention,
@@ -367,6 +345,20 @@ figure2$plotG <- ggplot2::ggplot(
   notch = TRUE, outlier.size = 1,
   position = ggplot2::position_dodge(0.9),
   width = 0.28
+) + ggplot2::geom_text(
+  data = function(x) {
+    x |> tidytable::mutate(
+      Offset = (max(Value) - min(Value))* 0.08
+    ) |> tidytable::group_by(
+      Intervention, Subset
+    ) |> tidytable::summarise(
+      Value = max(Value) + Offset,
+      Label = substr(Subset, 0, 1),
+      .groups = "drop"
+    )
+  },
+  mapping = ggplot2::aes(label = Label),
+  position = ggplot2::position_dodge(0.9)
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat Type"
@@ -386,74 +378,7 @@ if (figure2$abundlog) {
   figure2$plotG <- figure2$plotG + ggplot2::scale_y_log10()
 }
 
-##### h: ######################################################################
-# Basal and Consumer Richness And Abundance co-vary for our scenarios.
-# Note separate from Abundance to have two separate grobs to inset.
-figure2$plotH <- ggplot2::ggplot(
-  figure2$dataBC |> tidytable::pivot_wider(
-    names_from = Metric, values_from = Value
-  ),
-  ggplot2::aes(
-    x = Abundance,
-    y = Richness,
-    fill = Intervention,
-    shape = Subset
-  )
-) + ggplot2::geom_point(
-  color = "white"
-) + ggplot2::scale_color_manual(
-  values = colorPalette, aesthetics = c("color", "fill"),
-  name = "Habitat Type"
-) + ggplot2::theme_minimal(
-) + ggplot2::guides(
-  color = "none",
-  fill = "none",
-  shape = "none"
-) + ggplot2::scale_shape_manual(
-  values = c(22, 24) # circles (21), squares (22), triangles (24)
-) + ggplot2::theme(
-  panel.grid.minor = ggplot2::element_blank()
-) + ggplot2::coord_cartesian(
-  ylim = c(0, richnessYMax),
-  xlim = figure2$abundLimits
-)
 
-if (figure2$abundlog) {
-  figure2$plotH <- figure2$plotH + ggplot2::scale_x_log10()
-}
-
-
-##### i: ######################################################################
-# Basal and Consumer Richness And Abundance co-vary for our scenarios.
-# Note separate from Abundance to have two separate grobs to inset.
-figure2$plotI <- ggplot2::ggplot(
-  figure2$dataBC |> tidytable::filter(
-    Subset == "Consumer"
-  ) |> tidytable::pivot_wider(
-    names_from = Metric, values_from = Value
-  ),
-  ggplot2::aes(
-    x = Abundance,
-    y = Richness,
-    fill = Intervention,
-    shape = Subset
-  )
-) + ggplot2::geom_point(
-  color = "white"
-) + ggplot2::scale_color_manual(
-  values = colorPalette, aesthetics = c("color", "fill"),
-  name = "Habitat Type"
-) + ggplot2::theme_minimal(
-) + ggplot2::guides(
-  color = "none",
-  fill = "none",
-  shape = "none"
-) + ggplot2::scale_x_log10(
-) + ggplot2::scale_shape_manual(
-  values = c(22, 24) # circles (21), squares (22), triangles (24)
-) + ggplot2::theme(
-  panel.grid.minor = ggplot2::element_blank()
-)
 
 ##### Combine: ################################################################
 figure2$plot <- ggpubr::ggarrange(
@@ -462,43 +387,33 @@ figure2$plot <- ggpubr::ggarrange(
     figure2$plotB + ggplot2::theme(legend.position = "none"),
     cowplot::plot_grid(plotlist = list(
       figure2$plotC, figure2$plotF,
-      figure2$plotD, figure2$plotG,
-      figure2$plotE, figure2$plotH
+      figure2$plotD, figure2$plotG
     ), ncol = 2)
   ), nrow = 1, widths = c(2/5, 1/5, 2/5), common.legend = TRUE
 )
 
-ggplot2::ggsave(plot = figure2$plot, 
+ggplot2::ggsave(plot = figure2$plot,
                 filename = file.path(dirImages, "Figure2n3_Prototype1.pdf"),
                 units = "cm", width = 6.5*5, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plot, 
+ggplot2::ggsave(plot = figure2$plot,
                 filename = file.path(dirImages, "Figure2n3_Prototype1.png"),
                 units = "cm", width = 6.5*5, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotA, 
+ggplot2::ggsave(plot = figure2$plotA,
                 filename = file.path(dirImages, "Figure2n3A_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*3)
-ggplot2::ggsave(plot = figure2$plotB, 
+ggplot2::ggsave(plot = figure2$plotB,
                 filename = file.path(dirImages, "Figure2n3B_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotC, 
+ggplot2::ggsave(plot = figure2$plotC,
                 filename = file.path(dirImages, "Figure2n3C_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotD, 
+ggplot2::ggsave(plot = figure2$plotD,
                 filename = file.path(dirImages, "Figure2n3D_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotE, 
-                filename = file.path(dirImages, "Figure2n3E_Prototype1.pdf"),
-                units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotF, 
+ggplot2::ggsave(plot = figure2$plotF,
                 filename = file.path(dirImages, "Figure2n3F_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotG, 
+ggplot2::ggsave(plot = figure2$plotG,
                 filename = file.path(dirImages, "Figure2n3G_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotH, 
-                filename = file.path(dirImages, "Figure2n3H_Prototype1.pdf"),
-                units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotI, 
-                filename = file.path(dirImages, "Figure2n3I_Prototype1.pdf"),
-                units = "cm", width = 6.5*1.2, height = 6.5)
 
