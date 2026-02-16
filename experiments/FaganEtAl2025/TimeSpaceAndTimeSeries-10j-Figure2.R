@@ -1,7 +1,7 @@
 # Setup: ######################################################################
-# Plot of Richness as a function of species preferences and land-use,
-# when species preferences are 100% 0.
-# Also functinally an overview plot of network structure.
+# Plot of Richness as a function of species preferences and land-use, when
+# species preferences are 100% 0. Also functinally an overview plot of network
+# structure. This version combines aspects of figure 3.
 
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
@@ -15,8 +15,15 @@ figure2 <- list(
     seed = "2", # "11", "17", "2"!,
     time = 25000
   ),
+  abundlog = FALSE,
   pref = "100% 0"#"Uniform(0, 1)"
 )
+
+if (figure2$abundlog) {
+  figure2$abundLimits <- c(1e-1, 4e4)
+} else {
+  figure2$abundLimits <- c(0, 3.7e4)
+}
 
 figure2$graph$specification <- diversitiesRichness |> tidytable::select(c(
   # Which network:
@@ -81,6 +88,36 @@ figure2$data <- dplyr::full_join(
     DispersalParam, Start, Stop)
 )
 
+figure2$dataBC <- tidytable::bind_rows(
+  diversitiesRichness |> tidytable::filter(
+    SpeciesPreferences == figure2$pref,
+    NicheDistance == defaultNicheDistance,
+    Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
+    PoolPatchSeed %in% basePoolPatchSeeds,
+    Metric == "Alpha Hill:0",
+    !is.na(Subset)
+  ),
+  diversitiesAbund |> tidytable::filter(
+    SpeciesPreferences == figure2$pref,
+    NicheDistance == defaultNicheDistance,
+    Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
+    PoolPatchSeed %in% basePoolPatchSeeds,
+    Metric == "Alpha Abundance",
+    !is.na(Subset)
+  )
+) |> tidytable::mutate(
+  Subset = factor(Subset, levels = c("Consumer_0", "Basal_0"),
+                  labels = c("Consumer", "Basal"), ordered = TRUE),
+  Metric = factor(Metric, levels = c("Alpha Hill:0", "Alpha Abundance"),
+                  labels = c("Richness", "Abundance"), ordered = TRUE)
+) |> tidytable::filter(
+  Time > Start, Time < Stop
+) |> tidytable::group_by(
+  PoolPatchSeed, Intervention, SpeciesAffinity, Metric, Subset
+) |> tidytable::summarise(
+  Value = mean(Value), .groups = "drop"
+)
+
 figure2$indices <- figure2$graph$networks$Index |> tidytable::filter(
   SpeciesPreferences == figure2$pref,
   NicheDistance == defaultNicheDistance,
@@ -140,11 +177,11 @@ figure2$plotA <- plotMeanAndInner(
 figure2$plotB <- figure2$graph$networks$Plot + ggplot2::facet_grid(
   # Reverse order
   factor(Intervention, levels = c("(1)", "(0.5)", "(0)"), ordered = T) ~ .
-  ) + ggplot2::theme(
-    axis.title.x = ggplot2::element_blank(),
-    axis.text.x = ggplot2::element_blank(),
-    panel.border = ggplot2::element_rect(color = "black", fill = NA)
-  )
+) + ggplot2::theme(
+  axis.title.x = ggplot2::element_blank(),
+  axis.text.x = ggplot2::element_blank(),
+  panel.border = ggplot2::element_rect(color = "black", fill = NA)
+)
 
 ##### c: ######################################################################
 # Richness varies with land-use type for our fixed land-use preference (0).
@@ -171,21 +208,24 @@ figure2$plotC <- ggplot2::ggplot(
   width = 0.28
   # ) + ggplot2::geom_jitter(
   #   alpha = 0.25
-# ) + ggplot2::geom_line( # Tracks the mean across sims and habitat types.
-#   data = ~ summarise(group_by(.x, Intervention), Value = mean(Value)),
-#   color = "black", group = 1
+  # ) + ggplot2::geom_line( # Tracks the mean across sims and habitat types.
+  #   data = ~ summarise(group_by(.x, Intervention), Value = mean(Value)),
+  #   color = "black", group = 1
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat Type"
 ) + ggplot2::theme_minimal(
 ) + ggplot2::labs(
-  y = "Avg. Richness",
+  y = "Richness",
   x = "Habitat Type"
 ) + ggplot2::guides(
   color = "none",
   fill = "none"
+) + ggplot2::theme(
+  panel.grid.minor = ggplot2::element_blank()
 ) + ggplot2::annotate(
-  "text", x = c(1.5, 4.5), y = 5, label = c("Well\nAdapted", "Poorly\nAdapted"),
+  "text", x = c(1.5, 4.5), y = c(30, 15),
+  label = c("Well\nAdapted", "Poorly\nAdapted"),
   size = 3
 )
 
@@ -204,8 +244,6 @@ figure2$plotD <- ggplot2::ggplot(
     y = Value,
     color = Intervention
   )
-) + ggplot2::coord_cartesian(
-  expand = FALSE
 ) + ggplot2::geom_violin(
   position = ggplot2::position_dodge(0.9)
 ) + ggplot2::geom_boxplot(
@@ -214,56 +252,132 @@ figure2$plotD <- ggplot2::ggplot(
   width = 0.28
   # ) + ggplot2::geom_jitter(
   #   alpha = 0.25
-# ) + ggplot2::geom_line( # Tracks the mean across sims and habitat types.
-#   data = ~ summarise(group_by(.x, Intervention), Value = mean(Value)),
-#   color = "black", group = 1
+  # ) + ggplot2::geom_line( # Tracks the mean across sims and habitat types.
+  #   data = ~ summarise(group_by(.x, Intervention), Value = mean(Value)),
+  #   color = "black", group = 1
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat Type"
 ) + ggplot2::theme_minimal(
 ) + ggplot2::labs(
-  y = "Avg. Total Abundance",
+  y = "Abundance",
   x = "Habitat Type"
 ) + ggplot2::guides(
   color = "none",
   fill = "none"
-# ) + ggplot2::annotate(
-#   "text", x = c(1.5, 4.5), y = 3e3, label = c("Well\nAdapted", "Poorly\nAdapted"),
-#   size = 3
-) + ggplot2::scale_y_log10(
+  # ) + ggplot2::annotate(
+  #   "text", x = c(1.5, 4.5), y = 3e3, label = c("Well\nAdapted", "Poorly\nAdapted"),
+  #   size = 3
+) + ggplot2::theme(
+  panel.grid.minor = ggplot2::element_blank()
+) + ggplot2::coord_cartesian(
+  ylim = figure2$abundLimits
 )
 
-##### e: ######################################################################
-# Richness and abundance co-vary for our scenarios.
-figure2$plotE <- ggplot2::ggplot(
-  figure2$data |> tidytable::filter(
-    Time > Start, Time < Stop
-  ) |> tidytable::group_by( # Reduce to per run (x44 sims for param combns)
-    PoolPatchSeed, Intervention, SpeciesAffinity
-  ) |> tidytable::summarise(
-    `Alpha Hill:0` = mean(`Alpha Hill:0`),
-    `Alpha Abundance` = mean(`Alpha Abundance`)
+if (figure2$abundlog) {
+  figure2$plotD <- figure2$plotD + ggplot2::scale_y_log10()
+}
+
+##### f: ######################################################################
+figure2$plotF <- ggplot2::ggplot(
+  figure2$dataBC |> tidytable::filter(
+    Metric == "Richness"
+  ) |> tidytable::mutate( # Left-Right ordering, not Top-Bottom
+    Subset = factor(Subset, ordered = TRUE, levels = c("Basal", "Consumer"))
   ),
   ggplot2::aes(
-    x = `Alpha Abundance`,
-    y = `Alpha Hill:0`,
-    color = Intervention
+    x = Intervention,
+    y = Value,
+    color = Intervention,
+    group = interaction(Intervention, Subset)
   )
-) + ggplot2::geom_point(
+) + ggplot2::geom_violin(
+  position = ggplot2::position_dodge(0.9)
+) + ggplot2::geom_boxplot(
+  notch = TRUE, outlier.size = 1,
+  position = ggplot2::position_dodge(0.9),
+  width = 0.28
+) + ggplot2::geom_text(
+  data = function(x) {
+    x |> tidytable::mutate(
+      Offset = (max(Value) - min(Value))* 0.08
+    ) |> tidytable::group_by(
+      Intervention, Subset
+    ) |> tidytable::summarise(
+      Value = max(Value) + Offset,
+      Label = substr(Subset, 0, 1),
+      .groups = "drop"
+    )
+  },
+  mapping = ggplot2::aes(label = Label),
+  position = ggplot2::position_dodge(0.9)
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat Type"
 ) + ggplot2::theme_minimal(
-) + ggplot2::labs(
-  x = "Avg. Total Abundance",
-  y = "Avg. Richness"
 ) + ggplot2::guides(
   color = "none",
   fill = "none"
-# ) + ggplot2::scale_x_log10(
+) + ggplot2::theme(
+  panel.grid.minor = ggplot2::element_blank()
+) + ggplot2::labs(
+  x = "Habitat Type", y = "Richness"
 ) + ggplot2::coord_cartesian(
   ylim = c(0, richnessYMax)
 )
+
+##### g: ######################################################################
+figure2$plotG <- ggplot2::ggplot(
+  figure2$dataBC |> tidytable::filter(
+    Metric == "Abundance"
+  ) |> tidytable::mutate( # Left-Right ordering, not Top-Bottom
+    Subset = factor(Subset, ordered = TRUE, levels = c("Basal", "Consumer"))
+  ),
+  ggplot2::aes(
+    x = Intervention,
+    y = Value,
+    color = Intervention,
+    group = interaction(Intervention, Subset)
+  )
+) + ggplot2::geom_violin(
+  position = ggplot2::position_dodge(0.9)
+) + ggplot2::geom_boxplot(
+  notch = TRUE, outlier.size = 1,
+  position = ggplot2::position_dodge(0.9),
+  width = 0.28
+) + ggplot2::geom_text(
+  data = function(x) {
+    x |> tidytable::mutate(
+      Offset = (max(Value) - min(Value))* 0.08
+    ) |> tidytable::group_by(
+      Intervention, Subset
+    ) |> tidytable::summarise(
+      Value = max(Value) + Offset,
+      Label = substr(Subset, 0, 1),
+      .groups = "drop"
+    )
+  },
+  mapping = ggplot2::aes(label = Label),
+  position = ggplot2::position_dodge(0.9)
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat Type"
+) + ggplot2::theme_minimal(
+) + ggplot2::guides(
+  color = "none",
+  fill = "none"
+) + ggplot2::theme(
+  panel.grid.minor = ggplot2::element_blank()
+) + ggplot2::labs(
+  x = "Habitat Type", y = "Abundance"
+) + ggplot2::coord_cartesian(
+  ylim = figure2$abundLimits
+)
+
+if (figure2$abundlog) {
+  figure2$plotG <- figure2$plotG + ggplot2::scale_y_log10()
+}
+
 
 
 ##### Combine: ################################################################
@@ -271,25 +385,35 @@ figure2$plot <- ggpubr::ggarrange(
   plotlist = list(
     figure2$plotA,
     figure2$plotB + ggplot2::theme(legend.position = "none"),
-    ggpubr::ggarrange(plotlist = list(
-      figure2$plotC,
-      figure2$plotD,
-      figure2$plotE
-    ), ncol = 1)
-  ), nrow = 1, widths = c(2/4, 1/4, 1/4), common.legend = TRUE
+    cowplot::plot_grid(plotlist = list(
+      figure2$plotC, figure2$plotF,
+      figure2$plotD, figure2$plotG
+    ), ncol = 2)
+  ), nrow = 1, widths = c(2/5, 1/5, 2/5), common.legend = TRUE
 )
 
-ggplot2::ggsave(plot = figure2$plot, filename = file.path(dirImages, "Figure2_Prototype9.pdf"),
-                units = "cm", width = 6.5*4, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plot, filename = file.path(dirImages, "Figure2_Prototype9.png"),
-                units = "cm", width = 6.5*4, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotA, filename = file.path(dirImages, "Figure2A_Prototype9.pdf"),
+ggplot2::ggsave(plot = figure2$plot,
+                filename = file.path(dirImages, "Figure2_Prototype1.pdf"),
+                units = "cm", width = 6.5*5, height = 6.5*2)
+ggplot2::ggsave(plot = figure2$plot,
+                filename = file.path(dirImages, "Figure2_Prototype1.png"),
+                units = "cm", width = 6.5*5, height = 6.5*2)
+ggplot2::ggsave(plot = figure2$plotA,
+                filename = file.path(dirImages, "Figure2A_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*3)
-ggplot2::ggsave(plot = figure2$plotB, filename = file.path(dirImages, "Figure2B_Prototype9.pdf"),
+ggplot2::ggsave(plot = figure2$plotB,
+                filename = file.path(dirImages, "Figure2B_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotC, filename = file.path(dirImages, "Figure2C_Prototype9.pdf"),
+ggplot2::ggsave(plot = figure2$plotC,
+                filename = file.path(dirImages, "Figure2C_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotD, filename = file.path(dirImages, "Figure2D_Prototype9.pdf"),
+ggplot2::ggsave(plot = figure2$plotD,
+                filename = file.path(dirImages, "Figure2D_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotE, filename = file.path(dirImages, "Figure2E_Prototype9.pdf"),
+ggplot2::ggsave(plot = figure2$plotF,
+                filename = file.path(dirImages, "Figure2F_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(plot = figure2$plotG,
+                filename = file.path(dirImages, "Figure2G_Prototype1.pdf"),
+                units = "cm", width = 6.5*3, height = 6.5*2)
+
