@@ -89,7 +89,7 @@ figure4$dataBase <- tidytable::bind_rows(
 ) |> tidytable::mutate(
   Metric = factor(Metric, levels = c("Alpha Hill:0", "Alpha Abundance"),
                   labels = c("Richness", "Abundance"), ordered = TRUE),
-  Time = Time - InterventionTime
+  Time = round(Time - InterventionTime, 6) # remove false differences
 ) |> tidytable::filter(
   Time <= 16000, # Need the start for the inset.
   # Avoid singletons.

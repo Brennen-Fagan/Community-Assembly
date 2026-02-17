@@ -161,7 +161,7 @@ figure2$plotA <- plotMeanAndInner(
   color = ggplot2::guide_legend(ncol = 5, title = "Habitat Type"),
   fill = ggplot2::guide_legend(ncol = 5, title = "Habitat Type")
 ) + ggplot2::coord_cartesian(
-  xlim = c(0, 30000), ylim = c(0, richnessYMax), expand = FALSE
+  xlim = c(0, 31000), ylim = c(0, richnessYMax), expand = FALSE
 ) + ggplot2::theme(
   legend.position = c(0.5, 0.09),
   plot.tag.position = c(0.025, 0.95),
