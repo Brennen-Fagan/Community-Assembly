@@ -435,3 +435,188 @@ figure4$SupplementAbundanceRatio <- ggplot2::ggplot(
   transform = "log1p"
 ) + ggplot2::scale_y_log10(
 )
+
+
+### Figure 5: ################################################################
+##### Data: ##################################################################
+# Why to the level of summary? Because the PlotMeanAndInner function
+# isn't built to handle the multiple resolutions that we have in the
+# actual data, which makes it harder to portray the data accurately.
+figure5$dataOverallSummary <- figure5$dataBase |> tidytable::filter(
+  Metric %in% c("Richness", "Abundance"),
+  is.na(Subset) # Not overall values
+) |> tidytable::mutate(
+  Time = tidytable::case_when( # Create groupings for times.
+    Time < -50 ~ round(Time, -2),
+    Time < 0 ~ -25, # In the last bin before regime change.
+    Time <= 50 ~ round(Time, 0),
+    Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
+    Time < 16350 ~ round(Time, -2),
+    TRUE ~ Time
+  )
+) |> tidytable::filter(
+  Time %in% c(0, figure5$heatmapTimes)
+) |> tidytable::group_by(
+  # Average Over the now grouped times to make each sim equally weighted.
+  # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
+  # simple and match each other with the seeds. More complicated set-ups
+  # will want to adjust the groupings here.
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  PoolPatchSeed, SpeciesPreferences, Time
+) |> tidytable::summarise(
+  Value = median(Value), .groups = "drop"
+) |> tidytable::group_by(
+  # Average across simulations
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  SpeciesPreferences, Time
+) |> tidytable::summarise(
+  Average = mean(Value)
+) |> dplyr::mutate( # Change labelling, dplyr for conversion (can't in dt)
+  Time = factor(
+    Time, levels = c(0, range(figure5$heatmapTimes)),
+    labels = c("Time 0", paste0(
+      c("Short (t = ", "Long (t = "),
+      range(figure5$heatmapTimes), ")"
+    ))
+  )
+)
+
+# Ratios need to be handled slightly differently due to consumer/basal
+# resulting in row changes.
+figure5$dataBCSummary <- figure5$dataBase |> tidytable::filter(
+  Metric %in% c("Richness", "Abundance"),
+  !is.na(Subset) # Not overall values
+) |> tidytable::separate_wider_delim(
+  delim = "_", cols = Subset, names = c("Guild", "AffinityBins")
+) |> unifyAffinityBins( # if many preference types.
+) |> tidytable::group_by(
+  # Aggregate Over the AffinityBins.
+  # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
+  # simple and match each other with the seeds. More complicated set-ups
+  # will want to adjust the groupings here.
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  PoolPatchSeed, SpeciesPreferences, Guild, Time
+) |> tidytable::summarise(
+  Value = sum(Value)
+) |> tidytable::pivot_wider(
+  names_from = Guild, values_from = Value
+) |> tidytable::mutate(
+  Time = tidytable::case_when( # Create groupings for times.
+    Time < -50 ~ round(Time, -2),
+    Time < 0 ~ -25, # In the last bin before regime change.
+    Time <= 50 ~ round(Time, 0),
+    Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
+    Time < 16350 ~ round(Time, -2),
+    TRUE ~ Time
+  ),
+  Subset = NA,
+  Value = Consumer/Basal
+) |> tidytable::filter(
+  Time %in% c(0, figure5$heatmapTimes)
+) |> tidytable::group_by(
+  # Average Over the now grouped times to make each sim equally weighted.
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  PoolPatchSeed, SpeciesPreferences, Time
+) |> tidytable::summarise(
+  Value = median(Value), .groups = "drop"
+) |> tidytable::group_by(
+  # Average across simulations
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  SpeciesPreferences, Time
+) |> tidytable::summarise(
+  Average = mean(Value)
+) |> dplyr::mutate( # Change labelling, dplyr for conversion (can't in dt)
+  Time = factor(
+    Time, levels = c(0, range(figure5$heatmapTimes)),
+    labels = c("Time 0", paste0(
+      c("Short (t = ", "Long (t = "),
+      range(figure5$heatmapTimes), ")"
+    ))
+  )
+)
+
+##### Plots: #################################################################
+figure5$plotRR <- plotTextHeatmap(
+  figure5$dataBCSummary |> tidytable::filter(
+    Metric == "Richness", Time != "Time 0"
+  ) |> tidytable::mutate(
+    Emphasis = Intervention %in% figure5$emphasise,
+    Average = signif(Average, digits = 2)
+  ),
+  "Richness\nRatio"
+)
+figure5$plotAR <- plotTextHeatmap(
+  figure5$dataBCSummary |> tidytable::filter(
+    Metric == "Abundance", Time != "Time 0"
+  ) |> tidytable::mutate(
+    Emphasis = Intervention %in% figure5$emphasise,
+    Average = signif(Average, digits = 2)
+  ),
+  "Abundance\nRatio", "log10"
+)
+
+figure5$plotRD <- plotTextHeatmap(
+  figure5$dataOverallSummary |> tidytable::filter(
+    Metric == "Richness"
+  ) |> tidytable::pivot_wider(
+    names_from = Time, values_from = Average
+  ) |> tidytable::rename(
+    "Initial" = `Time 0`
+  ) |> tidytable::mutate(
+    Emphasis = Intervention %in% figure5$emphasise,
+    tidytable::across(
+      tidytable::contains("t = "),
+      function(x, init) signif(x - init, digits = 2),
+      init = Initial
+    )
+  ) |> tidytable::pivot_longer(
+    names_to = "Time", values_to = "Average", # Works because division by same
+    # number in both fractions, so we can rearrange numerators for equiv.
+    cols = tidytable::contains("t = ")
+  ) |> tidytable::mutate( # Fix ordering
+    TimeString = regmatches(Time, regexpr("[0-9]+", Time)), # Extract t vals.
+    Time = factor(
+      Time,
+      levels = unique(Time)[
+        order(as.numeric(TimeString))
+        ],
+      ordered = TRUE
+    )
+  ),
+  "Richness\nDifference"
+) + colorspace::scale_fill_continuous_diverging(
+  palette = "Green-Brown", mid = 0
+)
+
+figure5$plotAD <- plotTextHeatmap(
+  figure5$dataOverallSummary |> tidytable::filter(
+    Metric == "Abundance"
+  ) |> tidytable::pivot_wider(
+    names_from = Time, values_from = Average
+  ) |> tidytable::rename(
+    "Initial" = `Time 0`
+  ) |> tidytable::mutate(
+    Emphasis = Intervention %in% figure5$emphasise,
+    tidytable::across(
+      tidytable::contains("t = "),
+      function(x, init) signif(x - init, digits = 2),
+      init = Initial
+    )
+  ) |> tidytable::pivot_longer(
+    names_to = "Time", values_to = "Average", # Works because division by same
+    # number in both fractions, so we can rearrange numerators for equiv.
+    cols = tidytable::contains("t = ")
+  ) |> tidytable::mutate( # Fix ordering
+    TimeString = regmatches(Time, regexpr("[0-9]+", Time)), # Extract t vals.
+    Time = factor(
+      Time,
+      levels = unique(Time)[
+        order(as.numeric(TimeString))
+        ],
+      ordered = TRUE
+    )
+  ),
+  "Abundance\nDifference"
+) + colorspace::scale_fill_continuous_diverging(
+  palette = "Green-Brown", mid = 0
+)

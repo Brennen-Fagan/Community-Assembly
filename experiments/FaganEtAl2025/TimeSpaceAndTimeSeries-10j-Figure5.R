@@ -8,6 +8,7 @@ source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
 
 library(colorspace) # for diverging color scales with midpoint control.
+library(scales) # conversion to percentages
 
 figure5 <- list(
   pref = "100% 0", #"Uniform(0, 1)"
@@ -65,9 +66,9 @@ figure5$dataBase <- tidytable::bind_rows(
 ) |> tidytable::mutate(
   Metric = factor(Metric, levels = c("Alpha Hill:0", "Alpha Abundance"),
                   labels = c("Richness", "Abundance"), ordered = TRUE),
-  Time = Time - InterventionTime
+  Time = round(Time - InterventionTime, 6) # remove false differences
 ) |> tidytable::filter(
-  Time > -1000, Time < 15000,
+  Time > -1000, Time <= 16000,
   # Avoid singletons.
   abs(Time - round(Time)) < 1e-6 | Time >= 55 | Time < 0
 )
@@ -99,11 +100,20 @@ figure5$dataOverallSummary <- figure5$dataBase |> tidytable::filter(
 ) |> tidytable::summarise(
   Value = median(Value), .groups = "drop"
 ) |> tidytable::group_by(
+  # Within simulation proportions
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  PoolPatchSeed, SpeciesPreferences
+) |> tidytable::mutate(
+  Value = Value/Value[Time == 0]
+) |> tidytable::group_by(
   # Average across simulations
   Intervention, InterventionInitial, InterventionFinal, Metric,
   SpeciesPreferences, Time
 ) |> tidytable::summarise(
-  Average = mean(Value)
+  Average = mean(Value),
+  StdDev = sd(Value),
+  CI025 = quantile(Value, p = 0.025),
+  CI975 = quantile(Value, p = 0.975)
 ) |> dplyr::mutate( # Change labelling, dplyr for conversion (can't in dt)
   Time = factor(
     Time, levels = c(0, range(figure5$heatmapTimes)),
@@ -114,25 +124,9 @@ figure5$dataOverallSummary <- figure5$dataBase |> tidytable::filter(
   )
 )
 
-# Ratios need to be handled slightly differently due to consumer/basal
-# resulting in row changes.
-figure5$dataBCSummary <- figure5$dataBase |> tidytable::filter(
+figure5$dataLogScale <- figure5$dataBase |> tidytable::filter(
   Metric %in% c("Richness", "Abundance"),
-  !is.na(Subset) # Not overall values
-) |> tidytable::separate_wider_delim(
-  delim = "_", cols = Subset, names = c("Guild", "AffinityBins")
-) |> unifyAffinityBins( # if many preference types.
-) |> tidytable::group_by(
-  # Aggregate Over the AffinityBins.
-  # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
-  # simple and match each other with the seeds. More complicated set-ups
-  # will want to adjust the groupings here.
-  Intervention, InterventionInitial, InterventionFinal, Metric,
-  PoolPatchSeed, SpeciesPreferences, Guild, Time
-) |> tidytable::summarise(
-  Value = sum(Value)
-) |> tidytable::pivot_wider(
-  names_from = Guild, values_from = Value
+  is.na(Subset) # Not overall values
 ) |> tidytable::mutate(
   Time = tidytable::case_when( # Create groupings for times.
     Time < -50 ~ round(Time, -2),
@@ -141,13 +135,62 @@ figure5$dataBCSummary <- figure5$dataBase |> tidytable::filter(
     Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
     Time < 16350 ~ round(Time, -2),
     TRUE ~ Time
-  ),
-  Subset = NA,
-  Value = Consumer/Basal
+  )
 ) |> tidytable::filter(
   Time %in% c(0, figure5$heatmapTimes)
 ) |> tidytable::group_by(
   # Average Over the now grouped times to make each sim equally weighted.
+  # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
+  # simple and match each other with the seeds. More complicated set-ups
+  # will want to adjust the groupings here.
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  PoolPatchSeed, SpeciesPreferences, Time
+) |> tidytable::summarise(
+  Value = median(Value), .groups = "drop"
+) |> tidytable::group_by(
+  # Within simulation proportions
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  PoolPatchSeed, SpeciesPreferences
+) |> tidytable::mutate(
+  Value = log10(Value/Value[Time == 0]) # Both x3, x/3 same magnitude.
+) |> tidytable::group_by(
+  # Average across simulations
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  SpeciesPreferences, Time
+) |> tidytable::summarise(
+  Average = mean(Value),
+  StdDev = sd(Value),
+  CI025 = quantile(Value, p = 0.025),
+  CI975 = quantile(Value, p = 0.975)
+) |> dplyr::mutate( # Change labelling, dplyr for conversion (can't in dt)
+  Time = factor(
+    Time, levels = c(0, range(figure5$heatmapTimes)),
+    labels = c("Time 0", paste0(
+      c("Short (t = ", "Long (t = "),
+      range(figure5$heatmapTimes), ")"
+    ))
+  )
+)
+
+figure5$dataChangeInAverages <- figure5$dataBase |> tidytable::filter(
+  Metric %in% c("Richness", "Abundance"),
+  is.na(Subset) # Not overall values
+) |> tidytable::mutate(
+  Time = tidytable::case_when( # Create groupings for times.
+    Time < -50 ~ round(Time, -2),
+    Time < 0 ~ -25, # In the last bin before regime change.
+    Time <= 50 ~ round(Time, 0),
+    Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
+    Time < 16350 ~ round(Time, -2),
+    TRUE ~ Time
+  )
+) |> tidytable::filter(
+  Time %in% c(0, figure5$heatmapTimes)
+) |> tidytable::group_by(
+  # Average Over the now grouped times to make each sim equally weighted.
+  # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
+  # simple and match each other with the seeds. More complicated set-ups
+  # will want to adjust the groupings here.
   Intervention, InterventionInitial, InterventionFinal, Metric,
   PoolPatchSeed, SpeciesPreferences, Time
 ) |> tidytable::summarise(
@@ -157,7 +200,16 @@ figure5$dataBCSummary <- figure5$dataBase |> tidytable::filter(
   Intervention, InterventionInitial, InterventionFinal, Metric,
   SpeciesPreferences, Time
 ) |> tidytable::summarise(
-  Average = mean(Value)
+  Average = mean(Value),
+  StdDev = sd(Value),
+  CI025 = quantile(Value, p = 0.025),
+  CI975 = quantile(Value, p = 0.975)
+) |> tidytable::group_by(
+  # Proportions
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  SpeciesPreferences
+) |> tidytable::mutate(
+  Average = Average/Average[Time == 0]
 ) |> dplyr::mutate( # Change labelling, dplyr for conversion (can't in dt)
   Time = factor(
     Time, levels = c(0, range(figure5$heatmapTimes)),
@@ -171,7 +223,11 @@ figure5$dataBCSummary <- figure5$dataBase |> tidytable::filter(
 ##### FUNCTION: ###############################################################
 # Different Scales mean we have to separate out the data, so we define a
 # function to perform the plotting repeatedly/consistently.
-plotTextHeatmap <- function(data, legendName, legendtrans = "identity") {
+plotTextHeatmap <- function(
+  data, legendName,
+  legendtrans = "identity",
+  scalestrans = scales::label_percent(accuracy = 0.1)
+) {
   ggplot2::ggplot(
     data,
     ggplot2::aes(
@@ -185,7 +241,7 @@ plotTextHeatmap <- function(data, legendName, legendtrans = "identity") {
     data = function(x) x |> tidytable::filter(Emphasis),
     fill = NA, color = "black", linewidth = 1
   ) + ggplot2::geom_text(
-    ggplot2::aes(label = Average)
+    ggplot2::aes(label = scalestrans(Average))
   ) + ggplot2::facet_grid(
     Metric ~ Time
   ) + ggplot2::scale_fill_viridis_c(
@@ -195,6 +251,7 @@ plotTextHeatmap <- function(data, legendName, legendtrans = "identity") {
     fill = legendName,
     x = "Initial Habitat Type",
     y = "Final Habitat Type"
+  ) + ggplot2::coord_fixed(
   )
 }
 
@@ -203,158 +260,66 @@ plotTextHeatmap <- function(data, legendName, legendtrans = "identity") {
 # Richness guild Ratio, Abundance guild Ratio,
 # Richness time Difference, Abundance time Difference
 
-figure5$plotR <- plotTextHeatmap(
+figure5$plot <- plotTextHeatmap(
   figure5$dataOverallSummary |> tidytable::filter(
-    Metric == "Richness", Time != "Time 0"
+    Time != "Time 0"
   ) |> tidytable::mutate(
-    Emphasis = Intervention %in% figure5$emphasise,
-    Average = signif(Average, digits = 2)
+    Emphasis = Intervention %in% figure5$emphasise
   ),
-  "Richness"
-)
-figure5$plotRR <- plotTextHeatmap(
-  figure5$dataBCSummary |> tidytable::filter(
-    Metric == "Richness", Time != "Time 0"
-  ) |> tidytable::mutate(
-    Emphasis = Intervention %in% figure5$emphasise,
-    Average = signif(Average, digits = 2)
-  ),
-  "Richness\nRatio"
-)
-figure5$plotA <- plotTextHeatmap(
-  figure5$dataOverallSummary |> tidytable::filter(
-    Metric == "Abundance", Time != "Time 0"
-  ) |> tidytable::mutate(
-    Emphasis = Intervention %in% figure5$emphasise,
-    Average = signif(Average, digits = 2)
-  ),
-  "Abundance", "log10"
-)
-figure5$plotAR <- plotTextHeatmap(
-  figure5$dataBCSummary |> tidytable::filter(
-    Metric == "Abundance", Time != "Time 0"
-  ) |> tidytable::mutate(
-    Emphasis = Intervention %in% figure5$emphasise,
-    Average = signif(Average, digits = 2)
-  ),
-  "Abundance\nRatio", "log10"
-)
-
-
-figure5$plotRD <- plotTextHeatmap(
-  figure5$dataOverallSummary |> tidytable::filter(
-    Metric == "Richness"
-  ) |> tidytable::pivot_wider(
-    names_from = Time, values_from = Average
-  ) |> tidytable::rename(
-    "Initial" = `Time 0`
-  ) |> tidytable::mutate(
-    Emphasis = Intervention %in% figure5$emphasise,
-    tidytable::across(
-      tidytable::contains("t = "),
-      function(x, init) signif(x - init, digits = 2),
-      init = Initial
-    )
-  ) |> tidytable::pivot_longer(
-    names_to = "Time", values_to = "Average", # Works because division by same
-    # number in both fractions, so we can rearrange numerators for equiv.
-    cols = tidytable::contains("t = ")
-  ) |> tidytable::mutate( # Fix ordering
-    TimeString = regmatches(Time, regexpr("[0-9]+", Time)), # Extract t vals.
-    Time = factor(
-      Time,
-      levels = unique(Time)[
-        order(as.numeric(TimeString))
-        ],
-      ordered = TRUE
-    )
-  ),
-  "Richness\nDifference"
+  "Avg. Percentage Change"#, "log10"
 ) + colorspace::scale_fill_continuous_diverging(
-  palette = "Green-Brown", mid = 0
+  palette = "Blue-Yellow 3", mid = 1
+  #mid = log10(1), transform = "log10"
+  # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
 )
 
-figure5$plotAD <- plotTextHeatmap(
+figure5$plotSD <- plotTextHeatmap(
   figure5$dataOverallSummary |> tidytable::filter(
-    Metric == "Abundance"
-  ) |> tidytable::pivot_wider(
-    names_from = Time, values_from = Average
-  ) |> tidytable::rename(
-    "Initial" = `Time 0`
+    Time != "Time 0"
   ) |> tidytable::mutate(
     Emphasis = Intervention %in% figure5$emphasise,
-    tidytable::across(
-      tidytable::contains("t = "),
-      function(x, init) signif(x - init, digits = 2),
-      init = Initial
-    )
-  ) |> tidytable::pivot_longer(
-    names_to = "Time", values_to = "Average", # Works because division by same
-    # number in both fractions, so we can rearrange numerators for equiv.
-    cols = tidytable::contains("t = ")
-  ) |> tidytable::mutate( # Fix ordering
-    TimeString = regmatches(Time, regexpr("[0-9]+", Time)), # Extract t vals.
-    Time = factor(
-      Time,
-      levels = unique(Time)[
-        order(as.numeric(TimeString))
-        ],
-      ordered = TRUE
-    )
+    Average = signif(StdDev, digits = 2)
   ),
-  "Abundance\nDifference"
+  "Std. Dev.", scalestrans = identity
 ) + colorspace::scale_fill_continuous_diverging(
-  palette = "Green-Brown", mid = 0
+  palette = "Blue-Yellow 3", mid = log10(1), transform = "log10"
+  # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
 )
 
-
-##### Combine: ################################################################
-figure5$plotRichness <- ggpubr::ggarrange(
-  plotlist = list(
-    figure5$plotR,
-    figure5$plotRR
-  ), nrow = 2
-)
-figure5$plotSupplement <- ggpubr::ggarrange(
-  plotlist = list(
-    figure5$plotA,
-    figure5$plotAR
-  ), nrow = 2
+figure5$plotLog <- plotTextHeatmap(
+  figure5$dataLogScale |> tidytable::filter(
+    Time != "Time 0"
+  ) |> tidytable::mutate(
+    Emphasis = Intervention %in% figure5$emphasise,
+    Average = 10^Average
+  ),
+  "Percentage Change of Avg."
+) + colorspace::scale_fill_continuous_diverging(
+  palette = "Blue-Yellow 3", mid = log10(1), transform = "log10"
+  # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
 )
 
+figure5$plotAvg <- plotTextHeatmap(
+  figure5$dataChangeInAverages |> tidytable::filter(
+    Time != "Time 0"
+  ) |> tidytable::mutate(
+    Emphasis = Intervention %in% figure5$emphasise
+  ),
+  "Percentage Change of Avg."
+) + colorspace::scale_fill_continuous_diverging(
+  palette = "Blue-Yellow 3", mid = log10(1), transform = "log10"
+  # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
+)
+
 ggplot2::ggsave(
-  plot = figure5$plotRichness,
-  filename = file.path(dirImages, "Figure5_Prototype4.pdf"),
-  units = "cm", width = 6.5*3, height = 6.5*2)
+  plot = figure5$plot,
+  filename = file.path(dirImages, "Figure5_Prototype5.pdf"),
+  units = "cm", width = 6.5*4, height = 6.5*3)
 ggplot2::ggsave(
-  plot = figure5$plotRichness,
-  filename = file.path(dirImages, "Figure5_Prototype4.png"),
-  units = "cm", width = 6.5*3, height = 6.5*2)
+  plot = figure5$plot,
+  filename = file.path(dirImages, "Figure5_Prototype5.png"),
+  units = "cm", width = 6.5*4, height = 6.5*3)
 ggplot2::ggsave(
-  plot = figure5$plotSupplement,
-  filename = file.path(dirImages, "Figure5S_Prototype4.pdf"),
-  units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(
-  plot = figure5$plotR,
-  filename = file.path(dirImages, "Figure5R_Prototype4.pdf"),
-  units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(
-  plot = figure5$plotRR,
-  filename = file.path(dirImages, "Figure5RR_Prototype4.pdf"),
-  units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(
-  plot = figure5$plotA,
-  filename = file.path(dirImages, "Figure5A_Prototype4.pdf"),
-  units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(
-  plot = figure5$plotAR,
-  filename = file.path(dirImages, "Figure5AR_Prototype4.pdf"),
-  units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(
-  plot = figure5$plotAD,
-  filename = file.path(dirImages, "Figure5AD_Prototype4.pdf"),
-  units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(
-  plot = figure5$plotRD,
-  filename = file.path(dirImages, "Figure5RD_Prototype4.pdf"),
-  units = "cm", width = 6.5*3, height = 6.5*2)
+  plot = figure5$plotSD,
+  filename = file.path(dirImages, "Figure5SD_Prototype5.pdf"),
+  units = "cm", width = 6.5*4, height = 6.5*3)
