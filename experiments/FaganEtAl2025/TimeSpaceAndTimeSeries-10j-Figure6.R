@@ -6,7 +6,6 @@
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsPersistence.R")
-library(ggbreak)
 
 # This is better as an environment, but that's more opaque.
 figure6 <- list(
@@ -83,8 +82,6 @@ figure6$plotA <- plotMeanAndInner(
   ylim = c(0, richnessYMax)
 ) + ggplot2::scale_x_continuous(
   breaks = (0:3)*10000
-) + ggbreak::scale_x_break(
-  c(5000, 20000), expand = FALSE
 )
 
 ##### b: Violins ##############################################################
@@ -227,7 +224,7 @@ figure6$insetC <- ggplot2::ggplot(
 ##### Combine: ################################################################
 figure6$plot <- ggpubr::ggarrange(
   plotlist = list(
-    print(figure6$plotA), # github.com/YuLab-SMU/ggbreak/issues/36 to fix.
+    figure6$plotA,
     ggpubr::ggarrange(
       plotlist = list(
         figure6$plotB + ggplot2::annotation_custom(
