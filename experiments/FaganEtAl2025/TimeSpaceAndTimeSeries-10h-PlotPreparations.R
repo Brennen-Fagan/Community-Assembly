@@ -67,9 +67,14 @@ byrow = TRUE, nrow = 5)
 colorPalette %assign% sapply(interventionMatrix, colorPaletteAlg)
 
 linetypePalette %assign% c(
+  # Internal Aliases
   "100% 0" = "solid",
   "50% 0, 50% 1" = "longdash",
-  "Uniform(0, 1)" = "dotdash"
+  "Uniform(0, 1)" = "dotdash",
+  # Paper Aliases
+  "1 Adaptation Type" = "solid",
+  "2 Adaptation Types" = "longdash",
+  "Multiple Adaptation Types" = "dotdash"
 )
 
 ### renames: ##################################################################
