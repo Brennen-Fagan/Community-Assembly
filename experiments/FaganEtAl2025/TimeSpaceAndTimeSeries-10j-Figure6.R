@@ -6,6 +6,11 @@
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsPersistence.R")
+source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
+
+library(cowplot) # plot arrangement with pagination (ggarrange).
+library(tibble) # data.frames that can incorporate grobs.
+library(ggpp) # for the geom_grob function -> factor placement of grobs.
 
 # This is better as an environment, but that's more opaque.
 figure6 <- list(
@@ -22,6 +27,14 @@ figure6$dataRich <- diversitiesRichness |> tidytable::filter(
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
   PoolPatchSeed %in% basePoolPatchSeeds,
   Metric == "Alpha Hill:0",
+  is.na(Subset)
+)
+figure6$dataAbund <- diversitiesAbund |> tidytable::filter(
+  SpeciesPreferences %in% figure6$pref,
+  NicheDistance == defaultNicheDistance,
+  Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
+  PoolPatchSeed %in% basePoolPatchSeeds,
+  Metric == "Alpha Abundance",
   is.na(Subset)
 )
 
@@ -68,7 +81,14 @@ figure6$plotA <- plotMeanAndInner(
     ) |> tidytable::mutate(
       Value = 10 # coord_cartesian will eliminate these points.
     )
-  ), CIs = 0.75, facets = as.formula(SpeciesPreferences ~ .)
+  ) |> tidytable::mutate(
+    SpeciesPreferences = tidytable::case_when(
+      SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
+      SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
+      SpeciesPreferences == "Uniform(0, 1)" ~ "Multiple Adaptation Types",
+      TRUE ~ SpeciesPreferences
+    )
+  ), CIs = 0.75
 ) + ggplot2::labs(
   y = "Richness"
 ) + ggplot2::guides(
@@ -79,15 +99,17 @@ figure6$plotA <- plotMeanAndInner(
   legend.position = c(0.5, 0.09),
   plot.tag.position = c(0.025, 0.95)
 ) + ggplot2::coord_cartesian(
-  ylim = c(0, richnessYMax)
+  ylim = c(0, 30), expand = FALSE
 ) + ggplot2::scale_x_continuous(
   breaks = (0:3)*10000
+) + ggplot2::facet_grid(
+  switch = "y", rows = ggplot2::vars(SpeciesPreferences)
 )
 
 ##### b: Violins ##############################################################
 figure6$plotB <- ggplot2::ggplot(
   figure6$dataRich |> tidytable::filter(
-    Time > Start, Time < Stop, SpeciesPreferences == "50% 0, 50% 1"
+    Time > Start, Time < Stop
   ) |> tidytable::group_by(
     PoolPatchSeed, Intervention, SpeciesPreferences
   ) |> tidytable::summarise(
@@ -107,27 +129,29 @@ figure6$plotB <- ggplot2::ggplot(
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat Type"
+) + ggplot2::scale_y_continuous(
+  breaks = c(0, 10, 20, 30)
+) + ggplot2::coord_cartesian(
+  ylim = c(0, 30), expand = FALSE
+) + ggplot2::facet_grid(
+  SpeciesPreferences ~ .
 ) + ggplot2::theme_minimal(
 ) + ggplot2::theme(
   plot.tag.position = c(0.01, 1),
-  panel.grid.minor = ggplot2::element_blank()
+  panel.grid.minor = ggplot2::element_blank(),
+  strip.background = ggplot2::element_blank(),
+  strip.text = ggplot2::element_blank()
 ) + ggplot2::labs(
-  y = "Avg. Richness",
+  y = "Richness",
   x = "Habitat Type"
 ) + ggplot2::guides(
   color = "none",
   fill = "none"
-) + ggplot2::scale_y_continuous(
-  breaks = c(0, 10, 20, 30)
-) + ggplot2::coord_cartesian(
-  ylim = c(0, richnessYMax), expand = FALSE
-) + ggplot2::facet_grid(
-  SpeciesPreferences ~ .
 )
 
 figure6$plotC <- ggplot2::ggplot(
-  figure6$dataRich |> tidytable::filter(
-    Time > Start, Time < Stop, SpeciesPreferences == "Uniform(0, 1)"
+  figure6$dataAbund |> tidytable::filter(
+    Time > Start, Time < Stop
   ) |> tidytable::group_by(
     PoolPatchSeed, Intervention, SpeciesPreferences
   ) |> tidytable::summarise(
@@ -147,95 +171,183 @@ figure6$plotC <- ggplot2::ggplot(
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat Type"
+) + ggplot2::facet_grid(
+  SpeciesPreferences ~ .
 ) + ggplot2::theme_minimal(
 ) + ggplot2::theme(
   plot.tag.position = c(0.01, 1),
-  panel.grid.minor = ggplot2::element_blank()
+  panel.grid.minor = ggplot2::element_blank(),
+  strip.background = ggplot2::element_blank(),
+  strip.text = ggplot2::element_blank()
 ) + ggplot2::labs(
-  y = "Avg. Richness",
+  y = "Abundance",
   x = "Habitat Type"
 ) + ggplot2::guides(
   color = "none",
   fill = "none"
-) + ggplot2::scale_y_continuous(
-  breaks = c(0, 10, 20, 30)
 ) + ggplot2::coord_cartesian(
-  ylim = c(0, richnessYMax), expand = FALSE
-) + ggplot2::facet_grid(
-  SpeciesPreferences ~ .
+  ylim = c(0, NA)
 )
 
-##### b: Insets ###############################################################
-figure6$insetB <- ggplot2::ggplot(
-  # Aggregate and normalise weights so that better correspond to probabilities,
-  # see line 29.
-  figure6$dataPers |> tidytable::filter(
-    SpeciesPreferences == "50% 0, 50% 1"
-  ) |> tidytable::group_by(
-    Intervention, AffinityBins
-  ) |> tidytable::summarise(
-    Persistence = sum(Persistence)
-  ) |> tidytable::group_by(
-    Intervention
-  ) |> tidytable::mutate(
-    Persistence = Persistence / sum(Persistence)
-  ),
-  ggplot2::aes(
-    x = AffinityBins,
-    y = Persistence,
-    fill = Intervention
+
+##### c: Insets ###############################################################
+figure6$insetGrobs <- figure6$dataPers |> tidytable::filter(
+  # Match A
+  Intervention %in% c("(0)", "(0.5)", "(1)")
+) |> tidytable::mutate(
+  SpeciesPreferences = tidytable::case_when(
+    SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
+    SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
+    SpeciesPreferences == "Uniform(0, 1)" ~ "Multiple Adaptation Types",
+    TRUE ~ SpeciesPreferences
   )
-) + ggplot2::geom_col(
-  show.legend = FALSE
-) + ggplot2::facet_grid(
-  . ~ Intervention
-) + ggplot2::scale_color_manual(
-  values = colorPalette, aesthetics = c("color", "fill"),
-  name = "Habitat Type"
-) + ggplot2::theme_void(
-) + ggplot2::theme(
-  panel.background = ggplot2::element_rect(fill = "white")
-) + ggplot2::coord_cartesian(
-  expand = FALSE, ylim = c(0, 1)
-)
-figure6$insetC <- ggplot2::ggplot(
-  figure6$dataPers |> tidytable::filter(SpeciesPreferences == "Uniform(0, 1)"),
-  ggplot2::aes(
-    x = Affinity,
-    weight = Persistence,
-    fill = Intervention,
-    group = Intervention
-  )
-) + ggplot2::geom_density(
-  adjust = 1/2,
-  show.legend = FALSE
-) + ggplot2::facet_grid(
-  . ~ Intervention
-) + ggplot2::scale_color_manual(
-  values = colorPalette, aesthetics = c("color", "fill"),
-  name = "Habitat Type"
-) + ggplot2::theme_void(
-) + ggplot2::theme(
-  panel.background = ggplot2::element_rect(fill = "white")
-) + ggplot2::coord_cartesian(
-  expand = FALSE
+) |> dplyr::group_by(
+  SpeciesPreferences, Intervention
+) |> dplyr::group_modify(
+  .f = function(data, key) {
+    if (key$SpeciesPreferences == "2 Adaptation Types") {
+      # Image:
+      tibblegrob <- tibble::tibble(
+        grob = list(
+          (
+            dplyr::bind_cols(data, key) |> tidytable::group_by(
+              Intervention, AffinityBins, SpeciesType
+            ) |> tidytable::summarise(
+              Persistence = sum(Persistence)
+            ) |> tidytable::group_by(
+              Intervention
+            ) |> tidytable::mutate(
+              Persistence = Persistence / sum(Persistence)
+            ) |> ggplot2::ggplot(
+              mapping = ggplot2::aes(
+                x = AffinityBins,
+                y = Persistence,
+                color = Intervention,
+                fill = factor(SpeciesType, ordered = TRUE,
+                              levels = c("Consumer", "Basal"))
+              )
+            ) + ggplot2::geom_col(
+              show.legend = FALSE
+            ) + ggplot2::facet_grid(
+              . ~ Intervention
+            ) + ggplot2::scale_color_manual(
+              values = colorPalette,
+              name = "Habitat Type"
+            ) + ggplot2::scale_fill_manual(
+              values = c("Basal" = "darkgreen", "Consumer" = "burlywood4")
+            ) + ggplot2::theme_void(
+            ) + ggplot2::theme(
+              plot.background = ggplot2::element_rect(fill = "white",
+                                                      color = "white"),
+              panel.background = ggplot2::element_rect(fill = "white")
+            ) + ggplot2::coord_cartesian(
+              expand = FALSE, ylim = c(0, 1)
+            )
+          ) |> ggplot2::ggplotGrob()
+        )
+      )
+
+      # Coordinates:
+      if (key$Intervention == "(0)") {
+        tibbleplace <- tibble::tibble(
+          Time = 7500, Value = 2.5
+        )
+      } else if (key$Intervention == "(0.25)") {
+        tibbleplace <- tibble::tibble(
+          Time = 12500, Value = 2.5
+        )
+      } else if (key$Intervention == "(0.5)") {
+        tibbleplace <- tibble::tibble(
+          Time = 17500, Value = 2.5
+        )
+      } else if (key$Intervention == "(0.75)") {
+        tibbleplace <- tibble::tibble(
+          Time = 22500, Value = 2.5
+        )
+      } else if (key$Intervention == "(1)") {
+        tibbleplace <- tibble::tibble(
+          Time = 27500, Value = 2.5
+        )
+      }
+    } else if (key$SpeciesPreferences == "Multiple Adaptation Types") {
+      # Image:
+      tibblegrob <- tibble::tibble(
+        grob = list(
+          (
+            dplyr::bind_cols(data, key) |> ggplot2::ggplot(
+              mapping = ggplot2::aes(
+                x = Affinity,
+                weight = Persistence,
+                fill = factor(SpeciesType, ordered = TRUE,
+                              levels = c("Consumer", "Basal")),
+                # group = interaction(Intervention, SpeciesType),
+                color = Intervention
+              )
+            ) + ggplot2::geom_density(
+              position = "stack",
+              adjust = 1/2, linewidth = 0.5,
+              show.legend = FALSE
+            ) + ggplot2::facet_grid(
+              . ~ Intervention
+            ) + ggplot2::scale_color_manual(
+              values = colorPalette,
+              name = "Habitat Type"
+            ) + ggplot2::scale_fill_manual(
+              values = c("Basal" = "darkgreen", "Consumer" = "burlywood4")
+            ) + ggplot2::theme_void(
+            ) + ggplot2::theme(
+              plot.background = ggplot2::element_rect(fill = "white",
+                                                      color = "white"),
+              panel.background = ggplot2::element_rect(fill = "white")
+            ) + ggplot2::coord_cartesian(
+              expand = FALSE
+            )
+          ) |> ggplot2::ggplotGrob()
+        )
+      )
+
+      # Coordinates:
+      if (key$Intervention == "(0)") {
+        tibbleplace <- tibble::tibble(
+          Time = 7500, Value = 22.5
+        )
+      } else if (key$Intervention == "(0.25)") {
+        tibbleplace <- tibble::tibble(
+          Time = 12500, Value = 22.5
+        )
+      } else if (key$Intervention == "(0.5)") {
+        tibbleplace <- tibble::tibble(
+          Time = 17500, Value = 22.5
+        )
+      } else if (key$Intervention == "(0.75)") {
+        tibbleplace <- tibble::tibble(
+          Time = 22500, Value = 22.5
+        )
+      } else if (key$Intervention == "(1)") {
+        tibbleplace <- tibble::tibble(
+          Time = 27500, Value = 22.5
+        )
+      }
+    }
+
+    tibblegrob <- dplyr::bind_cols(tibblegrob, tibbleplace)
+
+    return(tibblegrob)
+  }
 )
 
 ##### Combine: ################################################################
 figure6$plot <- ggpubr::ggarrange(
   plotlist = list(
-    figure6$plotA,
-    ggpubr::ggarrange(
+    figure6$plotA + ggpp::geom_grob(
+      data = figure6$insetGrobs,
+      mapping = ggplot2::aes(x = Time, y = Value, label = grob)
+    ),
+    cowplot::plot_grid(
       plotlist = list(
-        figure6$plotB + ggplot2::annotation_custom(
-          ggplot2::ggplotGrob(figure6$insetB),
-          xmin = 0.55, xmax = 5.45, ymin = 32, ymax = richnessYMax
-        ),
-        figure6$plotC + ggplot2::annotation_custom(
-          ggplot2::ggplotGrob(figure6$insetC),
-          xmin = 0.55, xmax = 5.45, ymin = 32, ymax = richnessYMax
-        )
-      ), ncol = 1
+        figure6$plotB,
+        figure6$plotC
+      ), ncol = 2
     )
   ),
   nrow = 1, common.legend = TRUE
