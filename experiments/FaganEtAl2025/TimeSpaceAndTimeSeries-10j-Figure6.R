@@ -294,6 +294,7 @@ figure6$plotC <- ggplot2::ggplot(
   color = "none",
   fill = "none"
 ) + scale_y_log10(
+  label = scales::label_log()
 )
 
 ##### c: Insets ###############################################################

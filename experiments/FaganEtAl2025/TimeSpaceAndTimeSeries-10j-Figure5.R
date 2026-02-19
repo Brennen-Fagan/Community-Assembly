@@ -189,7 +189,7 @@ plotTextHeatmap <- function(
   ) + ggplot2::facet_grid(
     Metric ~ Time
   ) + ggplot2::scale_fill_viridis_c(
-    transform = legendtrans, begin = 0.1
+    transform = legendtrans, begin = 0.1, labels = scalestrans
   ) + ggplot2::theme_minimal(
   ) + ggplot2::labs(
     fill = legendName,
@@ -210,7 +210,8 @@ figure5$plot <- plotTextHeatmap(
   ),
   ""
 ) + colorspace::scale_fill_continuous_diverging(
-  palette = "Blue-Yellow 3", mid = log10(1), transform = "log10"
+  palette = "Blue-Yellow 3", mid = log10(1), transform = "log10",
+  labels = scales::label_percent(accuracy = 0.1)
   # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
 )
 
@@ -223,7 +224,8 @@ figure5$plotB <- plotTextHeatmap(
   ),
   "Basal"
 ) + colorspace::scale_fill_continuous_diverging(
-  palette = "Blue-Yellow 3", mid = log10(1), transform = "log10"
+  palette = "Blue-Yellow 3", mid = log10(1), transform = "log10",
+  labels = scales::label_percent(accuracy = 0.1)
   # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
 )
 
@@ -236,7 +238,8 @@ figure5$plotC <- plotTextHeatmap(
   ),
   "Consumer"
 ) + colorspace::scale_fill_continuous_diverging(
-  palette = "Blue-Yellow 3", mid = log10(1), transform = "log10"
+  palette = "Blue-Yellow 3", mid = log10(1), transform = "log10",
+  labels = scales::label_percent(accuracy = 0.1)
   # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
 )
 
