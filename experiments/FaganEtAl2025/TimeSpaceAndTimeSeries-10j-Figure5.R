@@ -1,287 +1,485 @@
 # Setup: ######################################################################
-# Plot of the effects of intervention overall as a set of heatmaps.
-# Quite a bit of reproduction of effort from Figure 4, but for a different
-# set of data.
+# Plot of Richness as a function of species preferences and land-use,
+# when species preferences are 100% 0.
+# Also functinally an overview plot of network structure.
 
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
+source("TimeSpaceAndTimeSeries-10i-PreparationsPersistence.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
 
-library(colorspace) # for diverging color scales with midpoint control.
-library(scales) # conversion to percentages
+library(cowplot) # plot arrangement with pagination (ggarrange).
+library(tibble) # data.frames that can incorporate grobs.
+library(ggpp) # for the geom_grob function -> factor placement of grobs.
 
-figure4 <- list(
-  pref = "100% 0", #"Uniform(0, 1)"
-  heatmapTimes = c(10, 10000),
-  emphasise = c("(0.5)", "(0.5)->(0)", "(0.5)->(1)")
+# This is better as an environment, but that's more opaque.
+figure5 <- list(
+  pref = c("Uniform(0, 1)", "50% 0, 50% 1")
 )
 
 # Main Plots: #################################################################
-### Plot 5: ###################################################################
+### Plot 6: ###################################################################
 ##### Data: ###################################################################
-
-# Interventions store the time right before intervention, then the
-# time of the intervention itself. Retrieve this second time.
-# Note it is per-simulation (timescale set by PoolPatch effectively).
-# (If done correctly, the set-up as of 23/01/2026 means there will be
-# round numbers from 1:10, evens from 12:20, and then by 3s 20:50.)
-figure4$interventionTimes <- diversitiesRichness |> tidytable::filter(
-  SpeciesPreferences == figure4$pref,
+# Richness data: should be straightforward.
+figure5$dataRich <- diversitiesRichness |> tidytable::filter(
+  SpeciesPreferences %in% figure5$pref,
   NicheDistance == defaultNicheDistance,
+  Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
   PoolPatchSeed %in% basePoolPatchSeeds,
-  Metric == "Alpha Hill:0",
-  is.na(Subset), # Won't matter, so less data
-  InterventionInitial != InterventionFinal
-) |> tidytable::select(
-  PoolPatch, PoolPatchSeed, Time
+  Metric == "Alpha Hill:0"
+)
+figure5$dataAbund <- diversitiesAbund |> tidytable::filter(
+  SpeciesPreferences %in% figure5$pref,
+  NicheDistance == defaultNicheDistance,
+  Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
+  PoolPatchSeed %in% basePoolPatchSeeds,
+  Metric == "Alpha Abundance"
+)
+
+# Persistence data: why? Because we're using persistence as a weight, followed
+# with by species aggregation. That way approximately we are picking a random
+# simulation, a random time, and then a random species, the plot shows the
+# probability we would get a certain land-use preference out.
+figure5$dataPers <- Pers |> tidytable::filter(
+  SpeciesPreferences %in% figure5$pref,
+  NicheDistance == defaultNicheDistance,
+  Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
+  PoolPatchSeed %in% basePoolPatchSeeds
+) |> tidytable::filter(
+  In < Stop, Out > Start # Not things outside of [Start, Stop]
+) |> tidytable::mutate(
+  # Shorten intervals for equivalent comparisons.
+  InType = ifelse(In < Start, "Persistent", InType),
+  OutType = ifelse(Out > Stop, "Persistent", OutType),
+  In = ifelse(In < Start, Start, In),
+  Out = ifelse(Out > Stop, Stop, Out),
+  Persistence = Out - In
 ) |> tidytable::group_by(
-  PoolPatch, PoolPatchSeed
-) |> tidytable::summarise(
-  Time = min(
-    Time[round(Time, 6)!=round(min(Time), 6)]
-  ), # Not min(Time) but the next time.
+  Species, Environment, SpeciesType, Size, ReproductionRate, Speed,
+  Affinity, AffinityBins,
+  PoolPatch:InterventionNicheDistance,
+  Intervention, SpeciesPreferences, Start, Stop
+) |> tidytable::summarise( # Sum over Appearances.
+  Persistence = sum(Persistence),
   .groups = "drop"
 )
 
-figure4$dataBase <- tidytable::bind_rows(
-  diversitiesRichness |> tidytable::filter(
-    SpeciesPreferences == figure4$pref,
-    NicheDistance == defaultNicheDistance,
-    PoolPatchSeed %in% basePoolPatchSeeds,
-    Metric == "Alpha Hill:0"
-    # Need all subsets
-  ),
-  diversitiesAbund |> tidytable::filter(
-    SpeciesPreferences == figure4$pref,
-    NicheDistance == defaultNicheDistance,
-    PoolPatchSeed %in% basePoolPatchSeeds,
-    Metric == "Alpha Abundance"
-    # Need all subsets
-  )
-) |> tidytable::left_join(
-  figure4$interventionTimes |> tidytable::rename(
-    InterventionTime = Time
-  ),
-  by = c("PoolPatch", "PoolPatchSeed")
-) |> tidytable::mutate(
-  Metric = factor(Metric, levels = c("Alpha Hill:0", "Alpha Abundance"),
-                  labels = c("Richness", "Abundance"), ordered = TRUE),
-  Time = round(Time - InterventionTime, 6) # remove false differences
-) |> tidytable::filter(
-  Time > -1000, Time <= 16000,
-  # Avoid singletons.
-  abs(Time - round(Time)) < 1e-6 | Time >= 55 | Time < 0
-)
-
-# Why to the level of summary? Because the PlotMeanAndInner function
-# isn't built to handle the multiple resolutions that we have in the
-# actual data, which makes it harder to portray the data accurately.
-figure4$dataLogScale <- figure4$dataBase |> tidytable::filter(
-  Metric %in% c("Richness", "Abundance")#,
-  # is.na(Subset) # Not overall values
-) |> tidytable::mutate(
-  Time = tidytable::case_when( # Create groupings for times.
-    Time < -50 ~ round(Time, -2),
-    Time < 0 ~ -25, # In the last bin before regime change.
-    Time <= 50 ~ round(Time, 0),
-    Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
-    Time < 16350 ~ round(Time, -2),
-    TRUE ~ Time
-  )
-) |> tidytable::filter(
-  Time %in% c(0, figure4$heatmapTimes)
-) |> tidytable::group_by(
-  # Average Over the now grouped times to make each sim equally weighted.
-  # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
-  # simple and match each other with the seeds. More complicated set-ups
-  # will want to adjust the groupings here.
-  Intervention, InterventionInitial, InterventionFinal, Metric, Subset,
-  PoolPatchSeed, SpeciesPreferences, Time
-) |> tidytable::summarise(
-  Value = median(Value), .groups = "drop"
-) |> tidytable::group_by(
-  # Within simulation proportions
-  Intervention, InterventionInitial, InterventionFinal, Metric, Subset,
-  PoolPatchSeed, SpeciesPreferences
-) |> tidytable::mutate(
-  Value = log10(Value/Value[Time == 0]) # Both x3, x/3 same magnitude.
-) |> tidytable::group_by(
-  # Average across simulations
-  Intervention, InterventionInitial, InterventionFinal, Metric, Subset,
-  SpeciesPreferences, Time
-) |> tidytable::summarise(
-  Average = 10^mean(Value),
-  StdDev = sd(Value),
-  CI025 = 10^quantile(Value, p = 0.025, na.rm = TRUE), # Some subsets
-  CI975 = 10^quantile(Value, p = 0.975, na.rm = TRUE), # have x/0.
-  .groups = "drop"
-) |> dplyr::mutate( # Change labelling, dplyr for conversion (can't in dt)
-  Time = factor(
-    Time, levels = c(0, range(figure4$heatmapTimes)),
-    labels = c("Time 0", paste0(
-      c("Short (t = ", "Long (t = "),
-      range(figure4$heatmapTimes), ")"
-    ))
-  )
-)
-
-figure4$dataRawValues <- figure4$dataBase |> tidytable::filter(
-  Metric %in% c("Richness", "Abundance"),
-  is.na(Subset) # Not overall values
-) |> tidytable::mutate(
-  Time = tidytable::case_when( # Create groupings for times.
-    Time < -50 ~ round(Time, -2),
-    Time < 0 ~ -25, # In the last bin before regime change.
-    Time <= 50 ~ round(Time, 0),
-    Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
-    Time < 16350 ~ round(Time, -2),
-    TRUE ~ Time
-  )
-) |> tidytable::filter(
-  Time %in% c(0, figure4$heatmapTimes)
-) |> tidytable::group_by(
-  # Average Over the now grouped times to make each sim equally weighted.
-  # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
-  # simple and match each other with the seeds. More complicated set-ups
-  # will want to adjust the groupings here.
-  Intervention, InterventionInitial, InterventionFinal, Metric,
-  PoolPatchSeed, SpeciesPreferences, Time
-) |> tidytable::summarise(
-  Value = median(Value), .groups = "drop"
-) |> tidytable::group_by(
-  # Average across simulations
-  Intervention, InterventionInitial, InterventionFinal, Metric,
-  SpeciesPreferences, Time
-) |> tidytable::summarise(
-  Average = mean(Value)
-) |> dplyr::mutate( # Change labelling, dplyr for conversion (can't in dt)
-  Time = factor(
-    Time, levels = c(0, range(figure4$heatmapTimes)),
-    labels = c("Time 0", paste0(
-      c("Short (t = ", "Long (t = "),
-      range(figure4$heatmapTimes), ")"
-    ))
-  )
-)
-
-##### FUNCTION: ###############################################################
-# Different Scales mean we have to separate out the data, so we define a
-# function to perform the plotting repeatedly/consistently.
-plotTextHeatmap <- function(
-  data, legendName,
-  legendtrans = "identity",
-  scalestrans = scales::label_percent(accuracy = 0.1)
-) {
-  ggplot2::ggplot(
-    data,
-    ggplot2::aes(
-      x = InterventionInitial,
-      y = InterventionFinal,
-      fill = Average
+##### a: ######################################################################
+# Richness through time across simulations, showing stability and separation.
+figure5$plotA <- plotMeanAndInner(
+  rbind(
+    figure5$dataRich |> tidytable::filter(
+      Intervention %in% c("(0)", "(0.5)", "(1)"),
+      is.na(Subset)
+    ),
+    # We want to appear in the legend but not on the plot!
+    figure5$dataRich |> tidytable::filter(
+      PoolPatchSeed == figure5$dataRich$PoolPatchSeed[1],
+      Intervention %in% c("(0.25)", "(0.75)"),
+      abs(Time - 10000) == min(abs(Time - 10000)),
+      is.na(Subset)
+    ) |> tidytable::mutate(
+      Value = 10 # coord_cartesian will eliminate these points.
     )
-  ) + ggplot2::geom_tile(
-    width = 1, height = 1, color = NA
-  ) + ggplot2::geom_tile(
-    data = function(x) x |> tidytable::filter(Emphasis),
-    fill = NA, color = "black", linewidth = 1
-  ) + ggplot2::geom_text(
-    ggplot2::aes(label = scalestrans(Average))
-  ) + ggplot2::facet_grid(
-    Metric ~ Time
-  ) + ggplot2::scale_fill_viridis_c(
-    transform = legendtrans, begin = 0.1, labels = scalestrans
-  ) + ggplot2::theme_minimal(
-  ) + ggplot2::labs(
-    fill = legendName,
-    x = "Initial Habitat Type",
-    y = "Final Habitat Type"
-  ) + ggplot2::coord_fixed(
+  ) |> tidytable::mutate(
+    SpeciesPreferences = tidytable::case_when(
+      SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
+      SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
+      SpeciesPreferences == "Uniform(0, 1)" ~ "Multiple Adaptation Types",
+      TRUE ~ SpeciesPreferences
+    )
+  ), CIs = 0.75
+) + ggplot2::labs(
+  y = "Richness"
+) + ggplot2::guides(
+  linetype = "none",
+  color = ggplot2::guide_legend(ncol = 5),
+  fill = ggplot2::guide_legend(ncol = 5)
+) + ggplot2::theme(
+  legend.position = c(0.5, 0.09),
+  plot.tag.position = c(0.025, 0.95)
+) + ggplot2::coord_cartesian(
+  ylim = c(0, 30), expand = FALSE
+) + ggplot2::scale_x_continuous(
+  breaks = (0:3)*10000
+) + ggplot2::facet_grid(
+  switch = "y", rows = ggplot2::vars(SpeciesPreferences)
+)
+
+##### b: Violins ##############################################################
+figure5$plotB <- ggplot2::ggplot(
+  figure5$dataRich |> tidytable::filter(
+    Time > Start, Time < Stop
+  ) |> tidytable::group_by(
+    PoolPatchSeed, Intervention, SpeciesPreferences, Subset
+  ) |> tidytable::summarise(
+    Value = mean(Value)
+  ),
+  ggplot2::aes(
+    x = Intervention,
+    y = Value,
+    color = Intervention,
+    group = paste(Intervention, Subset)
   )
-}
-
-##### KEY: ####################################################################
-
-figure4$plot <- plotTextHeatmap(
-  figure4$dataLogScale |> tidytable::filter(
-    Time != "Time 0", is.na(Subset)
-  ) |> tidytable::mutate(
-    Emphasis = Intervention %in% figure4$emphasise,
-    Average = Average
+) + ggplot2::geom_violin(
+  data = function(x) x |> tidytable::filter(is.na(Subset)),
+  position = ggplot2::position_dodge(0.9), scale = "count"
+) + ggplot2::geom_boxplot(
+  data = function(x) x |> tidytable::filter(is.na(Subset)),
+  notch = TRUE, outlier.size = 0,
+  position = ggplot2::position_dodge(0.9),
+  width = 0.28
+) + geom_flat_violin(
+  data = function(x) x |> tidytable::filter(
+    !is.na(Subset)
+  ) |> tidytable::separate_wider_delim(
+    cols = Subset, delim = "_", names = c("Subset", "Bins")
+  ) |> tidytable::filter(
+    Subset == "Basal"
+  ) |> tidytable::group_by(
+    PoolPatchSeed, Intervention, SpeciesPreferences, Subset
+  ) |> tidytable::summarise(
+    Value = sum(Value)
   ),
-  ""
-) + colorspace::scale_fill_continuous_diverging(
-  palette = "Blue-Yellow 3", mid = log10(1), transform = "log10",
-  labels = scales::label_percent(accuracy = 0.1)
-  # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
-)
-
-figure4$plotB <- plotTextHeatmap(
-  figure4$dataLogScale |> tidytable::filter(
-    Time != "Time 0", Subset == "Basal_0"
-  ) |> tidytable::mutate(
-    Emphasis = Intervention %in% figure4$emphasise,
-    Average = Average
+  flip = 1, color = "black",
+  ggplot2::aes(fill = Intervention)
+) + geom_flat_violin(
+  data = function(x) x |> tidytable::filter(
+    !is.na(Subset)
+  ) |> tidytable::separate_wider_delim(
+    cols = Subset, delim = "_", names = c("Subset", "Bins")
+  ) |> tidytable::filter(
+    Subset == "Consumer"
+  ) |> tidytable::group_by(
+    PoolPatchSeed, Intervention, SpeciesPreferences, Subset
+  ) |> tidytable::summarise(
+    Value = sum(Value)
   ),
-  "Basal"
-) + colorspace::scale_fill_continuous_diverging(
-  palette = "Blue-Yellow 3", mid = log10(1), transform = "log10",
-  labels = scales::label_percent(accuracy = 0.1)
-  # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
-)
-
-figure4$plotC <- plotTextHeatmap(
-  figure4$dataLogScale |> tidytable::filter(
-    Time != "Time 0", Subset == "Consumer_0"
-  ) |> tidytable::mutate(
-    Emphasis = Intervention %in% figure4$emphasise,
-    Average = Average
-  ),
-  "Consumer"
-) + colorspace::scale_fill_continuous_diverging(
-  palette = "Blue-Yellow 3", mid = log10(1), transform = "log10",
-  labels = scales::label_percent(accuracy = 0.1)
-  # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
-)
-
-figure4$plotRaw <- ggpubr::ggarrange(
-  plotTextHeatmap(
-    figure4$dataRawValues |> tidytable::filter(
-      Time != "Time 0", Metric == "Richness"
+  flip = 2, color = "black",
+  ggplot2::aes(fill = Intervention)
+) + ggplot2::geom_text(
+  data = function(x) {
+    x |> tidytable::filter(
+      !is.na(Subset)
+    ) |> tidytable::separate_wider_delim(
+      cols = Subset, delim = "_", names = c("Subset", "Bins")
+    ) |> tidytable::group_by(
+      PoolPatchSeed, Intervention, SpeciesPreferences, Subset
+    ) |> tidytable::summarise(
+      Value = sum(Value),
+      .groups = "drop"
     ) |> tidytable::mutate(
-      Emphasis = Intervention %in% figure4$emphasise
-    ),
-    legendName = "Raw Values",
-    scalestrans = scales::label_number(accuracy = 0.1)
-  ),
-  plotTextHeatmap(
-    figure4$dataRawValues |> tidytable::filter(
-      Time != "Time 0", Metric == "Abundance"
-    ) |> tidytable::mutate(
-      Emphasis = Intervention %in% figure4$emphasise
-    ),
-    legendName = "Raw Values", legendtrans = "log10",
-    scalestrans = scales::label_number(accuracy = 1)
-  ),
-  nrow = 2
+      Offset = (max(Value) - min(Value)) * 0.08
+    ) |> dplyr::group_by(
+      Intervention, SpeciesPreferences, Subset
+    ) |> dplyr::summarise(
+      Value = min(Value - Offset),
+      Label = substr(Subset[1], 0, 1),
+      .groups = "drop"
+    )
+  },
+  mapping = ggplot2::aes(label = Label),
+  position = ggplot2::position_dodge(0.9)
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat Type"
+) + ggplot2::scale_y_continuous(
+  breaks = c(0, 10, 20, 30)
+) + ggplot2::coord_cartesian(
+  ylim = c(0, 30), expand = FALSE
+) + ggplot2::facet_grid(
+  SpeciesPreferences ~ .
+) + ggplot2::theme_minimal(
+) + ggplot2::theme(
+  plot.tag.position = c(0.01, 1),
+  panel.grid.minor = ggplot2::element_blank(),
+  strip.background = ggplot2::element_blank(),
+  strip.text = ggplot2::element_blank()
+) + ggplot2::labs(
+  y = "Richness",
+  x = "Habitat Type"
+) + ggplot2::guides(
+  color = "none",
+  fill = "none"
 )
 
+figure5$plotC <- ggplot2::ggplot(
+  figure5$dataAbund |> tidytable::filter(
+    Time > Start, Time < Stop
+  ) |> tidytable::group_by(
+    PoolPatchSeed, Intervention, SpeciesPreferences, Subset
+  ) |> tidytable::summarise(
+    Value = mean(Value)
+  ),
+  ggplot2::aes(
+    x = Intervention,
+    y = Value,
+    color = Intervention,
+    group = paste(Intervention, Subset)
+  )
+) + ggplot2::geom_violin(
+  data = function(x) x |> tidytable::filter(is.na(Subset)),
+  position = ggplot2::position_dodge(0.9), scale = "count"
+) + ggplot2::geom_boxplot(
+  data = function(x) x |> tidytable::filter(is.na(Subset)),
+  notch = TRUE, outlier.size = 0,
+  position = ggplot2::position_dodge(0.9),
+  width = 0.28
+) + geom_flat_violin(
+  data = function(x) x |> tidytable::filter(
+    !is.na(Subset)
+  ) |> tidytable::separate_wider_delim(
+    cols = Subset, delim = "_", names = c("Subset", "Bins")
+  ) |> tidytable::filter(
+    Subset == "Basal"
+  ) |> tidytable::group_by(
+    PoolPatchSeed, Intervention, SpeciesPreferences, Subset
+  ) |> tidytable::summarise(
+    Value = sum(Value)
+  ),
+  flip = 1, color = "black",
+  ggplot2::aes(fill = Intervention)
+) + geom_flat_violin(
+  data = function(x) x |> tidytable::filter(
+    !is.na(Subset)
+  ) |> tidytable::separate_wider_delim(
+    cols = Subset, delim = "_", names = c("Subset", "Bins")
+  ) |> tidytable::filter(
+    Subset == "Consumer"
+  ) |> tidytable::group_by(
+    PoolPatchSeed, Intervention, SpeciesPreferences, Subset
+  ) |> tidytable::summarise(
+    Value = sum(Value)
+  ),
+  flip = 2, color = "black",
+  ggplot2::aes(fill = Intervention)
+) + ggplot2::geom_text(
+  data = function(x) {
+    x |> tidytable::filter(
+      !is.na(Subset)
+    ) |> tidytable::separate_wider_delim(
+      cols = Subset, delim = "_", names = c("Subset", "Bins")
+    ) |> tidytable::group_by(
+      PoolPatchSeed, Intervention, SpeciesPreferences, Subset
+    ) |> tidytable::summarise(
+      Value = sum(Value),
+      .groups = "drop"
+    ) |> tidytable::mutate(
+      Offset = (max(log10(Value)) - min(log10(Value))) * 0.08
+    ) |> dplyr::group_by(
+      Intervention, SpeciesPreferences, Subset
+    ) |> dplyr::summarise(
+      Value = 10^min(log10(Value) - Offset),
+      Label = substr(Subset[1], 0, 1),
+      .groups = "drop"
+    )
+  },
+  mapping = ggplot2::aes(label = Label),
+  position = ggplot2::position_dodge(0.9)
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat Type"
+) + ggplot2::facet_grid(
+  SpeciesPreferences ~ .
+) + ggplot2::theme_minimal(
+) + ggplot2::theme(
+  plot.tag.position = c(0.01, 1),
+  panel.grid.minor = ggplot2::element_blank(),
+  strip.background = ggplot2::element_blank(),
+  strip.text = ggplot2::element_blank()
+) + ggplot2::labs(
+  y = "Abundance",
+  x = "Habitat Type"
+) + ggplot2::guides(
+  color = "none",
+  fill = "none"
+) + scale_y_log10(
+  label = scales::label_log()
+)
+
+##### c: Insets ###############################################################
+figure5$insetGrobs <- figure5$dataPers |> tidytable::filter(
+  # Match A
+  Intervention %in% c("(0)", "(0.5)", "(1)")
+) |> tidytable::mutate(
+  SpeciesPreferences = tidytable::case_when(
+    SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
+    SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
+    SpeciesPreferences == "Uniform(0, 1)" ~ "Multiple Adaptation Types",
+    TRUE ~ SpeciesPreferences
+  )
+) |> dplyr::group_by(
+  SpeciesPreferences, Intervention
+) |> dplyr::group_modify(
+  .f = function(data, key) {
+    if (key$SpeciesPreferences == "2 Adaptation Types") {
+      # Image:
+      tibblegrob <- tibble::tibble(
+        grob = list(
+          (
+            dplyr::bind_cols(data, key) |> tidytable::group_by(
+              Intervention, AffinityBins, SpeciesType
+            ) |> tidytable::summarise(
+              Persistence = sum(Persistence)
+            ) |> tidytable::group_by(
+              Intervention
+            ) |> tidytable::mutate(
+              Persistence = Persistence / sum(Persistence)
+            ) |> ggplot2::ggplot(
+              mapping = ggplot2::aes(
+                x = AffinityBins,
+                y = Persistence,
+                color = Intervention,
+                fill = factor(SpeciesType, ordered = TRUE,
+                              levels = c("Consumer", "Basal"))
+              )
+            ) + ggplot2::geom_col(
+              show.legend = FALSE
+            ) + ggplot2::facet_grid(
+              . ~ Intervention
+            ) + ggplot2::scale_color_manual(
+              values = colorPalette,
+              name = "Habitat Type"
+            ) + ggplot2::scale_fill_manual(
+              values = c("Basal" = "darkgreen", "Consumer" = "burlywood4")
+            ) + ggplot2::theme_void(
+            ) + ggplot2::theme(
+              plot.background = ggplot2::element_rect(fill = "white",
+                                                      color = "white"),
+              panel.background = ggplot2::element_rect(fill = "white")
+            ) + ggplot2::coord_cartesian(
+              expand = FALSE, ylim = c(0, 1)
+            )
+          ) |> ggplot2::ggplotGrob()
+        )
+      )
+
+      # Coordinates:
+      if (key$Intervention == "(0)") {
+        tibbleplace <- tibble::tibble(
+          Time = 7500, Value = 2.5
+        )
+      } else if (key$Intervention == "(0.25)") {
+        tibbleplace <- tibble::tibble(
+          Time = 12500, Value = 2.5
+        )
+      } else if (key$Intervention == "(0.5)") {
+        tibbleplace <- tibble::tibble(
+          Time = 17500, Value = 2.5
+        )
+      } else if (key$Intervention == "(0.75)") {
+        tibbleplace <- tibble::tibble(
+          Time = 22500, Value = 2.5
+        )
+      } else if (key$Intervention == "(1)") {
+        tibbleplace <- tibble::tibble(
+          Time = 27500, Value = 2.5
+        )
+      }
+    } else if (key$SpeciesPreferences == "Multiple Adaptation Types") {
+      # Image:
+      tibblegrob <- tibble::tibble(
+        grob = list(
+          (
+            dplyr::bind_cols(data, key) |> ggplot2::ggplot(
+              mapping = ggplot2::aes(
+                x = Affinity,
+                weight = Persistence,
+                fill = factor(SpeciesType, ordered = TRUE,
+                              levels = c("Consumer", "Basal")),
+                # group = interaction(Intervention, SpeciesType),
+                color = Intervention
+              )
+            ) + ggplot2::geom_density(
+              position = "stack",
+              adjust = 1/2, linewidth = 0.5,
+              show.legend = FALSE
+            ) + ggplot2::facet_grid(
+              . ~ Intervention
+            ) + ggplot2::scale_color_manual(
+              values = colorPalette,
+              name = "Habitat Type"
+            ) + ggplot2::scale_fill_manual(
+              values = c("Basal" = "darkgreen", "Consumer" = "burlywood4")
+            ) + ggplot2::theme_void(
+            ) + ggplot2::theme(
+              plot.background = ggplot2::element_rect(fill = "white",
+                                                      color = "white"),
+              panel.background = ggplot2::element_rect(fill = "white")
+            ) + ggplot2::coord_cartesian(
+              expand = FALSE
+            )
+          ) |> ggplot2::ggplotGrob()
+        )
+      )
+
+      # Coordinates:
+      if (key$Intervention == "(0)") {
+        tibbleplace <- tibble::tibble(
+          Time = 7500, Value = 22.5
+        )
+      } else if (key$Intervention == "(0.25)") {
+        tibbleplace <- tibble::tibble(
+          Time = 12500, Value = 22.5
+        )
+      } else if (key$Intervention == "(0.5)") {
+        tibbleplace <- tibble::tibble(
+          Time = 17500, Value = 22.5
+        )
+      } else if (key$Intervention == "(0.75)") {
+        tibbleplace <- tibble::tibble(
+          Time = 22500, Value = 22.5
+        )
+      } else if (key$Intervention == "(1)") {
+        tibbleplace <- tibble::tibble(
+          Time = 27500, Value = 22.5
+        )
+      }
+    }
+
+    tibblegrob <- dplyr::bind_cols(tibblegrob, tibbleplace)
+
+    return(tibblegrob)
+  }
+)
+
+##### Combine: ################################################################
+figure5$plot <- ggpubr::ggarrange(
+  plotlist = list(
+    figure5$plotA + ggpp::geom_grob(
+      data = figure5$insetGrobs,
+      mapping = ggplot2::aes(x = Time, y = Value, label = grob)
+    ),
+    cowplot::plot_grid(
+      plotlist = list(
+        figure5$plotB,
+        figure5$plotC
+      ), ncol = 2
+    )
+  ),
+  nrow = 1, common.legend = TRUE
+)
+
+ggplot2::ggsave(plot = figure5$plot, filename = file.path(dirImages, "Figure5_Prototype2.pdf"),
+                units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(plot = figure5$plot, filename = file.path(dirImages, "Figure5_Prototype2.png"),
+                units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(plot = figure5$plotA, filename = file.path(dirImages, "Figure5A_Prototype2.pdf"),
+                units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(plot = figure5$plotB, filename = file.path(dirImages, "Figure5B_Prototype2.pdf"),
+                units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(plot = figure5$plotC, filename = file.path(dirImages, "Figure5C_Prototype2.pdf"),
+                units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(
-  plot = figure4$plot,
-  filename = file.path(dirImages, "Figure4_Prototype5.pdf"),
-  units = "cm", width = 6.5*4, height = 6.5*3)
-ggplot2::ggsave(
-  plot = figure4$plot,
-  filename = file.path(dirImages, "Figure4_Prototype5.png"),
-  units = "cm", width = 6.5*4, height = 6.5*3)
-ggplot2::ggsave(
-  plot = figure4$plotB,
-  filename = file.path(dirImages, "Figure4B_Prototype5.pdf"),
-  units = "cm", width = 6.5*4, height = 6.5*3)
-ggplot2::ggsave(
-  plot = figure4$plotC,
-  filename = file.path(dirImages, "Figure4C_Prototype5.pdf"),
-  units = "cm", width = 6.5*4, height = 6.5*3)
-ggplot2::ggsave(
-  plot = figure4$plotRaw,
-  filename = file.path(dirImages, "Figure4Raw_Prototype5.pdf"),
-  units = "cm", width = 6.5*4, height = 6.5*3)
+  plot =
+    ggplot2::ggplot(
+    ) + ggplot2::coord_cartesian(
+      xlim = c(3500, 30000), ylim = c(0, 27)
+    ) + ggpp::geom_grob(
+      data = figure5$insetGrobs,
+      mapping = ggplot2::aes(x = Time, y = Value, label = grob)
+    ),
+  filename = file.path(dirImages, "Figure5Inset_Prototype2.pdf"),
+  units = "cm", width = 6.5*3, height = 6.5*2
+)
+

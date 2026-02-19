@@ -1,42 +1,23 @@
 # Setup: ######################################################################
-# Plot of the effects of intervention from (0.5) on 100% (0) species case.
-# This means a) summarised richness time series from time of intervention,
-# b) pseudo-heatmap of short and long time scales (statistic intensities, not
-# counts), c) Consumer-Basal Richness ratio and d) Abundance ratio through
-# short time scales, e) supplement with short to long-term transition
-# for richness and abundance on log(1+Time) scales, and f) repeat all of the
-# above for from (0) and from (1).
+# Plot of the effects of intervention overall as a set of heatmaps.
+# Quite a bit of reproduction of effort from Figure 4, but for a different
+# set of data.
 
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
 
-library(scales)
+library(colorspace) # for diverging color scales with midpoint control.
+library(scales) # conversion to percentages
 
-# This is better as an environment, but that's more opaque.
-figure3 <- list(
-  CI = 0.75,
+figure4 <- list(
   pref = "100% 0", #"Uniform(0, 1)"
-  luinitl = "(0.5)", # Land Use INITiaL
-  lufinal = c("(0)", "(0.5)", "(1)") # Land Use FINAL
-  # lufinal = c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)") # Land Use FINAL
+  heatmapTimes = c(10, 10000),
+  emphasise = c("(0.5)", "(0.5)->(0)", "(0.5)->(1)")
 )
-
-figure3$prefstring <- switch(
-  figure3$pref,
-  "100% 0" = "", # Base Case
-  "50% 0, 50% 1" = "_5050",
-  "Uniform(0, 1)" = "_Unif"
-)
-figure3$lustring <- paste0(switch(
-  figure3$luinitl,
-  "(0)" = "0",
-  "(0.5)" = "", # Base Case
-  "(1)" = "1"
-), "to", length(figure3$lufinal))
 
 # Main Plots: #################################################################
-### Plot 4: ###################################################################
+### Plot 5: ###################################################################
 ##### Data: ###################################################################
 
 # Interventions store the time right before intervention, then the
@@ -44,8 +25,8 @@ figure3$lustring <- paste0(switch(
 # Note it is per-simulation (timescale set by PoolPatch effectively).
 # (If done correctly, the set-up as of 23/01/2026 means there will be
 # round numbers from 1:10, evens from 12:20, and then by 3s 20:50.)
-figure3$interventionTimes <- diversitiesRichness |> tidytable::filter(
-  SpeciesPreferences == figure3$pref,
+figure4$interventionTimes <- diversitiesRichness |> tidytable::filter(
+  SpeciesPreferences == figure4$pref,
   NicheDistance == defaultNicheDistance,
   PoolPatchSeed %in% basePoolPatchSeeds,
   Metric == "Alpha Hill:0",
@@ -62,27 +43,23 @@ figure3$interventionTimes <- diversitiesRichness |> tidytable::filter(
   .groups = "drop"
 )
 
-figure3$dataBase <- tidytable::bind_rows(
+figure4$dataBase <- tidytable::bind_rows(
   diversitiesRichness |> tidytable::filter(
-    SpeciesPreferences == figure3$pref,
+    SpeciesPreferences == figure4$pref,
     NicheDistance == defaultNicheDistance,
-    InterventionInitial == figure3$luinitl,
-    InterventionFinal %in% figure3$lufinal,
     PoolPatchSeed %in% basePoolPatchSeeds,
     Metric == "Alpha Hill:0"
     # Need all subsets
   ),
   diversitiesAbund |> tidytable::filter(
-    SpeciesPreferences == figure3$pref,
+    SpeciesPreferences == figure4$pref,
     NicheDistance == defaultNicheDistance,
-    InterventionInitial == figure3$luinitl,
-    InterventionFinal %in% figure3$lufinal,
     PoolPatchSeed %in% basePoolPatchSeeds,
     Metric == "Alpha Abundance"
     # Need all subsets
   )
 ) |> tidytable::left_join(
-  figure3$interventionTimes |> tidytable::rename(
+  figure4$interventionTimes |> tidytable::rename(
     InterventionTime = Time
   ),
   by = c("PoolPatch", "PoolPatchSeed")
@@ -91,7 +68,7 @@ figure3$dataBase <- tidytable::bind_rows(
                   labels = c("Richness", "Abundance"), ordered = TRUE),
   Time = round(Time - InterventionTime, 6) # remove false differences
 ) |> tidytable::filter(
-  Time <= 16000, # Need the start for the inset.
+  Time > -1000, Time <= 16000,
   # Avoid singletons.
   abs(Time - round(Time)) < 1e-6 | Time >= 55 | Time < 0
 )
@@ -99,8 +76,56 @@ figure3$dataBase <- tidytable::bind_rows(
 # Why to the level of summary? Because the PlotMeanAndInner function
 # isn't built to handle the multiple resolutions that we have in the
 # actual data, which makes it harder to portray the data accurately.
-figure3$dataOverallSummary <- figure3$dataBase |> tidytable::filter(
-  Time > -1000,
+figure4$dataLogScale <- figure4$dataBase |> tidytable::filter(
+  Metric %in% c("Richness", "Abundance")#,
+  # is.na(Subset) # Not overall values
+) |> tidytable::mutate(
+  Time = tidytable::case_when( # Create groupings for times.
+    Time < -50 ~ round(Time, -2),
+    Time < 0 ~ -25, # In the last bin before regime change.
+    Time <= 50 ~ round(Time, 0),
+    Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
+    Time < 16350 ~ round(Time, -2),
+    TRUE ~ Time
+  )
+) |> tidytable::filter(
+  Time %in% c(0, figure4$heatmapTimes)
+) |> tidytable::group_by(
+  # Average Over the now grouped times to make each sim equally weighted.
+  # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
+  # simple and match each other with the seeds. More complicated set-ups
+  # will want to adjust the groupings here.
+  Intervention, InterventionInitial, InterventionFinal, Metric, Subset,
+  PoolPatchSeed, SpeciesPreferences, Time
+) |> tidytable::summarise(
+  Value = median(Value), .groups = "drop"
+) |> tidytable::group_by(
+  # Within simulation proportions
+  Intervention, InterventionInitial, InterventionFinal, Metric, Subset,
+  PoolPatchSeed, SpeciesPreferences
+) |> tidytable::mutate(
+  Value = log10(Value/Value[Time == 0]) # Both x3, x/3 same magnitude.
+) |> tidytable::group_by(
+  # Average across simulations
+  Intervention, InterventionInitial, InterventionFinal, Metric, Subset,
+  SpeciesPreferences, Time
+) |> tidytable::summarise(
+  Average = 10^mean(Value),
+  StdDev = sd(Value),
+  CI025 = 10^quantile(Value, p = 0.025, na.rm = TRUE), # Some subsets
+  CI975 = 10^quantile(Value, p = 0.975, na.rm = TRUE), # have x/0.
+  .groups = "drop"
+) |> dplyr::mutate( # Change labelling, dplyr for conversion (can't in dt)
+  Time = factor(
+    Time, levels = c(0, range(figure4$heatmapTimes)),
+    labels = c("Time 0", paste0(
+      c("Short (t = ", "Long (t = "),
+      range(figure4$heatmapTimes), ")"
+    ))
+  )
+)
+
+figure4$dataRawValues <- figure4$dataBase |> tidytable::filter(
   Metric %in% c("Richness", "Abundance"),
   is.na(Subset) # Not overall values
 ) |> tidytable::mutate(
@@ -112,6 +137,8 @@ figure3$dataOverallSummary <- figure3$dataBase |> tidytable::filter(
     Time < 16350 ~ round(Time, -2),
     TRUE ~ Time
   )
+) |> tidytable::filter(
+  Time %in% c(0, figure4$heatmapTimes)
 ) |> tidytable::group_by(
   # Average Over the now grouped times to make each sim equally weighted.
   # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
@@ -126,253 +153,135 @@ figure3$dataOverallSummary <- figure3$dataBase |> tidytable::filter(
   Intervention, InterventionInitial, InterventionFinal, Metric,
   SpeciesPreferences, Time
 ) |> tidytable::summarise(
-  Lower = quantile(Value, p = (1 - figure3$CI) - (1 - figure3$CI)/2, na.rm = TRUE),
-  Average = mean(Value),
-  Upper = quantile(Value, p = figure3$CI + (1 - figure3$CI)/2, na.rm = TRUE)
-)
-
-# Same idea as the overall case, but split by guild.
-figure3$dataBCSupplement <- figure3$dataBase |> tidytable::filter(
-  Time > -1000,
-  Metric %in% c("Richness", "Abundance"),
-  !is.na(Subset) # Not overall values
-) |> tidytable::separate_wider_delim(
-  delim = "_", cols = Subset, names = c("Guild", "AffinityBins")
-) |> unifyAffinityBins( # if many preference types.
-) |> tidytable::mutate(
-  Time = tidytable::case_when( # Create groupings for times.
-    Time < -50 ~ round(Time, -2),
-    Time < 0 ~ -25, # In the last bin before regime change.
-    Time <= 50 ~ round(Time, 0),
-    Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
-    Time < 16350 ~ round(Time, -2),
-    TRUE ~ Time
-  ),
-  Subset = NA
-) |> tidytable::group_by(
-  # Average Over the now grouped times to make each sim equally weighted.
-  # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
-  # simple and match each other with the seeds. More complicated set-ups
-  # will want to adjust the groupings here.
-  Intervention, InterventionInitial, InterventionFinal, Metric,
-  PoolPatchSeed, SpeciesPreferences, Guild, AffinityBins, Time
-) |> tidytable::summarise(
-  Value = median(Value), .groups = "drop"
-) |> tidytable::group_by(
-  # Average across simulations
-  Intervention, InterventionInitial, InterventionFinal, Metric,
-  SpeciesPreferences, Guild, AffinityBins, Time
-) |> tidytable::summarise(
-  Lower = quantile(Value, p = (1 - figure3$CI) - (1 - figure3$CI)/2, na.rm = TRUE),
-  Average = mean(Value),
-  Upper = quantile(Value, p = figure3$CI + (1 - figure3$CI)/2, na.rm = TRUE)
-)
-
-##### A: ################################################################
-figure3$plotA <- plotMeanAndInner(
-  figure3$dataBase |> tidytable::filter(
-    Metric == "Richness",
-    is.na(Subset) # Not overall values
-  ) |> tidytable::mutate(
-    Time = Time + InterventionTime
-  ), CIs = 0.75, facets = as.formula(. ~ .)
-) + ggplot2::geom_vline(
-  xintercept = min(figure3$interventionTimes$Time),
-  color = "black", linetype = "dashed"
-) + ggplot2::labs(
-  x = "Time",
-  y = "Richness"
-) + ggplot2::guides(
-  linetype = "none",
-  color = "none", # already covered by the main plot.
-  fill = "none"
-) + ggplot2::coord_cartesian(
-  ylim = c(0, richnessYMax),
-  xlim = c(0, 31000),
-  expand = FALSE
-)
-
-##### B: ######################################################################
-figure3$plotB <- ggplot2::ggplot(
-  figure3$dataOverallSummary |> tidytable::filter(
-    Metric == "Richness", Time >= 0
-  ),
-  aes(x = Time, y = Average,
-      color = Intervention,
-      fill = Intervention
+  Average = mean(Value)
+) |> dplyr::mutate( # Change labelling, dplyr for conversion (can't in dt)
+  Time = factor(
+    Time, levels = c(0, range(figure4$heatmapTimes)),
+    labels = c("Time 0", paste0(
+      c("Short (t = ", "Long (t = "),
+      range(figure4$heatmapTimes), ")"
+    ))
   )
-) + ggplot2::geom_vline(
-  xintercept = 0, color = "black", linetype = "dashed"
-) + ggplot2::geom_line(
-) + ggplot2::geom_ribbon(
-  ggplot2::aes(ymin = Lower, ymax = Upper),
-  alpha = 0.25, linewidth = 0.25
-) + ggplot2::scale_color_manual(
-  values = colorPalette, aesthetics = c("color", "fill"),
-  name = "Habitat Type"
-) + ggplot2::theme_minimal(
-) + ggplot2::guides(
-  fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
-) + ggplot2::labs(
-  x = "Time Since Intervention",
-  y = "Richness"
-) + ggplot2::coord_cartesian(
-  ylim = c(0, richnessYMax),
-  expand = FALSE
-) + ggplot2::scale_x_continuous(
-  trans = "log1p",
-  breaks = 10^(0:4)
 )
 
-##### C+D: ####################################################################
-figure3$plotCD <- ggplot2::ggplot(
-  figure3$dataBCSupplement |> tidytable::filter(
-    Metric == "Richness", Time >= 0
-  ) |> dplyr::mutate(
-    Guild = factor(Guild, ordered = TRUE, levels = c("Consumer", "Basal"))
-    # Top-Bottom ordering
-  ),
-  aes(x = Time, y = Average,
-      color = Intervention,
-      fill = Intervention
-  )
-) + ggplot2::geom_vline(
-  xintercept = 0, color = "black", linetype = "dashed"
-) + ggplot2::geom_line(
-) + ggplot2::geom_ribbon(
-  ggplot2::aes(ymin = Lower, ymax = Upper),
-  alpha = 0.25, linewidth = 0.25
-) + ggplot2::scale_color_manual(
-  values = colorPalette, aesthetics = c("color", "fill"),
-  name = "Habitat Type"
-) + ggplot2::theme_minimal(
-) + ggplot2::guides(
-  fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
-) + ggplot2::labs(
-  x = "Time Since Intervention",
-  y = "Richness"
-) + ggplot2::coord_cartesian(
-  ylim = c(0, richnessYMax),
-  expand = FALSE
-) + ggplot2::scale_x_continuous(
-  trans = "log1p",
-  breaks = 10^(0:4)
-) + ggplot2::facet_grid(
-  Guild~.
-)
-
-##### E: ######################################################################
-figure3$plotE <- ggplot2::ggplot(
-  figure3$dataOverallSummary |> tidytable::filter(
-    Metric == "Abundance", Time >= 0
-  ),
-  aes(x = Time, y = Average,
-      color = Intervention,
-      fill = Intervention
-  )
-) + ggplot2::geom_vline(
-  xintercept = 0, color = "black", linetype = "dashed"
-) + ggplot2::geom_line(
-) + ggplot2::geom_ribbon(
-  ggplot2::aes(ymin = Lower, ymax = Upper),
-  alpha = 0.25, linewidth = 0.25
-) + ggplot2::scale_color_manual(
-  values = colorPalette, aesthetics = c("color", "fill"),
-  name = "Habitat Type"
-) + ggplot2::theme_minimal(
-) + ggplot2::guides(
-  fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
-) + ggplot2::labs(
-  x = "Time Since Intervention",
-  y = "Abundance"
-) + ggplot2::coord_cartesian(
-  ylim = c(1e-2, 1e5),
-  expand = FALSE
-) + ggplot2::scale_y_log10(
-  label = scales::label_log()
-) + ggplot2::scale_x_continuous(
-  trans = "log1p",
-  breaks = 10^(0:4)
-)
-
-##### F+G: ####################################################################
-figure3$plotFG <- ggplot2::ggplot(
-  figure3$dataBCSupplement |> tidytable::filter(
-    Metric == "Abundance", Time >= 0
-  ) |> dplyr::mutate(
-    Guild = factor(Guild, ordered = TRUE, levels = c("Consumer", "Basal"))
-    # Top-Bottom ordering
-  ),
-  aes(x = Time, y = Average,
-      color = Intervention,
-      fill = Intervention
-  )
-) + ggplot2::geom_vline(
-  xintercept = 0, color = "black", linetype = "dashed"
-) + ggplot2::geom_line(
-) + ggplot2::geom_ribbon(
-  ggplot2::aes(ymin = Lower, ymax = Upper),
-  alpha = 0.25, linewidth = 0.25
-) + ggplot2::scale_color_manual(
-  values = colorPalette, aesthetics = c("color", "fill"),
-  name = "Habitat Type"
-) + ggplot2::theme_minimal(
-) + ggplot2::guides(
-  fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
-) + ggplot2::labs(
-  x = "Time Since Intervention",
-  y = "Abundance"
-) + ggplot2::coord_cartesian(
-  ylim = c(1e-2, 1e5),
-  expand = FALSE
-) + ggplot2::scale_x_continuous(
-  trans = "log1p",
-  breaks = 10^(0:4)
-) + ggplot2::scale_y_log10(
-  label = scales::label_log()
-) + ggplot2::facet_grid(
-  Guild~.
-)
-
-##### Combine: ################################################################
-figure3$plot <- ggpubr::ggarrange(
-  plotlist = list(
-    figure3$plotA + ggplot2::scale_y_continuous(
-      breaks = c(0, 10, 20, 30, 40),
-      labels = c("0", "10", "20", "30", "")
-    ),
-    ggpubr::ggarrange(plotlist = list(
-      figure3$plotB + ggplot2::theme(legend.position = "none"),
-      figure3$plotCD + ggplot2::theme(legend.position = "none",
-                                      axis.title.y = ggplot2::element_blank())
-    ), nrow = 1),
-    ggpubr::ggarrange(plotlist = list(
-      figure3$plotE + ggplot2::theme(legend.position = "none",
-                                     axis.text.y = ggplot2::element_text(
-                                       margin = ggplot2::margin(0, 0, 0, -5)
-                                     )),
-      figure3$plotFG + ggplot2::theme(legend.position = "none",
-                                      axis.title.y = ggplot2::element_blank(),
-                                      axis.text.y = ggplot2::element_text(
-                                        margin = ggplot2::margin(0, 0, 0, -5)
-                                      ))
-    ), nrow = 1)
-  ), nrow = 3, common.legend = TRUE
-)
-
-figure3$suffix <- paste0("_", figure3$prefstring, "_", figure3$lustring)
-figure3$prefix <- "Figure3"
-figure3$iter <- "_Prototype6"
-figure3$ids <- c("", "", "A", "B", "CD", "E", "FG")
-figure3$ext <- c(".png", rep(".pdf", 6))
-
-for (fnum in 1:7) {
-  with(figure3, ggplot2::ggsave(
-    plot = switch(fnum,
-                  plot, plot,
-                  plotA, plotB, plotCD, plotE, plotFG),
-    filename = file.path(dirImages,
-                         paste0(prefix, ids[fnum], iter, suffix, ext[fnum])),
-    units = "cm", width = 6.5*3, height = 6.5*2.1)
+##### FUNCTION: ###############################################################
+# Different Scales mean we have to separate out the data, so we define a
+# function to perform the plotting repeatedly/consistently.
+plotTextHeatmap <- function(
+  data, legendName,
+  legendtrans = "identity",
+  scalestrans = scales::label_percent(accuracy = 0.1)
+) {
+  ggplot2::ggplot(
+    data,
+    ggplot2::aes(
+      x = InterventionInitial,
+      y = InterventionFinal,
+      fill = Average
+    )
+  ) + ggplot2::geom_tile(
+    width = 1, height = 1, color = NA
+  ) + ggplot2::geom_tile(
+    data = function(x) x |> tidytable::filter(Emphasis),
+    fill = NA, color = "black", linewidth = 1
+  ) + ggplot2::geom_text(
+    ggplot2::aes(label = scalestrans(Average))
+  ) + ggplot2::facet_grid(
+    Metric ~ Time
+  ) + ggplot2::scale_fill_viridis_c(
+    transform = legendtrans, begin = 0.1, labels = scalestrans
+  ) + ggplot2::theme_minimal(
+  ) + ggplot2::labs(
+    fill = legendName,
+    x = "Initial Habitat Type",
+    y = "Final Habitat Type"
+  ) + ggplot2::coord_fixed(
   )
 }
+
+##### KEY: ####################################################################
+
+figure4$plot <- plotTextHeatmap(
+  figure4$dataLogScale |> tidytable::filter(
+    Time != "Time 0", is.na(Subset)
+  ) |> tidytable::mutate(
+    Emphasis = Intervention %in% figure4$emphasise,
+    Average = Average
+  ),
+  ""
+) + colorspace::scale_fill_continuous_diverging(
+  palette = "Blue-Yellow 3", mid = log10(1), transform = "log10",
+  labels = scales::label_percent(accuracy = 0.1)
+  # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
+)
+
+figure4$plotB <- plotTextHeatmap(
+  figure4$dataLogScale |> tidytable::filter(
+    Time != "Time 0", Subset == "Basal_0"
+  ) |> tidytable::mutate(
+    Emphasis = Intervention %in% figure4$emphasise,
+    Average = Average
+  ),
+  "Basal"
+) + colorspace::scale_fill_continuous_diverging(
+  palette = "Blue-Yellow 3", mid = log10(1), transform = "log10",
+  labels = scales::label_percent(accuracy = 0.1)
+  # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
+)
+
+figure4$plotC <- plotTextHeatmap(
+  figure4$dataLogScale |> tidytable::filter(
+    Time != "Time 0", Subset == "Consumer_0"
+  ) |> tidytable::mutate(
+    Emphasis = Intervention %in% figure4$emphasise,
+    Average = Average
+  ),
+  "Consumer"
+) + colorspace::scale_fill_continuous_diverging(
+  palette = "Blue-Yellow 3", mid = log10(1), transform = "log10",
+  labels = scales::label_percent(accuracy = 0.1)
+  # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
+)
+
+figure4$plotRaw <- ggpubr::ggarrange(
+  plotTextHeatmap(
+    figure4$dataRawValues |> tidytable::filter(
+      Time != "Time 0", Metric == "Richness"
+    ) |> tidytable::mutate(
+      Emphasis = Intervention %in% figure4$emphasise
+    ),
+    legendName = "Raw Values",
+    scalestrans = scales::label_number(accuracy = 0.1)
+  ),
+  plotTextHeatmap(
+    figure4$dataRawValues |> tidytable::filter(
+      Time != "Time 0", Metric == "Abundance"
+    ) |> tidytable::mutate(
+      Emphasis = Intervention %in% figure4$emphasise
+    ),
+    legendName = "Raw Values", legendtrans = "log10",
+    scalestrans = scales::label_number(accuracy = 1)
+  ),
+  nrow = 2
+)
+
+ggplot2::ggsave(
+  plot = figure4$plot,
+  filename = file.path(dirImages, "Figure4_Prototype5.pdf"),
+  units = "cm", width = 6.5*4, height = 6.5*3)
+ggplot2::ggsave(
+  plot = figure4$plot,
+  filename = file.path(dirImages, "Figure4_Prototype5.png"),
+  units = "cm", width = 6.5*4, height = 6.5*3)
+ggplot2::ggsave(
+  plot = figure4$plotB,
+  filename = file.path(dirImages, "Figure4B_Prototype5.pdf"),
+  units = "cm", width = 6.5*4, height = 6.5*3)
+ggplot2::ggsave(
+  plot = figure4$plotC,
+  filename = file.path(dirImages, "Figure4C_Prototype5.pdf"),
+  units = "cm", width = 6.5*4, height = 6.5*3)
+ggplot2::ggsave(
+  plot = figure4$plotRaw,
+  filename = file.path(dirImages, "Figure4Raw_Prototype5.pdf"),
+  units = "cm", width = 6.5*4, height = 6.5*3)
