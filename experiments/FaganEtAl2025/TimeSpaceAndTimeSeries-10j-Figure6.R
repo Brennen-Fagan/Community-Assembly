@@ -26,16 +26,14 @@ figure6$dataRich <- diversitiesRichness |> tidytable::filter(
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
   PoolPatchSeed %in% basePoolPatchSeeds,
-  Metric == "Alpha Hill:0",
-  is.na(Subset)
+  Metric == "Alpha Hill:0"
 )
 figure6$dataAbund <- diversitiesAbund |> tidytable::filter(
   SpeciesPreferences %in% figure6$pref,
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
   PoolPatchSeed %in% basePoolPatchSeeds,
-  Metric == "Alpha Abundance",
-  is.na(Subset)
+  Metric == "Alpha Abundance"
 )
 
 # Persistence data: why? Because we're using persistence as a weight, followed
@@ -71,13 +69,15 @@ figure6$dataPers <- Pers |> tidytable::filter(
 figure6$plotA <- plotMeanAndInner(
   rbind(
     figure6$dataRich |> tidytable::filter(
-      Intervention %in% c("(0)", "(0.5)", "(1)")
+      Intervention %in% c("(0)", "(0.5)", "(1)"),
+      is.na(Subset)
     ),
     # We want to appear in the legend but not on the plot!
     figure6$dataRich |> tidytable::filter(
       PoolPatchSeed == figure6$dataRich$PoolPatchSeed[1],
       Intervention %in% c("(0.25)", "(0.75)"),
-      abs(Time - 10000) == min(abs(Time - 10000))
+      abs(Time - 10000) == min(abs(Time - 10000)),
+      is.na(Subset)
     ) |> tidytable::mutate(
       Value = 10 # coord_cartesian will eliminate these points.
     )
@@ -111,21 +111,75 @@ figure6$plotB <- ggplot2::ggplot(
   figure6$dataRich |> tidytable::filter(
     Time > Start, Time < Stop
   ) |> tidytable::group_by(
-    PoolPatchSeed, Intervention, SpeciesPreferences
+    PoolPatchSeed, Intervention, SpeciesPreferences, Subset
   ) |> tidytable::summarise(
     Value = mean(Value)
   ),
   ggplot2::aes(
     x = Intervention,
     y = Value,
-    color = Intervention
+    color = Intervention,
+    group = paste(Intervention, Subset)
   )
 ) + ggplot2::geom_violin(
+  data = function(x) x |> tidytable::filter(is.na(Subset)),
   position = ggplot2::position_dodge(0.9), scale = "count"
 ) + ggplot2::geom_boxplot(
+  data = function(x) x |> tidytable::filter(is.na(Subset)),
   notch = TRUE, outlier.size = 0,
   position = ggplot2::position_dodge(0.9),
   width = 0.28
+) + geom_flat_violin(
+  data = function(x) x |> tidytable::filter(
+    !is.na(Subset)
+  ) |> tidytable::separate_wider_delim(
+    cols = Subset, delim = "_", names = c("Subset", "Bins")
+  ) |> tidytable::filter(
+    Subset == "Basal"
+  ) |> tidytable::group_by(
+    PoolPatchSeed, Intervention, SpeciesPreferences, Subset
+  ) |> tidytable::summarise(
+    Value = sum(Value)
+  ),
+  flip = 1, color = "black",
+  ggplot2::aes(fill = Intervention)
+) + geom_flat_violin(
+  data = function(x) x |> tidytable::filter(
+    !is.na(Subset)
+  ) |> tidytable::separate_wider_delim(
+    cols = Subset, delim = "_", names = c("Subset", "Bins")
+  ) |> tidytable::filter(
+    Subset == "Consumer"
+  ) |> tidytable::group_by(
+    PoolPatchSeed, Intervention, SpeciesPreferences, Subset
+  ) |> tidytable::summarise(
+    Value = sum(Value)
+  ),
+  flip = 2, color = "black",
+  ggplot2::aes(fill = Intervention)
+) + ggplot2::geom_text(
+  data = function(x) {
+    x |> tidytable::filter(
+      !is.na(Subset)
+    ) |> tidytable::separate_wider_delim(
+      cols = Subset, delim = "_", names = c("Subset", "Bins")
+    ) |> tidytable::group_by(
+      PoolPatchSeed, Intervention, SpeciesPreferences, Subset
+    ) |> tidytable::summarise(
+      Value = sum(Value),
+      .groups = "drop"
+    ) |> tidytable::mutate(
+      Offset = (max(Value) - min(Value)) * 0.08
+    ) |> dplyr::group_by(
+      Intervention, SpeciesPreferences, Subset
+    ) |> dplyr::summarise(
+      Value = min(Value - Offset),
+      Label = substr(Subset[1], 0, 1),
+      .groups = "drop"
+    )
+  },
+  mapping = ggplot2::aes(label = Label),
+  position = ggplot2::position_dodge(0.9)
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat Type"
@@ -153,21 +207,75 @@ figure6$plotC <- ggplot2::ggplot(
   figure6$dataAbund |> tidytable::filter(
     Time > Start, Time < Stop
   ) |> tidytable::group_by(
-    PoolPatchSeed, Intervention, SpeciesPreferences
+    PoolPatchSeed, Intervention, SpeciesPreferences, Subset
   ) |> tidytable::summarise(
     Value = mean(Value)
   ),
   ggplot2::aes(
     x = Intervention,
     y = Value,
-    color = Intervention
+    color = Intervention,
+    group = paste(Intervention, Subset)
   )
 ) + ggplot2::geom_violin(
+  data = function(x) x |> tidytable::filter(is.na(Subset)),
   position = ggplot2::position_dodge(0.9), scale = "count"
 ) + ggplot2::geom_boxplot(
+  data = function(x) x |> tidytable::filter(is.na(Subset)),
   notch = TRUE, outlier.size = 0,
   position = ggplot2::position_dodge(0.9),
   width = 0.28
+) + geom_flat_violin(
+  data = function(x) x |> tidytable::filter(
+    !is.na(Subset)
+  ) |> tidytable::separate_wider_delim(
+    cols = Subset, delim = "_", names = c("Subset", "Bins")
+  ) |> tidytable::filter(
+    Subset == "Basal"
+  ) |> tidytable::group_by(
+    PoolPatchSeed, Intervention, SpeciesPreferences, Subset
+  ) |> tidytable::summarise(
+    Value = sum(Value)
+  ),
+  flip = 1, color = "black",
+  ggplot2::aes(fill = Intervention)
+) + geom_flat_violin(
+  data = function(x) x |> tidytable::filter(
+    !is.na(Subset)
+  ) |> tidytable::separate_wider_delim(
+    cols = Subset, delim = "_", names = c("Subset", "Bins")
+  ) |> tidytable::filter(
+    Subset == "Consumer"
+  ) |> tidytable::group_by(
+    PoolPatchSeed, Intervention, SpeciesPreferences, Subset
+  ) |> tidytable::summarise(
+    Value = sum(Value)
+  ),
+  flip = 2, color = "black",
+  ggplot2::aes(fill = Intervention)
+) + ggplot2::geom_text(
+  data = function(x) {
+    x |> tidytable::filter(
+      !is.na(Subset)
+    ) |> tidytable::separate_wider_delim(
+      cols = Subset, delim = "_", names = c("Subset", "Bins")
+    ) |> tidytable::group_by(
+      PoolPatchSeed, Intervention, SpeciesPreferences, Subset
+    ) |> tidytable::summarise(
+      Value = sum(Value),
+      .groups = "drop"
+    ) |> tidytable::mutate(
+      Offset = (max(log10(Value)) - min(log10(Value))) * 0.08
+    ) |> dplyr::group_by(
+      Intervention, SpeciesPreferences, Subset
+    ) |> dplyr::summarise(
+      Value = 10^min(log10(Value) - Offset),
+      Label = substr(Subset[1], 0, 1),
+      .groups = "drop"
+    )
+  },
+  mapping = ggplot2::aes(label = Label),
+  position = ggplot2::position_dodge(0.9)
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat Type"
@@ -185,10 +293,8 @@ figure6$plotC <- ggplot2::ggplot(
 ) + ggplot2::guides(
   color = "none",
   fill = "none"
-) + ggplot2::coord_cartesian(
-  ylim = c(0, NA)
+) + scale_y_log10(
 )
-
 
 ##### c: Insets ###############################################################
 figure6$insetGrobs <- figure6$dataPers |> tidytable::filter(
@@ -353,17 +459,26 @@ figure6$plot <- ggpubr::ggarrange(
   nrow = 1, common.legend = TRUE
 )
 
-ggplot2::ggsave(plot = figure6$plot, filename = file.path(dirImages, "Figure6_Prototype1.pdf"),
+ggplot2::ggsave(plot = figure6$plot, filename = file.path(dirImages, "Figure6_Prototype2.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure6$plot, filename = file.path(dirImages, "Figure6_Prototype1.png"),
+ggplot2::ggsave(plot = figure6$plot, filename = file.path(dirImages, "Figure6_Prototype2.png"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = print(figure6$plotA), filename = file.path(dirImages, "Figure6A_Prototype1.pdf"),
+ggplot2::ggsave(plot = figure6$plotA, filename = file.path(dirImages, "Figure6A_Prototype2.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure6$plotB, filename = file.path(dirImages, "Figure6B_Prototype1.pdf"),
+ggplot2::ggsave(plot = figure6$plotB, filename = file.path(dirImages, "Figure6B_Prototype2.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure6$plotC, filename = file.path(dirImages, "Figure6C_Prototype1.pdf"),
+ggplot2::ggsave(plot = figure6$plotC, filename = file.path(dirImages, "Figure6C_Prototype2.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure6$insetB, filename = file.path(dirImages, "Figure6BInset_Prototype1.pdf"),
-                units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure6$insetC, filename = file.path(dirImages, "Figure6CInset_Prototype1.pdf"),
-                units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(
+  plot =
+    ggplot2::ggplot(
+    ) + ggplot2::coord_cartesian(
+      xlim = c(3500, 30000), ylim = c(0, 27)
+    ) + ggpp::geom_grob(
+      data = figure6$insetGrobs,
+      mapping = ggplot2::aes(x = Time, y = Value, label = grob)
+    ),
+  filename = file.path(dirImages, "Figure6Inset_Prototype2.pdf"),
+  units = "cm", width = 6.5*3, height = 6.5*2
+)
+

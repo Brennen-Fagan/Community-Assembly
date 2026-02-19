@@ -41,6 +41,7 @@ source("TimeSpaceAndTimeSeries-10-Dictionaries.R") # Defines IDs
 source(file.path("R", "changeInterventionLevels.R")) # Land-use names.
 source(file.path("R", "changePreferencesLevels.R")) # More human readable WISOTT.
 source(file.path("R", "colorPaletteAlg.R")) # Color scheme.
+source(file.path("R", "geom_flat_violin.R")) # Half-violin plots.
 source(file.path("R", "interventionNamingScheme.R")) # WISOTT.
 source(file.path("R", "plotGraph.R")) # WISOTT.
 source(file.path("R", "plotMeanAndInner.R")) # WISOTT for Value over Time.
