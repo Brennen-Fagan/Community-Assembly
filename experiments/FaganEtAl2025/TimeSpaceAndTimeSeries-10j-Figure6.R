@@ -13,7 +13,7 @@ library(tibble) # data.frames that can incorporate grobs.
 library(ggpp) # for the geom_grob function -> factor placement of grobs.
 
 # This is better as an environment, but that's more opaque.
-figure6 <- list(
+figure5 <- list(
   pref = c("Uniform(0, 1)", "50% 0, 50% 1")
 )
 
@@ -21,15 +21,15 @@ figure6 <- list(
 ### Plot 6: ###################################################################
 ##### Data: ###################################################################
 # Richness data: should be straightforward.
-figure6$dataRich <- diversitiesRichness |> tidytable::filter(
-  SpeciesPreferences %in% figure6$pref,
+figure5$dataRich <- diversitiesRichness |> tidytable::filter(
+  SpeciesPreferences %in% figure5$pref,
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
   PoolPatchSeed %in% basePoolPatchSeeds,
   Metric == "Alpha Hill:0"
 )
-figure6$dataAbund <- diversitiesAbund |> tidytable::filter(
-  SpeciesPreferences %in% figure6$pref,
+figure5$dataAbund <- diversitiesAbund |> tidytable::filter(
+  SpeciesPreferences %in% figure5$pref,
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
   PoolPatchSeed %in% basePoolPatchSeeds,
@@ -40,8 +40,8 @@ figure6$dataAbund <- diversitiesAbund |> tidytable::filter(
 # with by species aggregation. That way approximately we are picking a random
 # simulation, a random time, and then a random species, the plot shows the
 # probability we would get a certain land-use preference out.
-figure6$dataPers <- Pers |> tidytable::filter(
-  SpeciesPreferences %in% figure6$pref,
+figure5$dataPers <- Pers |> tidytable::filter(
+  SpeciesPreferences %in% figure5$pref,
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
   PoolPatchSeed %in% basePoolPatchSeeds
@@ -66,15 +66,15 @@ figure6$dataPers <- Pers |> tidytable::filter(
 
 ##### a: ######################################################################
 # Richness through time across simulations, showing stability and separation.
-figure6$plotA <- plotMeanAndInner(
+figure5$plotA <- plotMeanAndInner(
   rbind(
-    figure6$dataRich |> tidytable::filter(
+    figure5$dataRich |> tidytable::filter(
       Intervention %in% c("(0)", "(0.5)", "(1)"),
       is.na(Subset)
     ),
     # We want to appear in the legend but not on the plot!
-    figure6$dataRich |> tidytable::filter(
-      PoolPatchSeed == figure6$dataRich$PoolPatchSeed[1],
+    figure5$dataRich |> tidytable::filter(
+      PoolPatchSeed == figure5$dataRich$PoolPatchSeed[1],
       Intervention %in% c("(0.25)", "(0.75)"),
       abs(Time - 10000) == min(abs(Time - 10000)),
       is.na(Subset)
@@ -107,8 +107,8 @@ figure6$plotA <- plotMeanAndInner(
 )
 
 ##### b: Violins ##############################################################
-figure6$plotB <- ggplot2::ggplot(
-  figure6$dataRich |> tidytable::filter(
+figure5$plotB <- ggplot2::ggplot(
+  figure5$dataRich |> tidytable::filter(
     Time > Start, Time < Stop
   ) |> tidytable::group_by(
     PoolPatchSeed, Intervention, SpeciesPreferences, Subset
@@ -203,8 +203,8 @@ figure6$plotB <- ggplot2::ggplot(
   fill = "none"
 )
 
-figure6$plotC <- ggplot2::ggplot(
-  figure6$dataAbund |> tidytable::filter(
+figure5$plotC <- ggplot2::ggplot(
+  figure5$dataAbund |> tidytable::filter(
     Time > Start, Time < Stop
   ) |> tidytable::group_by(
     PoolPatchSeed, Intervention, SpeciesPreferences, Subset
@@ -298,7 +298,7 @@ figure6$plotC <- ggplot2::ggplot(
 )
 
 ##### c: Insets ###############################################################
-figure6$insetGrobs <- figure6$dataPers |> tidytable::filter(
+figure5$insetGrobs <- figure5$dataPers |> tidytable::filter(
   # Match A
   Intervention %in% c("(0)", "(0.5)", "(1)")
 ) |> tidytable::mutate(
@@ -444,31 +444,31 @@ figure6$insetGrobs <- figure6$dataPers |> tidytable::filter(
 )
 
 ##### Combine: ################################################################
-figure6$plot <- ggpubr::ggarrange(
+figure5$plot <- ggpubr::ggarrange(
   plotlist = list(
-    figure6$plotA + ggpp::geom_grob(
-      data = figure6$insetGrobs,
+    figure5$plotA + ggpp::geom_grob(
+      data = figure5$insetGrobs,
       mapping = ggplot2::aes(x = Time, y = Value, label = grob)
     ),
     cowplot::plot_grid(
       plotlist = list(
-        figure6$plotB,
-        figure6$plotC
+        figure5$plotB,
+        figure5$plotC
       ), ncol = 2
     )
   ),
   nrow = 1, common.legend = TRUE
 )
 
-ggplot2::ggsave(plot = figure6$plot, filename = file.path(dirImages, "Figure6_Prototype2.pdf"),
+ggplot2::ggsave(plot = figure5$plot, filename = file.path(dirImages, "Figure5_Prototype2.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure6$plot, filename = file.path(dirImages, "Figure6_Prototype2.png"),
+ggplot2::ggsave(plot = figure5$plot, filename = file.path(dirImages, "Figure5_Prototype2.png"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure6$plotA, filename = file.path(dirImages, "Figure6A_Prototype2.pdf"),
+ggplot2::ggsave(plot = figure5$plotA, filename = file.path(dirImages, "Figure5A_Prototype2.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure6$plotB, filename = file.path(dirImages, "Figure6B_Prototype2.pdf"),
+ggplot2::ggsave(plot = figure5$plotB, filename = file.path(dirImages, "Figure5B_Prototype2.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure6$plotC, filename = file.path(dirImages, "Figure6C_Prototype2.pdf"),
+ggplot2::ggsave(plot = figure5$plotC, filename = file.path(dirImages, "Figure5C_Prototype2.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(
   plot =
@@ -476,10 +476,10 @@ ggplot2::ggsave(
     ) + ggplot2::coord_cartesian(
       xlim = c(3500, 30000), ylim = c(0, 27)
     ) + ggpp::geom_grob(
-      data = figure6$insetGrobs,
+      data = figure5$insetGrobs,
       mapping = ggplot2::aes(x = Time, y = Value, label = grob)
     ),
-  filename = file.path(dirImages, "Figure6Inset_Prototype2.pdf"),
+  filename = file.path(dirImages, "Figure5Inset_Prototype2.pdf"),
   units = "cm", width = 6.5*3, height = 6.5*2
 )
 

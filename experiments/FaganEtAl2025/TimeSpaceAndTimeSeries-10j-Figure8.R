@@ -10,7 +10,7 @@ source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
 library(colorspace) # for diverging color scales with midpoint control.
 library(scales) # conversion to percentages
 
-figure8 <- list(
+figure7 <- list(
   pref = "Uniform(0, 1)",
   heatmapTimes = c(10, 10000),
   emphasise = c("(0.5)", "(0.5)->(0)", "(0.5)->(1)")
@@ -25,8 +25,8 @@ figure8 <- list(
 # Note it is per-simulation (timescale set by PoolPatch effectively).
 # (If done correctly, the set-up as of 23/01/2026 means there will be
 # round numbers from 1:10, evens from 12:20, and then by 3s 20:50.)
-figure8$interventionTimes <- diversitiesRichness |> tidytable::filter(
-  SpeciesPreferences == figure8$pref,
+figure7$interventionTimes <- diversitiesRichness |> tidytable::filter(
+  SpeciesPreferences == figure7$pref,
   NicheDistance == defaultNicheDistance,
   PoolPatchSeed %in% basePoolPatchSeeds,
   Metric == "Alpha Hill:0",
@@ -43,23 +43,23 @@ figure8$interventionTimes <- diversitiesRichness |> tidytable::filter(
   .groups = "drop"
 )
 
-figure8$dataBase <- tidytable::bind_rows(
+figure7$dataBase <- tidytable::bind_rows(
   diversitiesRichness |> tidytable::filter(
-    SpeciesPreferences == figure8$pref,
+    SpeciesPreferences == figure7$pref,
     NicheDistance == defaultNicheDistance,
     PoolPatchSeed %in% basePoolPatchSeeds,
     Metric == "Alpha Hill:0"
     # Need all subsets
   ),
   diversitiesAbund |> tidytable::filter(
-    SpeciesPreferences == figure8$pref,
+    SpeciesPreferences == figure7$pref,
     NicheDistance == defaultNicheDistance,
     PoolPatchSeed %in% basePoolPatchSeeds,
     Metric == "Alpha Abundance"
     # Need all subsets
   )
 ) |> tidytable::left_join(
-  figure8$interventionTimes |> tidytable::rename(
+  figure7$interventionTimes |> tidytable::rename(
     InterventionTime = Time
   ),
   by = c("PoolPatch", "PoolPatchSeed")
@@ -76,7 +76,7 @@ figure8$dataBase <- tidytable::bind_rows(
 # Why to the level of summary? Because the PlotMeanAndInner function
 # isn't built to handle the multiple resolutions that we have in the
 # actual data, which makes it harder to portray the data accurately.
-figure8$dataLogScale <- figure8$dataBase |> tidytable::filter(
+figure7$dataLogScale <- figure7$dataBase |> tidytable::filter(
   Metric %in% c("Richness", "Abundance")#,
   # is.na(Subset) # Not overall values
 ) |> tidytable::separate_wider_delim(
@@ -97,7 +97,7 @@ figure8$dataLogScale <- figure8$dataBase |> tidytable::filter(
     TRUE ~ Time
   )
 ) |> tidytable::filter(
-  Time %in% c(0, figure8$heatmapTimes)
+  Time %in% c(0, figure7$heatmapTimes)
 ) |> tidytable::group_by(
   # Average Over the now grouped times to make each sim equally weighted.
   # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
@@ -125,15 +125,15 @@ figure8$dataLogScale <- figure8$dataBase |> tidytable::filter(
   .groups = "drop"
 ) |> dplyr::mutate( # Change labelling, dplyr for conversion (can't in dt)
   Time = factor(
-    Time, levels = c(0, range(figure8$heatmapTimes)),
+    Time, levels = c(0, range(figure7$heatmapTimes)),
     labels = c("Time 0", paste0(
       c("Short (t = ", "Long (t = "),
-      range(figure8$heatmapTimes), ")"
+      range(figure7$heatmapTimes), ")"
     ))
   )
 )
 
-figure8$dataRawValues <- figure8$dataBase |> tidytable::filter(
+figure7$dataRawValues <- figure7$dataBase |> tidytable::filter(
   Metric %in% c("Richness", "Abundance"),
   is.na(Subset) # Not overall values
 ) |> tidytable::mutate(
@@ -146,7 +146,7 @@ figure8$dataRawValues <- figure8$dataBase |> tidytable::filter(
     TRUE ~ Time
   )
 ) |> tidytable::filter(
-  Time %in% c(0, figure8$heatmapTimes)
+  Time %in% c(0, figure7$heatmapTimes)
 ) |> tidytable::group_by(
   # Average Over the now grouped times to make each sim equally weighted.
   # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
@@ -164,10 +164,10 @@ figure8$dataRawValues <- figure8$dataBase |> tidytable::filter(
   Average = mean(Value)
 ) |> dplyr::mutate( # Change labelling, dplyr for conversion (can't in dt)
   Time = factor(
-    Time, levels = c(0, range(figure8$heatmapTimes)),
+    Time, levels = c(0, range(figure7$heatmapTimes)),
     labels = c("Time 0", paste0(
       c("Short (t = ", "Long (t = "),
-      range(figure8$heatmapTimes), ")"
+      range(figure7$heatmapTimes), ")"
     ))
   )
 )
@@ -209,11 +209,11 @@ plotTextHeatmap <- function(
 
 ##### KEY: ####################################################################
 
-figure8$plot <- plotTextHeatmap(
-  figure8$dataLogScale |> tidytable::filter(
+figure7$plot <- plotTextHeatmap(
+  figure7$dataLogScale |> tidytable::filter(
     Time != "Time 0", is.na(Subset)
   ) |> tidytable::mutate(
-    Emphasis = Intervention %in% figure8$emphasise,
+    Emphasis = Intervention %in% figure7$emphasise,
     Average = Average
   ),
   ""
@@ -223,11 +223,11 @@ figure8$plot <- plotTextHeatmap(
   # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
 )
 
-figure8$plotB <- plotTextHeatmap(
-  figure8$dataLogScale |> tidytable::filter(
+figure7$plotB <- plotTextHeatmap(
+  figure7$dataLogScale |> tidytable::filter(
     Time != "Time 0", Subset == "Basal"
   ) |> tidytable::mutate(
-    Emphasis = Intervention %in% figure8$emphasise,
+    Emphasis = Intervention %in% figure7$emphasise,
     Average = Average
   ),
   "Basal"
@@ -237,11 +237,11 @@ figure8$plotB <- plotTextHeatmap(
   # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
 ) # See end comment if you think it looks weird!
 
-figure8$plotC <- plotTextHeatmap(
-  figure8$dataLogScale |> tidytable::filter(
+figure7$plotC <- plotTextHeatmap(
+  figure7$dataLogScale |> tidytable::filter(
     Time != "Time 0", Subset == "Consumer"
   ) |> tidytable::mutate(
-    Emphasis = Intervention %in% figure8$emphasise,
+    Emphasis = Intervention %in% figure7$emphasise,
     Average = Average
   ),
   "Consumer"
@@ -251,21 +251,21 @@ figure8$plotC <- plotTextHeatmap(
   # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
 )
 
-figure8$plotRaw <- ggpubr::ggarrange(
+figure7$plotRaw <- ggpubr::ggarrange(
   plotTextHeatmap(
-    figure8$dataRawValues |> tidytable::filter(
+    figure7$dataRawValues |> tidytable::filter(
       Time != "Time 0", Metric == "Richness"
     ) |> tidytable::mutate(
-      Emphasis = Intervention %in% figure8$emphasise
+      Emphasis = Intervention %in% figure7$emphasise
     ),
     legendName = "Raw Values",
     scalestrans = scales::label_number(accuracy = 0.1)
   ),
   plotTextHeatmap(
-    figure8$dataRawValues |> tidytable::filter(
+    figure7$dataRawValues |> tidytable::filter(
       Time != "Time 0", Metric == "Abundance"
     ) |> tidytable::mutate(
-      Emphasis = Intervention %in% figure8$emphasise
+      Emphasis = Intervention %in% figure7$emphasise
     ),
     legendName = "Raw Values", legendtrans = "log10",
     scalestrans = scales::label_number(accuracy = 1)
@@ -274,24 +274,24 @@ figure8$plotRaw <- ggpubr::ggarrange(
 )
 
 ggplot2::ggsave(
-  plot = figure8$plot,
-  filename = file.path(dirImages, "figure8_Prototype2.pdf"),
+  plot = figure7$plot,
+  filename = file.path(dirImages, "Figure7_Prototype2.pdf"),
   units = "cm", width = 6.5*4, height = 6.5*3)
 ggplot2::ggsave(
-  plot = figure8$plot,
-  filename = file.path(dirImages, "figure8_Prototype2.png"),
+  plot = figure7$plot,
+  filename = file.path(dirImages, "Figure7_Prototype2.png"),
   units = "cm", width = 6.5*4, height = 6.5*3)
 ggplot2::ggsave(
-  plot = figure8$plotB,
-  filename = file.path(dirImages, "figure8B_Prototype2.pdf"),
+  plot = figure7$plotB,
+  filename = file.path(dirImages, "Figure7B_Prototype2.pdf"),
   units = "cm", width = 6.5*4, height = 6.5*3)
 ggplot2::ggsave(
-  plot = figure8$plotC,
-  filename = file.path(dirImages, "figure8C_Prototype2.pdf"),
+  plot = figure7$plotC,
+  filename = file.path(dirImages, "Figure7C_Prototype2.pdf"),
   units = "cm", width = 6.5*4, height = 6.5*3)
 ggplot2::ggsave(
-  plot = figure8$plotRaw,
-  filename = file.path(dirImages, "figure8Raw_Prototype2.pdf"),
+  plot = figure7$plotRaw,
+  filename = file.path(dirImages, "Figure7Raw_Prototype2.pdf"),
   units = "cm", width = 6.5*4, height = 6.5*3)
 
 
@@ -305,7 +305,7 @@ ggplot2::ggsave(
 # intervention?)
 
 # Drag the data back from before summarising:
-figure8$suppTesting <- figure8$dataBase |> tidytable::filter(
+figure7$suppTesting <- figure7$dataBase |> tidytable::filter(
   Metric %in% c("Richness", "Abundance"),
   is.na(Subset) # Not overall values
 ) |> tidytable::mutate(
@@ -318,7 +318,7 @@ figure8$suppTesting <- figure8$dataBase |> tidytable::filter(
     TRUE ~ Time
   )
 ) |> tidytable::filter(
-  Time %in% c(0, figure8$heatmapTimes)
+  Time %in% c(0, figure7$heatmapTimes)
 ) |> tidytable::group_by(
   # Average Over the now grouped times to make each sim equally weighted.
   # NOTE TO FUTURE USERS, I've been lazy here because the groupings are

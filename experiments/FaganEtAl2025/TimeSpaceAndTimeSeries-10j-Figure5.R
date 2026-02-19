@@ -10,7 +10,7 @@ source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
 library(colorspace) # for diverging color scales with midpoint control.
 library(scales) # conversion to percentages
 
-figure5 <- list(
+figure4 <- list(
   pref = "100% 0", #"Uniform(0, 1)"
   heatmapTimes = c(10, 10000),
   emphasise = c("(0.5)", "(0.5)->(0)", "(0.5)->(1)")
@@ -25,8 +25,8 @@ figure5 <- list(
 # Note it is per-simulation (timescale set by PoolPatch effectively).
 # (If done correctly, the set-up as of 23/01/2026 means there will be
 # round numbers from 1:10, evens from 12:20, and then by 3s 20:50.)
-figure5$interventionTimes <- diversitiesRichness |> tidytable::filter(
-  SpeciesPreferences == figure5$pref,
+figure4$interventionTimes <- diversitiesRichness |> tidytable::filter(
+  SpeciesPreferences == figure4$pref,
   NicheDistance == defaultNicheDistance,
   PoolPatchSeed %in% basePoolPatchSeeds,
   Metric == "Alpha Hill:0",
@@ -43,23 +43,23 @@ figure5$interventionTimes <- diversitiesRichness |> tidytable::filter(
   .groups = "drop"
 )
 
-figure5$dataBase <- tidytable::bind_rows(
+figure4$dataBase <- tidytable::bind_rows(
   diversitiesRichness |> tidytable::filter(
-    SpeciesPreferences == figure5$pref,
+    SpeciesPreferences == figure4$pref,
     NicheDistance == defaultNicheDistance,
     PoolPatchSeed %in% basePoolPatchSeeds,
     Metric == "Alpha Hill:0"
     # Need all subsets
   ),
   diversitiesAbund |> tidytable::filter(
-    SpeciesPreferences == figure5$pref,
+    SpeciesPreferences == figure4$pref,
     NicheDistance == defaultNicheDistance,
     PoolPatchSeed %in% basePoolPatchSeeds,
     Metric == "Alpha Abundance"
     # Need all subsets
   )
 ) |> tidytable::left_join(
-  figure5$interventionTimes |> tidytable::rename(
+  figure4$interventionTimes |> tidytable::rename(
     InterventionTime = Time
   ),
   by = c("PoolPatch", "PoolPatchSeed")
@@ -76,7 +76,7 @@ figure5$dataBase <- tidytable::bind_rows(
 # Why to the level of summary? Because the PlotMeanAndInner function
 # isn't built to handle the multiple resolutions that we have in the
 # actual data, which makes it harder to portray the data accurately.
-figure5$dataLogScale <- figure5$dataBase |> tidytable::filter(
+figure4$dataLogScale <- figure4$dataBase |> tidytable::filter(
   Metric %in% c("Richness", "Abundance")#,
   # is.na(Subset) # Not overall values
 ) |> tidytable::mutate(
@@ -89,7 +89,7 @@ figure5$dataLogScale <- figure5$dataBase |> tidytable::filter(
     TRUE ~ Time
   )
 ) |> tidytable::filter(
-  Time %in% c(0, figure5$heatmapTimes)
+  Time %in% c(0, figure4$heatmapTimes)
 ) |> tidytable::group_by(
   # Average Over the now grouped times to make each sim equally weighted.
   # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
@@ -117,15 +117,15 @@ figure5$dataLogScale <- figure5$dataBase |> tidytable::filter(
   .groups = "drop"
 ) |> dplyr::mutate( # Change labelling, dplyr for conversion (can't in dt)
   Time = factor(
-    Time, levels = c(0, range(figure5$heatmapTimes)),
+    Time, levels = c(0, range(figure4$heatmapTimes)),
     labels = c("Time 0", paste0(
       c("Short (t = ", "Long (t = "),
-      range(figure5$heatmapTimes), ")"
+      range(figure4$heatmapTimes), ")"
     ))
   )
 )
 
-figure5$dataRawValues <- figure5$dataBase |> tidytable::filter(
+figure4$dataRawValues <- figure4$dataBase |> tidytable::filter(
   Metric %in% c("Richness", "Abundance"),
   is.na(Subset) # Not overall values
 ) |> tidytable::mutate(
@@ -138,7 +138,7 @@ figure5$dataRawValues <- figure5$dataBase |> tidytable::filter(
     TRUE ~ Time
   )
 ) |> tidytable::filter(
-  Time %in% c(0, figure5$heatmapTimes)
+  Time %in% c(0, figure4$heatmapTimes)
 ) |> tidytable::group_by(
   # Average Over the now grouped times to make each sim equally weighted.
   # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
@@ -156,10 +156,10 @@ figure5$dataRawValues <- figure5$dataBase |> tidytable::filter(
   Average = mean(Value)
 ) |> dplyr::mutate( # Change labelling, dplyr for conversion (can't in dt)
   Time = factor(
-    Time, levels = c(0, range(figure5$heatmapTimes)),
+    Time, levels = c(0, range(figure4$heatmapTimes)),
     labels = c("Time 0", paste0(
       c("Short (t = ", "Long (t = "),
-      range(figure5$heatmapTimes), ")"
+      range(figure4$heatmapTimes), ")"
     ))
   )
 )
@@ -201,11 +201,11 @@ plotTextHeatmap <- function(
 
 ##### KEY: ####################################################################
 
-figure5$plot <- plotTextHeatmap(
-  figure5$dataLogScale |> tidytable::filter(
+figure4$plot <- plotTextHeatmap(
+  figure4$dataLogScale |> tidytable::filter(
     Time != "Time 0", is.na(Subset)
   ) |> tidytable::mutate(
-    Emphasis = Intervention %in% figure5$emphasise,
+    Emphasis = Intervention %in% figure4$emphasise,
     Average = Average
   ),
   ""
@@ -215,11 +215,11 @@ figure5$plot <- plotTextHeatmap(
   # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
 )
 
-figure5$plotB <- plotTextHeatmap(
-  figure5$dataLogScale |> tidytable::filter(
+figure4$plotB <- plotTextHeatmap(
+  figure4$dataLogScale |> tidytable::filter(
     Time != "Time 0", Subset == "Basal_0"
   ) |> tidytable::mutate(
-    Emphasis = Intervention %in% figure5$emphasise,
+    Emphasis = Intervention %in% figure4$emphasise,
     Average = Average
   ),
   "Basal"
@@ -229,11 +229,11 @@ figure5$plotB <- plotTextHeatmap(
   # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
 )
 
-figure5$plotC <- plotTextHeatmap(
-  figure5$dataLogScale |> tidytable::filter(
+figure4$plotC <- plotTextHeatmap(
+  figure4$dataLogScale |> tidytable::filter(
     Time != "Time 0", Subset == "Consumer_0"
   ) |> tidytable::mutate(
-    Emphasis = Intervention %in% figure5$emphasise,
+    Emphasis = Intervention %in% figure4$emphasise,
     Average = Average
   ),
   "Consumer"
@@ -243,21 +243,21 @@ figure5$plotC <- plotTextHeatmap(
   # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
 )
 
-figure5$plotRaw <- ggpubr::ggarrange(
+figure4$plotRaw <- ggpubr::ggarrange(
   plotTextHeatmap(
-    figure5$dataRawValues |> tidytable::filter(
+    figure4$dataRawValues |> tidytable::filter(
       Time != "Time 0", Metric == "Richness"
     ) |> tidytable::mutate(
-      Emphasis = Intervention %in% figure5$emphasise
+      Emphasis = Intervention %in% figure4$emphasise
     ),
     legendName = "Raw Values",
     scalestrans = scales::label_number(accuracy = 0.1)
   ),
   plotTextHeatmap(
-    figure5$dataRawValues |> tidytable::filter(
+    figure4$dataRawValues |> tidytable::filter(
       Time != "Time 0", Metric == "Abundance"
     ) |> tidytable::mutate(
-      Emphasis = Intervention %in% figure5$emphasise
+      Emphasis = Intervention %in% figure4$emphasise
     ),
     legendName = "Raw Values", legendtrans = "log10",
     scalestrans = scales::label_number(accuracy = 1)
@@ -266,22 +266,22 @@ figure5$plotRaw <- ggpubr::ggarrange(
 )
 
 ggplot2::ggsave(
-  plot = figure5$plot,
-  filename = file.path(dirImages, "Figure5_Prototype5.pdf"),
+  plot = figure4$plot,
+  filename = file.path(dirImages, "Figure4_Prototype5.pdf"),
   units = "cm", width = 6.5*4, height = 6.5*3)
 ggplot2::ggsave(
-  plot = figure5$plot,
-  filename = file.path(dirImages, "Figure5_Prototype5.png"),
+  plot = figure4$plot,
+  filename = file.path(dirImages, "Figure4_Prototype5.png"),
   units = "cm", width = 6.5*4, height = 6.5*3)
 ggplot2::ggsave(
-  plot = figure5$plotB,
-  filename = file.path(dirImages, "Figure5B_Prototype5.pdf"),
+  plot = figure4$plotB,
+  filename = file.path(dirImages, "Figure4B_Prototype5.pdf"),
   units = "cm", width = 6.5*4, height = 6.5*3)
 ggplot2::ggsave(
-  plot = figure5$plotC,
-  filename = file.path(dirImages, "Figure5C_Prototype5.pdf"),
+  plot = figure4$plotC,
+  filename = file.path(dirImages, "Figure4C_Prototype5.pdf"),
   units = "cm", width = 6.5*4, height = 6.5*3)
 ggplot2::ggsave(
-  plot = figure5$plotRaw,
-  filename = file.path(dirImages, "Figure5Raw_Prototype5.pdf"),
+  plot = figure4$plotRaw,
+  filename = file.path(dirImages, "Figure4Raw_Prototype5.pdf"),
   units = "cm", width = 6.5*4, height = 6.5*3)
