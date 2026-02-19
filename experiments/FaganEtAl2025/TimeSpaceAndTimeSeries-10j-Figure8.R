@@ -82,7 +82,7 @@ figure8$dataLogScale <- figure8$dataBase |> tidytable::filter(
 ) |> tidytable::separate_wider_delim(
   Subset, names = c("Subset", "Affinity"), delim = "_"
 ) |> tidytable::group_by(
-  # Need to aggregate over trophic levels before we reconcile times.
+  # Need to aggregate to trophic levels before we reconcile times.
   Intervention, InterventionInitial, InterventionFinal, Metric, Subset,
   PoolPatchSeed, SpeciesPreferences, Time
 ) |> tidytable::summarise(

@@ -139,6 +139,12 @@ figure7$dataBCSupplement <- figure7$dataBase |> tidytable::filter(
 ) |> tidytable::separate_wider_delim(
   delim = "_", cols = Subset, names = c("Guild", "AffinityBins")
 ) |> unifyAffinityBins( # if many preference types.
+) |> tidytable::group_by(
+  # Need to aggregate to trophic levels before we reconcile times.
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  PoolPatchSeed, SpeciesPreferences, Guild, Time
+) |> tidytable::summarise(
+  Value = sum(Value), .groups = "drop"
 ) |> tidytable::mutate(
   Time = tidytable::case_when( # Create groupings for times.
     Time < -50 ~ round(Time, -2),
@@ -155,13 +161,13 @@ figure7$dataBCSupplement <- figure7$dataBase |> tidytable::filter(
   # simple and match each other with the seeds. More complicated set-ups
   # will want to adjust the groupings here.
   Intervention, InterventionInitial, InterventionFinal, Metric,
-  PoolPatchSeed, SpeciesPreferences, Guild, AffinityBins, Time
+  PoolPatchSeed, SpeciesPreferences, Guild, Time
 ) |> tidytable::summarise(
   Value = median(Value), .groups = "drop"
 ) |> tidytable::group_by(
   # Average across simulations
   Intervention, InterventionInitial, InterventionFinal, Metric,
-  SpeciesPreferences, Guild, AffinityBins, Time
+  SpeciesPreferences, Guild, Time
 ) |> tidytable::summarise(
   Lower = quantile(Value, p = (1 - figure7$CI) - (1 - figure7$CI)/2, na.rm = TRUE),
   Average = mean(Value),
@@ -217,7 +223,7 @@ figure7$plotB <- ggplot2::ggplot(
   x = "Time Since Intervention",
   y = "Richness"
 ) + ggplot2::coord_cartesian(
-  ylim = c(0, richnessYMax),
+  ylim = c(0, 17),
   expand = FALSE
 ) + ggplot2::scale_x_continuous(
   trans = "log1p",
@@ -252,7 +258,7 @@ figure7$plotCD <- ggplot2::ggplot(
   x = "Time Since Intervention",
   y = "Richness"
 ) + ggplot2::coord_cartesian(
-  ylim = c(0, richnessYMax),
+  ylim = c(0, 17),
   expand = FALSE
 ) + ggplot2::scale_x_continuous(
   trans = "log1p",
@@ -286,7 +292,7 @@ figure7$plotE <- ggplot2::ggplot(
   x = "Time Since Intervention",
   y = "Abundance"
 ) + ggplot2::coord_cartesian(
-  ylim = c(1e-2, 1e5),
+  ylim = c(1e0, 1e5),
   expand = FALSE
 ) + ggplot2::scale_y_log10(
   label = scales::label_log()
@@ -323,7 +329,7 @@ figure7$plotFG <- ggplot2::ggplot(
   x = "Time Since Intervention",
   y = "Abundance"
 ) + ggplot2::coord_cartesian(
-  ylim = c(1e-2, 1e5),
+  ylim = c(1e0, 1e5),
   expand = FALSE
 ) + ggplot2::scale_x_continuous(
   trans = "log1p",
