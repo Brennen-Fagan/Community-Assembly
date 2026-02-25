@@ -183,9 +183,9 @@ figure3$plotA <- plotMeanAndInner(
   x = "Time",
   y = "Richness"
 ) + ggplot2::guides(
-  linetype = "none",
-  color = "none", # already covered by the main plot.
-  fill = "none"
+  linetype = "none"#,
+  # color = "none", # already covered by the main plot.
+  # fill = "none"
 ) + ggplot2::coord_cartesian(
   ylim = c(0, richnessYMax),
   xlim = c(0, 31000),
