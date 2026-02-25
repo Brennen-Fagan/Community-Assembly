@@ -15,7 +15,7 @@ figure2 <- list(
     seed = "2", # "11", "17", "2"!,
     time = 25000
   ),
-  abundlog = FALSE,
+  abundlog = TRUE,
   pref = "100% 0"#"Uniform(0, 1)"
 )
 
@@ -275,7 +275,9 @@ figure2$plotD <- ggplot2::ggplot(
 )
 
 if (figure2$abundlog) {
-  figure2$plotD <- figure2$plotD + ggplot2::scale_y_log10()
+  figure2$plotD <- figure2$plotD + ggplot2::scale_y_log10(
+    label = scales::label_log()
+  )
 }
 
 ##### f: ######################################################################
@@ -345,20 +347,6 @@ figure2$plotG <- ggplot2::ggplot(
   notch = TRUE, outlier.size = 1,
   position = ggplot2::position_dodge(0.9),
   width = 0.28
-) + ggplot2::geom_text(
-  data = function(x) {
-    x |> tidytable::mutate(
-      Offset = (max(Value) - min(Value))* 0.08
-    ) |> tidytable::group_by(
-      Intervention, Subset
-    ) |> tidytable::summarise(
-      Value = max(Value) + Offset,
-      Label = substr(Subset, 0, 1),
-      .groups = "drop"
-    )
-  },
-  mapping = ggplot2::aes(label = Label),
-  position = ggplot2::position_dodge(0.9)
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat Type"
@@ -375,7 +363,41 @@ figure2$plotG <- ggplot2::ggplot(
 )
 
 if (figure2$abundlog) {
-  figure2$plotG <- figure2$plotG + ggplot2::scale_y_log10()
+  figure2$plotG <- figure2$plotG + ggplot2::scale_y_log10(
+    label = scales::label_log()
+  ) + ggplot2::geom_text(
+    data = function(x) {
+      x |> tidytable::mutate(
+        Offset = (max(log10(Value)) - min(log10(Value))) * 0.08
+      ) |> dplyr::group_by(
+        Intervention, Subset
+      ) |> dplyr::summarise(
+        Value = ifelse(min(log10(Value)) >= 0,
+                       10^min(log10(Value) - Offset),
+                       10^max(log10(Value) + Offset)),
+        Label = substr(Subset[1], 0, 1),
+        .groups = "drop"
+      )
+    },
+    mapping = ggplot2::aes(label = Label),
+    position = ggplot2::position_dodge(0.9)
+  )
+} else {
+  figure2$plotG <- figure2$plotG + ggplot2::geom_text(
+    data = function(x) {
+      x |> tidytable::mutate(
+        Offset = (max(Value) - min(Value))* 0.08
+      ) |> tidytable::group_by(
+        Intervention, Subset
+      ) |> tidytable::summarise(
+        Value = max(Value) + Offset,
+        Label = substr(Subset, 0, 1),
+        .groups = "drop"
+      )
+    },
+    mapping = ggplot2::aes(label = Label),
+    position = ggplot2::position_dodge(0.9)
+  )
 }
 
 
