@@ -81,11 +81,13 @@ interventionChoices <- dplyr::bind_rows(lapply(
       )
     )}))
 
+# Combine seeds from parameterChoices with intervention seeds/choices.
 parameterChoices <- parameterChoices %>% dplyr::left_join(
   interventionChoices,
   by = c("pp", "dyn", "events", "initconds",
          "dispersal", "distance", "saff", "paff"),
-  multiple = "all"
+  multiple = "all",
+  relationship = "many-to-many"
 )
 
 # Since we've had success with making sure that the interruptions that do
