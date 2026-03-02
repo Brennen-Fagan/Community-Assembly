@@ -19,11 +19,11 @@ figure2 <- list(
   pref = "100% 0"#"Uniform(0, 1)"
 )
 
-if (figure2$abundlog) {
-  figure2$abundLimits <- c(1e-1, 4e4)
-} else {
-  figure2$abundLimits <- c(0, 3.7e4)
-}
+# if (figure2$abundlog) {
+#   figure2$abundLimits <- c(1e-1, 4e4)
+# } else {
+#   figure2$abundLimits <- c(0, 3.7e4)
+# }
 
 figure2$graph$specification <- diversitiesRichness |> tidytable::select(c(
   # Which network:
@@ -174,7 +174,7 @@ figure2$plotA <- plotMeanAndInner(
 # Example networks from different scenarios of the same simulation, showing
 # effects of the current habitat type through time on network shape.
 # Previously, these were independent panels, but I'm switching to a facets.
-figure2$plotB <- figure2$graph$networks$Plot + ggplot2::facet_grid(
+figure2$plotNetworks <- figure2$graph$networks$Plot + ggplot2::facet_grid(
   # Reverse order
   factor(Intervention, levels = c("(1)", "(0.5)", "(0)"), ordered = T) ~ .
 ) + ggplot2::theme(
@@ -198,8 +198,6 @@ figure2$plotC <- ggplot2::ggplot(
     y = Value,
     color = Intervention
   )
-) + ggplot2::coord_cartesian(
-  ylim = c(0, richnessYMax), expand = FALSE
 ) + ggplot2::geom_violin(
   position = ggplot2::position_dodge(0.9)
 ) + ggplot2::geom_boxplot(
@@ -227,6 +225,8 @@ figure2$plotC <- ggplot2::ggplot(
   "text", x = c(1.5, 4.5), y = c(30, 15),
   label = c("Well\nAdapted", "Poorly\nAdapted"),
   size = 3
+) + ggplot2::coord_cartesian(
+  ylim = c(0, richnessYMax), expand = FALSE
 )
 
 ##### d: ######################################################################
@@ -270,13 +270,13 @@ figure2$plotD <- ggplot2::ggplot(
   #   size = 3
 ) + ggplot2::theme(
   panel.grid.minor = ggplot2::element_blank()
-) + ggplot2::coord_cartesian(
-  ylim = figure2$abundLimits
+# ) + ggplot2::coord_cartesian(
+#   ylim = figure2$abundLimits
 )
 
 if (figure2$abundlog) {
   figure2$plotD <- figure2$plotD + ggplot2::scale_y_log10(
-    label = scales::label_log()
+    label = scales::label_log(digits = 2)
   )
 }
 
@@ -325,7 +325,7 @@ figure2$plotF <- ggplot2::ggplot(
 ) + ggplot2::labs(
   x = "Habitat Type", y = "Richness"
 ) + ggplot2::coord_cartesian(
-  ylim = c(0, richnessYMax)
+  ylim = c(0, richnessYMax), expand = FALSE
 )
 
 ##### g: ######################################################################
@@ -358,13 +358,13 @@ figure2$plotG <- ggplot2::ggplot(
   panel.grid.minor = ggplot2::element_blank()
 ) + ggplot2::labs(
   x = "Habitat Type", y = "Abundance"
-) + ggplot2::coord_cartesian(
-  ylim = figure2$abundLimits
+# ) + ggplot2::coord_cartesian(
+#   ylim = figure2$abundLimits
 )
 
 if (figure2$abundlog) {
   figure2$plotG <- figure2$plotG + ggplot2::scale_y_log10(
-    label = scales::label_log()
+    label = scales::label_log(digits = 2)
   ) + ggplot2::geom_text(
     data = function(x) {
       x |> tidytable::mutate(
@@ -406,7 +406,7 @@ if (figure2$abundlog) {
 figure2$plot <- ggpubr::ggarrange(
   plotlist = list(
     figure2$plotA,
-    figure2$plotB + ggplot2::theme(legend.position = "none"),
+    figure2$plotNetworks + ggplot2::theme(legend.position = "none"),
     cowplot::plot_grid(plotlist = list(
       figure2$plotC, figure2$plotF,
       figure2$plotD, figure2$plotG
@@ -423,8 +423,8 @@ ggplot2::ggsave(plot = figure2$plot,
 ggplot2::ggsave(plot = figure2$plotA,
                 filename = file.path(dirImages, "Figure2A_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*3)
-ggplot2::ggsave(plot = figure2$plotB,
-                filename = file.path(dirImages, "Figure2B_Prototype1.pdf"),
+ggplot2::ggsave(plot = figure2$plotNetworks,
+                filename = file.path(dirImages, "Figure2Networks_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(plot = figure2$plotC,
                 filename = file.path(dirImages, "Figure2C_Prototype1.pdf"),
