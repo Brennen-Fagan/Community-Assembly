@@ -6,6 +6,7 @@
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
+source(file.path("R", "plotTextHeatmap.R"))
 
 library(colorspace) # for diverging color scales with midpoint control.
 library(scales) # conversion to percentages
@@ -17,7 +18,7 @@ figure4 <- list(
 )
 
 # Main Plots: #################################################################
-### Plot 5: ###################################################################
+### Plot 4: ###################################################################
 ##### Data: ###################################################################
 
 # Interventions store the time right before intervention, then the
@@ -164,41 +165,6 @@ figure4$dataRawValues <- figure4$dataBase |> tidytable::filter(
   )
 )
 
-##### FUNCTION: ###############################################################
-# Different Scales mean we have to separate out the data, so we define a
-# function to perform the plotting repeatedly/consistently.
-plotTextHeatmap <- function(
-  data, legendName,
-  legendtrans = "identity",
-  scalestrans = scales::label_percent(accuracy = 0.1)
-) {
-  ggplot2::ggplot(
-    data,
-    ggplot2::aes(
-      x = InterventionInitial,
-      y = InterventionFinal,
-      fill = Average
-    )
-  ) + ggplot2::geom_tile(
-    width = 1, height = 1, color = NA
-  ) + ggplot2::geom_tile(
-    data = function(x) x |> tidytable::filter(Emphasis),
-    fill = NA, color = "black", linewidth = 1
-  ) + ggplot2::geom_text(
-    ggplot2::aes(label = scalestrans(Average))
-  ) + ggplot2::facet_grid(
-    Metric ~ Time
-  ) + ggplot2::scale_fill_viridis_c(
-    transform = legendtrans, begin = 0.1, labels = scalestrans
-  ) + ggplot2::theme_minimal(
-  ) + ggplot2::labs(
-    fill = legendName,
-    x = "Initial Habitat Type",
-    y = "Final Habitat Type"
-  ) + ggplot2::coord_fixed(
-  )
-}
-
 ##### KEY: ####################################################################
 
 figure4$plot <- plotTextHeatmap(
@@ -209,9 +175,9 @@ figure4$plot <- plotTextHeatmap(
     Average = Average
   ),
   ""
-) + colorspace::scale_fill_continuous_diverging(
-  palette = "Blue-Yellow 3", mid = log10(1), transform = "log10",
-  labels = scales::label_percent(accuracy = 0.1)
+) + colorspace::scale_fill_discrete_sequential(
+  palette = "Hawaii"#, mid = log10(1), transform = "log10",
+  #labels = scales::label_percent(accuracy = 0.1)
   # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
 )
 
@@ -223,10 +189,12 @@ figure4$plotB <- plotTextHeatmap(
     Average = Average
   ),
   "Basal"
-) + colorspace::scale_fill_continuous_diverging(
-  palette = "Blue-Yellow 3", mid = log10(1), transform = "log10",
-  labels = scales::label_percent(accuracy = 0.1)
-  # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
+) + colorspace::scale_fill_discrete_sequential(
+  palette = "Hawaii"
+# ) + colorspace::scale_fill_continuous_diverging(
+#   palette = "Blue-Yellow 3", mid = log10(1), transform = "log10",
+#   labels = scales::label_percent(accuracy = 0.1)
+#   # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
 )
 
 figure4$plotC <- plotTextHeatmap(
@@ -237,10 +205,12 @@ figure4$plotC <- plotTextHeatmap(
     Average = Average
   ),
   "Consumer"
-) + colorspace::scale_fill_continuous_diverging(
-  palette = "Blue-Yellow 3", mid = log10(1), transform = "log10",
-  labels = scales::label_percent(accuracy = 0.1)
-  # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
+) + colorspace::scale_fill_discrete_sequential(
+  palette = "Hawaii"
+# ) + colorspace::scale_fill_continuous_diverging(
+#   palette = "Blue-Yellow 3", mid = log10(1), transform = "log10",
+#   labels = scales::label_percent(accuracy = 0.1)
+#   # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
 )
 
 figure4$plotRaw <- ggpubr::ggarrange(
@@ -252,6 +222,9 @@ figure4$plotRaw <- ggpubr::ggarrange(
     ),
     legendName = "Raw Values",
     scalestrans = scales::label_number(accuracy = 0.1)
+  ) + ggplot2::scale_fill_viridis_c(
+    transform = "identity", begin = 0.1,
+    labels = scales::label_number(accuracy = 0.1)
   ),
   plotTextHeatmap(
     figure4$dataRawValues |> tidytable::filter(
@@ -261,6 +234,9 @@ figure4$plotRaw <- ggpubr::ggarrange(
     ),
     legendName = "Raw Values", legendtrans = "log10",
     scalestrans = scales::label_number(accuracy = 1)
+  ) + ggplot2::scale_fill_viridis_c(
+    transform = "log10", begin = 0.1,
+    labels = scales::label_number(accuracy = 0.1)
   ),
   nrow = 2
 )
