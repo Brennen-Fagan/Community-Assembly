@@ -185,7 +185,7 @@ figure2$plotNetworks <- figure2$graph$networks$Plot + ggplot2::facet_grid(
 
 ##### c: ######################################################################
 # Richness varies with land-use type for our fixed land-use preference (0).
-figure2$plotC <- ggplot2::ggplot(
+figure2$plotB <- ggplot2::ggplot(
   figure2$data |> tidytable::filter(
     Time > Start, Time < Stop
   ) |> tidytable::group_by(
@@ -231,7 +231,7 @@ figure2$plotC <- ggplot2::ggplot(
 
 ##### d: ######################################################################
 # Abundance has a complex relationship with land-use type for fixed preference.
-figure2$plotD <- ggplot2::ggplot(
+figure2$plotC <- ggplot2::ggplot(
   figure2$data |> tidytable::filter(
     Time > Start, Time < Stop
   ) |> tidytable::group_by(
@@ -275,13 +275,13 @@ figure2$plotD <- ggplot2::ggplot(
 )
 
 if (figure2$abundlog) {
-  figure2$plotD <- figure2$plotD + ggplot2::scale_y_log10(
+  figure2$plotC <- figure2$plotC + ggplot2::scale_y_log10(
     label = scales::label_log(digits = 2)
   )
 }
 
 ##### f: ######################################################################
-figure2$plotF <- ggplot2::ggplot(
+figure2$plotD <- ggplot2::ggplot(
   figure2$dataBC |> tidytable::filter(
     Metric == "Richness"
   ) |> tidytable::mutate( # Left-Right ordering, not Top-Bottom
@@ -329,7 +329,7 @@ figure2$plotF <- ggplot2::ggplot(
 )
 
 ##### g: ######################################################################
-figure2$plotG <- ggplot2::ggplot(
+figure2$plotE <- ggplot2::ggplot(
   figure2$dataBC |> tidytable::filter(
     Metric == "Abundance"
   ) |> tidytable::mutate( # Left-Right ordering, not Top-Bottom
@@ -363,7 +363,7 @@ figure2$plotG <- ggplot2::ggplot(
 )
 
 if (figure2$abundlog) {
-  figure2$plotG <- figure2$plotG + ggplot2::scale_y_log10(
+  figure2$plotE <- figure2$plotE + ggplot2::scale_y_log10(
     label = scales::label_log(digits = 2)
   ) + ggplot2::geom_text(
     data = function(x) {
@@ -383,7 +383,7 @@ if (figure2$abundlog) {
     position = ggplot2::position_dodge(0.9)
   )
 } else {
-  figure2$plotG <- figure2$plotG + ggplot2::geom_text(
+  figure2$plotE <- figure2$plotE + ggplot2::geom_text(
     data = function(x) {
       x |> tidytable::mutate(
         Offset = (max(Value) - min(Value))* 0.08
@@ -408,8 +408,8 @@ figure2$plot <- ggpubr::ggarrange(
     figure2$plotA,
     figure2$plotNetworks + ggplot2::theme(legend.position = "none"),
     cowplot::plot_grid(plotlist = list(
-      figure2$plotC, figure2$plotF,
-      figure2$plotD, figure2$plotG
+      figure2$plotB, figure2$plotD,
+      figure2$plotC, figure2$plotE
     ), ncol = 2)
   ), nrow = 1, widths = c(2/5, 1/5, 2/5), common.legend = TRUE
 )
@@ -426,16 +426,16 @@ ggplot2::ggsave(plot = figure2$plotA,
 ggplot2::ggsave(plot = figure2$plotNetworks,
                 filename = file.path(dirImages, "Figure2Networks_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(plot = figure2$plotB,
+                filename = file.path(dirImages, "Figure2B_Prototype1.pdf"),
+                units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(plot = figure2$plotC,
                 filename = file.path(dirImages, "Figure2C_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(plot = figure2$plotD,
                 filename = file.path(dirImages, "Figure2D_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotF,
-                filename = file.path(dirImages, "Figure2F_Prototype1.pdf"),
-                units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotG,
-                filename = file.path(dirImages, "Figure2G_Prototype1.pdf"),
+ggplot2::ggsave(plot = figure2$plotE,
+                filename = file.path(dirImages, "Figure2E_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
 
