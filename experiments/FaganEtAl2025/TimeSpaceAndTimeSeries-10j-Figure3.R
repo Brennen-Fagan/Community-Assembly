@@ -373,6 +373,6 @@ for (fnum in 1:7) {
                   plotA, plotB, plotCD, plotE, plotFG),
     filename = file.path(dirImages,
                          paste0(prefix, ids[fnum], iter, suffix, ext[fnum])),
-    units = "cm", width = 6.5*3, height = 6.5*2.1)
+    units = "cm", width = 6.5*3, height = 6.5*2.8)
   )
 }
