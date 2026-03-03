@@ -20,7 +20,6 @@ figure4 <- list(
 # Main Plots: #################################################################
 ### Plot 4: ###################################################################
 ##### Data: ###################################################################
-
 # Interventions store the time right before intervention, then the
 # time of the intervention itself. Retrieve this second time.
 # Note it is per-simulation (timescale set by PoolPatch effectively).
@@ -43,6 +42,8 @@ figure4$interventionTimes <- diversitiesRichness |> tidytable::filter(
   ), # Not min(Time) but the next time.
   .groups = "drop"
 )
+
+figure4$timeDiameter <- 10^(log10(max(figure4$heatmapTimes))-1)
 
 figure4$dataBase <- tidytable::bind_rows(
   diversitiesRichness |> tidytable::filter(
@@ -69,43 +70,89 @@ figure4$dataBase <- tidytable::bind_rows(
                   labels = c("Richness", "Abundance"), ordered = TRUE),
   Time = round(Time - InterventionTime, 6) # remove false differences
 ) |> tidytable::filter(
-  Time > -1000, Time <= 16000,
+  Time >= -figure4$timeDiameter, Time <= 16000,
   # Avoid singletons.
-  abs(Time - round(Time)) < 1e-6 | Time >= 55 | Time < 0
+  abs(Time - round(Time)) < 1e-6 | Time >= 55 | Time <= 0
 )
 
 # Why to the level of summary? Because the PlotMeanAndInner function
 # isn't built to handle the multiple resolutions that we have in the
 # actual data, which makes it harder to portray the data accurately.
+
+# We want to do two analogous but not identical comparisons.
+# One is the shorter drop-off between two points that have autocorrelation.
+# The other is long-run behaviours.
+# The differing goals, and differing amount of data we can use, suggests we
+# should look at two separate but similar analyses.
 figure4$dataLogScale <- figure4$dataBase |> tidytable::filter(
   Metric %in% c("Richness", "Abundance")#,
   # is.na(Subset) # Not overall values
+) |> tidytable::separate_wider_delim(
+  Subset, names = c("Subset", "Affinity"), delim = "_"
+) |> tidytable::group_by(
+  # Need to aggregate to trophic levels before we reconcile times.
+  Intervention, InterventionInitial, InterventionFinal, Metric, Subset,
+  PoolPatchSeed, SpeciesPreferences, Time
+) |> tidytable::summarise(
+  Value = sum(Value), .groups = "drop"
 ) |> tidytable::mutate(
-  Time = tidytable::case_when( # Create groupings for times.
-    Time < -50 ~ round(Time, -2),
-    Time < 0 ~ -25, # In the last bin before regime change.
-    Time <= 50 ~ round(Time, 0),
-    Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
-    Time < 16350 ~ round(Time, -2),
-    TRUE ~ Time
-  )
-) |> tidytable::filter(
-  Time %in% c(0, figure4$heatmapTimes)
+  # Time = tidytable::case_when( # Create groupings for times, avoid doublecount
+  #   Time < -50 ~ round(Time, -2),
+  #   Time < 0 ~ -25, # In the last bin before regime change.
+  #   Time <= 50 ~ round(Time, 0),
+  #   Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
+  #   Time < 16350 ~ round(Time, -2),
+  #   TRUE ~ Time
+  # )
+  Time = tidytable::case_when(
+    round(Time) == 0 ~ 0, # Base Case for reference point analysis
+    Time < 0 ~ -1, # Base Case for reference time segment analysis
+    round(Time) == min(figure4$heatmapTimes) ~
+      min(figure4$heatmapTimes), # Contrast point
+    max(figure4$heatmapTimes) - figure4$timeDiameter/2 < Time &
+      max(figure4$heatmapTimes) + figure4$timeDiameter/2 > Time ~
+      max(figure4$heatmapTimes), # Contrast time segment
+    TRUE ~ Time # To Discard.
+  ),
+  Analysis = ifelse(Time %in% c(0, min(figure4$heatmapTimes)),
+                    "Point", "Segment")
+) |> tidytable::filter( # Discard To-Discards.
+  Time %in% c(-1, 0, figure4$heatmapTimes)
 ) |> tidytable::group_by(
   # Average Over the now grouped times to make each sim equally weighted.
   # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
   # simple and match each other with the seeds. More complicated set-ups
   # will want to adjust the groupings here.
   Intervention, InterventionInitial, InterventionFinal, Metric, Subset,
-  PoolPatchSeed, SpeciesPreferences, Time
+  PoolPatchSeed, SpeciesPreferences, Time, Analysis
 ) |> tidytable::summarise(
   Value = median(Value), .groups = "drop"
+)
+
+# Because only non-intervention systems have a past (-> -1), we need to provide
+# the intervention systems with their corresponding past before continuing.
+figure4$dataLogScale <- tidytable::bind_rows(
+  figure4$dataLogScale,
+  figure4$dataLogScale |> tidytable::filter(
+    Time == -1
+  ) |> tidytable::select(
+    -Intervention, -InterventionFinal
+  ) |> tidytable::full_join(
+    tidytable::expand_grid(
+      InterventionInitial = unique(figure4$dataLogScale$InterventionInitial),
+      InterventionFinal = unique(figure4$dataLogScale$InterventionFinal)
+    )
+  ) |> tidytable::filter(
+    InterventionInitial != InterventionFinal
+  ) |> tidytable::mutate(
+    Intervention = paste(InterventionInitial, InterventionFinal, sep = "->")
+  )
 ) |> tidytable::group_by(
   # Within simulation proportions
   Intervention, InterventionInitial, InterventionFinal, Metric, Subset,
-  PoolPatchSeed, SpeciesPreferences
+  PoolPatchSeed, SpeciesPreferences, Analysis
 ) |> tidytable::mutate(
-  Value = log10(Value/Value[Time == 0]) # Both x3, x/3 same magnitude.
+  Value = log10(Value/Value[Time == min(Time)]) # Both x3, x/3 same magnitude.
 ) |> tidytable::group_by(
   # Average across simulations
   Intervention, InterventionInitial, InterventionFinal, Metric, Subset,
@@ -118,8 +165,8 @@ figure4$dataLogScale <- figure4$dataBase |> tidytable::filter(
   .groups = "drop"
 ) |> dplyr::mutate( # Change labelling, dplyr for conversion (can't in dt)
   Time = factor(
-    Time, levels = c(0, range(figure4$heatmapTimes)),
-    labels = c("Time 0", paste0(
+    Time, levels = c(-1, 0, range(figure4$heatmapTimes)),
+    labels = c("Time Past", "Time 0", paste0(
       c("Short (t = ", "Long (t = "),
       range(figure4$heatmapTimes), ")"
     ))
@@ -169,21 +216,19 @@ figure4$dataRawValues <- figure4$dataBase |> tidytable::filter(
 
 figure4$plot <- plotTextHeatmap(
   figure4$dataLogScale |> tidytable::filter(
-    Time != "Time 0", is.na(Subset)
+    Time != "Time 0", Time != "Time Past", is.na(Subset)
   ) |> tidytable::mutate(
     Emphasis = Intervention %in% figure4$emphasise,
     Average = Average
   ),
   ""
 ) + colorspace::scale_fill_discrete_sequential(
-  palette = "Hawaii", drop = FALSE #, mid = log10(1), transform = "log10",
-  #labels = scales::label_percent(accuracy = 0.1)
-  # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
+  palette = "Hawaii", drop = FALSE
 )
 
 figure4$plotB <- plotTextHeatmap(
   figure4$dataLogScale |> tidytable::filter(
-    Time != "Time 0", Subset == "Basal_0"
+    Time != "Time 0", Time != "Time Past", Subset == "Basal"
   ) |> tidytable::mutate(
     Emphasis = Intervention %in% figure4$emphasise,
     Average = Average
@@ -191,15 +236,11 @@ figure4$plotB <- plotTextHeatmap(
   "Basal"
 ) + colorspace::scale_fill_discrete_sequential(
   palette = "Hawaii", drop = FALSE
-# ) + colorspace::scale_fill_continuous_diverging(
-#   palette = "Blue-Yellow 3", mid = log10(1), transform = "log10",
-#   labels = scales::label_percent(accuracy = 0.1)
-#   # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
 )
 
 figure4$plotC <- plotTextHeatmap(
   figure4$dataLogScale |> tidytable::filter(
-    Time != "Time 0", Subset == "Consumer_0"
+    Time != "Time 0", Time != "Time Past", Subset == "Consumer"
   ) |> tidytable::mutate(
     Emphasis = Intervention %in% figure4$emphasise,
     Average = Average
@@ -207,10 +248,6 @@ figure4$plotC <- plotTextHeatmap(
   "Consumer"
 ) + colorspace::scale_fill_discrete_sequential(
   palette = "Hawaii", drop = FALSE
-# ) + colorspace::scale_fill_continuous_diverging(
-#   palette = "Blue-Yellow 3", mid = log10(1), transform = "log10",
-#   labels = scales::label_percent(accuracy = 0.1)
-#   # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
 )
 
 figure4$plotRaw <- ggpubr::ggarrange(
@@ -245,21 +282,21 @@ figure4$plotRaw <- ggpubr::ggarrange(
 
 ggplot2::ggsave(
   plot = figure4$plot,
-  filename = file.path(dirImages, "Figure4_Prototype5.pdf"),
+  filename = file.path(dirImages, "Figure4_Prototype6.pdf"),
   units = "cm", width = 6.5*4, height = 6.5*3)
 ggplot2::ggsave(
   plot = figure4$plot,
-  filename = file.path(dirImages, "Figure4_Prototype5.png"),
+  filename = file.path(dirImages, "Figure4_Prototype6.png"),
   units = "cm", width = 6.5*4, height = 6.5*3)
 ggplot2::ggsave(
   plot = figure4$plotB,
-  filename = file.path(dirImages, "Figure4B_Prototype5.pdf"),
+  filename = file.path(dirImages, "Figure4B_Prototype6.pdf"),
   units = "cm", width = 6.5*4, height = 6.5*3)
 ggplot2::ggsave(
   plot = figure4$plotC,
-  filename = file.path(dirImages, "Figure4C_Prototype5.pdf"),
+  filename = file.path(dirImages, "Figure4C_Prototype6.pdf"),
   units = "cm", width = 6.5*4, height = 6.5*3)
 ggplot2::ggsave(
   plot = figure4$plotRaw,
-  filename = file.path(dirImages, "Figure4Raw_Prototype5.pdf"),
+  filename = file.path(dirImages, "Figure4Raw_Prototype6.pdf"),
   units = "cm", width = 6.5*4, height = 6.5*3)

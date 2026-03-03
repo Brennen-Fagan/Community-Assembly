@@ -237,7 +237,7 @@ figure7$plotB <- plotTextHeatmap(
   "Basal"
 ) + colorspace::scale_fill_discrete_sequential(
   palette = "Hawaii", drop = FALSE
-) # See end comment if you think it looks weird!
+)
 
 figure7$plotC <- plotTextHeatmap(
   figure7$dataLogScale |> tidytable::filter(
@@ -302,101 +302,3 @@ ggplot2::ggsave(
   filename = file.path(dirImages, "Figure7Raw_Prototype3.pdf"),
   units = "cm", width = 6.5*4, height = 6.5*3)
 
-
-### Does it look weird? ######################################################
-# If you're here, you probably saw that figure 8 abundance looks oddly high. And
-# this goes for the basal and consumer versions to varying extents. If you
-# compare the raw values between 10 and 10000, the 10 looks a lot lower as well.
-# So, are the values generating this data particularly weird? (I.e., when can we
-# reject the null hypothesis that the data before and after the intervention
-# point are drawn from the same distribution, esp. when there is a null
-# intervention?)
-
-# Drag the data back from before summarising:
-figure7$suppTesting <- figure7$dataBase |> tidytable::filter(
-  Metric %in% c("Richness", "Abundance"),
-  is.na(Subset) # Not overall values
-) |> tidytable::mutate(
-  Time = tidytable::case_when( # Create groupings for times.
-    Time < -50 ~ round(Time, -2),
-    Time < 0 ~ -25, # In the last bin before regime change.
-    Time <= 50 ~ round(Time, 0),
-    Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
-    Time < 16350 ~ round(Time, -2),
-    TRUE ~ Time
-  )
-) |> tidytable::filter(
-  Time %in% c(0, figure7$heatmapTimes)
-) |> tidytable::group_by(
-  # Average Over the now grouped times to make each sim equally weighted.
-  # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
-  # simple and match each other with the seeds. More complicated set-ups
-  # will want to adjust the groupings here.
-  Intervention, InterventionInitial, InterventionFinal, Metric,
-  PoolPatchSeed, SpeciesPreferences, Time
-) |> tidytable::summarise(
-  Value = median(Value), .groups = "drop"
-) |> dplyr::group_by(
-  # compare across seeds, but within each metric and intervention
-  Metric, Intervention
-) |> dplyr::group_map(
-  function(data, key) {
-    cbind(
-      key,
-      data.frame(
-        vs = c(10, 10000),
-        p.value = c( # Test against null two samples drawn from same dist.
-          ks.test(data |> filter(Time == 0) |> pull(Value),
-                  data |> filter(Time == 10) |> pull(Value),
-                  simulate.p.value = TRUE)$p.value,
-          ks.test(data |> filter(Time == 0) |> pull(Value),
-                  data |> filter(Time == 10000) |> pull(Value),
-                  simulate.p.value = TRUE)$p.value)
-      )
-    )
-  }
-) |> tidytable::bind_rows(
-) |> tidytable::mutate(
-  # Adjust for the mass testing situation.
-  p.adj = p.adjust(p.value, method = "fdr")
-)
-
-# An alternative way of looking at it: how many are increasing/decreasing?
-figure7$suppSummary <- figure7$dataBase |> tidytable::filter(
-  Metric %in% c("Richness", "Abundance"),
-  is.na(Subset) # Not overall values
-) |> tidytable::mutate(
-  Time = tidytable::case_when( # Create groupings for times.
-    Time < -50 ~ round(Time, -2),
-    Time < 0 ~ -25, # In the last bin before regime change.
-    Time <= 50 ~ round(Time, 0),
-    Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
-    Time < 16350 ~ round(Time, -2),
-    TRUE ~ Time
-  )
-) |> tidytable::filter(
-  Time %in% c(0, figure7$heatmapTimes)
-) |> tidytable::group_by(
-  # Average Over the now grouped times to make each sim equally weighted.
-  # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
-  # simple and match each other with the seeds. More complicated set-ups
-  # will want to adjust the groupings here.
-  Intervention, InterventionInitial, InterventionFinal, Metric,
-  PoolPatchSeed, SpeciesPreferences, Time
-) |> tidytable::summarise(
-  Value = median(Value), .groups = "drop"
-) |> tidytable::pivot_wider(
-  names_from = Time, values_from = Value
-) |> tidytable::mutate(
-  Ratio10 = `10`/`0`,
-  Ratio10000 = `10000`/`0`
-) |> tidytable::group_by(
-  Metric, Intervention
-) |> tidytable::summarise(
-  Increase10 = mean(Ratio10 > 1),
-  Neutral10 = mean(Ratio10 == 1),
-  Decrease10 = mean(Ratio10 < 1),
-  Increase10000 = mean(Ratio10000 > 1),
-  Neutral10000 = mean(Ratio10000 == 1),
-  Decrease10000 = mean(Ratio10000 < 1)
-)
