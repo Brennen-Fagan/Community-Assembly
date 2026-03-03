@@ -6,26 +6,32 @@ plotTextHeatmap <- function(
   legendtrans = "identity",
   scalestrans = scales::label_percent(accuracy = 0.1)
 ) {
-  if (mean(data$Average > 0 & data$Average < 1) > 0.25) {
-    cutbreaks <- with(
-      data, 
-      c(0, 10^c(-0.5, -0.1, 0.1, 0.5), ceiling(max(Average)))
-      )
-  } else {
-    cutbreaks <- with(
-      data, 
-      c(floor(min(Average)),
-        quantile(Average, p = c(0.2, 0.4, 0.6, 0.8)),
-        ceiling(max(Average)))
-    )
-  }
-  
+  cutbreaks <- with(
+    data[is.finite(data$Average),], {
+      if (mean(Average > 0 & Average < 1) > 0.25) {
+        c(0,
+          round(10^c(-0.5, -0.1, 0.1, 0.5), digits = 1),
+          max(ceiling(max(Average)), 5))
+      } else {
+        c(floor(min(Average)),
+          quantile(Average, p = c(0.2, 0.4, 0.6, 0.8)),
+          ceiling(max(Average)))
+      }
+    }
+  )
+  cutbreaksLabels <- scalestrans(cutbreaks)
+  cutbreaksLabels <- paste(cutbreaksLabels[1:(length(cutbreaksLabels) - 1)],
+                           cutbreaksLabels[2:length(cutbreaksLabels)],
+                           sep = " - ")
+
   ggplot2::ggplot(
     data,
     ggplot2::aes(
       x = InterventionInitial,
       y = InterventionFinal,
-      fill = cut(Average, breaks = cutbreaks)
+      fill = factor(findInterval(Average, vec = cutbreaks, all.inside = TRUE),
+                    levels = 1:length(cutbreaksLabels),
+                    labels = cutbreaksLabels)
     )
   ) + ggplot2::geom_tile(
     width = 1, height = 1, color = NA

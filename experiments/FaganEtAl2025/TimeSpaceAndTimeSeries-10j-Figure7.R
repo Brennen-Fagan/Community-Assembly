@@ -184,7 +184,7 @@ figure7$plot <- plotTextHeatmap(
   ),
   ""
 ) + colorspace::scale_fill_discrete_sequential(
-  palette = "Hawaii"
+  palette = "Hawaii", drop = FALSE
 )
 
 figure7$plotB <- plotTextHeatmap(
@@ -196,7 +196,7 @@ figure7$plotB <- plotTextHeatmap(
   ),
   "Basal"
 ) + colorspace::scale_fill_discrete_sequential(
-  palette = "Hawaii"
+  palette = "Hawaii", drop = FALSE
 ) # See end comment if you think it looks weird!
 
 figure7$plotC <- plotTextHeatmap(
@@ -208,7 +208,7 @@ figure7$plotC <- plotTextHeatmap(
   ),
   "Consumer"
 ) + colorspace::scale_fill_discrete_sequential(
-  palette = "Hawaii"
+  palette = "Hawaii", drop = FALSE
 )
 
 figure7$plotRaw <- ggpubr::ggarrange(
@@ -221,6 +221,7 @@ figure7$plotRaw <- ggpubr::ggarrange(
     legendName = "Raw Values",
     scalestrans = scales::label_number(accuracy = 0.1)
   ) + ggplot2::scale_fill_viridis_d(
+    drop = FALSE
     # transform = "identity", begin = 0.1,
     # labels = scales::label_number(accuracy = 0.1)
   ),
@@ -233,6 +234,7 @@ figure7$plotRaw <- ggpubr::ggarrange(
     legendName = "Raw Values", legendtrans = "log10",
     scalestrans = scales::label_number(accuracy = 1)
   ) + ggplot2::scale_fill_viridis_d(
+    drop = FALSE
     # transform = "log10", begin = 0.1,
     # labels = scales::label_number(accuracy = 0.1)
   ),

@@ -176,7 +176,7 @@ figure4$plot <- plotTextHeatmap(
   ),
   ""
 ) + colorspace::scale_fill_discrete_sequential(
-  palette = "Hawaii"#, mid = log10(1), transform = "log10",
+  palette = "Hawaii", drop = FALSE #, mid = log10(1), transform = "log10",
   #labels = scales::label_percent(accuracy = 0.1)
   # Old Version of the package, github.com/tidyverse/ggplot2/issues/3198
 )
@@ -190,7 +190,7 @@ figure4$plotB <- plotTextHeatmap(
   ),
   "Basal"
 ) + colorspace::scale_fill_discrete_sequential(
-  palette = "Hawaii"
+  palette = "Hawaii", drop = FALSE
 # ) + colorspace::scale_fill_continuous_diverging(
 #   palette = "Blue-Yellow 3", mid = log10(1), transform = "log10",
 #   labels = scales::label_percent(accuracy = 0.1)
@@ -206,7 +206,7 @@ figure4$plotC <- plotTextHeatmap(
   ),
   "Consumer"
 ) + colorspace::scale_fill_discrete_sequential(
-  palette = "Hawaii"
+  palette = "Hawaii", drop = FALSE
 # ) + colorspace::scale_fill_continuous_diverging(
 #   palette = "Blue-Yellow 3", mid = log10(1), transform = "log10",
 #   labels = scales::label_percent(accuracy = 0.1)
@@ -222,9 +222,10 @@ figure4$plotRaw <- ggpubr::ggarrange(
     ),
     legendName = "Raw Values",
     scalestrans = scales::label_number(accuracy = 0.1)
-  ) + ggplot2::scale_fill_viridis_c(
-    transform = "identity", begin = 0.1,
-    labels = scales::label_number(accuracy = 0.1)
+  ) + ggplot2::scale_fill_viridis_d(
+    drop = FALSE
+    # transform = "identity", begin = 0.1,
+    # labels = scales::label_number(accuracy = 0.1)
   ),
   plotTextHeatmap(
     figure4$dataRawValues |> tidytable::filter(
@@ -234,9 +235,10 @@ figure4$plotRaw <- ggpubr::ggarrange(
     ),
     legendName = "Raw Values", legendtrans = "log10",
     scalestrans = scales::label_number(accuracy = 1)
-  ) + ggplot2::scale_fill_viridis_c(
-    transform = "log10", begin = 0.1,
-    labels = scales::label_number(accuracy = 0.1)
+  ) + ggplot2::scale_fill_viridis_d(
+    drop = FALSE
+    # transform = "log10", begin = 0.1,
+    # labels = scales::label_number(accuracy = 0.1)
   ),
   nrow = 2
 )
