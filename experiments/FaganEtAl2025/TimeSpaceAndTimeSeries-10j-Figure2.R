@@ -413,12 +413,24 @@ figure2$plot <- ggpubr::ggarrange(
     ), ncol = 2)
   ), nrow = 1, widths = c(2/5, 1/5, 2/5), common.legend = TRUE
 )
+figure2$plotNoB <- ggpubr::ggarrange(
+  plotlist = list(
+    figure2$plotA,
+    cowplot::plot_grid(plotlist = list(
+      figure2$plotB, figure2$plotD,
+      figure2$plotC, figure2$plotE
+    ), ncol = 2)
+  ), nrow = 1, widths = c(2/5, 3/5), common.legend = TRUE
+)
 
 ggplot2::ggsave(plot = figure2$plot,
                 filename = file.path(dirImages, "Figure2_Prototype1.pdf"),
                 units = "cm", width = 6.5*5, height = 6.5*2)
 ggplot2::ggsave(plot = figure2$plot,
                 filename = file.path(dirImages, "Figure2_Prototype1.png"),
+                units = "cm", width = 6.5*5, height = 6.5*2)
+ggplot2::ggsave(plot = figure2$plotNoB,
+                filename = file.path(dirImages, "Figure2noB_Prototype1.pdf"),
                 units = "cm", width = 6.5*5, height = 6.5*2)
 ggplot2::ggsave(plot = figure2$plotA,
                 filename = file.path(dirImages, "Figure2A_Prototype1.pdf"),

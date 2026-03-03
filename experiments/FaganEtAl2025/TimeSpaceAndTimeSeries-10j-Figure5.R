@@ -457,7 +457,7 @@ figure5$plot <- ggpubr::ggarrange(
       ), ncol = 2
     )
   ),
-  nrow = 1, common.legend = TRUE
+  nrow = 1, widths = c(2/5, 3/5), common.legend = TRUE
 )
 
 ggplot2::ggsave(plot = figure5$plot, filename = file.path(dirImages, "Figure5_Prototype2.pdf"),
