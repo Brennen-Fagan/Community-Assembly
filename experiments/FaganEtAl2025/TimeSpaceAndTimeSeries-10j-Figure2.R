@@ -270,8 +270,8 @@ figure2$plotC <- ggplot2::ggplot(
   #   size = 3
 ) + ggplot2::theme(
   panel.grid.minor = ggplot2::element_blank()
-# ) + ggplot2::coord_cartesian(
-#   ylim = figure2$abundLimits
+  # ) + ggplot2::coord_cartesian(
+  #   ylim = figure2$abundLimits
 )
 
 if (figure2$abundlog) {
@@ -358,8 +358,8 @@ figure2$plotE <- ggplot2::ggplot(
   panel.grid.minor = ggplot2::element_blank()
 ) + ggplot2::labs(
   x = "Habitat Type", y = "Abundance"
-# ) + ggplot2::coord_cartesian(
-#   ylim = figure2$abundLimits
+  # ) + ggplot2::coord_cartesian(
+  #   ylim = figure2$abundLimits
 )
 
 if (figure2$abundlog) {
@@ -415,7 +415,14 @@ figure2$plot <- ggpubr::ggarrange(
 )
 figure2$plotNoB <- ggpubr::ggarrange(
   plotlist = list(
-    figure2$plotA,
+    figure2$plotA + ggplot2::guides(
+      fill = ggplot2::guide_legend(
+        label.position = "bottom", byrow = TRUE, nrow = 1
+      ),
+      color = ggplot2::guide_legend(
+        label.position = "bottom", byrow = TRUE, nrow = 1
+      )
+    ),
     cowplot::plot_grid(plotlist = list(
       figure2$plotB, figure2$plotD,
       figure2$plotC, figure2$plotE
@@ -432,12 +439,22 @@ ggplot2::ggsave(plot = figure2$plot,
 ggplot2::ggsave(plot = figure2$plotNoB,
                 filename = file.path(dirImages, "Figure2noB_Prototype1.pdf"),
                 units = "cm", width = 6.5*5, height = 6.5*2)
+ggplot2::ggsave(plot = figure2$plotNoB,
+                filename = file.path(dirImages, "Figure2noB_Prototype1.png"),
+                units = "cm", width = 6.5*5, height = 6.5*2)
 ggplot2::ggsave(plot = figure2$plotA,
                 filename = file.path(dirImages, "Figure2A_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*3)
-ggplot2::ggsave(plot = figure2$plotNetworks,
-                filename = file.path(dirImages, "Figure2Networks_Prototype1.pdf"),
-                units = "cm", width = 6.5*3, height = 6.5*2)
+ggplot2::ggsave(
+  plot = figure2$plotNetworks + ggplot2::theme(
+    legend.position = "none",
+    axis.text.y = ggplot2::element_text(margin = ggplot2::margin(r = -30),
+                                        size = 12),
+    axis.text.x = ggplot2::element_blank()
+  ) + ggplot2::coord_cartesian(xlim = c(-0.25, 1)),
+  filename = file.path(dirImages, "Figure2Networks_Prototype1.pdf"),
+  units = "cm", width = 6.5*1, height = 6.5*2
+)
 ggplot2::ggsave(plot = figure2$plotB,
                 filename = file.path(dirImages, "Figure2B_Prototype1.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
