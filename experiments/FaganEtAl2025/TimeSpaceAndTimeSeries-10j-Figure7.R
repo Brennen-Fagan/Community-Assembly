@@ -320,3 +320,43 @@ figure7$suppTesting <- figure7$dataBase |> tidytable::filter(
   # Adjust for the mass testing situation.
   p.adj = p.adjust(p.value, method = "fdr")
 )
+
+# An alternative way of looking at it: how many are increasing/decreasing?
+figure7$suppSummary <- figure7$dataBase |> tidytable::filter(
+  Metric %in% c("Richness", "Abundance"),
+  is.na(Subset) # Not overall values
+) |> tidytable::mutate(
+  Time = tidytable::case_when( # Create groupings for times.
+    Time < -50 ~ round(Time, -2),
+    Time < 0 ~ -25, # In the last bin before regime change.
+    Time <= 50 ~ round(Time, 0),
+    Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
+    Time < 16350 ~ round(Time, -2),
+    TRUE ~ Time
+  )
+) |> tidytable::filter(
+  Time %in% c(0, figure7$heatmapTimes)
+) |> tidytable::group_by(
+  # Average Over the now grouped times to make each sim equally weighted.
+  # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
+  # simple and match each other with the seeds. More complicated set-ups
+  # will want to adjust the groupings here.
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  PoolPatchSeed, SpeciesPreferences, Time
+) |> tidytable::summarise(
+  Value = median(Value), .groups = "drop"
+) |> tidytable::pivot_wider(
+  names_from = Time, values_from = Value
+) |> tidytable::mutate(
+  Ratio10 = `10`/`0`,
+  Ratio10000 = `10000`/`0`
+) |> tidytable::group_by(
+  Metric, Intervention
+) |> tidytable::summarise(
+  Increase10 = mean(Ratio10 > 1),
+  Neutral10 = mean(Ratio10 == 1),
+  Decrease10 = mean(Ratio10 < 1),
+  Increase10000 = mean(Ratio10000 > 1),
+  Neutral10000 = mean(Ratio10000 == 1),
+  Decrease10000 = mean(Ratio10000 < 1)
+)
