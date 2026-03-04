@@ -223,8 +223,8 @@ figure7$plot <- plotTextHeatmap(
     Average = Average
   ),
   ""
-) + colorspace::scale_fill_discrete_qualitative(
-  palette = "Set 2", drop = FALSE
+) + colorspace::scale_fill_discrete_sequential(
+  palette = "Hawaii", drop = FALSE
 )
 
 figure7$plotB <- plotTextHeatmap(
@@ -235,8 +235,8 @@ figure7$plotB <- plotTextHeatmap(
     Average = Average
   ),
   "Basal"
-) + colorspace::scale_fill_discrete_qualitative(
-  palette = "Set 2", drop = FALSE
+) + colorspace::scale_fill_discrete_sequential(
+  palette = "Hawaii", drop = FALSE
 )
 
 figure7$plotC <- plotTextHeatmap(
@@ -247,8 +247,8 @@ figure7$plotC <- plotTextHeatmap(
     Average = Average
   ),
   "Consumer"
-) + colorspace::scale_fill_discrete_qualitative(
-  palette = "Set 2", drop = FALSE
+) + colorspace::scale_fill_discrete_sequential(
+  palette = "Hawaii", drop = FALSE
 )
 
 figure7$plotRaw <- ggpubr::ggarrange(
