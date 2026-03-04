@@ -4,8 +4,8 @@ source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 
 figure8 <- list(
   # pref = "100% 0",
-  pref = "50% 0, 50% 1",
-  # pref = "Uniform(0, 1)",
+  # pref = "50% 0, 50% 1",
+  pref = "Uniform(0, 1)",
   luinitl = c("(0)", "(0.5)", "(1)"), # Land Use INITiaL
   lufinal = c("(0)", "(0.5)", "(1)") # Land Use FINAL
   # luinitl = c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
