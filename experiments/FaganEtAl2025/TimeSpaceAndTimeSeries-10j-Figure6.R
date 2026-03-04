@@ -12,10 +12,15 @@ source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
 
 library(scales)
+library(patchwork)
 
 # This is better as an environment, but that's more opaque.
 figure6 <- list(
   CI = 0.75,
+  graph = list(
+    seed = "2", # "11", "17", "2"!,
+    time = 25000
+  ),
   pref = "Uniform(0, 1)",
   luinitl = "(0.5)", # Land Use INITiaL
   lufinal = c("(0)", "(0.5)", "(1)") # Land Use FINAL
@@ -24,9 +29,9 @@ figure6 <- list(
 
 figure6$prefstring <- switch(
   figure6$pref,
-  "100% 0" = "", # Base Case
+  "100% 0" = "",
   "50% 0, 50% 1" = "_5050",
-  "Uniform(0, 1)" = "_Unif"
+  "Uniform(0, 1)" = "_Unif" # Base Case
 )
 figure6$lustring <- paste0(switch(
   figure6$luinitl,
@@ -35,8 +40,38 @@ figure6$lustring <- paste0(switch(
   "(1)" = "1"
 ), "to", length(figure6$lufinal))
 
+figure6$graph$specification <- diversitiesRichness |> tidytable::select(c(
+  # Which network:
+  "Time", "Environment1",
+  # Which File (Base):
+  "PoolPatch", "PoolPatchSeed", "Interactions", "InteractionsSeed",
+  "Events", "EventsSeed", "InitialConditions", "InitialConditionsSeed",
+  "Dispersal", "NicheDistance",
+  # Oops, there was a collision causing human readable to replace machine.
+  # Will be replaced SpeciesAffinity#2 will -> SpeciesPreferences.
+  "SpeciesAffinity",
+  "SpeciesAffinitySeed", "PatchAffinity", "PatchAffinitySeed",
+  # Which File (Intervention):
+  "InterventionPatchType", "InterventionPatchSeed", "InterventionTimeType",
+  "InterventionTimeSeed", "InterventionDispersal", "InterventionNicheDistance",
+  # Ease of Use
+  "SpeciesPreferences",
+  "Intervention", "InterventionInitial", "InterventionFinal"
+)) |> tidytable::filter(
+  SpeciesPreferences == figure6$pref,
+  NicheDistance == defaultNicheDistance,
+  InterventionInitial %in% figure6$luinitl,
+  InterventionFinal %in% figure6$lufinal,
+  PoolPatchSeed %in% figure6$graph$seed,
+  Time == figure6$graph$time
+) |> tidytable::distinct(
+)
+
+figure6$graph$networks <- generateNetworks(figure6$graph$specification,
+                                           Date = "2025-07-30", split = FALSE)
+
 # Main Plots: #################################################################
-### Plot 7: ###################################################################
+### Plot 6: ###################################################################
 ##### Data: ###################################################################
 
 # Interventions store the time right before intervention, then the
@@ -139,12 +174,6 @@ figure6$dataBCSupplement <- figure6$dataBase |> tidytable::filter(
 ) |> tidytable::separate_wider_delim(
   delim = "_", cols = Subset, names = c("Guild", "AffinityBins")
 ) |> unifyAffinityBins( # if many preference types.
-) |> tidytable::group_by(
-  # Need to aggregate to trophic levels before we reconcile times.
-  Intervention, InterventionInitial, InterventionFinal, Metric,
-  PoolPatchSeed, SpeciesPreferences, Guild, Time
-) |> tidytable::summarise(
-  Value = sum(Value), .groups = "drop"
 ) |> tidytable::mutate(
   Time = tidytable::case_when( # Create groupings for times.
     Time < -50 ~ round(Time, -2),
@@ -174,6 +203,16 @@ figure6$dataBCSupplement <- figure6$dataBase |> tidytable::filter(
   Upper = quantile(Value, p = figure6$CI + (1 - figure6$CI)/2, na.rm = TRUE)
 )
 
+figure6$indices <- figure6$graph$networks$Index |> tidytable::filter(
+  SpeciesPreferences == figure6$pref,
+  NicheDistance == defaultNicheDistance,
+  Intervention %in% c(figure6$luinitl,
+                      paste(figure6$luinitl, figure6$lufinal, sep = "->")),
+  PoolPatchSeed %in% figure6$graph$seed
+) |> tidytable::arrange(
+  Intervention
+)
+
 ##### A: ################################################################
 figure6$plotA <- plotMeanAndInner(
   figure6$dataBase |> tidytable::filter(
@@ -189,14 +228,32 @@ figure6$plotA <- plotMeanAndInner(
   x = "Time",
   y = "Richness"
 ) + ggplot2::guides(
-  linetype = "none",
-  color = "none", # already covered by the main plot.
-  fill = "none"
+  linetype = "none"#,
+  # color = "none", # already covered by the main plot.
+  # fill = "none"
 ) + ggplot2::coord_cartesian(
   ylim = c(0, richnessYMax),
   xlim = c(0, 31000),
   expand = FALSE
 )
+
+##### Networks: ###############################################################
+# Example networks from different scenarios of the same simulation, showing
+# effects of the current habitat type through time on network shape.
+# Previously, these were independent panels, but I'm switching to a facets.
+figure6$plotNetworks <- figure6$graph$networks$Plot + ggplot2::facet_grid(
+  # Reverse order
+  factor(Intervention,
+         levels = c("(0.5)->(1)", "(0.5)", "(0.5)->(0)"), ordered = T) ~ .
+) + ggplot2::theme(
+  axis.title.x = ggplot2::element_blank(),
+  axis.text.x = ggplot2::element_blank(),
+  panel.border = ggplot2::element_rect(color = "black", fill = NA),
+  legend.position = "none",
+  axis.text.y = ggplot2::element_text(margin = ggplot2::margin(r = -30),
+                                      size = 12),
+  axis.text.x = ggplot2::element_blank()
+) + ggplot2::coord_cartesian(xlim = c(-0.25, 1))
 
 ##### B: ######################################################################
 figure6$plotB <- ggplot2::ggplot(
@@ -341,42 +398,80 @@ figure6$plotFG <- ggplot2::ggplot(
 )
 
 ##### Combine: ################################################################
-figure6$plot <- ggpubr::ggarrange(
-  plotlist = list(
-    figure6$plotA + ggplot2::scale_y_continuous(
-      breaks = c(0, 10, 20, 30, 40),
-      labels = c("0", "10", "20", "30", "")
+# figure6$plot <- ggpubr::ggarrange(
+#   plotlist = list(
+#     figure6$plotA + ggplot2::scale_y_continuous(
+#       breaks = c(0, 10, 20, 30, 40),
+#       labels = c("0", "10", "20", "30", "")
+#     ),
+#     ggpubr::ggarrange(plotlist = list(
+#       figure6$plotB + ggplot2::theme(legend.position = "none"),
+#       figure6$plotCD + ggplot2::theme(legend.position = "none",
+#                                       axis.title.y = ggplot2::element_blank())
+#     ), nrow = 1),
+#     ggpubr::ggarrange(plotlist = list(
+#       figure6$plotE + ggplot2::theme(legend.position = "none",
+#                                      axis.text.y = ggplot2::element_text(
+#                                        margin = ggplot2::margin(0, 0, 0, -5)
+#                                      )),
+#       figure6$plotFG + ggplot2::theme(legend.position = "none",
+#                                       axis.title.y = ggplot2::element_blank(),
+#                                       axis.text.y = ggplot2::element_text(
+#                                         margin = ggplot2::margin(0, 0, 0, -5)
+#                                       ))
+#     ), nrow = 1)
+#   ), nrow = 3, common.legend = TRUE
+# )
+
+figure6$plot <-
+  figure6$plotA + ggplot2::scale_y_continuous(
+    breaks = c(0, 10, 20, 30, 40),
+    labels = c("0", "10", "20", "30", "")
+  ) +
+  figure6$plotB + ggplot2::theme(
+    legend.position = "none"
+  ) +
+  figure6$plotCD + ggplot2::theme(
+    legend.position = "none",
+    axis.title.y = ggplot2::element_blank(),
+    panel.spacing = ggplot2::unit(0.5, "lines")
+  ) +
+  figure6$plotE + ggplot2::theme(
+    legend.position = "none",
+    axis.text.y = ggplot2::element_text(
+      margin = ggplot2::margin(0, 0, 0, -5)
+    )
+  ) +
+  figure6$plotFG + ggplot2::theme(
+    legend.position = "none",
+    axis.title.y = ggplot2::element_blank(),
+    axis.text.y = ggplot2::element_text(
+      margin = ggplot2::margin(0, 0, 0, -5)
     ),
-    ggpubr::ggarrange(plotlist = list(
-      figure6$plotB + ggplot2::theme(legend.position = "none"),
-      figure6$plotCD + ggplot2::theme(legend.position = "none",
-                                      axis.title.y = ggplot2::element_blank())
-    ), nrow = 1),
-    ggpubr::ggarrange(plotlist = list(
-      figure6$plotE + ggplot2::theme(legend.position = "none",
-                                     axis.text.y = ggplot2::element_text(
-                                       margin = ggplot2::margin(0, 0, 0, -5)
-                                     )),
-      figure6$plotFG + ggplot2::theme(legend.position = "none",
-                                      axis.title.y = ggplot2::element_blank(),
-                                      axis.text.y = ggplot2::element_text(
-                                        margin = ggplot2::margin(0, 0, 0, -5)
-                                      ))
-    ), nrow = 1)
-  ), nrow = 3, common.legend = TRUE
-)
+    panel.spacing = ggplot2::unit(0.5, "lines")
+  ) +
+  patchwork::plot_layout(design = "
+    #111111#
+    #111111#
+    #111111#
+    22222333
+    22222333
+    44444555
+    44444555
+  ")
+
 
 figure6$suffix <- paste0("_", figure6$prefstring, "_", figure6$lustring)
 figure6$prefix <- "Figure6"
 figure6$iter <- "_Prototype2"
-figure6$ids <- c("", "", "A", "B", "CD", "E", "FG")
-figure6$ext <- c(".png", rep(".pdf", 6))
+figure6$ids <- c("", "", "A", "Networks", "B", "CD", "E", "FG")
+figure6$ext <- c(".png", rep(".pdf", 7))
 
-for (fnum in 1:7) {
+for (fnum in 1:8) {
   with(figure6, ggplot2::ggsave(
     plot = switch(fnum,
                   plot, plot,
-                  plotA, plotB, plotCD, plotE, plotFG),
+                  plotA, plotNetworks, plotB, plotCD, plotE, plotFG),
     filename = file.path(dirImages,
                          paste0(prefix, ids[fnum], iter, suffix, ext[fnum])),
     units = "cm", width = 6.5*3, height = 6.5*2.8)
