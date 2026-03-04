@@ -174,6 +174,12 @@ figure6$dataBCSupplement <- figure6$dataBase |> tidytable::filter(
 ) |> tidytable::separate_wider_delim(
   delim = "_", cols = Subset, names = c("Guild", "AffinityBins")
 ) |> unifyAffinityBins( # if many preference types.
+) |> tidytable::group_by(
+  # Need to aggregate to trophic levels before we reconcile times.
+  Intervention, InterventionInitial, InterventionFinal, Metric,
+  PoolPatchSeed, SpeciesPreferences, Guild, Time
+) |> tidytable::summarise(
+  Value = sum(Value), .groups = "drop"
 ) |> tidytable::mutate(
   Time = tidytable::case_when( # Create groupings for times.
     Time < -50 ~ round(Time, -2),
