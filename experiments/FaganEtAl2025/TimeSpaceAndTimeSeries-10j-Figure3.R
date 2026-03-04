@@ -17,7 +17,10 @@ library(patchwork)
 # This is better as an environment, but that's more opaque.
 figure3 <- list(
   CI = 0.75,
-  time = 25000,
+  graph = list(
+    seed = "2", # "11", "17", "2"!,
+    time = 25000
+  ),
   pref = "100% 0", #"Uniform(0, 1)"
   luinitl = "(0.5)", # Land Use INITiaL
   lufinal = c("(0)", "(0.5)", "(1)") # Land Use FINAL
@@ -52,7 +55,8 @@ figure3$graph$specification <- diversitiesRichness |> tidytable::select(c(
   "InterventionPatchType", "InterventionPatchSeed", "InterventionTimeType",
   "InterventionTimeSeed", "InterventionDispersal", "InterventionNicheDistance",
   # Ease of Use
-  "SpeciesPreferences", "Intervention"
+  "SpeciesPreferences",
+  "Intervention", "InterventionInitial", "InterventionFinal"
 )) |> tidytable::filter(
   SpeciesPreferences == figure3$pref,
   NicheDistance == defaultNicheDistance,
@@ -202,8 +206,8 @@ figure3$dataBCSupplement <- figure3$dataBase |> tidytable::filter(
 figure3$indices <- figure3$graph$networks$Index |> tidytable::filter(
   SpeciesPreferences == figure3$pref,
   NicheDistance == defaultNicheDistance,
-  InterventionInitial %in% figure3$luinitl,
-  InterventionFinal %in% figure3$lufinal,
+  Intervention %in% c(figure3$luinitl,
+                      paste(figure3$luinitl, figure3$lufinal, sep = "->")),
   PoolPatchSeed %in% figure3$graph$seed
 ) |> tidytable::arrange(
   Intervention
@@ -224,9 +228,11 @@ figure3$plotA <- plotMeanAndInner(
   x = "Time",
   y = "Richness"
 ) + ggplot2::guides(
-  linetype = "none"#,
-  # color = "none", # already covered by the main plot.
+  linetype = "none",#,
+  # color = "none",
   # fill = "none"
+  fill = ggplot2::guide_legend(title = "Habitat Type",
+                               override.aes = list(alpha = 1))
 ) + ggplot2::coord_cartesian(
   ylim = c(0, richnessYMax),
   xlim = c(0, 31000),
@@ -239,12 +245,16 @@ figure3$plotA <- plotMeanAndInner(
 # Previously, these were independent panels, but I'm switching to a facets.
 figure3$plotNetworks <- figure3$graph$networks$Plot + ggplot2::facet_grid(
   # Reverse order
-  factor(Intervention, levels = c("(1)", "(0.5)", "(0)"), ordered = T) ~ .
+  factor(Intervention,
+         levels = c("(0.5)->(1)", "(0.5)", "(0.5)->(0)"), ordered = T) ~ .
 ) + ggplot2::theme(
   axis.title.x = ggplot2::element_blank(),
-  axis.text.x = ggplot2::element_blank(),
-  panel.border = ggplot2::element_rect(color = "black", fill = NA)
-)
+  panel.border = ggplot2::element_rect(color = "black", fill = NA),
+  legend.position = "none",
+  axis.text.y = ggplot2::element_text(margin = ggplot2::margin(r = -30),
+                                      size = 12),
+  axis.text.x = ggplot2::element_blank()
+) + ggplot2::coord_cartesian(xlim = c(-0.25, 1))
 
 ##### B: ######################################################################
 figure3$plotB <- ggplot2::ggplot(
@@ -389,42 +399,80 @@ figure3$plotFG <- ggplot2::ggplot(
 )
 
 ##### Combine: ################################################################
-figure3$plot <- ggpubr::ggarrange(
-  plotlist = list(
-    figure3$plotA + ggplot2::scale_y_continuous(
-      breaks = c(0, 10, 20, 30, 40),
-      labels = c("0", "10", "20", "30", "")
+# figure3$plot <- ggpubr::ggarrange(
+#   plotlist = list(
+#     figure3$plotA + ggplot2::scale_y_continuous(
+#       breaks = c(0, 10, 20, 30, 40),
+#       labels = c("0", "10", "20", "30", "")
+#     ),
+#     ggpubr::ggarrange(plotlist = list(
+#       figure3$plotB + ggplot2::theme(legend.position = "none"),
+#       figure3$plotCD + ggplot2::theme(legend.position = "none",
+#                                       axis.title.y = ggplot2::element_blank())
+#     ), nrow = 1),
+#     ggpubr::ggarrange(plotlist = list(
+#       figure3$plotE + ggplot2::theme(legend.position = "none",
+#                                      axis.text.y = ggplot2::element_text(
+#                                        margin = ggplot2::margin(0, 0, 0, -5)
+#                                      )),
+#       figure3$plotFG + ggplot2::theme(legend.position = "none",
+#                                       axis.title.y = ggplot2::element_blank(),
+#                                       axis.text.y = ggplot2::element_text(
+#                                         margin = ggplot2::margin(0, 0, 0, -5)
+#                                       ))
+#     ), nrow = 1)
+#   ), nrow = 3, common.legend = TRUE
+# )
+
+figure3$plot <-
+  figure3$plotA + ggplot2::scale_y_continuous(
+    breaks = c(0, 10, 20, 30, 40),
+    labels = c("0", "10", "20", "30", "")
+  ) +
+  figure3$plotB + ggplot2::theme(
+    legend.position = "none"
+  ) +
+  figure3$plotCD + ggplot2::theme(
+    legend.position = "none",
+    axis.title.y = ggplot2::element_blank(),
+    panel.spacing = ggplot2::unit(0.75, "lines")
+  ) +
+  figure3$plotE + ggplot2::theme(
+    legend.position = "none",
+    axis.text.y = ggplot2::element_text(
+      margin = ggplot2::margin(0, 0, 0, -5)
+    )
+  ) +
+  figure3$plotFG + ggplot2::theme(
+    legend.position = "none",
+    axis.title.y = ggplot2::element_blank(),
+    axis.text.y = ggplot2::element_text(
+      margin = ggplot2::margin(0, 0, 0, -5)
     ),
-    ggpubr::ggarrange(plotlist = list(
-      figure3$plotB + ggplot2::theme(legend.position = "none"),
-      figure3$plotCD + ggplot2::theme(legend.position = "none",
-                                      axis.title.y = ggplot2::element_blank())
-    ), nrow = 1),
-    ggpubr::ggarrange(plotlist = list(
-      figure3$plotE + ggplot2::theme(legend.position = "none",
-                                     axis.text.y = ggplot2::element_text(
-                                       margin = ggplot2::margin(0, 0, 0, -5)
-                                     )),
-      figure3$plotFG + ggplot2::theme(legend.position = "none",
-                                      axis.title.y = ggplot2::element_blank(),
-                                      axis.text.y = ggplot2::element_text(
-                                        margin = ggplot2::margin(0, 0, 0, -5)
-                                      ))
-    ), nrow = 1)
-  ), nrow = 3, common.legend = TRUE
-)
+    panel.spacing = ggplot2::unit(0.75, "lines")
+  ) +
+  patchwork::plot_layout(design = "
+    #111111#
+    #111111#
+    #111111#
+    22222333
+    22222333
+    44444555
+    44444555
+  ")
+
 
 figure3$suffix <- paste0("_", figure3$prefstring, "_", figure3$lustring)
 figure3$prefix <- "Figure3"
 figure3$iter <- "_Prototype6"
-figure3$ids <- c("", "", "A", "B", "CD", "E", "FG")
-figure3$ext <- c(".png", rep(".pdf", 6))
+figure3$ids <- c("", "", "A", "Networks", "B", "CD", "E", "FG")
+figure3$ext <- c(".png", rep(".pdf", 7))
 
-for (fnum in 1:7) {
+for (fnum in 1:8) {
   with(figure3, ggplot2::ggsave(
     plot = switch(fnum,
                   plot, plot,
-                  plotA, plotB, plotCD, plotE, plotFG),
+                  plotA, plotNetworks, plotB, plotCD, plotE, plotFG),
     filename = file.path(dirImages,
                          paste0(prefix, ids[fnum], iter, suffix, ext[fnum])),
     units = "cm", width = 6.5*3, height = 6.5*2.8)
