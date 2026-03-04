@@ -228,9 +228,11 @@ figure6$plotA <- plotMeanAndInner(
   x = "Time",
   y = "Richness"
 ) + ggplot2::guides(
-  linetype = "none"#,
+  linetype = "none",#,
   # color = "none", # already covered by the main plot.
   # fill = "none"
+  fill = ggplot2::guide_legend(title = "Habitat Type",
+                               override.aes = list(alpha = 1))
 ) + ggplot2::coord_cartesian(
   ylim = c(0, richnessYMax),
   xlim = c(0, 31000),
@@ -247,7 +249,6 @@ figure6$plotNetworks <- figure6$graph$networks$Plot + ggplot2::facet_grid(
          levels = c("(0.5)->(1)", "(0.5)", "(0.5)->(0)"), ordered = T) ~ .
 ) + ggplot2::theme(
   axis.title.x = ggplot2::element_blank(),
-  axis.text.x = ggplot2::element_blank(),
   panel.border = ggplot2::element_rect(color = "black", fill = NA),
   legend.position = "none",
   axis.text.y = ggplot2::element_text(margin = ggplot2::margin(r = -30),
@@ -349,7 +350,7 @@ figure6$plotE <- ggplot2::ggplot(
   x = "Time Since Intervention",
   y = "Abundance"
 ) + ggplot2::coord_cartesian(
-  ylim = c(1e0, 1e5),
+  ylim = c(1e-2, 1e5),
   expand = FALSE
 ) + ggplot2::scale_y_log10(
   label = scales::label_log()
@@ -386,7 +387,7 @@ figure6$plotFG <- ggplot2::ggplot(
   x = "Time Since Intervention",
   y = "Abundance"
 ) + ggplot2::coord_cartesian(
-  ylim = c(1e0, 1e5),
+  ylim = c(1e-2, 1e5),
   expand = FALSE
 ) + ggplot2::scale_x_continuous(
   trans = "log1p",
