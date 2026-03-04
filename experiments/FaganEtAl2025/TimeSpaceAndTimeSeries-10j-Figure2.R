@@ -127,7 +127,7 @@ figure2$indices <- figure2$graph$networks$Index |> tidytable::filter(
   Intervention
 )
 
-##### a: ######################################################################
+##### A: ######################################################################
 # Richness through time across simulations, showing stability and separation.
 figure2$plotA <- plotMeanAndInner(
   rbind(
@@ -170,7 +170,7 @@ figure2$plotA <- plotMeanAndInner(
   breaks = (0:3)*10000
 )
 
-##### b: ######################################################################
+##### Networks: ###############################################################
 # Example networks from different scenarios of the same simulation, showing
 # effects of the current habitat type through time on network shape.
 # Previously, these were independent panels, but I'm switching to a facets.
@@ -183,7 +183,7 @@ figure2$plotNetworks <- figure2$graph$networks$Plot + ggplot2::facet_grid(
   panel.border = ggplot2::element_rect(color = "black", fill = NA)
 )
 
-##### c: ######################################################################
+##### B: ######################################################################
 # Richness varies with land-use type for our fixed land-use preference (0).
 figure2$plotB <- ggplot2::ggplot(
   figure2$data |> tidytable::filter(
@@ -229,7 +229,7 @@ figure2$plotB <- ggplot2::ggplot(
   ylim = c(0, richnessYMax), expand = FALSE
 )
 
-##### d: ######################################################################
+##### C: ######################################################################
 # Abundance has a complex relationship with land-use type for fixed preference.
 figure2$plotC <- ggplot2::ggplot(
   figure2$data |> tidytable::filter(
@@ -280,7 +280,7 @@ if (figure2$abundlog) {
   )
 }
 
-##### f: ######################################################################
+##### D: ######################################################################
 figure2$plotD <- ggplot2::ggplot(
   figure2$dataBC |> tidytable::filter(
     Metric == "Richness"
@@ -328,7 +328,7 @@ figure2$plotD <- ggplot2::ggplot(
   ylim = c(0, richnessYMax), expand = FALSE
 )
 
-##### g: ######################################################################
+##### E: ######################################################################
 figure2$plotE <- ggplot2::ggplot(
   figure2$dataBC |> tidytable::filter(
     Metric == "Abundance"
@@ -399,8 +399,6 @@ if (figure2$abundlog) {
     position = ggplot2::position_dodge(0.9)
   )
 }
-
-
 
 ##### Combine: ################################################################
 figure2$plot <- ggpubr::ggarrange(

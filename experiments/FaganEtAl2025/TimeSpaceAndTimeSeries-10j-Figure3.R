@@ -16,6 +16,7 @@ library(scales)
 # This is better as an environment, but that's more opaque.
 figure3 <- list(
   CI = 0.75,
+  time = 25000,
   pref = "100% 0", #"Uniform(0, 1)"
   luinitl = "(0.5)", # Land Use INITiaL
   lufinal = c("(0)", "(0.5)", "(1)") # Land Use FINAL
@@ -35,8 +36,37 @@ figure3$lustring <- paste0(switch(
   "(1)" = "1"
 ), "to", length(figure3$lufinal))
 
+figure3$graph$specification <- diversitiesRichness |> tidytable::select(c(
+  # Which network:
+  "Time", "Environment1",
+  # Which File (Base):
+  "PoolPatch", "PoolPatchSeed", "Interactions", "InteractionsSeed",
+  "Events", "EventsSeed", "InitialConditions", "InitialConditionsSeed",
+  "Dispersal", "NicheDistance",
+  # Oops, there was a collision causing human readable to replace machine.
+  # Will be replaced SpeciesAffinity#2 will -> SpeciesPreferences.
+  "SpeciesAffinity",
+  "SpeciesAffinitySeed", "PatchAffinity", "PatchAffinitySeed",
+  # Which File (Intervention):
+  "InterventionPatchType", "InterventionPatchSeed", "InterventionTimeType",
+  "InterventionTimeSeed", "InterventionDispersal", "InterventionNicheDistance",
+  # Ease of Use
+  "SpeciesPreferences", "Intervention"
+)) |> tidytable::filter(
+  SpeciesPreferences == figure3$pref,
+  NicheDistance == defaultNicheDistance,
+  InterventionInitial %in% figure3$luinitl,
+  InterventionFinal %in% figure3$lufinal,
+  PoolPatchSeed %in% figure3$graph$seed,
+  Time == figure3$graph$time
+) |> tidytable::distinct(
+)
+
+figure3$graph$networks <- generateNetworks(figure3$graph$specification,
+                                           Date = "2025-07-30", split = FALSE)
+
 # Main Plots: #################################################################
-### Plot 4: ###################################################################
+### Plot 3: ###################################################################
 ##### Data: ###################################################################
 
 # Interventions store the time right before intervention, then the
@@ -168,6 +198,18 @@ figure3$dataBCSupplement <- figure3$dataBase |> tidytable::filter(
   Upper = quantile(Value, p = figure3$CI + (1 - figure3$CI)/2, na.rm = TRUE)
 )
 
+
+
+figure3$indices <- figure3$graph$networks$Index |> tidytable::filter(
+  SpeciesPreferences == figure3$pref,
+  NicheDistance == defaultNicheDistance,
+  InterventionInitial %in% figure3$luinitl,
+  InterventionFinal %in% figure3$lufinal,
+  PoolPatchSeed %in% figure3$graph$seed
+) |> tidytable::arrange(
+  Intervention
+)
+
 ##### A: ################################################################
 figure3$plotA <- plotMeanAndInner(
   figure3$dataBase |> tidytable::filter(
@@ -190,6 +232,19 @@ figure3$plotA <- plotMeanAndInner(
   ylim = c(0, richnessYMax),
   xlim = c(0, 31000),
   expand = FALSE
+)
+
+##### Networks: ###############################################################
+# Example networks from different scenarios of the same simulation, showing
+# effects of the current habitat type through time on network shape.
+# Previously, these were independent panels, but I'm switching to a facets.
+figure3$plotNetworks <- figure3$graph$networks$Plot + ggplot2::facet_grid(
+  # Reverse order
+  factor(Intervention, levels = c("(1)", "(0.5)", "(0)"), ordered = T) ~ .
+) + ggplot2::theme(
+  axis.title.x = ggplot2::element_blank(),
+  axis.text.x = ggplot2::element_blank(),
+  panel.border = ggplot2::element_rect(color = "black", fill = NA)
 )
 
 ##### B: ######################################################################
