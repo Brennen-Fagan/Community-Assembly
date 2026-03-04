@@ -356,7 +356,7 @@ figure6$plotE <- ggplot2::ggplot(
   x = "Time Since Intervention",
   y = "Abundance"
 ) + ggplot2::coord_cartesian(
-  ylim = c(1e-2, 1e5),
+  ylim = c(1e0, 1e5),
   expand = FALSE
 ) + ggplot2::scale_y_log10(
   label = scales::label_log()
@@ -393,7 +393,7 @@ figure6$plotFG <- ggplot2::ggplot(
   x = "Time Since Intervention",
   y = "Abundance"
 ) + ggplot2::coord_cartesian(
-  ylim = c(1e-2, 1e5),
+  ylim = c(1e0, 1e5),
   expand = FALSE
 ) + ggplot2::scale_x_continuous(
   trans = "log1p",
@@ -441,7 +441,7 @@ figure6$plot <-
   figure6$plotCD + ggplot2::theme(
     legend.position = "none",
     axis.title.y = ggplot2::element_blank(),
-    panel.spacing = ggplot2::unit(0.5, "lines")
+    panel.spacing = ggplot2::unit(0.75, "lines")
   ) +
   figure6$plotE + ggplot2::theme(
     legend.position = "none",
@@ -455,7 +455,7 @@ figure6$plot <-
     axis.text.y = ggplot2::element_text(
       margin = ggplot2::margin(0, 0, 0, -5)
     ),
-    panel.spacing = ggplot2::unit(0.5, "lines")
+    panel.spacing = ggplot2::unit(0.75, "lines")
   ) +
   patchwork::plot_layout(design = "
     #111111#
@@ -484,3 +484,4 @@ for (fnum in 1:8) {
     units = "cm", width = 6.5*3, height = 6.5*2.8)
   )
 }
+
