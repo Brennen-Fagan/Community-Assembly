@@ -116,8 +116,10 @@ allfiles <- dir(datfolders, full.names = TRUE,
                 pattern = "(Simulation|Result|Intervention)")
 
 EigenData <- foreach::foreach(
-  id = iterators::iter(1:length(allfiles)),
-  x = iterators::iter(allfiles)
+  # id = iterators::iter(1:length(allfiles)),
+  # x = iterators::iter(allfiles)
+  id = iterators::iter(550:length(allfiles)),
+  x = iterators::iter(allfiles[550:length(allfiles)])
   #, .packages = c("dplyr", "RMTRCode2")
 ) %op% {
   directory <- '.'
@@ -126,10 +128,7 @@ EigenData <- foreach::foreach(
   library(RMTRCode2); library(dplyr)
 
   x_properties <- strsplit(basename(x), split = splitchar)
-  stopifnot(length(x_properties) == 1#,
-            #x_properties[[1]][1] == "TSTS",
-            #x_properties[[1]][2] == "Simulation"
-  )
+  stopifnot(length(x_properties) == 1)
 
   filename <- file.path(
     dirname(x),
@@ -159,8 +158,7 @@ EigenData <- foreach::foreach(
       DynamicsFunction <- poolmats[[x_poolind]]$DynamicsFunction
       InteractionMatrices <- poolmats[[x_poolind]]$InteractionMatrices
     } else {
-      warning(paste("Pool not found, skipping", id, filename))
-      next()
+      warning(paste("Pool not found, skipping", id, filename)); next()
     }
 
     # Load result to analyse.
@@ -175,48 +173,6 @@ EigenData <- foreach::foreach(
     } else {
       warning("Reproduction Rate rprime not found."); next()
     }
-
-    # # Unify format, double check time scale and make sure on same time scale.
-    # if (!"ReactionTime" %in% names(loaded$Ellipsis)) {
-    #   loaded$Ellipsis$ReactionTime <- loaded$ReactionTime
-    # }
-    # if (!"Timescale" %in% names(loaded$Ellipsis) ||
-    #     loaded$Ellipsis$Timescale == "Simulation") {
-    #   loaded$Events$Times <-
-    #     loaded$Events$Times / loaded$Ellipsis$ReactionTime
-    #   loaded$Abundance[, 1] <-
-    #     loaded$Abundance[, 1] / loaded$Ellipsis$ReactionTime
-    #   if ("TimeIntervention" %in% names(loaded$Ellipsis$Affinity)) {
-    #     loaded$Ellipsis$Affinity$TimeIntervention <-
-    #       loaded$Ellipsis$Affinity$TimeIntervention /
-    #       loaded$Ellipsis$ReactionTime
-    #   }
-    #   loaded$Ellipsis$Timescale <- "Characteristic"
-    # }
-
-    # if (!"TimeIntervention" %in% names(loaded$Ellipsis$Affinity) &&
-    #     !is.null(substituteTimeIntervention)) {
-    #   loaded$Ellipsis$Affinity$TimeIntervention <-
-    #     substituteTimeIntervention(loaded$Events$Times)
-    # }
-
-    # loaded$Abundance <- thinAbundanceTimes(
-    #   abundance = loaded$Abundance,
-    #   threshold = loaded$Parameters$EliminationThreshold,
-    #   times = sort(unique(c(
-    #     # Start time
-    #     min(loaded$Abundance[, 1]),
-    #     # Base sequence, aligned to CTU time scale.
-    #     seq(
-    #       from = ceiling(loaded$Abundance[1, 1]/preferredTimestep)*preferredTimestep,
-    #       to = max(loaded$Abundance[, 1]),
-    #       by = max(diff(loaded$Abundance[, 1]), preferredTimestep)
-    #     ),
-    #     # Intervention times, aligned s.t. 0 = intervention.
-    #     loaded$Ellipsis$Affinity$TimeIntervention +
-    #       c(0:10, 2*(6:10), 20+3*(1:10)) # by 1s til 10, 2s til 20, 3s til 50.
-    #   )))
-    # )
 
     # Different handling is needed depending on if arguments are functions.
     # (Could functionalise the calls, but that introduces overhead on each call.)
