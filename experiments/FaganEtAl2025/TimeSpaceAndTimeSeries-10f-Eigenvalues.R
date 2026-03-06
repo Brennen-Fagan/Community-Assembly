@@ -140,10 +140,10 @@ allfiles <- dir(datfolders, full.names = TRUE,
                 pattern = "(Simulation|Result|Intervention)")
 
 EigenData <- foreach::foreach(
-  # id = iterators::iter(1:length(allfiles)),
-  # x = iterators::iter(allfiles)
-  id = iterators::iter(c(1:5, 9500)),
-  x = iterators::iter(allfiles[c(1:5, 9500)])
+  id = iterators::iter(1:length(allfiles)),
+  x = iterators::iter(allfiles)
+  # id = iterators::iter(c(1:5, 9500)),
+  # x = iterators::iter(allfiles[c(1:5, 9500)])
   #, .packages = c("dplyr", "RMTRCode2")
 ) %op% {
   directory <- '.'
@@ -274,6 +274,9 @@ EigenData <- foreach::foreach(
   return(EigData)
 }
 
+if (cores > 1)
+  parallel::stopCluster(clust)
+
 if (alsoload) {
   EigenData <- tidytable::bind_rows(lapply(EigenData, function(ED) {
     # Collect the identifying information for any analyses that we want to do.
@@ -355,6 +358,3 @@ if (alsoload) {
 
   save(EigenData, file = "EigenData10a1_flat.RData")
 }
-
-if (cores > 1)
-  parallel::stopCluster(clust)
