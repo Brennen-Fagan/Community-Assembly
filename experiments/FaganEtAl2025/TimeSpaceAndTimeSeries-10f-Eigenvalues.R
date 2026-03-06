@@ -46,7 +46,7 @@
 # Parameters: #################################################################
 alsoload <- FALSE # if TRUE, try to load all diversity files encountered.
 # if FALSE, only try to create new diversity files (and return the outputs).
-overwrite <- FALSE
+overwrite <- TRUE
 
 # datfolders <- dir(pattern = "TSTS_Simulations_.+2025-07-30$")
 datfolders <- dir(pattern = "TSTS_Simulations_.") # Grab w/&w/o competition.
@@ -82,6 +82,30 @@ source(file.path("R", "checkDominantEigenvalues.R"))
 # Parallelization: ############################################################
 if (cores > 1) {
   clust <- parallel::makeCluster(cores, outfile = "")
+  
+  # R seems to use too much compute despite trying to use 1 core at a time.
+  # This should make parallelisation clearer.
+  # Suggested environmental variabls from Google Gemini 3.1 Pro.
+  parallel::clusterEvalQ(clust, {
+    # Environment variables catch standard backends (OpenBLAS, MKL, Apple)
+    Sys.setenv(OMP_NUM_THREADS = 1)
+    Sys.setenv(OPENBLAS_NUM_THREADS = 1)
+    Sys.setenv(MKL_NUM_THREADS = 1)
+    Sys.setenv(VECLIB_MAXIMUM_THREADS = 1)
+    Sys.setenv(NUMEXPR_NUM_THREADS = 1)
+    
+    if (requireNamespace("data.table", quietly = TRUE)) {
+      # Same idea, but for data.table that tidytable uses.
+      data.table::setDTthreads(1)
+    }
+    
+    # RhpcBLASctl as a secondary measure
+    if (requireNamespace("RhpcBLASctl", quietly = TRUE)) {
+      RhpcBLASctl::blas_set_num_threads(1)
+      RhpcBLASctl::omp_set_num_threads(1)
+    }
+  })
+  
   doParallel::registerDoParallel(clust)
   `%op%` <- foreach::`%dopar%`
 } else {
@@ -118,8 +142,8 @@ allfiles <- dir(datfolders, full.names = TRUE,
 EigenData <- foreach::foreach(
   # id = iterators::iter(1:length(allfiles)),
   # x = iterators::iter(allfiles)
-  id = iterators::iter(550:length(allfiles)),
-  x = iterators::iter(allfiles[550:length(allfiles)])
+  id = iterators::iter(900:length(allfiles)),
+  x = iterators::iter(allfiles[900:length(allfiles)])
   #, .packages = c("dplyr", "RMTRCode2")
 ) %op% {
   directory <- '.'
