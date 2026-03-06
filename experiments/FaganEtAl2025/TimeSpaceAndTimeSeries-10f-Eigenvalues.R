@@ -44,9 +44,9 @@
 #       How does this vary based on habitat type and species preferences?
 
 # Parameters: #################################################################
-alsoload <- FALSE # if TRUE, try to load all diversity files encountered.
+alsoload <- TRUE # if TRUE, try to load all diversity files encountered.
 # if FALSE, only try to create new diversity files (and return the outputs).
-overwrite <- TRUE
+overwrite <- FALSE
 
 # datfolders <- dir(pattern = "TSTS_Simulations_.+2025-07-30$")
 datfolders <- dir(pattern = "TSTS_Simulations_.") # Grab w/&w/o competition.
@@ -82,7 +82,7 @@ source(file.path("R", "checkDominantEigenvalues.R"))
 # Parallelization: ############################################################
 if (cores > 1) {
   clust <- parallel::makeCluster(cores, outfile = "")
-  
+
   # R seems to use too much compute despite trying to use 1 core at a time.
   # This should make parallelisation clearer.
   # Suggested environmental variabls from Google Gemini 3.1 Pro.
@@ -93,19 +93,19 @@ if (cores > 1) {
     Sys.setenv(MKL_NUM_THREADS = 1)
     Sys.setenv(VECLIB_MAXIMUM_THREADS = 1)
     Sys.setenv(NUMEXPR_NUM_THREADS = 1)
-    
+
     if (requireNamespace("data.table", quietly = TRUE)) {
       # Same idea, but for data.table that tidytable uses.
       data.table::setDTthreads(1)
     }
-    
+
     # RhpcBLASctl as a secondary measure
     if (requireNamespace("RhpcBLASctl", quietly = TRUE)) {
       RhpcBLASctl::blas_set_num_threads(1)
       RhpcBLASctl::omp_set_num_threads(1)
     }
   })
-  
+
   doParallel::registerDoParallel(clust)
   `%op%` <- foreach::`%dopar%`
 } else {
@@ -142,8 +142,8 @@ allfiles <- dir(datfolders, full.names = TRUE,
 EigenData <- foreach::foreach(
   # id = iterators::iter(1:length(allfiles)),
   # x = iterators::iter(allfiles)
-  id = iterators::iter(900:length(allfiles)),
-  x = iterators::iter(allfiles[900:length(allfiles)])
+  id = iterators::iter(c(1:5, 9500)),
+  x = iterators::iter(allfiles[c(1:5, 9500)])
   #, .packages = c("dplyr", "RMTRCode2")
 ) %op% {
   directory <- '.'
@@ -257,7 +257,7 @@ EigenData <- foreach::foreach(
       EigenInteraction = max(abs(unlist(lapply(
         poolmats[[x_poolind]]$InteractionMatrices$Mats,
         eigen, only.values = TRUE
-        )))),
+      )))),
       CharacteristicRate = 1/loaded$ReactionTime, # Should match EigenInteraction.
       ReproductionRate = poolmats[[x_poolind]]$Pool$ReproductionRate, # orig rs
       Ellipsis = loaded$Ellipsis
@@ -271,6 +271,89 @@ EigenData <- foreach::foreach(
     # and simulation metadata.
     save(EigData, file = filename)
   }
+  return(EigData)
+}
+
+if (alsoload) {
+  EigenData <- tidytable::bind_rows(lapply(EigenData, function(ED) {
+    # Collect the identifying information for any analyses that we want to do.
+    id <- strsplit(
+      strsplit(
+        # Remove .RData.
+        strsplit(basename(ED$Ellipsis$ParentRun), ".", fixed = TRUE)[[1]][1],
+        # Remove TSTS_Type and split seeds off.
+        "_", fixed = TRUE)[[1]][-c(1:2)],
+      # Separate out the id values.
+      "-", fixed = TRUE
+    )
+
+    if (length(id) < 3) {
+      # I.e., no intervention.
+      id[[3]] <- rep(NA, 4)
+      id[[4]] <- rep(NA, 2)
+    }
+
+    # We need to collect the data.frame of the eigendata, its types, and IDs.
+    # Note that all values should be pure rates at this point:
+    #   Eigenvalues have units equal to those of the entries of the Jacobian.
+    #     In this case, as in the introduction, they are 1/time.
+    #   Reproduciton rates are rates 1/time (multiply by abundance in odes).
+    #   And Intrinsic is 1/(population*time), so we multiple by unit abundance.
+    with(ED, tidytable::bind_rows(
+      EigenData |> tidytable::mutate(
+        Type = "Eigenvalue"
+      ) |> tidytable::rename(
+        Timescale = Eigenvalue
+      ),
+      data.frame(
+        Time = NA, Row = NA, MaxChange = NA,
+        Timescale = ReproductionRate,
+        Type = "Intrinsic"
+      ),
+      data.frame(
+        Time = NA, Row = NA, MaxChange = NA,
+        Timescale = EigenInteraction,
+        Type = "InteractionMatrix"
+      )
+    ) |> tidytable::mutate(
+      PoolPatch = id[[1]][1],
+      PoolPatchSeed = id[[2]][1],
+      Interactions = id[[1]][2],
+      InteractionsSeed = id[[2]][2],
+      Events = id[[1]][3],
+      EventsSeed = id[[2]][3],
+      InitialConditions = id[[1]][4],
+      InitialConditionsSeed = id[[2]][4],
+      Dispersal = id[[1]][5],
+      NicheDistance = id[[1]][6],
+      SpeciesAffinity = id[[1]][7],
+      SpeciesAffinitySeed = id[[2]][5],
+      PatchAffinity = id[[1]][8],
+      PatchAffinitySeed = id[[2]][6],
+      InterventionPatchType = id[[3]][1],
+      InterventionPatchSeed = id[[4]][1],
+      InterventionTimeType = id[[3]][2],
+      InterventionTimeSeed = id[[4]][2],
+      InterventionDispersal = id[[3]][3],
+      InterventionNicheDistance = id[[3]][4],
+      CarryingCapacityType =
+        if (is.function(Ellipsis$Affinity$EffectiveReproductionRate)) {
+          "Basal"
+        } else {
+          "None"
+        },
+      CarryingCapacity =
+        if (is.function(Ellipsis$Affinity$EffectiveReproductionRate)) {
+          environment(
+            Ellipsis$Affinity$EffectiveReproductionRate
+            )$logisticCarryingCapacity$Basal
+        } else {
+          NA
+        }
+    ))
+  }))
+
+  save(EigenData, file = "EigenData10a1_flat.RData")
 }
 
 if (cores > 1)
