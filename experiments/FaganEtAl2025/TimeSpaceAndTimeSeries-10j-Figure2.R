@@ -179,7 +179,6 @@ figure2$plotNetworks <- figure2$graph$networks$Plot + ggplot2::facet_grid(
   factor(Intervention, levels = c("(1)", "(0.5)", "(0)"), ordered = T) ~ .
 ) + ggplot2::theme(
   axis.title.x = ggplot2::element_blank(),
-  axis.text.x = ggplot2::element_blank(),
   panel.border = ggplot2::element_rect(color = "black", fill = NA),
   legend.position = "none",
   axis.text.y = ggplot2::element_text(margin = ggplot2::margin(r = -30),
@@ -419,10 +418,12 @@ figure2$plotNoB <- ggpubr::ggarrange(
   plotlist = list(
     figure2$plotA + ggplot2::guides(
       fill = ggplot2::guide_legend(
-        label.position = "bottom", byrow = TRUE, nrow = 1
+        label.position = "bottom", byrow = TRUE, nrow = 1,
+        title = "Habitat Type"
       ),
       color = ggplot2::guide_legend(
-        label.position = "bottom", byrow = TRUE, nrow = 1
+        label.position = "bottom", byrow = TRUE, nrow = 1,
+        title = "Habitat Type"
       )
     ),
     cowplot::plot_grid(plotlist = list(
