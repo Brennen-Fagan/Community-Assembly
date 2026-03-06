@@ -7,7 +7,7 @@ checkAllDominantEigenvalues <- function(
   Events = NULL,
   PerCapitaDynamics,
   DispersalMatrix,
-  MaxChangeSize = 1e-5
+  MaxChangeSize = 1e-7 # histogram suggests we should be even more aggressive!
 ) {
   # For production version, would need to update to handle t, parms.
   Dynamics <- function(t, y, parms) {
@@ -23,7 +23,7 @@ checkAllDominantEigenvalues <- function(
   if (!is.null(Events)) {
     # Look at the times right before a successful event occurs to simplify.
     CandidateEvents <- Events[Events$Success,]
-    Candidates <- which(Abundance[, 1] %in% CandidateEvents$Times) - 1 # rows
+    Candidates <- which(Abundance[, 1] %in% CandidateEvents$Times) # rows
     if (length(Candidates) != nrow(CandidateEvents)) {
       warning("Some Candidate Times not found in Events.")
     }
@@ -31,17 +31,15 @@ checkAllDominantEigenvalues <- function(
     Candidates <- 1:nrow(Abundance) # rows -- not times.
   }
   # Check to see if there was much change at the Candidate times.
-  MaxChange <- apply(diff(Abundance[,-1])[Candidates, ], 1,
-                     function(x) max(abs(x)))
+  # Since we already have the dynamics, use that to evaluate if we are ~0.
+  MaxChange <- apply(Abundance[Candidates, ], 1,
+                     function(x) max(abs(Dynamics(t= x[1], y = x[-1])[[1]])))
   Candidates <- Candidates[MaxChange < MaxChangeSize]
 
   if (is.null(Events)) {
     # Take last value in a cluster (shouldn't be clusters if !is.null(events)).
     Candidates <- Candidates[diff(c(Candidates, Inf)) != 1]
   } else {
-    # Above accommodates diffs.
-    # Now move to last time to accommodate eigenvalue procedure.
-    Candidates <- Candidates + 1
   }
 
   allDominantEigenvalues <- apply(
@@ -52,6 +50,7 @@ checkAllDominantEigenvalues <- function(
   return(data.frame(
     Time = Abundance[Candidates, 1],
     Row = Candidates,
-    Eigenvalue = allDominantEigenvalues
+    Eigenvalue = allDominantEigenvalues,
+    MaxChange = MaxChange[MaxChange < MaxChangeSize]
   ))
 }
