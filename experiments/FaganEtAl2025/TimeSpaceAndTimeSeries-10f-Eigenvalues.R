@@ -142,8 +142,8 @@ allfiles <- dir(datfolders, full.names = TRUE,
 EigenData <- foreach::foreach(
   id = iterators::iter(1:length(allfiles)),
   x = iterators::iter(allfiles)
-  # id = iterators::iter(c(1:5, 9500)),
-  # x = iterators::iter(allfiles[c(1:5, 9500)])
+  # id = iterators::iter(c(1:100)),
+  # x = iterators::iter(sample(allfiles, 100))
   #, .packages = c("dplyr", "RMTRCode2")
 ) %op% {
   directory <- '.'
@@ -271,11 +271,14 @@ EigenData <- foreach::foreach(
     # and simulation metadata.
     save(EigData, file = filename)
   }
+  gc()
   return(EigData)
 }
 
 if (cores > 1)
   parallel::stopCluster(clust)
+
+gc()
 
 if (alsoload) {
   EigenData <- tidytable::bind_rows(lapply(EigenData, function(ED) {
