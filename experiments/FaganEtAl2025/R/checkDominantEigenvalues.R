@@ -10,7 +10,7 @@ checkAllDominantEigenvalues <- function(
   MaxChangeSize = 1e-7 # histogram suggests we should be even more aggressive!
 ) {
   # For production version, would need to update to handle t, parms.
-  Dynamics <- function(t, y, parms) {
+  Dynamics <- function(t, y, parms = NULL) {
     list( # Reaction: PerCapitaDynamics includes interactions and reproduction.
       as.numeric(
         y * PerCapitaDynamics(t, y, parms)
@@ -43,7 +43,7 @@ checkAllDominantEigenvalues <- function(
   }
 
   allDominantEigenvalues <- apply(
-    Abundance[Candidates, -1], 1,
+    matrix(Abundance[Candidates, -1], nrow = length(Candidates)), 1,
     function(x) checkDominantEigenvalue(x, Dynamics)
   )
 
