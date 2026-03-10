@@ -380,21 +380,24 @@ if (cores > 1)
 # ggplot(EigenData, aes(x = abs(Timescale), color = Type, group = Type)) + ggplot2::geom_density(data = function(x) x |> filter(Type != "InteractionMatrix")) + geom_rug(data = function(x) x |> filter(Type == "InteractionMatrix")) + facet_grid(PoolPatchSeed ~ SpeciesAffinity + PatchAffinity + NicheDistance) + scale_x_log10() + scale_y_log10() + ggplot2::coord_cartesian(ylim = c(1e-8, NA))
 # ggplot(EigenData, aes(y = Type, x = abs(Timescale), color = Type, group = Type)) + ggplot2::geom_point() + facet_grid(SpeciesAffinity + NicheDistance ~ PatchAffinity) + scale_x_log10() + ggplot2::coord_cartesian(ylim = c(1e-8, NA))
 ggplot(EigenData, aes(y = Type, x = abs(Timescale), color = Type, group = Type)) + ggplot2::geom_boxplot() + facet_grid(NicheDistance + SpeciesAffinity ~ PatchAffinity) + scale_x_log10() + ggplot2::coord_cartesian(ylim = c(1e-8, NA))
-ggsave(ggplot(
-  EigenData |> filter(
-    NicheDistance == "5",
-    is.na(InterventionPatchType),
-    CarryingCapacityType == "None"
-  ) |> mutate(
-    Type = ifelse(Type == "Eigenvalue", "Jacobian", Type)
-  ),
-  aes(y = Type, x = abs(Timescale), color = Type, group = Type)
-
-) + ggplot2::geom_boxplot(
-) + facet_grid(
-  NicheDistance + SpeciesAffinity ~ PatchAffinity
-) + scale_x_log10(
-) + ggplot2::coord_cartesian(
-  ylim = c(1e-8, NA)
-), filename = "Figure_EigenData_5.png")
+for (i in unique(EigenData$NicheDistance)) {
+  ggsave(ggplot(
+    EigenData |> filter(
+      NicheDistance == i,
+      is.na(InterventionPatchType),
+      CarryingCapacityType == "None"
+    ) |> distinct(
+    ) |> mutate(
+      Type = ifelse(Type == "Eigenvalue", "Jacobian", Type)
+    ),
+    aes(y = Type, x = abs(Timescale), color = Type, group = Type)
+  ) + ggplot2::geom_boxplot(
+  ) + facet_grid(
+    NicheDistance + SpeciesAffinity ~ PatchAffinity
+  ) + scale_x_log10(
+  ) + ggplot2::coord_cartesian(
+    ylim = c(1e-8, NA)
+  ), filename = paste0("Figure_EigenData_", i, ".png")
+  )
+}
 
