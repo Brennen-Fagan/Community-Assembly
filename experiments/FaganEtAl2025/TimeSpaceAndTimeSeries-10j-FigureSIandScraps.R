@@ -16,6 +16,8 @@ if (figureSI$abundlog) {
 
 # Main: ######################################################################
 ### SI1: #####################################################################
+# Capture how the basal and consumer populations behave for each system
+# for each of richness, abundance, and persistence.
 ##### Data: ##################################################################
 figureSI$data1DA <- tidytable::bind_rows(
   diversitiesRichness |> tidytable::filter(
@@ -183,6 +185,11 @@ figureSI$plot1C <- ggplot2::ggplot(
 ) + ggplot2::scale_x_log10(
 ) + ggplot2::scale_y_log10(
 )
+
+### SI2: ######################################################################
+
+
+
 
 
 # Scraps: #####################################################################
