@@ -292,6 +292,8 @@ figure6$plotB <- ggplot2::ggplot(
 ) + ggplot2::scale_x_continuous(
   trans = "log1p",
   breaks = 10^(0:4)
+) + ggplot2::facet_grid( # For consistent plot sizing.
+  "" ~ .
 )
 
 ##### C+D: ####################################################################
@@ -363,6 +365,8 @@ figure6$plotE <- ggplot2::ggplot(
 ) + ggplot2::scale_x_continuous(
   trans = "log1p",
   breaks = 10^(0:4)
+) + ggplot2::facet_grid( # For consistent plot sizing.
+  "" ~ .
 )
 
 ##### F+G: ####################################################################
@@ -441,7 +445,7 @@ figure6$plot <-
   figure6$plotCD + ggplot2::theme(
     legend.position = "none",
     axis.title.y = ggplot2::element_blank(),
-    panel.spacing = ggplot2::unit(0.75, "lines")
+    panel.spacing = ggplot2::unit(0.8, "lines")
   ) +
   figure6$plotE + ggplot2::theme(
     legend.position = "none",
@@ -455,7 +459,7 @@ figure6$plot <-
     axis.text.y = ggplot2::element_text(
       margin = ggplot2::margin(0, 0, 0, -5)
     ),
-    panel.spacing = ggplot2::unit(0.75, "lines")
+    panel.spacing = ggplot2::unit(0.8, "lines")
   ) +
   patchwork::plot_layout(design = "
     #111111#
