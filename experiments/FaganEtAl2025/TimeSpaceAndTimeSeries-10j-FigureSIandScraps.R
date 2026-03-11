@@ -1,9 +1,85 @@
-### Figure 2: #################################################################
-##### e: ######################################################################
+source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
+source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
+source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
+source("TimeSpaceAndTimeSeries-10i-PreparationsPersistence.R")
+
+figureSI <- list(
+  abundlog = TRUE,
+  SI1 = "100% 0"
+)
+
+if (figureSI$abundlog) {
+  figureSI$abundLimits <- c(1e-1, 4e4)
+} else {
+  figureSI$abundLimits <- c(0, 3.7e4)
+}
+
+# Main: ######################################################################
+### SI1: #####################################################################
+##### Data: ##################################################################
+figureSI$data1DA <- tidytable::bind_rows(
+  diversitiesRichness |> tidytable::filter(
+    SpeciesPreferences == figureSI$SI1,
+    NicheDistance == defaultNicheDistance,
+    Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
+    PoolPatchSeed %in% basePoolPatchSeeds,
+    Metric == "Alpha Hill:0"
+  ),
+  diversitiesAbund |> tidytable::filter(
+    SpeciesPreferences == figureSI$SI1,
+    NicheDistance == defaultNicheDistance,
+    Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
+    PoolPatchSeed %in% basePoolPatchSeeds,
+    Metric == "Alpha Abundance"
+  )
+) |> tidytable::pivot_wider(
+  names_from = Metric, values_from = Value
+)
+
+# Need to calculate the average total persistence of a species for each guild.
+figureSI$data1P <- Pers |> tidytable::filter(
+  SpeciesPreferences == figureSI$SI1,
+  NicheDistance == defaultNicheDistance,
+  Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
+  PoolPatchSeed %in% basePoolPatchSeeds,
+  In < Stop, Out > Start # Not things outside of [Start, Stop]
+) |> tidytable::mutate(
+  # Shorten intervals for equivalent comparisons.
+  InType = ifelse(In < Start, "Persistent", InType),
+  OutType = ifelse(Out > Stop, "Persistent", OutType),
+  In = ifelse(In < Start, Start, In),
+  Out = ifelse(Out > Stop, Stop, Out),
+  Persistence = Out - In
+) |> tidytable::group_by(
+  Species, Environment, SpeciesType, Size, ReproductionRate, Speed,
+  Affinity, AffinityBins,
+  PoolPatch:InterventionNicheDistance,
+  Intervention, SpeciesPreferences, Start, Stop
+) |> tidytable::summarise( # Sum over Appearances.
+  Persistence = sum(Persistence),
+  .groups = "drop"
+) |> tidytable::group_by(
+  SpeciesType, # Just over Guild and Simulation
+  PoolPatch:InterventionNicheDistance,
+  Intervention, SpeciesPreferences
+) |> tidytable::summarise( # Sum over Appearances.
+  Geometric = 10^mean(log10(Persistence)),
+  Arithmetic = mean(Persistence),
+  .groups = "drop"
+) |> tidytable::pivot_longer(
+  cols = c(Geometric, Arithmetic),
+  names_to = "Persistence Type",
+  values_to = "Persistence"
+) |> tidytable::pivot_wider(
+  names_from = SpeciesType,
+  values_from = Persistence
+)
+
+##### 1A: #####################################################################
 # Richness and abundance co-vary for our scenarios.
-figure2$plotE <- ggplot2::ggplot(
-  figure2$data |> tidytable::filter(
-    Time > Start, Time < Stop
+figureSI$plot1A <- ggplot2::ggplot(
+  figureSI$data1DA |> tidytable::filter(
+    Time > Start, Time < Stop, is.na(Subset)
   ) |> tidytable::group_by( # Reduce to per run (x44 sims for param combns)
     PoolPatchSeed, Intervention, SpeciesAffinity
   ) |> tidytable::summarise(
@@ -29,25 +105,30 @@ figure2$plotE <- ggplot2::ggplot(
   fill = "none"
 ) + ggplot2::coord_cartesian(
   ylim = c(0, richnessYMax),
-  xlim = figure2$abundLimits
+  xlim = figureSI$abundLimits
 ) + ggplot2::theme(
   panel.grid.minor = ggplot2::element_blank()
 )
 
-if (figure2$abundlog) {
-  figure2$plotE <- figure2$plotE + ggplot2::scale_x_log10()
+if (figureSI$abundlog) {
+  figureSI$plot1A <- figureSI$plot1A + ggplot2::scale_x_log10()
 }
 
-##### h: ######################################################################
+##### 1B: #####################################################################
 # Basal and Consumer Richness And Abundance co-vary for our scenarios.
 # Note separate from Abundance to have two separate grobs to inset.
-figure2$plotH <- ggplot2::ggplot(
-  figure2$dataBC |> tidytable::pivot_wider(
-    names_from = Metric, values_from = Value
+figureSI$plot1B <- ggplot2::ggplot(
+  figureSI$data1DA |> tidytable::filter(
+    Time > Start, Time < Stop, !is.na(Subset)
+  ) |> tidytable::group_by( # Reduce to per run (x44 sims for param combns)
+    PoolPatchSeed, Intervention, SpeciesAffinity, Subset
+  ) |> tidytable::summarise(
+    `Alpha Hill:0` = mean(`Alpha Hill:0`),
+    `Alpha Abundance` = mean(`Alpha Abundance`)
   ),
   ggplot2::aes(
-    x = Abundance,
-    y = Richness,
+    x = `Alpha Abundance`,
+    y = `Alpha Hill:0`,
     fill = Intervention,
     shape = Subset
   )
@@ -57,6 +138,9 @@ figure2$plotH <- ggplot2::ggplot(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat Type"
 ) + ggplot2::theme_minimal(
+) + ggplot2::labs(
+  x = "Abundance",
+  y = "Richness"
 ) + ggplot2::guides(
   color = "none",
   fill = "none",
@@ -67,14 +151,41 @@ figure2$plotH <- ggplot2::ggplot(
   panel.grid.minor = ggplot2::element_blank()
 ) + ggplot2::coord_cartesian(
   ylim = c(0, richnessYMax),
-  xlim = figure2$abundLimits
+  xlim = figureSI$abundLimits
 )
 
-if (figure2$abundlog) {
-  figure2$plotH <- figure2$plotH + ggplot2::scale_x_log10()
+if (figureSI$abundlog) {
+  figureSI$plot1B <- figureSI$plot1B + ggplot2::scale_x_log10()
 }
 
+##### 1C: #####################################################################
+figureSI$plot1C <- ggplot2::ggplot(
+  figureSI$data1P,
+  ggplot2::aes(
+    x = Basal,
+    y = Consumer,
+    fill = Intervention
+  )
+) + ggplot2::geom_point(
+  shape = 21, color = "white" # circles (21), squares (22), triangles (24)
+) + ggplot2::scale_color_manual(
+  values = colorPalette, aesthetics = c("color", "fill"),
+  name = "Habitat Type"
+) + ggplot2::theme_minimal(
+) + ggplot2::labs(
+  x = "Basal Persistence",
+  y = "Consumer Persistence"
+) + ggplot2::guides(
+  color = "none",
+  fill = "none"
+) + ggplot2::theme(
+  panel.grid.minor = ggplot2::element_blank()
+) + ggplot2::scale_x_log10(
+) + ggplot2::scale_y_log10(
+)
 
+
+# Scraps: #####################################################################
 ##### i: ######################################################################
 # Basal and Consumer Richness And Abundance co-vary for our scenarios.
 # Note separate from Abundance to have two separate grobs to inset.
