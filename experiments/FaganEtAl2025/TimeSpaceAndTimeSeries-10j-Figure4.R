@@ -157,9 +157,9 @@ figure4$dataLogScale <- tidytable::bind_rows(
   # Average across simulations
   Intervention, InterventionInitial, InterventionFinal, Metric, Subset,
   SpeciesPreferences, Time
-) |> tidytable::summarise(
-  Average = 10^mean(Value),
-  StdDev = sd(Value),
+) |> tidytable::summarise(      # Been told we want it 0-centred.
+  Average = 10^mean(Value) - 1, # Abusing that (new-old)/old = (new/old) - 1.
+  StdDev = sd(Value),           # full: 10^(sum(log10(new/old))/length(new))-1.
   CI025 = 10^quantile(Value, p = 0.025, na.rm = TRUE), # Some subsets
   CI975 = 10^quantile(Value, p = 0.975, na.rm = TRUE), # have x/0.
   .groups = "drop"

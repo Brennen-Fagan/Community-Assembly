@@ -8,11 +8,17 @@ plotTextHeatmap <- function(
 ) {
   cutbreaks <- with(
     data[is.finite(data$Average),], {
-      if (mean(Average > 0 & Average < 1) > 0.25) {
+      if (!any(Average < 0) && mean(Average > 0 & Average < 2) > 0.25) {
+        # Relative/Multiplicative Scale likely, centre around 1
         c(0,
           round(10^c(-0.5, -0.1, 0.1, 0.5), digits = 1),
-          max(ceiling(max(Average)), 5))
-      } else {
+          Inf)
+      } else if (any(Average < 0) && mean(Average > -1 & Average < 1) > 0.25) {
+        # Relative/Multiplicative scale centred around 0 likely (% difference)
+        c(-1,
+          round(10^c(-0.3, -0.05, 0.05, 0.3), digits = 1)-1,
+          Inf)
+      } else { # Raw values
         c(floor(min(Average)),
           quantile(Average, p = c(0.2, 0.4, 0.6, 0.8)),
           ceiling(max(Average)))
