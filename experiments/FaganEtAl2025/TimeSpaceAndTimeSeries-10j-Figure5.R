@@ -104,9 +104,9 @@ figure5$plotA <- plotMeanAndInner(
   ylim = c(0, 30), expand = FALSE
 ) + ggplot2::scale_x_continuous(
   breaks = (0:3)*10000
-) + ggplot2::facet_grid(
+) + ggplot2::facet_wrap( # Instead of grid to have strips on top.
   # switch = "y",
-  cols = ggplot2::vars(SpeciesPreferences)
+  ggplot2::vars(SpeciesPreferences), ncol = 1
 )
 
 ##### b: Violins ##############################################################
@@ -194,14 +194,15 @@ figure5$plotB <- ggplot2::ggplot(
   breaks = c(0, 10, 20, 30)
 ) + ggplot2::coord_cartesian(
   ylim = c(0, 30), expand = FALSE
-) + ggplot2::facet_grid(
-  . ~ SpeciesPreferences
+) + ggplot2::facet_wrap( # Instead of grid to have strips on top.
+  # switch = "y",
+  ggplot2::vars(SpeciesPreferences), ncol = 1
 ) + ggplot2::theme_minimal(
 ) + ggplot2::theme(
   plot.tag.position = c(0.01, 1),
   panel.grid.minor = ggplot2::element_blank(),
-  strip.background = ggplot2::element_blank(),
-  strip.text = ggplot2::element_blank(),
+  # strip.background = ggplot2::element_blank(),
+  strip.text = ggplot2::element_text(color = NA),
   panel.spacing = ggplot2::unit(1, "lines")
 ) + ggplot2::labs(
   y = "Richness",
@@ -291,14 +292,15 @@ figure5$plotC <- ggplot2::ggplot(
 ) + ggplot2::scale_color_manual(
   values = colorPalette, aesthetics = c("color", "fill"),
   name = "Habitat Type"
-) + ggplot2::facet_grid(
-  . ~ SpeciesPreferences
+) + ggplot2::facet_wrap( # Instead of grid to have strips on top.
+  # switch = "y",
+  ggplot2::vars(SpeciesPreferences), ncol = 1
 ) + ggplot2::theme_minimal(
 ) + ggplot2::theme(
   plot.tag.position = c(0.01, 1),
   panel.grid.minor = ggplot2::element_blank(),
-  strip.background = ggplot2::element_blank(),
-  strip.text = ggplot2::element_blank(),
+  # strip.background = ggplot2::element_blank(),
+  strip.text = ggplot2::element_text(color = NA),
   panel.spacing = ggplot2::unit(1, "lines")
 ) + ggplot2::labs(
   y = "Abundance",
@@ -357,9 +359,10 @@ figure5$insetGrobs <- figure5$dataPers |> tidytable::filter(
               values = c("Basal" = "darkgreen", "Consumer" = "burlywood4")
             ) + ggplot2::theme_void(
             ) + ggplot2::theme(
-              plot.background = ggplot2::element_rect(fill = "white",
-                                                      color = "white"),
-              panel.background = ggplot2::element_rect(fill = "white")
+              plot.background = ggplot2::element_rect(fill = NA,
+                                                      color = NA),
+              panel.background = ggplot2::element_rect(fill = NA),
+              strip.text = ggplot2::element_text(size = 10)
             ) + ggplot2::coord_cartesian(
               expand = FALSE, ylim = c(0, 1)
             )
@@ -416,9 +419,10 @@ figure5$insetGrobs <- figure5$dataPers |> tidytable::filter(
               values = c("Basal" = "darkgreen", "Consumer" = "burlywood4")
             ) + ggplot2::theme_void(
             ) + ggplot2::theme(
-              plot.background = ggplot2::element_rect(fill = "white",
-                                                      color = "white"),
-              panel.background = ggplot2::element_rect(fill = "white")
+              plot.background = ggplot2::element_rect(fill = NA,
+                                                      color = NA),
+              panel.background = ggplot2::element_rect(fill = NA),
+              strip.text = ggplot2::element_text(size = 10)
             ) + ggplot2::coord_cartesian(
               expand = FALSE
             )
@@ -467,10 +471,10 @@ figure5$plot <- ggpubr::ggarrange(
       plotlist = list(
         figure5$plotB,
         figure5$plotC
-      ), nrow = 2
+      ), ncol = 2
     )
   ),
-  ncol = 1, heights = c(2/5, 3/5), common.legend = TRUE
+  nrow = 1, widths = c(2/5, 3/5), common.legend = TRUE
 )
 
 ggplot2::ggsave(plot = figure5$plot, filename = file.path(dirImages, "Figure5_Prototype3.pdf"),

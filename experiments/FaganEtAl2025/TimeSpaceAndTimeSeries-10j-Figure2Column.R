@@ -6,6 +6,8 @@
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
+source(file.path("R", "flattenDiversity.R")) # Req'd by below
+source(file.path("R", "generateNetworks.R")) # To create inset graphs.
 
 library(cowplot) # plot arrangement with pagination (ggarrange).
 library(tibble) # data.frames that can incorporate grobs.
@@ -166,17 +168,17 @@ figure2$plotNetworks <- dplyr::bind_rows(lapply(
                                               size = 9, vjust = 0.2),
           axis.text.x = ggplot2::element_blank()
         ) + ggplot2::coord_cartesian(
-          xlim = c(-0.25, 1), ylim = c(0.01, 3)
+          xlim = c(-0.5, 1), ylim = c(0.01, 3)
         ) + ggplot2::ylab(
           ""
         ) + ggplot2::scale_size(
           range = c(0.1, 2)
-        )) |> ggplot2::ggplotGrob() 
+        )) |> ggplot2::ggplotGrob()
       ),
-      Time = 20000, 
+      Time = 17500,
       Value = value
     )
-  } 
+  }
 ))
 
 ##### b: Violins ##############################################################
@@ -388,22 +390,22 @@ figure2$plot <- ggpubr::ggarrange(
     figure2$plotA + ggpp::geom_grob(
       data = figure2$plotNetworks,
       mapping = ggplot2::aes(x = Time, y = Value, label = grob),
-      vp.height = 0.35, vp.width = 0.3, default.alpha = 0.25
+      vp.height = 0.3, vp.width = 0.4, default.alpha = 0.25
     ),
     cowplot::plot_grid(
       plotlist = list(
         figure2$plotB,
         figure2$plotC
-      ), nrow = 2
+      ), ncol = 2
     )
   ),
-  ncol = 1, heights = c(2/5, 3/5), common.legend = TRUE
+  nrow = 1, widths = c(2/5, 3/5), common.legend = TRUE
 )
 
 ggplot2::ggsave(plot = figure2$plot, filename = file.path(dirImages, "Figure2_Prototype2.pdf"),
-                units = "cm", width = 6.5*2, height = 6.5*3)
+                units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(plot = figure2$plot, filename = file.path(dirImages, "Figure2_Prototype2.png"),
-                units = "cm", width = 6.5*2, height = 6.5*3)
+                units = "cm", width = 6.5*3, height = 6.5*2)
 ggplot2::ggsave(plot = figure2$plotA, filename = file.path(dirImages, "Figure2A_Prototype2.pdf"),
                 units = "cm", width = 6.5*3, height = 6.5*2)
 # ggplot2::ggsave(plot = figure2$plotNetworks,
