@@ -6,30 +6,21 @@ logisticCarryingCapacity <-
   NULL # OR
 # list(Basal = 1000) # 300 or 3000 also have arguments.
 
+characteristicRateOverride <-
+  # NULL # OR
+0.02887 # median from 10f-Eigenvalues
+
+# simulationsTargetIndex <- # Overrides which target we are loading
+# advantage is it allows other scripts to use this one.
+
 simulationsTargets <- c(
   "TimeSpaceAndTimeSeries-10a1-DictionaryIDs.R"#,
 )
 
-simulationsTarget <- switch(
-  EXPR = {
-    if(exists("simulationsTargetIndex")) simulationsTargetIndex else "NA"
-  },
-  "1" = simulationsTargets[1],
-  # "2" = simulationsTargets[2],
-  # "3" = simulationsTargets[3],
-  # "4" = simulationsTargets[4],
-  # "5" = simulationsTargets[5],
-  # "6" = simulationsTargets[6],
-  # "7" = simulationsTargets[7],
-  # "8" = simulationsTargets[8],
-  # "9" = simulationsTargets[9],
-  simulationsTargets[length(simulationsTargets)] # Default
-)
 directory <- '.'
-source(file.path(directory, simulationsTarget))
 
 if (runSimulationsFlag) {
-  librarypath <- file.path(".", "Rlibs")
+  librarypath <- file.path(directory, "Rlibs")
   if (!dir.exists(librarypath)) {
     dir.create(librarypath, showWarnings = FALSE)
   }
@@ -47,6 +38,23 @@ if (runSimulationsFlag) {
   library(iterators)
 }
 
+simulationsTarget <- switch(
+  EXPR = {
+    if(exists("simulationsTargetIndex")) simulationsTargetIndex else "NA"
+  },
+  "1" = simulationsTargets[1],
+  # "2" = simulationsTargets[2],
+  # "3" = simulationsTargets[3],
+  # "4" = simulationsTargets[4],
+  # "5" = simulationsTargets[5],
+  # "6" = simulationsTargets[6],
+  # "7" = simulationsTargets[7],
+  # "8" = simulationsTargets[8],
+  # "9" = simulationsTargets[9],
+  simulationsTargets[length(simulationsTargets)] # Default
+)
+source(file.path(directory, simulationsTarget))
+
 if (!exists("cores") || is.na(cores)) {
   if (is.null(cargs <- commandArgs(trailingOnly = TRUE)[1]) || is.na(cargs)) {
     cores <- 1 # Normally happy to put higher, but there's not the redundancy of
@@ -59,7 +67,9 @@ if (!exists("cores") || is.na(cores)) {
 print(paste("cores", cores))
 
 # Setup Notes: ################################################################
-thisDate <- "2025-07-30" #Sys.Date()
+# thisDate <- "2025-07-30" #Sys.Date()
+# thisDate <- "2025-09-03" #Sys.Date() # Used for carrying capacities.
+thisDate <- "2026-03-11" #Sys.Date() # Used for fixed time rescaling.
 
 # Parameters: #################################################################
 if (simulationsTarget == simulationsTargets[1]) {
@@ -263,11 +273,12 @@ parameterChoices <- parameterChoices %>% dplyr::mutate(
 # Run across each row of parameterChoices: ####################################
 if (runSimulationsFlag) {
   if (cores > 1) {
-    clust <- parallel::makeCluster(min(nrow(parameterChoices), cores))
+    clust <- parallel::makeCluster(min(nrow(parameterChoices), cores),
+                                   outfile = "")
     doParallel::registerDoParallel(clust)
-    `%op%` <- `%dopar%`
+    `%op%` <- foreach::`%dopar%`
   } else {
-    `%op%` <- `%do%`
+    `%op%` <- foreach::`%do%`
   }
   toExport <- unlist(lapply(
     1:8, # Non-seed columns of parameterChoices
@@ -291,17 +302,18 @@ if (runSimulationsFlag) {
 
   success <- foreach::foreach(
     #pc = iterators::iter(parameterChoices[(nrow(parameterChoices)*3/4):(nrow(parameterChoices)*4/4), ], by = "row"),
-    pc = iterators::iter(parameterChoices[(nrow(parameterChoices)):1, ], by = "row"),
+    # pc = iterators::iter(parameterChoices[(nrow(parameterChoices)):1, ], by = "row"),
+    pc = iterators::iter(parameterChoices, by = "row"),
     # .packages = c("RMTRCode2", "dplyr"),
     .export = toExport
   ) %op% {
-    directory <- '.'
-    librarypath <- file.path(directory, "Rlibs")
-    .libPaths(c(librarypath, .libPaths()))
-    library(RMTRCode2); library(dplyr)
+    .libPaths(allLibraryPaths)
+    # print(dir(allLibraryPaths))
+    library(RMTRCode2); library(dplyr); library(foreach)
 
     pc <- unlist(pc) # untibble so we are passing numerics.
-    simulationWrapper(
+    print(pc)
+    retval <- simulationWrapper(
       poolpatchDictionaryChoice = pc[1],
       poolpatchSeedChoice = pc[2],
       dynamicsDictionaryChoice = pc[3],
@@ -317,11 +329,15 @@ if (runSimulationsFlag) {
       patchAffinityDictionaryChoice = pc[13],
       patchAffinitySeedChoice = pc[14],
       logisticCarryingCapacity = logisticCarryingCapacity,
+      characteristicRateOverride = force(characteristicRateOverride),
       parameters = list(Date = thisDate),
       returnResults = FALSE,
       saveResults = TRUE,
       skipIfSaveExists = TRUE
     )
+
+    print(paste(paste(pc, collapse = " "), "done"))
+    return(retval)
   }
 
   if (cores > 1)

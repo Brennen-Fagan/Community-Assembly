@@ -39,6 +39,7 @@ simulationWrapper <- function(
     "initialConditions" = 8554899
   ),
   logisticCarryingCapacity = NULL, # list(Basal=x, Consumer=y) or (Total=z)
+  characteristicRateOverride = NULL, # num; decouple events from interactions.
   returnResults = FALSE,
   saveResults = TRUE,
   skipIfSaveExists = TRUE, # Precedence over the next argument.
@@ -303,6 +304,7 @@ simulationWrapper <- function(
       EnvironmentSeeds = withRandom(runif(id)[id] * 1e8, seed = dynamicsSeed)
     )
 
+    # Actual rate, to be hit with override later.
     CharacteristicRate <- max(unlist(lapply(
       InteractionMatrices$Mats, function(m) {abs(eigen(m)$values)}
     )))
@@ -313,6 +315,10 @@ simulationWrapper <- function(
            poolpatchSeed, dynamicsSeed, ID = partialID,
            file = datfile_ppd)
     }
+  }
+
+  if (!is.null(characteristicRateOverride)) {
+    CharacteristicRate <- characteristicRateOverride
   }
 
   # Affinities are not a part of the pool-patch framework.
