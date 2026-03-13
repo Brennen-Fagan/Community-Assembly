@@ -1,7 +1,7 @@
 # Setup: ######################################################################
 # Plot of Richness as a function of species preferences and land-use,
 # when species preferences are 100% 0.
-# Also functinally an overview plot of network structure.
+# Also functionally an overview plot of network structure.
 
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
