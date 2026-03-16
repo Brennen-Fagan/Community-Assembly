@@ -13,6 +13,11 @@ if (variant == "Networks") {
   source(file.path("R", "generateNetworks.R")) # To create inset graphs.
   library(patchwork)
 
+  dirImages <- file.path(".", "TSTS_Images_Networks")
+  if (!dir.exists(dirImages)) {
+    dir.create(dirImages, showWarnings = FALSE)
+  }
+
   ##### Data Management: ######################################################
   figureNetworks <- list(
     graph = list(
@@ -130,7 +135,11 @@ if (variant == "Networks") {
     PoolPatchSeed %in% figureNetworks$graph$seed
   ) |> tidytable::pull(ID) |> lapply(
     function(id) {
-      figureNetworks$graph$networks$Envs[[id]]$singletonGraphs[[1]] # + theme.
+      list(
+        ID = figureNetworks$indices[id, ],
+        plt =
+          figureNetworks$graph$networks$Envs[[id]]$singletonGraphs[[1]] # + ...
+      )
     }
   )
 
@@ -179,7 +188,34 @@ if (variant == "Networks") {
   ) + ggplot2::theme_minimal(
   )
 
+  ###### Save: ################################################################
+  ggplot2::ggsave(
+    # Use Patchwork to Combine
+    figureNetworks$plot2A + figureNetworks$plot2C + patchwork::plot_layout(
+      ncol = 2, widths = c(18, 7)
+    )
+    path = dirImages,
+    filename = "FigureN2_NoIntervention.png",
+    units = "cm", width = 25, height = 11
+  )
+
+  # Save insets separately in order to animate them on the presentation.
+  lapply(figureNetworks$plot2B, function(lst) {
+    ggplot2::ggsave(
+      lst$plt
+      path = dirImages,
+      filename = paste0(
+        "FigureN2_", lst$ID$ID, "_",
+        # anything in (, ), ., -, or > needs to be eliminated for filename.
+        gsub(lst$ID$Intervention, pattern = "[()(.)>-]", replacement = ""),
+        "_", lst$ID$Time, ".png"
+      ),
+      units = "cm", width = 4, height = 3
+    )
+  })
+
   ##### Figure 3: Intervention, Richness, Networks through Time ###############
+
 
   ##### Figure 4: Richness, Abundance, Turnover, Complexity (RATC) ############
 
