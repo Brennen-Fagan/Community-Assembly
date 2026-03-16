@@ -5,36 +5,192 @@ variant <- c("Networks")[1]
 if (variant == "Networks") {
   ### Networks oriented: ######################################################
   #### Setup: #################################################################
-  
-  
+  ##### Resources: ############################################################
   source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
   source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
   source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
   source(file.path("R", "flattenDiversity.R")) # Req'd by below
   source(file.path("R", "generateNetworks.R")) # To create inset graphs.
-  
+  library(patchwork)
+
+  ##### Data Management: ######################################################
   figureNetworks <- list(
     graph = list(
+      # Note that, unusually, we need all max(time), but only seed for others.
       seed = "2", # "11", "17", "2"!,
-      time = 25000
-    )
+      time = c(100, 2000, 25000)
+    ),
+    interventions = c("(0)", "(0.5)->(0)", "(0.5)", "(0.5)->(1)", "(1)")
   )
-  
+
+  figureNetworks$graph$specification <-
+    diversitiesRichness |> tidytable::select(c(
+      # Which network:
+      "Time", "Environment1",
+      # Which File (Base):
+      "PoolPatch", "PoolPatchSeed", "Interactions", "InteractionsSeed",
+      "Events", "EventsSeed", "InitialConditions", "InitialConditionsSeed",
+      "Dispersal", "NicheDistance",
+      # Oops, there was a collision causing human readable to replace machine.
+      # Will be replaced SpeciesAffinity#2 with -> SpeciesPreferences.
+      "SpeciesAffinity",
+      "SpeciesAffinitySeed", "PatchAffinity", "PatchAffinitySeed",
+      # Which File (Intervention):
+      "InterventionPatchType", "InterventionPatchSeed", "InterventionTimeType",
+      "InterventionTimeSeed", "InterventionDispersal",
+      "InterventionNicheDistance",
+      # Ease of Use
+      "SpeciesPreferences", "Intervention"
+    )) |> tidytable::filter(
+      # SpeciesPreferences == figureNetworks$pref,
+      NicheDistance == defaultNicheDistance,
+      Intervention %in% figureNetworks$interventions,
+      Time == max(figureNetworks$graph$time) | # The unusual OR addition.
+        PoolPatchSeed %in% figureNetworks$graph$seed,
+      Time %in% figureNetworks$graph$time
+    ) |> tidytable::distinct(
+    )
+
+  figureNetworks$dataRich <- diversitiesRichness |> tidytable::filter(
+    # SpeciesPreferences %in% figureNetworks$pref,
+    NicheDistance == defaultNicheDistance,
+    Intervention %in% figureNetworks$interventions,
+    PoolPatchSeed %in% basePoolPatchSeeds,
+    Metric == "Alpha Hill:0"
+  )
+
   #### Cluster of Single Adaptation Type Figures: #############################
   ##### Figure 2: Richness, Networks through Time #############################
-  
+  ###### Main Plot: ###########################################################
+  # This is essentially figure 2, but with some more reference points, which
+  # we will anchor additional network insets to.
+  figureNetworks$plot2A <- plotMeanAndInner(
+    figureNetworks$dataRich |> tidytable::filter(
+      InterventionFinal == InterventionInitial,
+      SpeciesPreferences == "100% 0",
+      is.na(Subset)
+    ) |> tidytable::mutate(
+      SpeciesPreferences = tidytable::case_when(
+        SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
+        SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
+        SpeciesPreferences == "Uniform(0, 1)" ~ "Multiple Adaptation Types",
+        TRUE ~ SpeciesPreferences
+      )
+    ),
+    CIs = 0.75
+  ) + ggplot2::geom_point(
+    data = function(x) {x |> tidytable::filter(
+      PoolPatchSeed == figureNetworks$graph$seed,
+      Intervention %in% c("(0)", "(0.5)", "(1)"),
+      Time %in% figureNetworks$graph$time
+    )},
+    mapping = ggplot2::aes(fill = Intervention),
+    shape = 21,
+    color = "black"
+  )  + ggplot2::labs(
+    y = "Richness"
+  ) + ggplot2::guides(
+    linetype = "none",
+    color = ggplot2::guide_legend(ncol = 5, title = "Habitat Type"),
+    fill = ggplot2::guide_legend(ncol = 5, title = "Habitat Type")
+  ) + ggplot2::theme(
+    legend.position = c(0.8, 0.09),
+    plot.tag.position = c(0.025, 0.95),
+    panel.spacing = ggplot2::unit(1, "lines"),
+    strip.text = ggplot2::element_text(size = 12)
+  ) + ggplot2::coord_cartesian(
+    xlim = c(0, 31000), ylim = c(0, richnessYMax), expand = FALSE
+  ) + ggplot2::scale_x_continuous(
+    breaks = c(0, 1, 10, 100, 1000, (0:3)*10000),
+    transform = scales::transform_pseudo_log(sigma = 10)
+  ) + ggplot2::facet_grid(
+    # switch = "y",
+    cols = ggplot2::vars(SpeciesPreferences)
+  )
+
+  ###### Inset Plots: #########################################################
+  # Network plots at various times, and fuel for the KDEs.
+  figureNetworks$graph$networks <- generateNetworks(
+    figureNetworks$graph$specification,
+    Date = "2025-07-30", split = TRUE
+  )
+
+  figureNetworks$indices <-
+    figureNetworks$graph$networks$Index |> tidytable::filter(
+      # SpeciesPreferences == figureNetworks$pref,
+      NicheDistance == defaultNicheDistance,
+      Intervention %in% figureNetworks$interventions,
+      PoolPatchSeed %in% basePoolPatchSeeds
+    ) |> tidytable::arrange(
+      Intervention
+    )
+
+  figureNetworks$plot2B <- figureNetworks$indices |> tidytable::filter(
+    Time %in% figureNetworks$graph$time,
+    PoolPatchSeed %in% figureNetworks$graph$seed
+  ) |> tidytable::pull(ID) |> lapply(
+    function(id) {
+      figureNetworks$graph$networks$Envs[[id]]$singletonGraphs[[1]] # + theme.
+    }
+  )
+
+  ###### Summary Plot: ########################################################
+  # KDE plots where we are looking at
+  figureNetworks$kdes <- lapply(
+    figureNetworks$graph$networks$Envs, function(e) {
+      e$trophics$EdgeVertexLists[[1]][[1]]$Vertices |> tidytable::select(
+        node, Type, Size, N
+      ) |> cbind(
+        e$Row |> tidytable::select(Time, PoolPatch:Intervention)
+      ) |> tidytable::mutate(
+        AffinityVals = e$result$Ellipsis$Affinity$SpeciesAffinities[
+          as.numeric(substring(node, 2))
+          ]
+      )
+    }
+  ) |> tidytable::bind_rows(
+  )
+
+  figureNetworks$plot2C <- ggplot2::ggplot(
+    figureNetworks$kdes |> tidytable::filter(
+      Time == max(figureNetworks$graph$time),
+      InterventionFinal == InterventionInitial,
+      SpeciesPreferences == "100% 0"
+    )
+  ) + ggplot2::geom_density(
+    mapping = ggplot2::aes(
+      y = Size, fill = Type#, color = Intervention
+    ),
+    trim = TRUE
+  ) + ggplot2::geom_density(
+    mapping = ggplot2::aes(
+      y = Size, fill = Type, color = Intervention
+    ),
+    alpha = 0.25,
+    trim = TRUE
+  ) + ggplot2::facet_grid(
+    Intervention ~ .
+  ) + ggplot2::scale_y_log10(
+  ) + ggplot2::scale_color_manual(
+    values = colorPalette,
+    name = "Habitat Land-use"
+  ) + ggplot2::scale_fill_manual(
+    values = c("Basal" = "darkgreen", "Consumer" = "burlywood4")
+  ) + ggplot2::theme_minimal(
+  )
+
   ##### Figure 3: Intervention, Richness, Networks through Time ###############
-  
+
   ##### Figure 4: Richness, Abundance, Turnover, Complexity (RATC) ############
-  
+
   #### 2 and Multiple Adaptation Type Figures: ################################
   ##### Figure 5: Richness w/Time, Abundance, Turnover, Complexity ############
-  
+
   ##### Figure 6: Short Term Int. RATC ########################################
-  
+
   #### Summary Images: ########################################################
   ##### Figure 7a: Parameters Cause RATC ######################################
-  
+
   ##### Figure 7b: Network reorganisation over short time scales ##############
-  
+
 }
