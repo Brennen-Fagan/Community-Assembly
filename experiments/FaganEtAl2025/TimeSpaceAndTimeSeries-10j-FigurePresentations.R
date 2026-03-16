@@ -6,13 +6,19 @@ if (variant == "Networks") {
   ### Networks oriented: ######################################################
   #### Setup: #################################################################
   ##### Resources: ############################################################
+  # Data:
   source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
   source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
   source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
+
+  load("TSTS_Interventions_10a1.RData")
+
+  # Functions:
   source(file.path("R", "flattenDiversity.R")) # Req'd by below
   source(file.path("R", "generateNetworks.R")) # To create inset graphs.
   library(patchwork)
 
+  # Directories:
   dirImages <- file.path(".", "TSTS_Images_Networks")
   if (!dir.exists(dirImages)) {
     dir.create(dirImages, showWarnings = FALSE)
@@ -22,12 +28,18 @@ if (variant == "Networks") {
   figureNetworks <- list(
     graph = list(
       # Note that, unusually, we need all max(time), but only seed for others.
-      seed = "2", # "11", "17", "2"!,
-      time = c(100, 2000, 25000)
+      seed = "2", # "11", "17", "2"!,          # for examples
+      time = c(100, 2000, 25000),              # for examples
+      timeInterventions = c(0, 10, 100, 1000), # for examples
+      pref = c("100% 0", "Uniform(0, 1)"),     # for KDEs
+      interventions = c("(0)", "(0.5)", "(1)") # for KDEs
     ),
     interventions = c("(0)", "(0.5)->(0)", "(0.5)", "(0.5)->(1)", "(1)")
   )
 
+  # Apply initial specification set-up, but then identify practical times
+  # post-intervention rather than the approximates supplied above for the
+  # examples.
   figureNetworks$graph$specification <-
     diversitiesRichness |> tidytable::select(c(
       # Which network:
@@ -46,14 +58,47 @@ if (variant == "Networks") {
       "InterventionNicheDistance",
       # Ease of Use
       "SpeciesPreferences", "Intervention"
-    )) |> tidytable::filter(
-      # SpeciesPreferences == figureNetworks$pref,
+    )) |> tidytable::left_join(
+      InterventionTimes |> tidytable::select(
+        TimeIntervention, PoolPatch:PatchAffinitySeed
+      ),
+      by = c("PoolPatch", "PoolPatchSeed", "Interactions",
+             "InteractionsSeed", "Events",
+             "EventsSeed", "InitialConditions",
+             "InitialConditionsSeed", "Dispersal",
+             "NicheDistance", "SpeciesAffinity",
+             "SpeciesAffinitySeed", "PatchAffinity",
+             "PatchAffinitySeed")
+    ) |> tidytable::mutate(
+      TimeSinceIntervention = Time - TimeIntervention
+    ) |> tidytable::filter(
+      SpeciesPreferences %in% figureNetworks$graph$pref,
       NicheDistance == defaultNicheDistance,
-      Intervention %in% figureNetworks$interventions,
-      Time == max(figureNetworks$graph$time) | # The unusual OR addition.
-        PoolPatchSeed %in% figureNetworks$graph$seed,
-      Time %in% figureNetworks$graph$time
+      Intervention %in% figureNetworks$graph$interventions | # for KDEs
+        (PoolPatchSeed %in% figureNetworks$graph$seed &      # for examples
+           Intervention %in% figureNetworks$interventions),  # for examples
+      Time == max(figureNetworks$graph$time) |               # for KDEs
+        PoolPatchSeed %in% figureNetworks$graph$seed         # for examples
     ) |> tidytable::distinct(
+    )
+
+  figureNetworks$graph$timeInterventions <-
+    figureNetworks$graph$specification |> tidytable::filter(
+      PoolPatchSeed %in% figureNetworks$graph$seed
+    ) |> with(
+      TimeSinceIntervention[
+        outer(
+        TimeSinceIntervention,
+        figureNetworks$graph$timeInterventions,
+        function(x, y) abs(x - y)
+      ) |> apply(2, which.min)
+      ]
+    )
+
+  figureNetworks$graph$specification <-
+    figureNetworks$graph$specification |> tidytable::filter(
+      Time %in% figureNetworks$graph$time |                  # for examples
+        (TimeSinceIntervention %in% figureNetworks$graph$timeInterventions)
     )
 
   figureNetworks$dataRich <- diversitiesRichness |> tidytable::filter(
