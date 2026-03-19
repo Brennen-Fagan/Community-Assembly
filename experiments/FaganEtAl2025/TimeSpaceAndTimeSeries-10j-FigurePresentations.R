@@ -361,8 +361,45 @@ if (variant == "Networks") {
   }
 
   ##### Figure 3: Intervention, Richness, Networks through Time ###############
+  # Figure 3 looks a lot like figure 2, but we're going to focus on the
+  # post-intervention period, and the comparison with Figure 2 instead of on
+  # the KDEs.
+  if (3 %in% figures) {
+  ###### Main Plot: #########################################################
+  figureNetworks$plotB <- ggplot2::ggplot(
+    figureNetworks$dataSummary |> tidytable::filter(
+      Metric == "Richness", InterventionInitial != InterventionFinal
+    ),
+    aes(x = Time, y = Average,
+        color = Intervention,
+        fill = Intervention
+    )
+  ) + ggplot2::geom_vline(
+    xintercept = 0, color = "black", linetype = "dashed"
+  ) + ggplot2::geom_line(
+  ) + ggplot2::geom_ribbon(
+    ggplot2::aes(ymin = Lower, ymax = Upper),
+    alpha = 0.25, linewidth = 0.25
+  ) + ggplot2::scale_color_manual(
+    values = colorPalette, aesthetics = c("color", "fill"),
+    name = "Habitat Type"
+  ) + ggplot2::theme_minimal(
+  ) + ggplot2::guides(
+    fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
+  ) + ggplot2::labs(
+    x = "Time Since Intervention",
+    y = "Richness"
+  ) + ggplot2::coord_cartesian(
+    ylim = c(0, richnessYMax),
+    expand = FALSE
+  ) + ggplot2::scale_x_continuous(
+    breaks = c(0, 1, 10, 100, 1000, 10000, 15000),
+    transform = scales::transform_pseudo_log(sigma = 10)
+  )
 
+  ###### Comparison Plot: ###################################################
 
+  }
   ##### Figure 4: Richness, Abundance, Turnover, Complexity (RATC) ############
 
   #### 2 and Multiple Adaptation Type Figures: ################################
