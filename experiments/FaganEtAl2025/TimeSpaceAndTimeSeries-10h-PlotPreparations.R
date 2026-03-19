@@ -17,6 +17,13 @@ if (!exists("ColExt")) {
 # Problems with X11
 options(bitmapType = "cairo")
 
+dateSwitch <- switch(
+  c("Original", "Carrying Capacity", "Timescales")[3],
+  "Original" = "2025-07-30",
+  "Carrying Capacity" = "2025-09-04",
+  "Timescales" = "2026-03-11"
+)
+
 # Grey interval that we compute over, usually after intervention (~50%)
 # If second number is less than 1, we lose persistent species.
 endprops %assign% c(0.602, 0.9045) # Aiming for 20000 - 30000. ~0.0003% away.
@@ -26,7 +33,7 @@ defaultNicheDistance %assign% "5" # "3"::2, "5"::5, "7"::10
 richnessYMax %assign% 42
 basePoolPatchSeeds %assign% as.character(1:44)
 
-dirImages %assign% "TSTS_Images_10j"
+dirImages %assign% paste0("TSTS_Images_10j_", dateSwitch)
 
 # Common Libraries / Functions: ###############################################
 library(RMTRCode2) # Personal

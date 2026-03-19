@@ -2,7 +2,7 @@
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 
 if (!exists("diversitiesTimeBC")) {
-  load("diversitiesFlattened10a1_2025-07-30_TimeBC.RData")
+  load(paste0("diversitiesFlattened10a1_", dateSwitch, "_TimeBC.RData"))
   # load("diversitiesFlattened10a1_2025-09-04_TimeBC.RData")
 
   diversitiesTimeBC <- diversitiesTimeBC |> changePreferencesLevels(
