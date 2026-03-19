@@ -1,22 +1,37 @@
 
-datfolders <- dir(pattern = "TSTS_Simulations_.+2025-07-30")
+#datfolders <- dir(pattern = "TSTS_Simulations_.+2025-07-30")
 #datfolders <- dir(pattern = "TSTS_Simulations_.+2025-09-04")
+datfolders <- dir(pattern = "TSTS_Simulations_.+2026-03-11")
 
 overwrite <- TRUE # FALSE # TRUE
 
 prefix <- "diversitiesFlattened10"
-suffix <- "2025-07-30"
+#suffix <- "2025-07-30"
 #suffix <- "2025-09-04"
+suffix <- "2026-03-11"
 
 # Libraries: ##################################################################
+directory <- '.'
+librarypath <- file.path(directory, "Rlibs")
+if (!dir.exists(librarypath)) {
+  dir.create(librarypath, showWarnings = FALSE)
+}
+.libPaths(c(librarypath, .libPaths()))
+
+allLibraryPaths <- .libPaths()
+
+#update.packages(ask = FALSE, repos = c(CRAN = "https://cloud.r-project.org"), 
+#                instlib = librarypath, oldPkgs = "dplyr")
+
 source("TimeSpaceAndTimeSeries-10-Dictionaries.R")
-source('TimeSpaceAndTimeSeries-0-Functions.R')
+#source('TimeSpaceAndTimeSeries-0-Functions.R')
 library(tidytable)
-#library(RMTRCode2)
+library(RMTRCode2)
 
 # functions: ##################################################################
 
-source("flattenDiversity.R")
+source(file.path("R", "flattenDiversity.R"))
+source(file.path("R", "interventionNamingScheme.R"))
 
 # Load Data: ##################################################################
 
