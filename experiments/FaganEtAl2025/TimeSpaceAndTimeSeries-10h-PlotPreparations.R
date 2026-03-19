@@ -10,6 +10,8 @@
 }
 
 # Required for interventionStrings and endTimes, which have downstream deps.
+# WARNING: This does not respect the dateSwitch below.
+# The detected endtimes and intervention strings may therefore be incorrect.
 if (!exists("ColExt")) {
   load("ColExt10a1_flat.RData")
 }
@@ -55,13 +57,26 @@ source(file.path("R", "plotMeanAndInner.R")) # WISOTT for Value over Time.
 source(file.path("R", "unifyAffinityBins.R")) # Make intervals consistent.
 
 # Resources: ##################################################################
-
 ### Folder creation: ##########################################################
 if (!dir.exists(dirImages)) {
   dir.create(dirImages, showWarnings = FALSE)
 }
 
+### Strings: ##################################################################
+# Enhance readability, from 9g TablePlots
+interventionStrings %assign% (ColExt |> tidytable::select(
+  PatchAffinity, PoolPatch, InterventionPatchType
+) |> tidytable::distinct(
+) |> tidytable::mutate(
+  Intervention = unlist(mapply(
+    FUN = interventionNamingScheme,
+    PatchAffinity, PoolPatch, InterventionPatchType
+  ))
+))
+
 ### Standardised intervention names: ##########################################
+# WARNING: This should probably be derived from interventionNamingScheme rather
+# than be hard-coded (something like outer(initial state, final state)).
 interventionMatrix %assign% matrix(c(
   "(0)", "(0)->(0.25)", "(0)->(0.5)", "(0)->(0.75)", "(0)->(1)",
   "(0.25)->(0)", "(0.25)", "(0.25)->(0.5)", "(0.25)->(0.75)", "(0.25)->(1)",
@@ -97,18 +112,6 @@ externalNames %assign% c(
   "EndOfSimulation" = "Persistent",
   "NA"              = "NA"
 )
-
-### Strings: ##################################################################
-# Enhance readability, from 9g TablePlots
-interventionStrings %assign% (ColExt |> tidytable::select(
-  PatchAffinity, PoolPatch, InterventionPatchType
-) |> tidytable::distinct(
-) |> tidytable::mutate(
-  Intervention = unlist(mapply(
-    FUN = interventionNamingScheme,
-    PatchAffinity, PoolPatch, InterventionPatchType
-  ))
-))
 
 ### End times: #################################################################
 # Work out the end times so we can truncate the simulations
