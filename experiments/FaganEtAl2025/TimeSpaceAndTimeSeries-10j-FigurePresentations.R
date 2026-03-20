@@ -14,6 +14,9 @@ if (variant == "Networks") {
   source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
 
   load("TSTS_Interventions_10a1.RData")
+  InterventionTimes <- InterventionTimes |> tidytable::select(
+    -tidytable::starts_with("Intervention")
+    ) # Only for the base cases, so Intervention information all NA.
 
   # Functions:
   source(file.path("R", "flattenDiversity.R")) # Req'd by below
@@ -39,6 +42,7 @@ if (variant == "Networks") {
     interventions = c("(0)", "(0.5)->(0)", "(0.5)", "(0.5)->(1)", "(1)"),
     ci = 0.75
   )
+
 
   # Apply initial specification set-up, but then identify practical times
   # post-intervention rather than the approximates supplied above for the
@@ -100,8 +104,9 @@ if (variant == "Networks") {
 
   figureNetworks$graph$specification <-
     figureNetworks$graph$specification |> tidytable::filter(
-      Time %in% figureNetworks$graph$time |                  # for examples
-        (TimeSinceIntervention %in% figureNetworks$graph$timeInterventions)
+      round(Time, 6) %in% round(figureNetworks$graph$time, 6) | # for examples
+        (round(TimeSinceIntervention, 6) %in%
+           round(figureNetworks$graph$timeInterventions, 6))
     )
 
   figureNetworks$dataRich <- diversitiesRichness |> tidytable::filter(
@@ -194,7 +199,7 @@ if (variant == "Networks") {
       mapping = ggplot2::aes(fill = Intervention),
       shape = 21,
       color = "black"
-    )  + ggplot2::labs(
+    ) + ggplot2::labs(
       y = "Richness"
     ) + ggplot2::guides(
       linetype = "none",
@@ -211,7 +216,6 @@ if (variant == "Networks") {
       breaks = c(0, 1, 10, 100, 1000, (0:3)*10000),
       transform = scales::transform_pseudo_log(sigma = 10)
     ) + ggplot2::facet_grid(
-      # switch = "y",
       cols = ggplot2::vars(SpeciesPreferences)
     )
 
@@ -289,15 +293,9 @@ if (variant == "Networks") {
       )
     ) + ggplot2::geom_density(
       mapping = ggplot2::aes(
-        y = Size#, color = Intervention
+        y = Size
       ),
       trim = TRUE, fill = "grey"
-      # ) + ggplot2::geom_density(
-      #   mapping = ggplot2::aes(
-      #     y = Size, fill = Type, #color = Intervention
-      #   ),
-      #   alpha = 0.25,
-      #   trim = TRUE
     ) + ggplot2::facet_grid(
       factor(Intervention, # Set the order precisely
              levels = c("(1)", "(0.5)", "(0)"), ordered = TRUE) ~ .
@@ -310,8 +308,6 @@ if (variant == "Networks") {
       xlim = c(0, 4)
     )
 
-
-
     ###### Save: ##############################################################
     ggplot2::ggsave(
       # Use Patchwork to Combine
@@ -322,7 +318,6 @@ if (variant == "Networks") {
       filename = "FigureN2_NoIntervention_Base.png",
       units = "cm", width = 25, height = 11
     )
-
 
     ggplot2::ggsave(
       # Use Patchwork to Combine
@@ -389,12 +384,41 @@ if (variant == "Networks") {
     ) + ggplot2::geom_ribbon(
       ggplot2::aes(ymin = Lower, ymax = Upper),
       alpha = 0.25, linewidth = 0.25
+    ) + ggplot2::geom_point(
+      data = figureNetworks$dataRich |> tidytable::filter(
+        # Two step filter to reduce computation as much as possible.
+        PoolPatchSeed == figureNetworks$graph$seed,
+        Intervention %in% c("(0.5)->(0)", "(0.5)", "(0.5)->(1)"),
+        is.na(Subset), SpeciesPreferences == "100% 0"
+      ) |> tidytable::left_join(
+        InterventionTimes
+      ) |> tidytable::mutate(
+        Time = Time - TimeIntervention
+      ) |> tidytable::filter(
+        Time %in% figureNetworks$graph$timeInterventions |
+          round(Time, 6) %in% figureNetworks$graph$timeInterventions
+      ) |> tidytable::mutate(
+        SpeciesPreferences = tidytable::case_when(
+          SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
+          SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
+          SpeciesPreferences == "Uniform(0, 1)" ~ "Multiple Adaptation Types",
+          TRUE ~ SpeciesPreferences
+        )
+      ),
+      mapping = ggplot2::aes(fill = Intervention, y = Value),
+      shape = 21,
+      color = "black"
     ) + ggplot2::scale_color_manual(
       values = colorPalette, aesthetics = c("color", "fill"),
-      name = "Habitat Type"
-    ) + ggplot2::theme_minimal(
+      name = ""
     ) + ggplot2::guides(
+      linetype = "none",
       fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
+    ) + ggplot2::theme_minimal(
+    ) + ggplot2::theme(
+      legend.position = c(0.58, 0.88),
+      panel.spacing = ggplot2::unit(1, "lines"),
+      strip.text = ggplot2::element_text(size = 12)
     ) + ggplot2::labs(
       x = "Time Since Intervention",
       y = "Richness"
@@ -404,11 +428,147 @@ if (variant == "Networks") {
     ) + ggplot2::scale_x_continuous(
       breaks = c(0, 1, 10, 100, 1000, 10000, 15000),
       transform = scales::transform_pseudo_log(sigma = 10)
+    ) + ggplot2::facet_grid(
+      cols = ggplot2::vars(SpeciesPreferences)
     )
 
-    ###### Comparison Plot: ###################################################
+    ###### Inset Plots: #######################################################
+    # Network plots at various times.
+    # If we've already had the KDEs from F2, then we don't need to redo all of
+    # this. If we don't then we want to only do the bits we'll use. KDEs mean
+    # doing pretty much all (so minor addt'l cost), but here we use only some.
+    figureNetworks$graph$networksSubset <-
+      if("networks" %in% names(figureNetworks$graph)) {
+        # NOT TESTED:
+        targets <- figureNetworks$graph$networks$Index |> tidytable::filter(
+          PoolPatchSeed == figureNetworks$graph$seed,
+          Intervention %in% c("(0.5)->(0)", "(0.5)", "(0.5)->(1)"),
+          SpeciesPreferences == "100% 0",
+          TimeSinceIntervention > -1
+        ) |> tidytable::pull(ID)
+        list(
+          Envs = figureNetworks$graph$networks[targets],
+          Index = figureNetworks$graph$networks$Index[
+            targets,
+            ] |> tidytable::mutate(
+              ID = tidytable::row_number()
+            )
+        )
+    } else {
+      generateNetworks(
+        figureNetworks$graph$specification |> tidytable::filter(
+          PoolPatchSeed == figureNetworks$graph$seed,
+          Intervention %in% c("(0.5)->(0)", "(0.5)", "(0.5)->(1)"),
+          SpeciesPreferences == "100% 0",
+          TimeSinceIntervention > -1
+        ),
+        Date = "2025-07-30", split = TRUE
+      )
+    }
 
+    figureNetworks$plot3B <-
+      figureNetworks$graph$networksSubset$Index |> tidytable::pull(ID) |> lapply(
+        function(id) {
+          list(
+            ID = figureNetworks$graph$networksSubset$Index[id, ],
+            plt =
+              figureNetworks$graph$networksSubset$Envs[[
+                id
+                ]]$singletonGraphs[[1]] +
+              ggplot2::theme(
+                axis.title.x = ggplot2::element_blank(),
+                panel.border = ggplot2::element_rect(
+                  color = "black", fill = NA
+                ),
+                legend.position = "none",
+                axis.text.y = ggplot2::element_text(
+                  margin = ggplot2::margin(r = -23),
+                  size = 9, vjust = 0.2),
+                axis.text.x = ggplot2::element_blank()
+              ) + ggplot2::coord_cartesian(
+                xlim = c(-0.5, 1), ylim = c(0.01, 3)
+              ) + ggplot2::ylab(
+                ""
+              ) + ggplot2::scale_size(
+                range = c(0.1, 2)
+              )
+          )
+        }
+      )
+
+    ###### Comparison Plot: ###################################################
+    figureNetworks$plot3C <- ggplot2::ggplot(
+      figureNetworks$dataSummary |> tidytable::filter(
+        Metric == "Richness", Time >= 9000,
+        Intervention %in% c("(0)", "(0.5)", "(1)"),
+        SpeciesPreferences == "100% 0"
+      ) |> tidytable::mutate(
+        SpeciesPreferences = tidytable::case_when(
+          SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
+          SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
+          SpeciesPreferences == "Uniform(0, 1)" ~ "Multiple Adaptation Types",
+          TRUE ~ SpeciesPreferences
+        )
+      ),
+      aes(x = Time, y = Average,
+          color = Intervention,
+          fill = Intervention
+      )
+    ) + ggplot2::geom_vline(
+      xintercept = 0, color = "black", linetype = "dashed"
+    ) + ggplot2::geom_line(
+    ) + ggplot2::geom_ribbon(
+      ggplot2::aes(ymin = Lower, ymax = Upper),
+      alpha = 0.25, linewidth = 0.25
+    ) + ggplot2::scale_color_manual(
+      values = colorPalette, aesthetics = c("color", "fill"),
+      name = ""
+    ) + ggplot2::theme_minimal(
+    ) + ggplot2::theme(
+      legend.position = c(0.4, 0.15),
+      panel.spacing = ggplot2::unit(1, "lines"),
+      strip.text = ggplot2::element_text(size = 12),
+      axis.title.y = ggplot2::element_blank()
+    ) + ggplot2::guides(
+      fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
+    ) + ggplot2::labs(
+      x = "Time Since Intervention"#,
+      # y = "Richness"
+    ) + ggplot2::coord_cartesian(
+      ylim = c(0, richnessYMax), xlim = c(10000, 15000),
+      expand = FALSE
+    ) + ggplot2::scale_x_continuous(
+      breaks = c(10000, 15000),
+      transform = scales::transform_pseudo_log(sigma = 10)
+    )
+
+    ###### Save: ##############################################################
+    ggplot2::ggsave(
+      # Use Patchwork to Combine
+      figureNetworks$plot3A + figureNetworks$plot3C + patchwork::plot_layout(
+        ncol = 2, widths = c(23, 2)
+      ),
+      path = dirImages,
+      filename = "FigureN3_Intervention_Base.png",
+      units = "cm", width = 20, height = 11
+    )
+
+    # Save insets separately in order to animate them on the presentation.
+    lapply(figureNetworks$plot3B, function(lst) {
+      ggplot2::ggsave(
+        lst$plt,
+        path = dirImages,
+        filename = paste0(
+          "FigureN3_", lst$ID$ID, "_",
+          # anything in (, ), ., -, or > needs to be eliminated for filename.
+          gsub(lst$ID$Intervention, pattern = "[()(.)>-]", replacement = ""),
+          "_", lst$ID$Time, ".png"
+        ),
+        units = "cm", width = 4, height = 3
+      )
+    })
   }
+
   ##### Figure 4: Richness, Abundance, Turnover, Complexity (RATC) ############
 
   #### 2 and Multiple Adaptation Type Figures: ################################
