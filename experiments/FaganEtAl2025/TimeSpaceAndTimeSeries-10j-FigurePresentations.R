@@ -1,7 +1,7 @@
 # Presentation variations:
 
 variant <- c("Networks")[1]
-figures <- c(3)
+figures <- c(4)
 # 2:3 # Networks
 
 if (variant == "Networks") {
@@ -12,6 +12,7 @@ if (variant == "Networks") {
   source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
   source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
   source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
+  source("TimeSpaceAndTimeSeries-10i-PreparationsTimeBC.R")
 
   load("TSTS_Interventions_10a1.RData")
   InterventionTimes <- InterventionTimes |> tidytable::select(
@@ -42,7 +43,6 @@ if (variant == "Networks") {
     interventions = c("(0)", "(0.5)->(0)", "(0.5)", "(0.5)->(1)", "(1)"),
     ci = 0.75
   )
-
 
   # Apply initial specification set-up, but then identify practical times
   # post-intervention rather than the approximates supplied above for the
@@ -112,9 +112,25 @@ if (variant == "Networks") {
   figureNetworks$dataRich <- diversitiesRichness |> tidytable::filter(
     # SpeciesPreferences %in% figureNetworks$pref,
     NicheDistance == defaultNicheDistance,
-    Intervention %in% figureNetworks$interventions,
+    Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
     PoolPatchSeed %in% basePoolPatchSeeds,
     Metric == "Alpha Hill:0"
+  )
+
+  figureNetworks$dataAbund <- diversitiesAbund |> tidytable::filter(
+    # SpeciesPreferences %in% figure2$pref,
+    NicheDistance == defaultNicheDistance,
+    Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
+    PoolPatchSeed %in% basePoolPatchSeeds,
+    Metric == "Alpha Abundance"
+  )
+
+  figureNetworks$dataTurnover <- diversitiesTimeBC |> tidytable::filter(
+    # SpeciesPreferences %in% figure2$pref,
+    NicheDistance == defaultNicheDistance,
+    Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
+    PoolPatchSeed %in% basePoolPatchSeeds,
+    Metric == "TimeBrayCurtis: 10"
   )
 
   # Why to the level of summary? Because the PlotMeanAndInner function
@@ -224,7 +240,7 @@ if (variant == "Networks") {
     figureNetworks$graph$networks <- generateNetworks(
       figureNetworks$graph$specification,
       Date = "2025-07-30", split = TRUE
-    )
+    ); gc() # Tend to have lots of leftover memory usage.
 
     figureNetworks$indices <-
       figureNetworks$graph$networks$Index |> tidytable::filter(
@@ -463,7 +479,7 @@ if (variant == "Networks") {
           TimeSinceIntervention > -1
         ),
         Date = "2025-07-30", split = TRUE
-      )
+      ); gc() # Tend to have lots of leftover memory usage.
     }
 
     figureNetworks$plot3B <-
@@ -525,7 +541,7 @@ if (variant == "Networks") {
       name = ""
     ) + ggplot2::theme_minimal(
     ) + ggplot2::theme(
-      legend.position = c(0.4, 0.15),
+      legend.position = c(0.5, 0.15),
       panel.spacing = ggplot2::unit(1, "lines"),
       strip.text = ggplot2::element_text(size = 12),
       axis.title.y = ggplot2::element_blank()
@@ -570,6 +586,85 @@ if (variant == "Networks") {
   }
 
   ##### Figure 4: Richness, Abundance, Turnover, Complexity (RATC) ############
+  if (4 %in% figures) {
+    ###### Prep Connectance Data: #############################################
+
+    ###### Violin Plots: ######################################################
+    figureNetworks$makeViolins <- function(dat) {
+      ggplot2::ggplot(
+        dat |> tidytable::filter(
+          Time > Start, Time < Stop
+        ) |> tidytable::group_by(
+          PoolPatchSeed, Intervention, SpeciesPreferences, Subset
+        ) |> tidytable::summarise(
+          Value = mean(Value)
+        ),
+        ggplot2::aes(
+          x = Intervention,
+          y = Value,
+          color = Intervention,
+          group = paste(Intervention, Subset)
+        )
+        # OVERALL Violins
+      ) + ggplot2::geom_violin(
+        data = function(x) x |> tidytable::filter(is.na(Subset)),
+        position = ggplot2::position_dodge(0.9), scale = "count"
+      ) + ggplot2::geom_boxplot(
+        data = function(x) x |> tidytable::filter(is.na(Subset)),
+        notch = TRUE, outlier.size = 0,
+        position = ggplot2::position_dodge(0.9),
+        width = 0.13
+      ) + ggplot2::scale_color_manual(
+        values = colorPalette, aesthetics = c("color", "fill"),
+        name = "Habitat Type"
+      # ) + ggplot2::facet_grid(
+      #   . ~ SpeciesPreferences
+      ) + ggplot2::theme_minimal(
+      ) + ggplot2::theme(
+        plot.tag.position = c(0.01, 1),
+        panel.grid.minor = ggplot2::element_blank(),
+        strip.background = ggplot2::element_blank(),
+        strip.text = ggplot2::element_blank(),
+        panel.spacing = ggplot2::unit(1, "lines")
+      ) + ggplot2::guides(
+        color = "none",
+        fill = "none"
+      )
+    }
+
+    figureNetworks$plot4A <- (
+      figureNetworks$dataRich |> tidytable::filter(
+        SpeciesPreferences %in% c("100% 0")
+      ) |> figureNetworks$makeViolins()
+    ) + ggplot2::coord_cartesian(
+      ylim = c(0, richnessYMax), expand = FALSE
+    ) + ggplot2::labs(
+      y = "Richness",
+      x = "Habitat Type"
+    )
+
+    figureNetworks$plot4B <- (
+      figureNetworks$dataAbund |> tidytable::filter(
+        SpeciesPreferences %in% c("100% 0")
+      ) |> figureNetworks$makeViolins()
+    ) + ggplot2::labs(
+      y = "Abundance",
+      x = "Habitat Type"
+    ) + ggplot2::scale_y_continuous(
+      transform = "pseudo_log", breaks = 10^(0:4),
+      label = scales::label_log(digits = 2)
+    )
+
+    figureNetworks$plot4C <- (
+      figureNetworks$dataTurnover |> tidytable::filter(
+        SpeciesPreferences %in% c("100% 0")
+      ) |> figureNetworks$makeViolins()
+    ) + ggplot2::labs(
+      y = "Bray-Curtis Dissimilarity",
+      x = "Habitat Type"
+    )
+
+  }
 
   #### 2 and Multiple Adaptation Type Figures: ################################
   ##### Figure 5: Richness w/Time, Abundance, Turnover, Complexity ############
