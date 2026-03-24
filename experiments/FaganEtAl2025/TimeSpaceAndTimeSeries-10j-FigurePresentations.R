@@ -624,7 +624,7 @@ if (variant == "Networks") {
         dat |> tidytable::filter(
           Time > Start, Time < Stop
         ) |> tidytable::group_by(
-          PoolPatchSeed, Intervention, SpeciesPreferences, Subset
+          PoolPatchSeed, Intervention, SpeciesPreferences, Subset, Metric
         ) |> tidytable::summarise(
           Value = mean(Value)
         ),
@@ -718,6 +718,13 @@ if (variant == "Networks") {
         figureNetworks$dataConnectance
       ) |> tidytable::pivot_wider(
         names_from = "Metric", values_from = "Value"
+      ) |> tidytable::mutate(
+        # For inspection, but not otherwise used.
+        PerSpeciesAbundance = 10^`Log10 Abundance` / `Alpha Hill:0`,
+        PerSpeciesBC = `TimeBrayCurtis: 10` / `Alpha Hill:0`,
+        PerIndividualBC =  `TimeBrayCurtis: 10` / (10^`Log10 Abundance`),
+        PerNodeEdges = (`Alpha Hill:0` - 1) * Connectance,
+        Edges = `Alpha Hill:0` * (`Alpha Hill:0` - 1) * Connectance
       )
 
       figureNetworks$plot4E <- GGally::ggpairs(
@@ -761,6 +768,27 @@ if (variant == "Networks") {
         units = "cm", width = 25, height = 14
       )
     }
+
+    ((figureNetworks$sensecheck4 |> tidytable::pivot_longer(
+      names_to = "Metric", values_to = "Value", cols = c(
+        figureNetworks$dataRich$Metric[1],
+        gsub(pattern = "Alpha", replacement = "Log10",
+             x = figureNetworks$dataAbund$Metric[1], fixed = TRUE),
+        figureNetworks$dataTurnover$Metric[1],
+        figureNetworks$dataConnectance$Metric[1],
+        "PerSpeciesAbundance",
+        "PerSpeciesBC",
+        "PerIndividualBC" ,
+        "PerNodeEdges",
+        "Edges"
+      )) |> figureNetworks$makeViolins()) + ggplot2::facet_wrap(ggplot2::vars(Metric), scales = "free"
+      ) + ggplot2::theme(
+        strip.text = ggplot2::element_text()
+      )) |> ggplot2::ggsave(
+        path = dirImages,
+        filename = "FigureN4_Overview.png",
+        units = "cm", width = 25, height = 14
+      )
   }
 
   #### 2 and Multiple Adaptation Type Figures: ################################
