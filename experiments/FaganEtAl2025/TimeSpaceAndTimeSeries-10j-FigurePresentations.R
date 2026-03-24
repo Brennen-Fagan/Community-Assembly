@@ -17,7 +17,7 @@ if (variant == "Networks") {
   load("TSTS_Interventions_10a1.RData")
   InterventionTimes <- InterventionTimes |> tidytable::select(
     -tidytable::starts_with("Intervention")
-    ) # Only for the base cases, so Intervention information all NA.
+  ) # Only for the base cases, so Intervention information all NA.
 
   # Functions:
   source(file.path("R", "flattenDiversity.R")) # Req'd by below
@@ -470,17 +470,17 @@ if (variant == "Networks") {
               ID = tidytable::row_number()
             )
         )
-    } else {
-      generateNetworks(
-        figureNetworks$graph$specification |> tidytable::filter(
-          PoolPatchSeed == figureNetworks$graph$seed,
-          Intervention %in% c("(0.5)->(0)", "(0.5)", "(0.5)->(1)"),
-          SpeciesPreferences == "100% 0",
-          TimeSinceIntervention > -1
-        ),
-        Date = "2025-07-30", split = TRUE
-      ); gc() # Tend to have lots of leftover memory usage.
-    }
+      } else {
+        generateNetworks(
+          figureNetworks$graph$specification |> tidytable::filter(
+            PoolPatchSeed == figureNetworks$graph$seed,
+            Intervention %in% c("(0.5)->(0)", "(0.5)", "(0.5)->(1)"),
+            SpeciesPreferences == "100% 0",
+            TimeSinceIntervention > -1
+          ),
+          Date = "2025-07-30", split = TRUE
+        ); gc() # Tend to have lots of leftover memory usage.
+      }
 
     figureNetworks$plot3B <-
       figureNetworks$graph$networksSubset$Index |> tidytable::pull(ID) |> lapply(
@@ -588,6 +588,35 @@ if (variant == "Networks") {
   ##### Figure 4: Richness, Abundance, Turnover, Complexity (RATC) ############
   if (4 %in% figures) {
     ###### Prep Connectance Data: #############################################
+    # This is buried in the graphs of all of the relevant simulations. We'll
+    # take specifically from the t = 25000 CTU data, but note that we need to
+    # keep things comparable for RAT as well, so we need all non-int. data.
+    #
+
+    intermediate <- generateNetworks( # high memory intermediate to be rm'd.
+      # 5 Interventions x 44 simulations = 220
+      figureNetworks$dataRich |> tidytable::filter(
+        Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
+        SpeciesPreferences == "100% 0", is.na(Subset),
+        Time == 25000
+      ) |> tidytable::select(-Metric, -Value),
+      Date = "2025-07-30", split = TRUE
+    ); gc() # Tend to have lots of leftover memory usage.
+
+    figureNetworks$dataConnectance <- lapply(
+      intermediate$Envs,
+      function(env) {
+        val <- env$graphs[[1]] %E>% filter(# only 1!
+          to != from # Remove self-edges/loops; bias connectance
+        ) |> igraph::edge_density(loops = FALSE)
+        return(env$Row |> tidytable::mutate(
+          Value = val,
+          Metric = "Connectance"
+        ))
+      }
+    ) |> tidytable::bind_rows()
+
+    rm(intermediate); gc()
 
     ###### Violin Plots: ######################################################
     figureNetworks$makeViolins <- function(dat) {
@@ -617,8 +646,8 @@ if (variant == "Networks") {
       ) + ggplot2::scale_color_manual(
         values = colorPalette, aesthetics = c("color", "fill"),
         name = "Habitat Type"
-      # ) + ggplot2::facet_grid(
-      #   . ~ SpeciesPreferences
+        # ) + ggplot2::facet_grid(
+        #   . ~ SpeciesPreferences
       ) + ggplot2::theme_minimal(
       ) + ggplot2::theme(
         plot.tag.position = c(0.01, 1),
@@ -664,6 +693,74 @@ if (variant == "Networks") {
       x = "Habitat Type"
     )
 
+    figureNetworks$plot4D <- (
+      figureNetworks$dataConnectance |> tidytable::filter(
+        SpeciesPreferences %in% c("100% 0")
+      ) |> figureNetworks$makeViolins()
+    ) + ggplot2::labs(
+      y = "Connectance",
+      x = "Habitat Type"
+    )
+
+    ###### Sense-check: #######################################################
+    if (require("GGally")) {
+      figureNetworks$sensecheck4 <- tidytable::bind_rows(
+        figureNetworks$dataRich,
+        figureNetworks$dataAbund |> tidytable::mutate(
+          Metric = gsub(pattern = "Alpha", replacement = "Log10",
+                        x = Metric, fixed = TRUE),
+          Value = log10(Value)
+        ),
+        figureNetworks$dataTurnover
+      ) |> tidytable::filter(
+        Time == 25000, is.na(Subset), SpeciesPreferences == "100% 0"
+      ) |> tidytable::bind_rows(
+        figureNetworks$dataConnectance
+      ) |> tidytable::pivot_wider(
+        names_from = "Metric", values_from = "Value"
+      )
+
+      figureNetworks$plot4E <- GGally::ggpairs(
+        figureNetworks$sensecheck4,
+        columns = c( # Each should be length(unique(...)) == 1.
+          figureNetworks$dataRich$Metric[1],
+          gsub(pattern = "Alpha", replacement = "Log10",
+               x = figureNetworks$dataAbund$Metric[1], fixed = TRUE),
+          figureNetworks$dataTurnover$Metric[1],
+          figureNetworks$dataConnectance$Metric[1]
+        ),
+        mapping = ggplot2::aes(
+          color = Intervention,
+          group = Intervention,
+          alpha = 0.25
+        )
+      ) + ggplot2::scale_color_manual(
+        values = colorPalette, aesthetics = c("color", "fill"),
+        name = "Habitat Type"
+      ) + ggplot2::theme_minimal(
+      )
+    }
+
+    ###### Save: ##############################################################
+    ggplot2::ggsave(
+      # Use Patchwork to Combine
+      figureNetworks$plot4A + figureNetworks$plot4B +
+        figureNetworks$plot4C + figureNetworks$plot4D + patchwork::plot_layout(
+        ncol = 2, nrow = 2
+      ),
+      path = dirImages,
+      filename = "FigureN4_Solos.png",
+      units = "cm", width = 20, height = 11
+    )
+
+    if (require("GGally")) {
+      ggplot2::ggsave(
+        figureNetworks$plot4E,
+        path = dirImages,
+        filename = "FigureN4_Combos.png",
+        units = "cm", width = 25, height = 14
+      )
+    }
   }
 
   #### 2 and Multiple Adaptation Type Figures: ################################
