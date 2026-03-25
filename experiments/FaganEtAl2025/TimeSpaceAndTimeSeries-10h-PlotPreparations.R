@@ -100,6 +100,11 @@ linetypePalette %assign% c(
   "Multiple Adaptation Types" = "dotdash"
 )
 
+# Presentation Aliases
+# Shorter phrase for Unif that is still more descriptive.
+linetypePalette["Many Adaptation Types"] <-
+  linetypePalette["Multiple Adaptation Types"]
+
 ### renames: ##################################################################
 # For presentation (i.e., "Arrival" is a working term, but not 100% accurate.)
 externalNames %assign% c(

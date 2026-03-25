@@ -252,7 +252,7 @@ if (variant == "Networks") {
         SpeciesPreferences = tidytable::case_when(
           SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
           SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
-          SpeciesPreferences == "Uniform(0, 1)" ~ "Multiple Adaptation Types",
+          SpeciesPreferences == "Uniform(0, 1)" ~ "Many Adaptation Types",
           TRUE ~ SpeciesPreferences
         )
       ),
@@ -437,7 +437,7 @@ if (variant == "Networks") {
         SpeciesPreferences = tidytable::case_when(
           SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
           SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
-          SpeciesPreferences == "Uniform(0, 1)" ~ "Multiple Adaptation Types",
+          SpeciesPreferences == "Uniform(0, 1)" ~ "Many Adaptation Types",
           TRUE ~ SpeciesPreferences
         )
       ),
@@ -468,7 +468,7 @@ if (variant == "Networks") {
         SpeciesPreferences = tidytable::case_when(
           SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
           SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
-          SpeciesPreferences == "Uniform(0, 1)" ~ "Multiple Adaptation Types",
+          SpeciesPreferences == "Uniform(0, 1)" ~ "Many Adaptation Types",
           TRUE ~ SpeciesPreferences
         )
       ),
@@ -573,7 +573,7 @@ if (variant == "Networks") {
         SpeciesPreferences = tidytable::case_when(
           SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
           SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
-          SpeciesPreferences == "Uniform(0, 1)" ~ "Multiple Adaptation Types",
+          SpeciesPreferences == "Uniform(0, 1)" ~ "Many Adaptation Types",
           TRUE ~ SpeciesPreferences
         )
       ),
@@ -801,7 +801,7 @@ if (variant == "Networks") {
       )
   }
 
-  #### 2 and Multiple Adaptation Type Figures: ################################
+  #### 2 and Many Adaptation Type Figures: ################################
   ##### Figure 5: Richness w/Time, Abundance, Turnover, Complexity ############
   if (5 %in% figures) {
     ###### Prep Connectance Data: #############################################
@@ -839,13 +839,15 @@ if (variant == "Networks") {
     figureNetworks$plot5A <- plotMeanAndInner(
       figureNetworks$dataRich |> tidytable::filter(
         InterventionFinal == InterventionInitial,
+        Intervention %in% c("(0)", "(0.5)", "(1)"),
+        # InterventionFinal == InterventionInitial,
         SpeciesPreferences != "100% 0", # Both prefs here.
         is.na(Subset)
       ) |> tidytable::mutate(
         SpeciesPreferences = tidytable::case_when(
           SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
           SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
-          SpeciesPreferences == "Uniform(0, 1)" ~ "Multiple Adaptation Types",
+          SpeciesPreferences == "Uniform(0, 1)" ~ "Many Adaptation Types",
           TRUE ~ SpeciesPreferences
         )
       ),
@@ -854,20 +856,26 @@ if (variant == "Networks") {
       y = "Richness"
     ) + ggplot2::guides(
       linetype = "none",
-      color = ggplot2::guide_legend(ncol = 5, title = "Habitat Type"),
-      fill = ggplot2::guide_legend(ncol = 5, title = "Habitat Type")
+      color = ggplot2::guide_legend(ncol = 1, title = "Habitat Type"),
+      fill = ggplot2::guide_legend(ncol = 1, title = "Habitat Type")
     ) + ggplot2::theme(
-      legend.position = c(0.8, 0.09),
+      legend.position = c(0.25, 0.8),
       plot.tag.position = c(0.025, 0.95),
       panel.spacing = ggplot2::unit(1, "lines"),
       strip.text = ggplot2::element_text(size = 12)
     ) + ggplot2::coord_cartesian(
       xlim = c(0, 31000), ylim = c(0, richnessYMax), expand = FALSE
     ) + ggplot2::scale_x_continuous(
-      breaks = c(0, 1, 10, 100, 1000, (0:3)*10000),
+      breaks = c(0, 10,
+                 100, 1000,
+                 (1:3)*10000),
+      labels = c("0", "10",
+                 expression("10"^"2"), expression("10"^"3"),
+                 expression(paste("10"^"4", phantom(100))), "",
+                 expression(paste("3"%*%"10"^"5", phantom(0)))),
       transform = scales::transform_pseudo_log(sigma = 10)
-    ) + ggplot2::facet_grid(
-      cols = ggplot2::vars(SpeciesPreferences)
+    ) + ggplot2::facet_wrap(
+      ggplot2::vars(SpeciesPreferences), nrow = 2
     )
 
     ###### RATC: ##############################################################
@@ -891,14 +899,16 @@ if (variant == "Networks") {
       y = "Abundance",
       x = "Habitat Type"
     ) + ggplot2::scale_y_continuous(
-      transform = "pseudo_log", breaks = 10^(0:4),
-      label = scales::label_log(digits = 2)
+      transform = "pseudo_log", breaks = 10^(4+(-4:4)/4),
+      label = scales::label_log(digits = 2), limits = 10^c(3.25, 4.75)
     )
 
     figureNetworks$plot5D1 <- (
       figureNetworks$dataTurnover |> tidytable::filter(
         SpeciesPreferences %in% pref
       ) |> figureNetworks$makeViolins()
+    ) + ggplot2::coord_cartesian(
+      ylim = c(0, 0.125), expand = FALSE
     ) + ggplot2::labs(
       y = "Bray-Curtis Dissimilarity",
       x = "Habitat Type"
@@ -908,6 +918,8 @@ if (variant == "Networks") {
       figureNetworks$dataConnectance |> tidytable::filter(
         SpeciesPreferences %in% pref
       ) |> figureNetworks$makeViolins()
+    ) + ggplot2::coord_cartesian(
+      ylim = c(0, 0.5), expand = TRUE
     ) + ggplot2::labs(
       y = "Connectance",
       x = "Habitat Type"
