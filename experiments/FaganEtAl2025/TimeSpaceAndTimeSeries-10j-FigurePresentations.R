@@ -186,6 +186,49 @@ if (variant == "Networks") {
       )
     )
 
+  ##### Functions: ############################################################
+  figureNetworks$makeViolins <- function(dat) {
+    ggplot2::ggplot(
+      dat |> tidytable::filter(
+        Time > Start, Time < Stop
+      ) |> tidytable::group_by(
+        PoolPatchSeed, Intervention, SpeciesPreferences, Subset, Metric
+      ) |> tidytable::summarise(
+        Value = mean(Value)
+      ),
+      ggplot2::aes(
+        x = Intervention,
+        y = Value,
+        color = Intervention,
+        group = paste(Intervention, SpeciesPreferences, Subset)
+      )
+      # OVERALL Violins
+    ) + ggplot2::geom_violin(
+      data = function(x) x |> tidytable::filter(is.na(Subset)),
+      position = ggplot2::position_dodge(0.9), scale = "count"
+    ) + ggplot2::geom_boxplot(
+      data = function(x) x |> tidytable::filter(is.na(Subset)),
+      notch = TRUE, outlier.size = 0,
+      position = ggplot2::position_dodge(0.9),
+      width = 0.13
+    ) + ggplot2::scale_color_manual(
+      values = colorPalette, aesthetics = c("color", "fill"),
+      name = "Habitat Type"
+      # ) + ggplot2::facet_grid(
+      #   . ~ SpeciesPreferences
+    ) + ggplot2::theme_minimal(
+    ) + ggplot2::theme(
+      plot.tag.position = c(0.01, 1),
+      panel.grid.minor = ggplot2::element_blank(),
+      strip.background = ggplot2::element_blank(),
+      strip.text = ggplot2::element_blank(),
+      panel.spacing = ggplot2::unit(1, "lines")
+    ) + ggplot2::guides(
+      color = "none",
+      fill = "none"
+    )
+  }
+
   #### Cluster of Single Adaptation Type Figures: #############################
   if (2 %in% figures) {
     ##### Figure 2: Richness, Networks through Time ###########################
@@ -619,48 +662,6 @@ if (variant == "Networks") {
     rm(intermediate); gc()
 
     ###### Violin Plots: ######################################################
-    figureNetworks$makeViolins <- function(dat) {
-      ggplot2::ggplot(
-        dat |> tidytable::filter(
-          Time > Start, Time < Stop
-        ) |> tidytable::group_by(
-          PoolPatchSeed, Intervention, SpeciesPreferences, Subset, Metric
-        ) |> tidytable::summarise(
-          Value = mean(Value)
-        ),
-        ggplot2::aes(
-          x = Intervention,
-          y = Value,
-          color = Intervention,
-          group = paste(Intervention, Subset)
-        )
-        # OVERALL Violins
-      ) + ggplot2::geom_violin(
-        data = function(x) x |> tidytable::filter(is.na(Subset)),
-        position = ggplot2::position_dodge(0.9), scale = "count"
-      ) + ggplot2::geom_boxplot(
-        data = function(x) x |> tidytable::filter(is.na(Subset)),
-        notch = TRUE, outlier.size = 0,
-        position = ggplot2::position_dodge(0.9),
-        width = 0.13
-      ) + ggplot2::scale_color_manual(
-        values = colorPalette, aesthetics = c("color", "fill"),
-        name = "Habitat Type"
-        # ) + ggplot2::facet_grid(
-        #   . ~ SpeciesPreferences
-      ) + ggplot2::theme_minimal(
-      ) + ggplot2::theme(
-        plot.tag.position = c(0.01, 1),
-        panel.grid.minor = ggplot2::element_blank(),
-        strip.background = ggplot2::element_blank(),
-        strip.text = ggplot2::element_blank(),
-        panel.spacing = ggplot2::unit(1, "lines")
-      ) + ggplot2::guides(
-        color = "none",
-        fill = "none"
-      )
-    }
-
     figureNetworks$plot4A <- (
       figureNetworks$dataRich |> tidytable::filter(
         SpeciesPreferences %in% c("100% 0")
@@ -753,8 +754,8 @@ if (variant == "Networks") {
       # Use Patchwork to Combine
       figureNetworks$plot4A + figureNetworks$plot4B +
         figureNetworks$plot4C + figureNetworks$plot4D + patchwork::plot_layout(
-        ncol = 2, nrow = 2
-      ),
+          ncol = 2, nrow = 2
+        ),
       path = dirImages,
       filename = "FigureN4_Solos.png",
       units = "cm", width = 20, height = 11
@@ -781,7 +782,8 @@ if (variant == "Networks") {
         "PerIndividualBC" ,
         "PerNodeEdges",
         "Edges"
-      )) |> figureNetworks$makeViolins()) + ggplot2::facet_wrap(ggplot2::vars(Metric), scales = "free"
+      )) |> figureNetworks$makeViolins()) + ggplot2::facet_wrap(
+        ggplot2::vars(Metric), scales = "free"
       ) + ggplot2::theme(
         strip.text = ggplot2::element_text()
       )) |> ggplot2::ggsave(
@@ -794,7 +796,328 @@ if (variant == "Networks") {
   #### 2 and Multiple Adaptation Type Figures: ################################
   ##### Figure 5: Richness w/Time, Abundance, Turnover, Complexity ############
   if (5 %in% figures) {
+    ###### Prep Connectance Data: #############################################
+    # This is buried in the graphs of all of the relevant simulations. We'll
+    # take specifically from the t = 25000 CTU data, but note that we need to
+    # keep things comparable for RAT as well, so we need all non-int. data.
+    #
 
+    intermediate <- generateNetworks( # high memory intermediate to be rm'd.
+      # 5 Interventions x 44 simulations x 2 Prefs = 440
+      figureNetworks$dataRich |> tidytable::filter(
+        Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
+        SpeciesPreferences != "100% 0", is.na(Subset),
+        Time == 25000
+      ) |> tidytable::select(-Metric, -Value),
+      Date = "2025-07-30", split = TRUE
+    ); gc() # Tend to have lots of leftover memory usage.
+
+    figureNetworks$dataConnectance <- lapply(
+      intermediate$Envs,
+      function(env) {
+        val <- env$graphs[[1]] %E>% filter(# only 1!
+          to != from # Remove self-edges/loops; bias connectance
+        ) |> igraph::edge_density(loops = FALSE)
+        return(env$Row |> tidytable::mutate(
+          Value = val,
+          Metric = "Connectance"
+        ))
+      }
+    ) |> tidytable::bind_rows()
+
+    rm(intermediate); gc()
+
+    ###### Time Series Plot: ##################################################
+    figureNetworks$plot5A <- plotMeanAndInner(
+      figureNetworks$dataRich |> tidytable::filter(
+        InterventionFinal == InterventionInitial,
+        SpeciesPreferences != "100% 0",
+        is.na(Subset)
+      ) |> tidytable::mutate(
+        SpeciesPreferences = tidytable::case_when(
+          SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
+          SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
+          SpeciesPreferences == "Uniform(0, 1)" ~ "Multiple Adaptation Types",
+          TRUE ~ SpeciesPreferences
+        )
+      ),
+      CIs = figureNetworks$ci
+    ) + ggplot2::labs(
+      y = "Richness"
+    ) + ggplot2::guides(
+      linetype = "none",
+      color = ggplot2::guide_legend(ncol = 5, title = "Habitat Type"),
+      fill = ggplot2::guide_legend(ncol = 5, title = "Habitat Type")
+    ) + ggplot2::theme(
+      legend.position = c(0.8, 0.09),
+      plot.tag.position = c(0.025, 0.95),
+      panel.spacing = ggplot2::unit(1, "lines"),
+      strip.text = ggplot2::element_text(size = 12)
+    ) + ggplot2::coord_cartesian(
+      xlim = c(0, 31000), ylim = c(0, richnessYMax), expand = FALSE
+    ) + ggplot2::scale_x_continuous(
+      breaks = c(0, 1, 10, 100, 1000, (0:3)*10000),
+      transform = scales::transform_pseudo_log(sigma = 10)
+    ) + ggplot2::facet_grid(
+      cols = ggplot2::vars(SpeciesPreferences)
+    )
+
+    ###### RATC: ##############################################################
+    ###### Violin Plots: ######################################################
+    figureNetworks$plot5B1 <- (
+      figureNetworks$dataRich |> tidytable::filter(
+        SpeciesPreferences %in% c("50% 0, 50% 1")
+      ) |> figureNetworks$makeViolins()
+    ) + ggplot2::coord_cartesian(
+      ylim = c(0, richnessYMax), expand = FALSE
+    ) + ggplot2::labs(
+      y = "Richness",
+      x = "Habitat Type"
+    )
+
+    figureNetworks$plot5C1 <- (
+      figureNetworks$dataAbund |> tidytable::filter(
+        SpeciesPreferences %in% c("50% 0, 50% 1")
+      ) |> figureNetworks$makeViolins()
+    ) + ggplot2::labs(
+      y = "Abundance",
+      x = "Habitat Type"
+    ) + ggplot2::scale_y_continuous(
+      transform = "pseudo_log", breaks = 10^(0:4),
+      label = scales::label_log(digits = 2)
+    )
+
+    figureNetworks$plot5D1 <- (
+      figureNetworks$dataTurnover |> tidytable::filter(
+        SpeciesPreferences %in% c("50% 0, 50% 1")
+      ) |> figureNetworks$makeViolins()
+    ) + ggplot2::labs(
+      y = "Bray-Curtis Dissimilarity",
+      x = "Habitat Type"
+    )
+
+    figureNetworks$plot5E1 <- (
+      figureNetworks$dataConnectance |> tidytable::filter(
+        SpeciesPreferences %in% c("50% 0, 50% 1")
+      ) |> figureNetworks$makeViolins()
+    ) + ggplot2::labs(
+      y = "Connectance",
+      x = "Habitat Type"
+    )
+
+    figureNetworks$plot5B2 <- (
+      figureNetworks$dataRich |> tidytable::filter(
+        SpeciesPreferences %in% c("Uniform(0, 1)")
+      ) |> figureNetworks$makeViolins()
+    ) + ggplot2::coord_cartesian(
+      ylim = c(0, richnessYMax), expand = FALSE
+    ) + ggplot2::labs(
+      y = "Richness",
+      x = "Habitat Type"
+    )
+
+    figureNetworks$plot5C2 <- (
+      figureNetworks$dataAbund |> tidytable::filter(
+        SpeciesPreferences %in% c("Uniform(0, 1)")
+      ) |> figureNetworks$makeViolins()
+    ) + ggplot2::labs(
+      y = "Abundance",
+      x = "Habitat Type"
+    ) + ggplot2::scale_y_continuous(
+      transform = "pseudo_log", breaks = 10^(0:4),
+      label = scales::label_log(digits = 2)
+    )
+
+    figureNetworks$plot5D2 <- (
+      figureNetworks$dataTurnover |> tidytable::filter(
+        SpeciesPreferences %in% c("Uniform(0, 1)")
+      ) |> figureNetworks$makeViolins()
+    ) + ggplot2::labs(
+      y = "Bray-Curtis Dissimilarity",
+      x = "Habitat Type"
+    )
+
+    figureNetworks$plot5E2 <- (
+      figureNetworks$dataConnectance |> tidytable::filter(
+        SpeciesPreferences %in% c("Uniform(0, 1)")
+      ) |> figureNetworks$makeViolins()
+    ) + ggplot2::labs(
+      y = "Connectance",
+      x = "Habitat Type"
+    )
+
+    ###### Sense-check: #######################################################
+    if (require("GGally")) {
+      figureNetworks$sensecheck5 <- tidytable::bind_rows(
+        figureNetworks$dataRich,
+        figureNetworks$dataAbund |> tidytable::mutate(
+          Metric = gsub(pattern = "Alpha", replacement = "Log10",
+                        x = Metric, fixed = TRUE),
+          Value = log10(Value)
+        ),
+        figureNetworks$dataTurnover
+      ) |> tidytable::filter(
+        Time == 25000, is.na(Subset), SpeciesPreferences != "100% 0"
+      ) |> tidytable::bind_rows(
+        figureNetworks$dataConnectance
+      ) |> tidytable::pivot_wider(
+        names_from = "Metric", values_from = "Value"
+      ) |> tidytable::mutate(
+        # For inspection, but not otherwise used.
+        PerSpeciesAbundance = 10^`Log10 Abundance` / `Alpha Hill:0`,
+        PerSpeciesBC = `TimeBrayCurtis: 10` / `Alpha Hill:0`,
+        PerIndividualBC =  `TimeBrayCurtis: 10` / (10^`Log10 Abundance`),
+        PerNodeEdges = (`Alpha Hill:0` - 1) * Connectance,
+        Edges = `Alpha Hill:0` * (`Alpha Hill:0` - 1) * Connectance
+      )
+
+      figureNetworks$plot5F1 <- GGally::ggpairs(
+        figureNetworks$sensecheck5 |> tidytable::filter(
+          SpeciesPreferences = "50% 0, 50% 1"
+        ),
+        columns = c( # Each should be length(unique(...)) == 1.
+          figureNetworks$dataRich$Metric[1],
+          gsub(pattern = "Alpha", replacement = "Log10",
+               x = figureNetworks$dataAbund$Metric[1], fixed = TRUE),
+          figureNetworks$dataTurnover$Metric[1],
+          figureNetworks$dataConnectance$Metric[1]
+        ),
+        mapping = ggplot2::aes(
+          color = Intervention,
+          group = Intervention,
+          alpha = 0.25
+        )
+      ) + ggplot2::scale_color_manual(
+        values = colorPalette, aesthetics = c("color", "fill"),
+        name = "Habitat Type"
+      ) + ggplot2::theme_minimal(
+      ) + ggplot2::ggtitle(
+        "50% 0, 50% 1"
+      )
+
+      figureNetworks$plot5F2 <- GGally::ggpairs(
+        figureNetworks$sensecheck5 |> tidytable::filter(
+          SpeciesPreferences = "Uniform(0, 1)"
+        ),
+        columns = c( # Each should be length(unique(...)) == 1.
+          figureNetworks$dataRich$Metric[1],
+          gsub(pattern = "Alpha", replacement = "Log10",
+               x = figureNetworks$dataAbund$Metric[1], fixed = TRUE),
+          figureNetworks$dataTurnover$Metric[1],
+          figureNetworks$dataConnectance$Metric[1]
+        ),
+        mapping = ggplot2::aes(
+          color = Intervention,
+          group = Intervention,
+          alpha = 0.25
+        )
+      ) + ggplot2::scale_color_manual(
+        values = colorPalette, aesthetics = c("color", "fill"),
+        name = "Habitat Type"
+      ) + ggplot2::theme_minimal(
+      ) + ggplot2::ggtitle(
+        "Uniform(0, 1)"
+      )
+    }
+
+    ###### Save: ##############################################################
+    ggplot2::ggsave(
+      # Use Patchwork to Combine
+      figureNetworks$plot5A +
+        figureNetworks$plot5B1 + figureNetworks$plot5C1 +
+        figureNetworks$plot5D1 + figureNetworks$plot5E1 +
+        patchwork::plot_layout(
+          design = "AABBCC
+                    AABBCC
+                    AADDEE
+                    AADDEE"
+        ),
+      path = dirImages,
+      filename = "FigureN5_5050.png",
+      units = "cm", width = 20, height = 11
+    )
+    ggplot2::ggsave(
+      # Use Patchwork to Combine
+      figureNetworks$plot5A +
+        figureNetworks$plot5B2 + figureNetworks$plot5C2 +
+        figureNetworks$plot5D2 + figureNetworks$plot5E2 +
+        patchwork::plot_layout(
+          design = "AABBCC
+                    AABBCC
+                    AADDEE
+                    AADDEE"
+        ),
+      path = dirImages,
+      filename = "FigureN5_Unif.png",
+      units = "cm", width = 20, height = 11
+    )
+
+    if (require("GGally")) {
+      ggplot2::ggsave(
+        figureNetworks$plot5F1,
+        path = dirImages,
+        filename = "FigureN5_Combos_5050.png",
+        units = "cm", width = 25, height = 14
+      )
+      ggplot2::ggsave(
+        figureNetworks$plot5F2,
+        path = dirImages,
+        filename = "FigureN5_Combos_Unif.png",
+        units = "cm", width = 25, height = 14
+      )
+    }
+
+    ((figureNetworks$sensecheck5 |> tidytable::filter(
+      SpeciesPreferences = "50% 0, 50% 1"
+    ) |> tidytable::pivot_longer(
+      names_to = "Metric", values_to = "Value", cols = c(
+        figureNetworks$dataRich$Metric[1],
+        gsub(pattern = "Alpha", replacement = "Log10",
+             x = figureNetworks$dataAbund$Metric[1], fixed = TRUE),
+        figureNetworks$dataTurnover$Metric[1],
+        figureNetworks$dataConnectance$Metric[1],
+        "PerSpeciesAbundance",
+        "PerSpeciesBC",
+        "PerIndividualBC" ,
+        "PerNodeEdges",
+        "Edges"
+      )) |> figureNetworks$makeViolins()) + ggplot2::facet_wrap(
+        ggplot2::vars(Metric), scales = "free"
+      ) + ggplot2::theme(
+        strip.text = ggplot2::element_text()
+      ) + ggplot2::ggtitle(
+        "50% 0, 50% 1"
+      )) |> ggplot2::ggsave(
+        path = dirImages,
+        filename = "FigureN5_Overview_5050.png",
+        units = "cm", width = 25, height = 14
+      )
+
+    ((figureNetworks$sensecheck5 |> tidytable::filter(
+      SpeciesPreferences = "Uniform(0, 1)"
+    ) |> tidytable::pivot_longer(
+      names_to = "Metric", values_to = "Value", cols = c(
+        figureNetworks$dataRich$Metric[1],
+        gsub(pattern = "Alpha", replacement = "Log10",
+             x = figureNetworks$dataAbund$Metric[1], fixed = TRUE),
+        figureNetworks$dataTurnover$Metric[1],
+        figureNetworks$dataConnectance$Metric[1],
+        "PerSpeciesAbundance",
+        "PerSpeciesBC",
+        "PerIndividualBC" ,
+        "PerNodeEdges",
+        "Edges"
+      )) |> figureNetworks$makeViolins()) + ggplot2::facet_wrap(
+        ggplot2::vars(Metric), scales = "free"
+      ) + ggplot2::theme(
+        strip.text = ggplot2::element_text()
+      ) + ggplot2::ggtitle(
+        "Uniform(0, 1)"
+      )) |> ggplot2::ggsave(
+        path = dirImages,
+        filename = "FigureN5_Overview_Uniform.png",
+        units = "cm", width = 25, height = 14
+      )
   }
   ##### Figure 6: Short Term Int. RATC ########################################
   if (6 %in% figures) {
