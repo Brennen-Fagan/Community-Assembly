@@ -1,8 +1,8 @@
 # Presentation variations:
 
 variant <- c("Networks")[1]
-figures <- c(4)
-# 2:3 # Networks
+figures <- c(5)
+# 2:4 # Available if variant == "Networks"
 
 if (variant == "Networks") {
   ### Networks oriented: ######################################################
@@ -793,12 +793,23 @@ if (variant == "Networks") {
 
   #### 2 and Multiple Adaptation Type Figures: ################################
   ##### Figure 5: Richness w/Time, Abundance, Turnover, Complexity ############
+  if (5 %in% figures) {
 
+  }
   ##### Figure 6: Short Term Int. RATC ########################################
+  if (6 %in% figures) {
+
+  }
 
   #### Summary Images: ########################################################
-  ##### Figure 7a: Parameters Cause RATC ######################################
+  ##### Figure 7: Parameters Cause RATC #######################################
+  if (7 %in% figures) {
 
-  ##### Figure 7b: Network reorganisation over short time scales ##############
+  }
+
+  ##### Figure 8: Network reorganisation over short time scales ###############
+  if (8 %in% figures) {
+
+  }
 
 }
