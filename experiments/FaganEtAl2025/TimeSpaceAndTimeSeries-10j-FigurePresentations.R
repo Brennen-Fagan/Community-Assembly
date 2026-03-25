@@ -3,7 +3,7 @@
 variant <- c("Networks")[1]
 figures <- c(5)
 # 2:4 # Available if variant == "Networks"
-pref <- c("50% 0, 50% 1", "Uniform(0, 1)")[1]
+pref <- c("50% 0, 50% 1", "Uniform(0, 1)")[2]
 # Break up the preferences to save memory for Networks 5.
 prefstring <- switch(
   pref,
@@ -838,7 +838,6 @@ if (variant == "Networks") {
     ###### Time Series Plot: ##################################################
     figureNetworks$plot5A <- plotMeanAndInner(
       figureNetworks$dataRich |> tidytable::filter(
-        InterventionFinal == InterventionInitial,
         Intervention %in% c("(0)", "(0.5)", "(1)"),
         # InterventionFinal == InterventionInitial,
         SpeciesPreferences != "100% 0", # Both prefs here.
