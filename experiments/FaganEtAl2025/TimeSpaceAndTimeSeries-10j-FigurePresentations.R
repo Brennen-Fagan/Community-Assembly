@@ -48,7 +48,8 @@ if (variant == "Networks") {
       pref = c("100% 0", "Uniform(0, 1)"),     # for KDEs
       interventions = c("(0)", "(0.5)", "(1)") # for KDEs
     ),
-    interventions = c("(0)", "(0.5)->(0)", "(0.5)", "(0.5)->(1)", "(1)"),
+    interventions = c("(0)", "(0)->(0.5)", "(0.5)->(0)",
+                      "(0.5)", "(0.5)->(1)", "(1)"),
     ci = 0.75
   )
 
@@ -144,7 +145,15 @@ if (variant == "Networks") {
   # Why to the level of summary? Because the PlotMeanAndInner function
   # isn't built to handle the multiple resolutions that we have in the
   # actual data, which makes it harder to portray the data accurately.
-  figureNetworks$dataSummary <- figureNetworks$dataRich |>
+  figureNetworks$dataSummary <- diversitiesRichness |> tidytable::filter(
+    # SpeciesPreferences %in% figureNetworks$pref,
+    NicheDistance == defaultNicheDistance,
+    Intervention %in% c("(0)", "(0)->(0.5)", # (0)->(0.5) used for N6
+                        "(0.5)", "(0.5)->(0)", # all others used in N3.
+                        "(0.5)->(1)", "(1)"),
+    PoolPatchSeed %in% basePoolPatchSeeds,
+    Metric == "Alpha Hill:0"
+  ) |>
     tidytable::left_join(
       InterventionTimes
     ) |> tidytable::mutate(
@@ -237,6 +246,17 @@ if (variant == "Networks") {
     )
   }
 
+  figureNetworks$renameSpeciesPreferences <- function(dat) {
+    dat |> tidytable::mutate(
+      SpeciesPreferences = tidytable::case_when(
+        SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
+        SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
+        SpeciesPreferences == "Uniform(0, 1)" ~ "Many Adaptation Types",
+        TRUE ~ SpeciesPreferences
+      )
+    )
+  }
+
   #### Cluster of Single Adaptation Type Figures: #############################
   if (2 %in% figures) {
     ##### Figure 2: Richness, Networks through Time ###########################
@@ -248,13 +268,7 @@ if (variant == "Networks") {
         InterventionFinal == InterventionInitial,
         SpeciesPreferences == "100% 0",
         is.na(Subset)
-      ) |> tidytable::mutate(
-        SpeciesPreferences = tidytable::case_when(
-          SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
-          SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
-          SpeciesPreferences == "Uniform(0, 1)" ~ "Many Adaptation Types",
-          TRUE ~ SpeciesPreferences
-        )
+      ) |> figureNetworks$renameSpeciesPreferences(
       ),
       CIs = figureNetworks$ci
     ) + ggplot2::geom_point(
@@ -433,13 +447,7 @@ if (variant == "Networks") {
         Metric == "Richness", Time >= -100,
         Intervention %in% c("(0.5)->(0)", "(0.5)", "(0.5)->(1)"),
         SpeciesPreferences == "100% 0"
-      ) |> tidytable::mutate(
-        SpeciesPreferences = tidytable::case_when(
-          SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
-          SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
-          SpeciesPreferences == "Uniform(0, 1)" ~ "Many Adaptation Types",
-          TRUE ~ SpeciesPreferences
-        )
+      ) |> figureNetworks$renameSpeciesPreferences(
       ),
       aes(x = Time, y = Average,
           color = Intervention,
@@ -464,13 +472,7 @@ if (variant == "Networks") {
       ) |> tidytable::filter(
         Time %in% figureNetworks$graph$timeInterventions |
           round(Time, 6) %in% figureNetworks$graph$timeInterventions
-      ) |> tidytable::mutate(
-        SpeciesPreferences = tidytable::case_when(
-          SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
-          SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
-          SpeciesPreferences == "Uniform(0, 1)" ~ "Many Adaptation Types",
-          TRUE ~ SpeciesPreferences
-        )
+      ) |> figureNetworks$renameSpeciesPreferences(
       ),
       mapping = ggplot2::aes(fill = Intervention, y = Value),
       shape = 21,
@@ -569,13 +571,7 @@ if (variant == "Networks") {
         Metric == "Richness", Time >= 9000,
         Intervention %in% c("(0)", "(0.5)", "(1)"),
         SpeciesPreferences == "100% 0"
-      ) |> tidytable::mutate(
-        SpeciesPreferences = tidytable::case_when(
-          SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
-          SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
-          SpeciesPreferences == "Uniform(0, 1)" ~ "Many Adaptation Types",
-          TRUE ~ SpeciesPreferences
-        )
+      ) |> figureNetworks$renameSpeciesPreferences(
       ),
       aes(x = Time, y = Average,
           color = Intervention,
@@ -842,13 +838,7 @@ if (variant == "Networks") {
         # InterventionFinal == InterventionInitial,
         SpeciesPreferences != "100% 0", # Both prefs here.
         is.na(Subset)
-      ) |> tidytable::mutate(
-        SpeciesPreferences = tidytable::case_when(
-          SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
-          SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
-          SpeciesPreferences == "Uniform(0, 1)" ~ "Many Adaptation Types",
-          TRUE ~ SpeciesPreferences
-        )
+      ) |> figureNetworks$renameSpeciesPreferences(
       ),
       CIs = figureNetworks$ci
     ) + ggplot2::labs(
@@ -1028,7 +1018,68 @@ if (variant == "Networks") {
   }
   ##### Figure 6: Short Term Int. RATC ########################################
   if (6 %in% figures) {
-
+    # Time series along the bottom, then two variants:
+    #   one with a progression of the networks and
+    #   one with the progression of all of the statistics we've been using.
+    #
+    ###### Main Plot: #########################################################
+    figureNetworks$plot6A <- ggplot2::ggplot(
+      figureNetworks$dataSummary |> tidytable::filter(
+        Metric == "Richness", Time >= -100,
+        Intervention %in% c("(0)", "(0.5)->(0)", "(0.5)", "(0)->(0.5)"),
+        SpeciesPreferences == "Uniform(0, 1)"
+      ) |> figureNetworks$renameSpeciesPreferences(
+      ),
+      aes(x = Time, y = Average,
+          color = Intervention,
+          fill = Intervention
+      )
+    ) + ggplot2::geom_vline(
+      xintercept = 0, color = "black", linetype = "dashed"
+    ) + ggplot2::geom_line(
+    ) + ggplot2::geom_ribbon(
+      ggplot2::aes(ymin = Lower, ymax = Upper),
+      alpha = 0.25, linewidth = 0.25
+    ) + ggplot2::geom_point(
+      data = figureNetworks$dataRich |> tidytable::filter(
+        # Two step filter to reduce computation as much as possible.
+        PoolPatchSeed == figureNetworks$graph$seed,
+        Intervention %in% c("(0)", "(0.5)->(0)", "(0.5)", "(0)->(0.5)"),
+        is.na(Subset), SpeciesPreferences == "Uniform(0, 1)"
+      ) |> tidytable::left_join(
+        InterventionTimes
+      ) |> tidytable::mutate(
+        Time = Time - TimeIntervention
+      ) |> tidytable::filter(
+        Time %in% figureNetworks$graph$timeInterventions |
+          round(Time, 6) %in% figureNetworks$graph$timeInterventions
+      ) ,
+      mapping = ggplot2::aes(fill = Intervention, y = Value),
+      shape = 21,
+      color = "black"
+    ) + ggplot2::scale_color_manual(
+      values = colorPalette, aesthetics = c("color", "fill"),
+      name = ""
+    ) + ggplot2::guides(
+      linetype = "none",
+      fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
+    ) + ggplot2::theme_minimal(
+    ) + ggplot2::theme(
+      legend.position = c(0.58, 0.88),
+      panel.spacing = ggplot2::unit(1, "lines"),
+      strip.text = ggplot2::element_text(size = 12)
+    ) + ggplot2::labs(
+      x = "Time Since Intervention",
+      y = "Richness"
+    ) + ggplot2::coord_cartesian(
+      ylim = c(0, richnessYMax), xlim = c(-20, NA),
+      expand = FALSE
+    ) + ggplot2::scale_x_continuous(
+      breaks = c(0, 1, 10, 100, 1000, 10000, 15000),
+      transform = scales::transform_pseudo_log(sigma = 10)
+    ) + ggplot2::facet_grid(
+      cols = ggplot2::vars(SpeciesPreferences)
+    )
   }
 
   #### Summary Images: ########################################################
