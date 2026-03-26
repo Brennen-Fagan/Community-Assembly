@@ -685,8 +685,8 @@ if (variant == "Networks") {
       y = "Abundance",
       x = "Habitat Type"
     ) + ggplot2::scale_y_continuous(
-      transform = "pseudo_log", breaks = 10^(0:4),
-      label = scales::label_log(digits = 2)
+      transform = "pseudo_log", breaks = 10^(4+(-4:4)/4),
+      label = scales::label_log(digits = 2), limits = 10^c(3.25, 4.75)
     )
 
     figureNetworks$plot4C <- (
