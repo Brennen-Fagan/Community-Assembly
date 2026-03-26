@@ -1009,7 +1009,7 @@ if (variant == "Networks") {
       ) + ggplot2::theme(
         strip.text = ggplot2::element_text()
       ) + ggplot2::ggtitle(
-        "50% 0, 50% 1"
+        pref
       )) |> ggplot2::ggsave(
         path = dirImages,
         filename = paste0("FigureN5_Overview_", prefstring, ".png"),
