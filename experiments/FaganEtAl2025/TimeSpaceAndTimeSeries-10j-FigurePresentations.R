@@ -1083,6 +1083,73 @@ if (variant == "Networks") {
     #       (1, 2, & 3 end early, 10 has holes, and these are substitutable.)
     #   Progression of the networks with R only.
     #
+    ###### Prep KDE Data: #####################################################
+    # Goal: x = "Affinity", y = "Size", scatter plot at a time, with marginal
+    # KDE plots, so that we can show how the distribution of species shifts
+    # after the intervention for a system with uniform habitat adaptations.
+
+    ColExtInterventionStrings <- ColExt %>% dplyr::select(
+      PatchAffinity, PoolPatch, InterventionPatchType
+    ) %>% dplyr::distinct(
+    ) %>% dplyr::mutate(
+      Intervention = unlist(mapply(
+        FUN = interventionNamingScheme,
+        PatchAffinity, PoolPatch, InterventionPatchType
+      ))
+    )
+
+    figureNetworks$ColExt <- ColExt |> tidytable::filter(
+      EventType != "Present", Success, # Only Events that Did Something.
+      NicheDistance == defaultNicheDistance # Base case.
+    ) |> tidytable::mutate( # Make human readable formats.
+      SpeciesPreferences =
+        speciesAffinityDictionaryOrigin$SpeciesAffinities[
+          as.numeric(SpeciesAffinity)
+          ]
+    ) |> tidytable::left_join(
+      ColExtInterventionStrings,
+      by = c("PatchAffinity", "PoolPatch", "InterventionPatchType"),
+      multiple = "all"
+    ) |> changePreferencesLevels(
+    ) |> changeInterventionLevels(
+    ) |> tidytable::filter( # Reduce to the levels we're interested in.
+      SpeciesPreferences == "Uniform(0, 1)",
+      Intervention %in% c("(0)->(0.5)", "(0.5)->(0)",  # To display.
+                          "(0)", "(0.5)") # To sense check.
+    ) |> tidytable::left_join(
+      endTimes |> dplyr::select(-Times)
+    ) |> tidytable::left_join( # So we can calculate our post-int. slices
+      InterventionTimes
+    ) |> tidytable::group_by(
+      # Species Characteristics
+      Species, Environment, SpeciesType, Size, ReproductionRate, Speed,
+      Affinity,
+      # Simulation Characteristics
+      PoolPatch:TimeIntervention
+    ) |> tidytable::mutate( # Create the groupings for when present in system.
+      In = ifelse(EventType == "Arrival", "In", "Out"),
+      InOutNumber = cumsum(In == "In"),
+      Time = Times - TimeIntervention
+    ) |> tidytable::pivot_wider( # Rearrange so we have time ranges
+      names_from = In, values_from  = Time,
+      id_cols = c(
+        # Species Characteristics
+        Species, Environment, SpeciesType, Size, ReproductionRate, Speed,
+        Affinity,
+        # Simulation Characteristics
+        PoolPatch:TimeIntervention,
+        InOutNumber
+      )
+    ) |> tidytable::filter( # Remove ranges that aren't included in any slice.
+      outer( # Check all combinations intervention and range, then summarize.
+        FUN = function(X, Y, low, high) {low[X] < Y & Y < high[X]},
+        X = seq_along(In),
+        Y = figureNetworks$graph$timeInterventions,
+        low = In, high = Out
+      ) |> apply(MARGIN = 1, FUN = any)
+    )
+
+
     ###### Main Plot: #########################################################
     figureNetworks$plot6A <- lapply(
       unique(figureNetworks$dataSummary$Metric), function(met, dat) {
@@ -1097,14 +1164,15 @@ if (variant == "Networks") {
             x = Time, y = Average,
             color = Intervention,
             fill = Intervention,
-            group = interaction(Intervention, Metric)
+            group = interaction(Intervention, Metric),
+            alpha = Intervention
           )
         ) + ggplot2::geom_vline(
           xintercept = 0, color = "black", linetype = "dashed"
         ) + ggplot2::geom_line(
-        # ) + ggplot2::geom_ribbon( # Too much going on in the plot at once.
-        #   ggplot2::aes(ymin = Lower, ymax = Upper),
-        #   alpha = 0.25, linewidth = 0.25
+          # ) + ggplot2::geom_ribbon( # Too much going on in the plot at once.
+          #   ggplot2::aes(ymin = Lower, ymax = Upper),
+          #   alpha = 0.25, linewidth = 0.25
         ) + ggplot2::scale_color_manual(
           values = colorPalette, aesthetics = c("color", "fill"),
           name = ""
@@ -1113,50 +1181,139 @@ if (variant == "Networks") {
           fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
         ) + ggplot2::theme_minimal(
         ) + ggplot2::theme(
-          legend.position = if(met == "Richness") {c(0.2, 0.88)} else {"none"},
+          legend.position = if(met == "Richness") {c(0.05, 0.35)} else {"none"},
           panel.spacing = ggplot2::unit(1, "lines"),
           strip.text = ggplot2::element_text(size = 12)
         ) + ggplot2::labs(
           x = "Time Since Intervention",
           y = met
         ) + ggplot2::coord_cartesian(
-          xlim = c(-20, NA),
-          expand = FALSE
+          xlim = c(-20, NA)
         ) + ggplot2::scale_x_continuous(
           breaks = c(0, 1, 10, 100, 1000, 10000, 15000),
           transform = scales::transform_pseudo_log(sigma = 10)
           # ) + ggplot2::facet_grid(
           #   cols = ggplot2::vars(SpeciesPreferences)
+        ) + ggplot2::scale_alpha_manual(
+          values = c("(0)" = 1, "(0.5)->(0)" = 1,
+                     "(0.5)" = 1, "(0)->(0.5)" = 1),
+          guide = "none"
         )
 
-        if (met == "Richness") {
-          plt <- plt + ggplot2::geom_point(
-            data = figureNetworks$dataRich |> tidytable::filter(
-              # Two step filter to reduce computation as much as possible.
-              PoolPatchSeed == figureNetworks$graph$seed,
-              Intervention %in% c("(0)", "(0.5)->(0)", "(0.5)", "(0)->(0.5)"),
-              is.na(Subset), SpeciesPreferences == "Uniform(0, 1)"
-            ) |> tidytable::left_join(
-              InterventionTimes
-            ) |> tidytable::mutate(
-              Time = Time - TimeIntervention
-            ) |> tidytable::filter(
-              Time %in% figureNetworks$graph$timeInterventions |
-                round(Time, 6) %in% figureNetworks$graph$timeInterventions
-            ) |> figureNetworks$renameSpeciesPreferences(
-            ) ,
-            mapping = ggplot2::aes(fill = Intervention, y = Value),
-            shape = 21,
-            color = "black"
-          )
-        }
+        # Not convinced this is helping making the message clearer either.
+        # if (met == "Richness") {
+        #   plt <- plt + ggplot2::geom_point(
+        #     data = figureNetworks$dataRich |> tidytable::filter(
+        #       # Two step filter to reduce computation as much as possible.
+        #       PoolPatchSeed == figureNetworks$graph$seed,
+        #       Intervention %in% c("(0)", "(0.5)->(0)", "(0.5)", "(0)->(0.5)"),
+        #       is.na(Subset), SpeciesPreferences == "Uniform(0, 1)"
+        #     ) |> tidytable::left_join(
+        #       InterventionTimes
+        #     ) |> tidytable::mutate(
+        #       Time = Time - TimeIntervention
+        #     ) |> tidytable::filter(
+        #       Time %in% figureNetworks$graph$timeInterventions |
+        #         round(Time, 6) %in% round(figureNetworks$graph$timeInterventions, 6)
+        #     ) |> figureNetworks$renameSpeciesPreferences(
+        #     ) |> tidytable::distinct(),
+        #     mapping = ggplot2::aes(fill = Intervention, y = Value),
+        #     shape = 21,
+        #     color = "black",
+        #     alpha = 0.5
+        #   )
+        # }
         return(plt)
       },
       dat = figureNetworks$dataSummary
     )
 
     ###### Network Plots: ####################################################
+    figureNetworks$plot6B <- with(
+      list(
+        plotfun = function(inter, time) {
+          list(
+            (
+              figureNetworks$ColExt |> tidytable::filter(
+                In < time, time < Out, Intervention == inter
+              ) |> ggplot2::ggplot(
+                ggplot2::aes(
+                  x = Affinity, y = Size, color = SpeciesType
+                )
+              ) + ggplot2::geom_point(
+                show.legend = FALSE
+              ) + ggplot2::scale_y_log10(
+              ) + ggplot2::scale_x_continuous(
+                breaks = c(0, 0.5, 1)
+              ) + ggplot2::theme_minimal(
+              ) + ggplot2::labs(
+                x = if(time == 0) "Habitat Adaptation",
+                y = if(time == 0) "Species Size"
+              ) + scale_color_manual(
+                values = c("Basal" = "darkgreen", "Consumer" = "burlywood4")
+              ) + ggplot2::coord_cartesian(
+                xlim = c(0, 1), ylim = c(10^-2, 10^0.5), expand = FALSE
+              )
+            ) |> ggExtra::ggMarginal(
+            )
+          )
+        }
+      ),
+      expand_grid(
+        Intervention = sort(unique(figureNetworks$ColExt$Intervention)),
+        Time = figureNetworks$graph$timeInterventions
+      ) |> tidytable::mutate_rowwise(
+        Plot = plotfun(Intervention, Time)
+      )
+    )
 
+    ###### Save: #############################################################
+    for (i in 1+5*(0:3)) {
+      ggplot2::ggsave(
+        # Use Patchwork to Combine
+        with(figureNetworks,
+             plot6A[[1]] + ggplot2::geom_vline(
+               xintercept = plot6B$Time[i+0:4], linetype = "dashed"
+             )  + ggplot2::scale_alpha_manual(
+               values = (table(plot6B$Intervention[i+0:4])+1)/6,
+               guide = "none"
+             ) +
+               plot6B$Plot[[i]] + plot6B$Plot[[i+1]] + plot6B$Plot[[i+2]] +
+               plot6B$Plot[[i+3]] + plot6B$Plot[[i+4]] +
+               patchwork::plot_layout(
+                 design =
+                   "BBCCDDEEFF
+                    BBCCDDEEFF
+                    AAAAAAAAAA
+                    AAAAAAAAAA"
+               )
+        ),
+        path = dirImages,
+        filename = paste0("FigureN6_RichnessAndKDEs_", i, ".png"),
+        units = "cm", width = 20, height = 11
+      )
+    }
+
+    ggplot2::ggsave(
+      # Use Patchwork to Combine
+      with(figureNetworks,
+           plot6A[[1]] + ggplot2::geom_vline(
+             xintercept = plot6B$Time[i+0:4], linetype = "dashed"
+           ) +
+             plot6B$Plot[[i]] + plot6B$Plot[[i+1]] + plot6B$Plot[[i+2]] +
+             plot6B$Plot[[i+3]] + plot6B$Plot[[i+4]] +
+             patchwork::plot_layout(
+               design =
+                 "BBCCDDEEFF
+                  BBCCDDEEFF
+                  AAAAAAAAAA
+                  AAAAAAAAAA"
+             )
+      ),
+      path = dirImages,
+      filename = paste0("FigureN6_RichnessAndKDEs_", i, "_noalpha.png"),
+      units = "cm", width = 20, height = 11
+    )
   }
 
   #### Summary Images: ########################################################
