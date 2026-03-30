@@ -1,9 +1,9 @@
 # Presentation variations:
 
 variant <- c("Networks")[1]
-figures <- c(6)
-# 2:4 # Available if variant == "Networks"
-pref <- c("50% 0, 50% 1", "Uniform(0, 1)")[2]
+figures <- c(7)
+# 2:6 # Available if variant == "Networks"
+pref <- c("50% 0, 50% 1", "Uniform(0, 1)")[1]
 # Break up the preferences to save memory for Networks 5.
 prefstring <- switch(
   pref,
@@ -30,7 +30,9 @@ if (variant == "Networks") {
   # Functions:
   source(file.path("R", "flattenDiversity.R")) # Req'd by below
   source(file.path("R", "generateNetworks.R")) # To create inset graphs.
-  library(patchwork)
+  source(file.path("R", "plotTextHeatmap.R")) # N7
+  library(patchwork) # Plot assembly
+  library(ggExtra) # N6 marginal distributions
 
   # Directories:
   dirImages <- file.path(".", "TSTS_Images_Networks")
@@ -42,7 +44,7 @@ if (variant == "Networks") {
   # Which seed to pick? How about one close to median performance?
   # figureNetworks$dataRich |> filter(
   #   is.na(Subset), Time > 16000,
-  #   Intervention != "(0.25)", Intervention != "(0.75)",
+  #   Intervention != "(0.25)", Intervention != "(0.75)"
   # ) |> pivot_wider(
   #   id_cols = c(Intervention, SpeciesPreferences, Time, Metric),
   #   values_from = Value, names_from = PoolPatchSeed
@@ -57,14 +59,6 @@ if (variant == "Networks") {
   #       `40`, `41`, `42`, `43`, `44`))
   # ) |> mutate(
   #   across(`1`:`9`, ~abs(.x - Median))
-  # ) |> group_by(Intervention, SpeciesPreferences, Metric) |> summarise(
-  #   across(`1`:`9`, ~sum(.x, na.rm = TRUE))
-  # ) |> pivot_longer(
-  #   cols = `1`:`9`, names_to = "Seed", values_to = "Value"
-  # ) |> group_by(Intervention, SpeciesPreferences, Metric) |> summarise(
-  #   Best = Seed[which.min(Value)],
-  #   Best2 = Seed[order(Value)[2]],
-  #   Best3 = Seed[order(Value)[3]]
   # )  |> group_by(Intervention, SpeciesPreferences, Metric) |> summarise(
   #   across(`1`:`9`, ~sum(.x, na.rm = TRUE))
   # ) |> pivot_longer(
@@ -80,7 +74,7 @@ if (variant == "Networks") {
   figureNetworks <- list(
     graph = list(
       # Note that, unusually, we need all max(time), but only seed for others.
-      seed = "27", # "11", "17", "2"!,                 # for examples
+      seed = "2", # "11", "17", "2"!,                 # for examples
       time = c(100, 2000, 25000),                     # for examples
       timeInterventions = c(0, 10, 100, 1000, 10000), # for examples
       pref = c("100% 0", "Uniform(0, 1)"),            # for KDEs
@@ -157,13 +151,22 @@ if (variant == "Networks") {
            round(figureNetworks$graph$timeInterventions, 6))
     )
 
-  figureNetworks$dataRich <- diversitiesRichness |> tidytable::filter(
-    # SpeciesPreferences %in% figureNetworks$pref,
-    NicheDistance == defaultNicheDistance,
-    Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
-    PoolPatchSeed %in% basePoolPatchSeeds,
-    Metric == "Alpha Hill:0"
-  )
+  figureNetworks$dataRich <- tidytable::bind_rows(
+    diversitiesRichness |> tidytable::filter(
+      # SpeciesPreferences %in% figureNetworks$pref,
+      NicheDistance == defaultNicheDistance,
+      Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
+      PoolPatchSeed %in% basePoolPatchSeeds,
+      Metric == "Alpha Hill:0"
+    ),
+    diversitiesRichness |> tidytable::filter(
+      SpeciesPreferences %in% figureNetworks$graph$pref,
+      NicheDistance == defaultNicheDistance,
+      Intervention %in% figureNetworks$graph$interventions,
+      PoolPatchSeed == figureNetworks$graph$seed,
+      Metric == "Alpha Hill:0"
+    )
+  ) |> tidytable::distinct()
 
   figureNetworks$dataAbund <- diversitiesAbund |> tidytable::filter(
     # SpeciesPreferences %in% figure2$pref,
@@ -322,7 +325,7 @@ if (variant == "Networks") {
     # we will anchor additional network insets to.
     figureNetworks$plot2A <- plotMeanAndInner(
       figureNetworks$dataRich |> tidytable::filter(
-        InterventionFinal == InterventionInitial,
+        Intervention %in% c("(0)", "(0.5)", "(1)"),
         SpeciesPreferences == "100% 0",
         is.na(Subset)
       ) |> figureNetworks$renameSpeciesPreferences(
