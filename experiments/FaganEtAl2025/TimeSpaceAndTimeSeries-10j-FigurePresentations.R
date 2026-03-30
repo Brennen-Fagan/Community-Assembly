@@ -30,7 +30,6 @@ if (variant == "Networks") {
   # Functions:
   source(file.path("R", "flattenDiversity.R")) # Req'd by below
   source(file.path("R", "generateNetworks.R")) # To create inset graphs.
-  source(file.path("R", "plotTextHeatmap.R")) # N7
   library(patchwork) # Plot assembly
   library(ggExtra) # N6 marginal distributions
 
@@ -1322,7 +1321,59 @@ if (variant == "Networks") {
   #### Summary Images: ########################################################
   ##### Figure 7: Parameters Cause RATC #######################################
   if (7 %in% figures) {
-
+    ((diversitiesRichness |> tidytable::filter(
+      SpeciesPreferences %in% c("100% 0", "Uniform(0, 1)"),
+      NicheDistance == defaultNicheDistance,
+      Metric == "Alpha Hill:0", is.na(Subset),
+      Start < Time, Time < Stop
+    ) |> tidytable::group_by(
+      Metric, Environment1, Environment2, PoolPatch:Stop
+    ) |> tidytable::summarise(
+      Average = mean(Value), # Average Richness within Simulation
+      .groups = "drop"
+    ) |> tidytable::group_by(
+      Metric, PoolPatch, Interactions, Events, InitialConditions, Dispersal,
+      NicheDistance, SpeciesAffinity, PatchAffinity, InterventionPatchType,
+      InterventionTimeType, InterventionDispersal, InterventionNicheDistance,
+      Intervention, SpeciesPreferences, InterventionInitial, InterventionFinal,
+      DispersalParam
+    ) |> tidytable::summarise(
+      Average = mean(Average), # Average Richness across Simulations
+      .groups = "drop" # (Simulations evenly weighted)
+    ) |> tidytable::mutate(
+      SpeciesPreferences = tidytable::case_when(
+        SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
+        SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
+        SpeciesPreferences == "Uniform(0, 1)" ~ "Many Adaptation Types",
+        TRUE ~ SpeciesPreferences
+      )
+    )) |> ggplot2::ggplot(
+      ggplot2::aes(
+        x = InterventionInitial,
+        y = InterventionFinal,
+        fill = Average
+      )
+    ) + ggplot2::geom_tile(
+      width = 1, height = 1, color = NA
+    ) + ggplot2::geom_text(
+      ggplot2::aes(label = round(Average))
+    ) + ggplot2::theme_minimal(
+    ) + ggplot2::theme(
+      strip.text = ggplot2::element_text(size = 10.5)
+    ) + ggplot2::labs(
+      fill = "Avg.\nRichness",
+      x = "Initial Habitat Type",
+      y = "Final Habitat Type"
+    ) + ggplot2::coord_fixed(
+    ) + ggplot2::facet_wrap(
+      ncol = 1, ggplot2::vars(SpeciesPreferences)
+    ) + ggplot2::scale_fill_viridis_c(
+      begin = 0.25
+    )) |> ggplot2::ggsave(
+      filename = "FigureN7_TileSummary.png",
+      path = dirImages,
+      units = "cm", width = 11, height = 11
+    )
   }
 
   ##### Figure 8: Network reorganisation over short time scales ###############
