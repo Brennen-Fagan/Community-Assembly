@@ -1378,7 +1378,94 @@ if (variant == "Networks") {
 
   ##### Figure 8: Network reorganisation over short time scales ###############
   if (8 %in% figures) {
-
+    ((diversitiesRichness |> tidytable::filter(
+      SpeciesPreferences %in% c("100% 0", "Uniform(0, 1)"),
+      NicheDistance == defaultNicheDistance,
+      Metric == "Alpha Hill:0", is.na(Subset)
+    ) |> tidytable::left_join(
+      InterventionTimes
+    ) |> tidytable::mutate(
+      Time = Time - TimeIntervention
+    ) |> tidytable::filter(
+      abs(Time - round(Time)) < 1e-6 | Time >= 55 | Time < 0,
+      Time > -25, Time <= 1000
+    ) |> tidytable::mutate(
+      # Follow what was done for the above figures.
+      Time = tidytable::case_when( # Create groupings for times.
+        Time < -5 ~ round(Time, -1),
+        # In between sampling regimes vs Initial Conditions
+        Time < 0 & (InterventionInitial == InterventionFinal) ~ -5,
+        Time < 0 & (InterventionInitial != InterventionFinal) ~ -0.1,
+        Time <= 50 ~ round(Time, 0), # After 50, jumps to 10s
+        Time < 1115 ~ round(Time, -1), # After 1115, slowly expands until ~1863
+        Time < 1117 ~ 1110, # Marginal
+        Time < 1298 ~ (round(Time/11)*11), # ~1300
+        Time < 1395 ~ (round(Time/15)*15), # ~1400
+        Time < 1500 ~ (round(Time/30)*30),
+        Time < 1600 ~ (round(Time/50)*50),
+        Time < 1831 ~ (round(Time/60)*60),
+        Time < 16350 ~ round(Time, -2), # 100 gap hols until the end.
+        TRUE ~ Time
+      )
+    ) |> tidytable::group_by(
+      # Average Over the now grouped times to make each sim equally weighted.
+      # NOTE TO FUTURE USERS, I've been lazy here because the groupings are
+      # simple and match each other with the seeds. More complicated set-ups
+      # will want to adjust the groupings here.
+      Intervention, InterventionInitial, InterventionFinal, Metric,
+      PoolPatchSeed, SpeciesPreferences, Time
+    ) |> tidytable::summarise(
+      Value = median(Value), .groups = "drop"
+    ) |> tidytable::group_by(
+      # Average across simulations
+      Intervention, InterventionInitial, InterventionFinal, Metric,
+      SpeciesPreferences, Time
+    ) |> tidytable::summarise(
+      Average = mean(Value),.groups = "drop"
+    ) |> tidytable::mutate(
+      SpeciesPreferences = tidytable::case_when(
+        SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
+        SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
+        SpeciesPreferences == "Uniform(0, 1)" ~ "Many Adaptation Types",
+        TRUE ~ SpeciesPreferences
+      ),
+      Linetype = ifelse(InterventionInitial != InterventionFinal, "dotted", "solid")
+    )) |> ggplot2::ggplot(
+      ggplot2::aes(
+        x = Time,
+        y = Average,
+        color = Intervention,
+        linetype = Linetype
+      )
+    ) + ggplot2::geom_vline(
+      xintercept = 0, color = "black", linetype = "dashed"
+    ) + ggplot2::geom_line(
+    ) + ggplot2::theme_minimal(
+    ) + ggplot2::theme(
+      strip.text = ggplot2::element_text(size = 10.5),
+      axis.text.x = ggplot2::element_text(hjust = 1)
+    ) + ggplot2::scale_color_manual(
+      values = colorPalette, aesthetics = c("color", "fill"),
+      name = "", guide = "none"
+    ) + ggplot2::labs(
+      y = "Avg.\nRichness",
+      x = "Time Since Intervention"
+    ) + ggplot2::facet_wrap(
+      ncol = 1, ggplot2::vars(SpeciesPreferences), scales = "free_y"
+    ) + ggplot2::coord_cartesian(
+      xlim = c(-20, NA),
+      expand = FALSE
+    ) + ggplot2::scale_x_continuous(
+      breaks = c(0, 1, 10, 100, 1000, 10000, 15000),
+      transform = scales::transform_pseudo_log(sigma = 10)
+    ) + ggplot2::scale_linetype_manual(
+      values = c("dashed" = "dashed", "solid" = "solid", "dotted" = "dotted"),
+      guide = "none"
+    )) |> ggplot2::ggsave(
+      filename = "FigureN8_LineSummary.png",
+      path = dirImages,
+      units = "cm", width = 11, height = 11
+    )
   }
 
 }
