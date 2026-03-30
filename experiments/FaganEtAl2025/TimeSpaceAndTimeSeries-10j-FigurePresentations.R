@@ -1316,6 +1316,22 @@ if (variant == "Networks") {
       filename = paste0("FigureN6_RichnessAndKDEs_", i, "_noalpha.png"),
       units = "cm", width = 20, height = 11
     )
+
+    if (require("magick")) {
+      magick::image_animate(
+        c(
+          magick::image_read(
+            file.path(dirImages, "FigureN6_RichnessAndKDEs_16.png")
+          ),
+          magick::image_read(
+            file.path(dirImages, "FigureN6_RichnessAndKDEs_11.png")
+          )
+        ),
+        fps = 1, optimize = TRUE
+      ) |> magick::image_write_gif(
+        "FigureN6_RichnessAndKDEs_1611.gif"
+      )
+    }
   }
 
   #### Summary Images: ########################################################
