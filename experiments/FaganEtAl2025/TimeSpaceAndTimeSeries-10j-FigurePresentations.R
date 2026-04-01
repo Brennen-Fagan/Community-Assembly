@@ -1328,8 +1328,8 @@ if (variant == "Networks") {
           )
         ),
         fps = 1, optimize = TRUE
-      ) |> magick::image_write_gif(
-        "FigureN6_RichnessAndKDEs_1611.gif"
+      ) |> magick::image_write(
+        file.path(dirImages, "FigureN6_RichnessAndKDEs_1611.gif")
       )
     }
   }
