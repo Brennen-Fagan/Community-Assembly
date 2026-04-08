@@ -728,6 +728,7 @@ if (variant == "Networks") {
     ###### Violin Plots: ######################################################
     figureNetworks$plot4A <- (
       figureNetworks$dataRich |> tidytable::filter(
+        Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
         SpeciesPreferences %in% c("100% 0")
       ) |> figureNetworks$makeViolins()
     ) + ggplot2::coord_cartesian(
@@ -1396,6 +1397,9 @@ if (variant == "Networks") {
   if (8 %in% figures) {
     ((diversitiesRichness |> tidytable::filter(
       SpeciesPreferences %in% c("100% 0", "Uniform(0, 1)"),
+      Intervention %in% c("(0)", "(0)->(0.5)", "(0)->(1)",
+                          "(0.5)", "(0.5)->(0)", "(0.5)->(1)",
+                          "(1)", "(1)->(0.5)", "(1)->(0)"),
       NicheDistance == defaultNicheDistance,
       Metric == "Alpha Hill:0", is.na(Subset)
     ) |> tidytable::left_join(
