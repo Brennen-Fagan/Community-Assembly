@@ -51,7 +51,8 @@ plotTextHeatmap <- function(
     . ~ Metric + Time
   ) + ggplot2::theme_minimal(
   ) + ggplot2::theme(
-    strip.text = ggplot2::element_text(size = 12)
+    strip.text = ggplot2::element_text(size = 12),
+    legend.key = ggplot2::element_rect(color = "black")
   ) + ggplot2::labs(
     fill = legendName,
     x = "Initial Habitat Type",
