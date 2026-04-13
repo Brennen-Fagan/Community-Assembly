@@ -226,7 +226,8 @@ figure3$plotA <- plotMeanAndInner(
   color = "black", linetype = "dashed"
 ) + ggplot2::labs(
   x = "Time",
-  y = "Richness"
+  y = "Richness",
+  tag = "a)"
 ) + ggplot2::guides(
   linetype = "none",#,
   # color = "none",
@@ -279,7 +280,8 @@ figure3$plotB <- ggplot2::ggplot(
   fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
 ) + ggplot2::labs(
   x = "Time Since Intervention",
-  y = "Richness"
+  y = "Richness",
+  tag = "b)"
 ) + ggplot2::coord_cartesian(
   ylim = c(0, richnessYMax),
   expand = FALSE
@@ -291,7 +293,7 @@ figure3$plotB <- ggplot2::ggplot(
 )
 
 ##### C+D: ####################################################################
-figure3$plotCD <- ggplot2::ggplot(
+figure3$plotC <- ggplot2::ggplot(
   figure3$dataBCSupplement |> tidytable::filter(
     Metric == "Richness", Time >= 0
   ) |> dplyr::mutate(
@@ -316,7 +318,8 @@ figure3$plotCD <- ggplot2::ggplot(
   fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
 ) + ggplot2::labs(
   x = "Time Since Intervention",
-  y = "Richness"
+  y = "Richness",
+  tag = "c)"
 ) + ggplot2::coord_cartesian(
   ylim = c(0, richnessYMax),
   expand = FALSE
@@ -328,7 +331,7 @@ figure3$plotCD <- ggplot2::ggplot(
 )
 
 ##### E: ######################################################################
-figure3$plotE <- ggplot2::ggplot(
+figure3$plotD <- ggplot2::ggplot(
   figure3$dataOverallSummary |> tidytable::filter(
     Metric == "Abundance", Time >= 0
   ),
@@ -350,7 +353,8 @@ figure3$plotE <- ggplot2::ggplot(
   fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
 ) + ggplot2::labs(
   x = "Time Since Intervention",
-  y = "Abundance"
+  y = "Abundance",
+  tag = "d)"
 ) + ggplot2::coord_cartesian(
   ylim = c(1e-2, 1e5),
   expand = FALSE
@@ -364,7 +368,7 @@ figure3$plotE <- ggplot2::ggplot(
 )
 
 ##### F+G: ####################################################################
-figure3$plotFG <- ggplot2::ggplot(
+figure3$plotE <- ggplot2::ggplot(
   figure3$dataBCSupplement |> tidytable::filter(
     Metric == "Abundance", Time >= 0
   ) |> dplyr::mutate(
@@ -389,7 +393,8 @@ figure3$plotFG <- ggplot2::ggplot(
   fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
 ) + ggplot2::labs(
   x = "Time Since Intervention",
-  y = "Abundance"
+  y = "Abundance",
+  tag = "e)"
 ) + ggplot2::coord_cartesian(
   ylim = c(1e-2, 1e5),
   expand = FALSE
@@ -411,15 +416,15 @@ figure3$plotFG <- ggplot2::ggplot(
 #     ),
 #     ggpubr::ggarrange(plotlist = list(
 #       figure3$plotB + ggplot2::theme(legend.position = "none"),
-#       figure3$plotCD + ggplot2::theme(legend.position = "none",
+#       figure3$plotC + ggplot2::theme(legend.position = "none",
 #                                       axis.title.y = ggplot2::element_blank())
 #     ), nrow = 1),
 #     ggpubr::ggarrange(plotlist = list(
-#       figure3$plotE + ggplot2::theme(legend.position = "none",
+#       figure3$plotD + ggplot2::theme(legend.position = "none",
 #                                      axis.text.y = ggplot2::element_text(
 #                                        margin = ggplot2::margin(0, 0, 0, -5)
 #                                      )),
-#       figure3$plotFG + ggplot2::theme(legend.position = "none",
+#       figure3$plotE + ggplot2::theme(legend.position = "none",
 #                                       axis.title.y = ggplot2::element_blank(),
 #                                       axis.text.y = ggplot2::element_text(
 #                                         margin = ggplot2::margin(0, 0, 0, -5)
@@ -436,18 +441,18 @@ figure3$plot <-
   figure3$plotB + ggplot2::theme(
     legend.position = "none"
   ) +
-  figure3$plotCD + ggplot2::theme(
+  figure3$plotC + ggplot2::theme(
     legend.position = "none",
     axis.title.y = ggplot2::element_blank(),
     panel.spacing = ggplot2::unit(0.8, "lines")
   ) +
-  figure3$plotE + ggplot2::theme(
+  figure3$plotD + ggplot2::theme(
     legend.position = "none",
     axis.text.y = ggplot2::element_text(
       margin = ggplot2::margin(0, 0, 0, -5)
     )
   ) +
-  figure3$plotFG + ggplot2::theme(
+  figure3$plotE + ggplot2::theme(
     legend.position = "none",
     axis.title.y = ggplot2::element_blank(),
     axis.text.y = ggplot2::element_text(
@@ -468,15 +473,15 @@ figure3$plot <-
 
 figure3$suffix <- paste0("_", figure3$prefstring, "_", figure3$lustring)
 figure3$prefix <- "Figure3"
-figure3$iter <- "_Prototype6"
-figure3$ids <- c("", "", "A", "Networks", "B", "CD", "E", "FG")
+figure3$iter <- "_Prototype7"
+figure3$ids <- c("", "", "A", "Networks", "B", "C", "D", "E")
 figure3$ext <- c(".png", rep(".pdf", 7))
 
 for (fnum in 1:8) {
   with(figure3, ggplot2::ggsave(
     plot = switch(fnum,
                   plot, plot,
-                  plotA, plotNetworks, plotB, plotCD, plotE, plotFG),
+                  plotA, plotNetworks, plotB, plotC, plotD, plotE),
     filename = file.path(dirImages,
                          paste0(prefix, ids[fnum], iter, suffix, ext[fnum])),
     units = "cm", width = 6.5*3, height = 6.5*2.8)
