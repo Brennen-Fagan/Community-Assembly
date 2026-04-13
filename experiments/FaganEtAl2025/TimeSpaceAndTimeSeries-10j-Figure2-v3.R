@@ -171,10 +171,14 @@ figure2$plotNetworks <- dplyr::bind_rows(lapply(
         (env$singletonGraphs[[1]] + ggplot2::theme(
           axis.title.x = ggplot2::element_blank(),
           panel.border = ggplot2::element_rect(color = "black", fill = NA),
-          panel.background = ggplot2::element_rect(color = NA, fill = scales::alpha("white", 0.4)),
+          panel.background = ggplot2::element_rect(
+            color = NA, fill = scales::alpha("white", 0.4)
+          ),
           legend.position = "none",
-          axis.text.y = ggplot2::element_text(margin = ggplot2::margin(r = -23),
-                                              size = 9, vjust = 0.2),
+          axis.text.y = ggplot2::element_text(
+            margin = ggplot2::margin(r = -23),
+            size = 9, vjust = 0.2
+          ),
           axis.text.x = ggplot2::element_blank()
         ) + ggplot2::coord_cartesian(
           xlim = c(-0.5, 1), ylim = c(0.01, 3)
