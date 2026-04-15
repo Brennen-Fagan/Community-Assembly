@@ -150,7 +150,7 @@ figure8$plot <- ggplot2::ggplot(
   labels = scales::percent
 ) + ggplot2::labs(
   x = "Time Since Intervention",
-  y = expression(Delta ~ "Richness" >= 0)
+  y = "Intact Ecosystems"#expression(Delta ~ "Richness" >= 0)
 )
 
 ##### Save: ###################################################################
