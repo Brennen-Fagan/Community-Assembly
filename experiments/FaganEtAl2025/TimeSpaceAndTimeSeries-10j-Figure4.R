@@ -260,8 +260,7 @@ figure4$plotRaw <- ggpubr::ggarrange(
     legendName = "Raw Values",
     scalestrans = scales::label_number(accuracy = 0.1)
   ) + ggplot2::scale_fill_viridis_d(
-    drop = FALSE
-    # transform = "identity", begin = 0.1,
+    begin = 0.2#,
     # labels = scales::label_number(accuracy = 0.1)
   ),
   plotTextHeatmap(
@@ -273,8 +272,7 @@ figure4$plotRaw <- ggpubr::ggarrange(
     legendName = "Raw Values", legendtrans = "log10",
     scalestrans = scales::label_number(accuracy = 1)
   ) + ggplot2::scale_fill_viridis_d(
-    drop = FALSE
-    # transform = "log10", begin = 0.1,
+    begin = 0.2#,
     # labels = scales::label_number(accuracy = 0.1)
   ),
   nrow = 2
@@ -290,13 +288,13 @@ ggplot2::ggsave(
   units = "cm", width = 6.5*4, height = 6.5*3)
 ggplot2::ggsave(
   plot = figure4$plotB,
-  filename = file.path(dirImages, "Figure4B_Prototype6.pdf"),
+  filename = file.path(dirImages, "FigureS3_Basal.png"),
   units = "cm", width = 6.5*4, height = 6.5*3)
 ggplot2::ggsave(
   plot = figure4$plotC,
-  filename = file.path(dirImages, "Figure4C_Prototype6.pdf"),
+  filename = file.path(dirImages, "FigureS3_Consumer.png"),
   units = "cm", width = 6.5*4, height = 6.5*3)
 ggplot2::ggsave(
   plot = figure4$plotRaw,
-  filename = file.path(dirImages, "Figure4Raw_Prototype6.pdf"),
+  filename = file.path(dirImages, "FigureS3_Raw.png"),
   units = "cm", width = 6.5*4, height = 6.5*3)
