@@ -20,7 +20,8 @@ figure2 <- list(
     time = 25000
   ),
   abundlog = TRUE,
-  pref = "100% 0"#c("Uniform(0, 1)", "50% 0, 50% 1")
+  pref = "100% 0", #c("Uniform(0, 1)", "50% 0, 50% 1")
+  dist = "3"# defaultNicheDistance
 )
 
 figure2$graph$specification <- diversitiesRichness |> tidytable::select(c(
@@ -41,7 +42,7 @@ figure2$graph$specification <- diversitiesRichness |> tidytable::select(c(
   "SpeciesPreferences", "Intervention"
 )) |> tidytable::filter(
   SpeciesPreferences == figure2$pref,
-  NicheDistance == defaultNicheDistance,
+  NicheDistance == figure2$dist,
   Intervention %in% c("(0)", "(0.5)", "(1)"),
   PoolPatchSeed %in% figure2$graph$seed,
   Time == figure2$graph$time
@@ -56,14 +57,14 @@ figure2$graph$networks <- generateNetworks(figure2$graph$specification,
 # Richness data: should be straightforward.
 figure2$dataRich <- diversitiesRichness |> tidytable::filter(
   SpeciesPreferences %in% figure2$pref,
-  NicheDistance == defaultNicheDistance,
+  NicheDistance == figure2$dist,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
   PoolPatchSeed %in% basePoolPatchSeeds,
   Metric == "Alpha Hill:0"
 )
 figure2$dataAbund <- diversitiesAbund |> tidytable::filter(
   SpeciesPreferences %in% figure2$pref,
-  NicheDistance == defaultNicheDistance,
+  NicheDistance == figure2$dist,
   Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
   PoolPatchSeed %in% basePoolPatchSeeds,
   Metric == "Alpha Abundance"
@@ -71,7 +72,7 @@ figure2$dataAbund <- diversitiesAbund |> tidytable::filter(
 
 figure2$indices <- figure2$graph$networks$Index |> tidytable::filter(
   SpeciesPreferences == figure2$pref,
-  NicheDistance == defaultNicheDistance,
+  NicheDistance == figure2$dist,
   Intervention %in% c("(0)", "(0.5)", "(1)"),
   PoolPatchSeed %in% basePoolPatchSeeds
 ) |> tidytable::arrange(
@@ -211,7 +212,7 @@ figure2$plotsViolin <- lapply(
     ) |> tidytable::summarise(
       Value = mean(Value)
     ),
-    
+
     figure2$dataAbund |> tidytable::filter(
       Time > Start, Time < Stop, is.na(Subset)
     ) |> tidytable::group_by(
@@ -266,7 +267,7 @@ figure2$plotsViolin[[1]] <- figure2$plotsViolin[[1]] + ggplot2::annotate(
   label = c("Well\nAdapted", "Poorly\nAdapted"),
   size = 4
 ) + ggplot2::annotate(
-  "segment", 
+  "segment",
   x = c(1, 4, 1, 2, 4, 5), xend = c(2, 5, 1, 2, 4, 5), # [ shape.
   y = c(25, 25, 25, 25, 25, 25), yend = c(25, 25, 23, 23, 27, 27),
   size = 0.5
@@ -276,7 +277,7 @@ figure2$plotsViolin[[1]] <- figure2$plotsViolin[[1]] + ggplot2::annotate(
   tag = "b)"
 ) + ggplot2::coord_cartesian(
   ylim = c(0, richnessYMax), expand = FALSE
-) 
+)
 
 figure2$plotsViolin[[2]] <- figure2$plotsViolin[[2]] + ggplot2::labs(
   y = "Richness",
@@ -299,7 +300,7 @@ figure2$plotsViolin[[2]] <- figure2$plotsViolin[[2]] + ggplot2::labs(
   },
   mapping = ggplot2::aes(label = Label),
   position = ggplot2::position_dodge(0.9)
-) 
+)
 
 figure2$plotsViolin[[3]] <- figure2$plotsViolin[[3]] + ggplot2::labs(
   y = "Abundance",
@@ -325,8 +326,8 @@ figure2$plotsViolin[[4]] <- figure2$plotsViolin[[4]] + ggplot2::labs(
     ) |> tidytable::group_by(
       Intervention, Subset
     ) |> tidytable::summarise(
-      Value = ifelse(min(log10(Value)) > 1, 
-                     10^min(log10(Value) - Offset), 
+      Value = ifelse(min(log10(Value)) > 1,
+                     10^min(log10(Value) - Offset),
                      10^max(log10(Value) + Offset)),
       Label = substr(Subset, 0, 1),
       .groups = "drop"
@@ -334,8 +335,7 @@ figure2$plotsViolin[[4]] <- figure2$plotsViolin[[4]] + ggplot2::labs(
   },
   mapping = ggplot2::aes(label = Label),
   position = ggplot2::position_dodge(0.9)
-) 
-
+)
 
 ##### Combine: ################################################################
 figure2$plot <- ggpubr::ggarrange(
@@ -352,28 +352,104 @@ figure2$plot <- ggpubr::ggarrange(
   nrow = 1, widths = c(2.5/5, 2.5/5)#, common.legend = TRUE
 )
 
-ggplot2::ggsave(plot = figure2$plot, 
-                filename = file.path(dirImages, "Figure2_Prototype3.pdf"),
-                units = "cm", width = 6.5*4, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plot, 
-                filename = file.path(dirImages, "Figure2_Prototype3.png"),
-                units = "cm", width = 6.5*4, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotA, 
-                filename = file.path(dirImages, "Figure2A_Prototype3.pdf"),
-                units = "cm", width = 6.5*3, height = 6.5*2)
-# ggplot2::ggsave(plot = figure2$plotNetworks,
-#                 filename = file.path(dirImages, "Figure2Networks_Prototype1.pdf"),
-#                 units = "cm", width = 6.5*1, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotsViolin[[1]], 
-                filename = file.path(dirImages, "Figure2B_Prototype3.pdf"),
-                units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotsViolin[[2]], 
-                filename = file.path(dirImages, "Figure2C_Prototype3.pdf"),
-                units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotsViolin[[3]], 
-                filename = file.path(dirImages, "Figure2D_Prototype3.pdf"),
-                units = "cm", width = 6.5*3, height = 6.5*2)
-ggplot2::ggsave(plot = figure2$plotsViolin[[4]], 
-                filename = file.path(dirImages, "Figure2E_Prototype3.pdf"),
-                units = "cm", width = 6.5*3, height = 6.5*2)
+if (figure2$dist == defaultNicheDistance) {
+  ggplot2::ggsave(plot = figure2$plot,
+                  filename = file.path(dirImages, "Figure2_Prototype3.pdf"),
+                  units = "cm", width = 6.5*4, height = 6.5*2)
+  ggplot2::ggsave(plot = figure2$plot,
+                  filename = file.path(dirImages, "Figure2_Prototype3.png"),
+                  units = "cm", width = 6.5*4, height = 6.5*2)
+  ggplot2::ggsave(plot = figure2$plotA,
+                  filename = file.path(dirImages, "Figure2A_Prototype3.pdf"),
+                  units = "cm", width = 6.5*3, height = 6.5*2)
+  # ggplot2::ggsave(plot = figure2$plotNetworks,
+  #                 filename = file.path(dirImages, "Figure2Networks_Prototype1.pdf"),
+  #                 units = "cm", width = 6.5*1, height = 6.5*2)
+  ggplot2::ggsave(plot = figure2$plotsViolin[[1]],
+                  filename = file.path(dirImages, "Figure2B_Prototype3.pdf"),
+                  units = "cm", width = 6.5*3, height = 6.5*2)
+  ggplot2::ggsave(plot = figure2$plotsViolin[[2]],
+                  filename = file.path(dirImages, "Figure2C_Prototype3.pdf"),
+                  units = "cm", width = 6.5*3, height = 6.5*2)
+  ggplot2::ggsave(plot = figure2$plotsViolin[[3]],
+                  filename = file.path(dirImages, "Figure2D_Prototype3.pdf"),
+                  units = "cm", width = 6.5*3, height = 6.5*2)
+  ggplot2::ggsave(plot = figure2$plotsViolin[[4]],
+                  filename = file.path(dirImages, "Figure2E_Prototype3.pdf"),
+                  units = "cm", width = 6.5*3, height = 6.5*2)
+} else {
+  ggplot2::ggsave(
+    plot = figure2$plot,
+    filename = file.path(dirImages,
+                         paste0("FigureS2_", figure2$dist, "_Prototype3.png")),
+    units = "cm", width = 6.5*4, height = 6.5*2
+  )
+}
 
+##### Figure S1: #############################################################
+if (figure2$dist == defaultNicheDistance) {
+  figure2$plotS1 <- plotMeanAndInner(
+    rbind(
+      figure2$dataRich |> tidytable::filter(
+        Intervention %in% c("(0)", "(0.5)", "(1)"),
+        !is.na(Subset)
+      ),
+      # We want to appear in the legend but not on the plot!
+      figure2$dataRich |> tidytable::filter(
+        PoolPatchSeed == figure2$dataRich$PoolPatchSeed[1],
+        Intervention %in% c("(0.25)", "(0.75)"),
+        abs(Time - 10000) == min(abs(Time - 10000)),
+        !is.na(Subset)
+      ) |> tidytable::mutate(
+        Value = 10 # coord_cartesian will eliminate these points.
+      )
+    ) |> tidytable::mutate(
+      SpeciesPreferences = tidytable::case_when(
+        SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
+        SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
+        SpeciesPreferences == "Uniform(0, 1)" ~ "Multiple Adaptation Types",
+        TRUE ~ SpeciesPreferences
+      )
+    ), CIs = 0.75
+  ) + ggplot2::geom_point(
+    data = function(x) {x |> tidytable::filter(
+      PoolPatchSeed == figure2$graph$seed,
+      Intervention %in% c("(0)", "(0.5)", "(1)"),
+      abs(Time - figure2$graph$time) == min(abs(Time - figure2$graph$time))
+    )},
+    mapping = ggplot2::aes(fill = Intervention),
+    shape = 21,
+    color = "black"
+  )  + ggplot2::labs(
+    y = "Richness"#, tag = "a)"
+  ) + ggplot2::guides(
+    linetype = "none",
+    color = ggplot2::guide_legend(ncol = 5),
+    fill = ggplot2::guide_legend(ncol = 5)
+  ) + ggplot2::theme(
+    legend.position = c(0.215, 0.9),
+    legend.key.size = ggplot2::unit(0.75, "cm"),
+    legend.background = ggplot2::element_rect(
+      fill = scales::alpha("white", 0.4),
+      color = "black"),
+    legend.text = ggplot2::element_text(
+      hjust = 0.5, vjust = 0.5
+    ),
+    legend.text.position = "bottom",
+    legend.title = ggplot2::element_blank(),
+    panel.spacing = ggplot2::unit(1, "lines"),
+    strip.text = ggplot2::element_text(size = 12)
+  ) + ggplot2::coord_cartesian(
+    xlim = c(0, 31000), ylim = c(0, richnessYMax), expand = FALSE
+  ) + ggplot2::scale_x_continuous(
+    breaks = (0:3)*10000
+  ) + ggplot2::facet_grid(
+    # switch = "y",
+    cols = ggplot2::vars(SpeciesPreferences),
+    rows = ggplot2::vars(Subset)
+  )
+
+  ggplot2::ggsave(plot = figure2$plotS1,
+                  filename = file.path(dirImages, "FigureS1_Prototype1.png"),
+                  units = "cm", width = 6.5*3, height = 6.5*2)
+}
