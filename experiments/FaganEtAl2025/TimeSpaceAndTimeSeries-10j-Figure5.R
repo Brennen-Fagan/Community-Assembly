@@ -219,7 +219,7 @@ figure5$plotC <- lapply(
       fill = "none"
     ) + scale_y_log10(
       label = scales::label_log(),
-      breaks = 10^c(3.4, 3.6, 3.8, 4, 4.2, 4.4)
+      breaks = 10^(2+(0:20)/5)
     )
   }
 )
