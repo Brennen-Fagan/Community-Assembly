@@ -291,14 +291,14 @@ ggplot2::ggsave(
   units = "cm", width = 6.5*4, height = 6.5*3)
 ggplot2::ggsave(
   plot = figure7$plotB,
-  filename = file.path(dirImages, "Figure7B_Prototype3.pdf"),
+  filename = file.path(dirImages, "FigureS8_Basal.png"),
   units = "cm", width = 6.5*4, height = 6.5*3)
 ggplot2::ggsave(
   plot = figure7$plotC,
-  filename = file.path(dirImages, "Figure7C_Prototype3.pdf"),
+  filename = file.path(dirImages, "FigureS8_Consumer.png"),
   units = "cm", width = 6.5*4, height = 6.5*3)
 ggplot2::ggsave(
   plot = figure7$plotRaw,
-  filename = file.path(dirImages, "Figure7Raw_Prototype3.pdf"),
+  filename = file.path(dirImages, "Figure7Raw_Prototype3.png"),
   units = "cm", width = 6.5*4, height = 6.5*3)
 
