@@ -21,7 +21,7 @@ figure6 <- list(
     seed = "2", # "11", "17", "2"!,
     time = 25000
   ),
-  pref = "Uniform(0, 1)",
+  pref = "50% 0, 50% 1", #"Uniform(0, 1)",
   luinitl = "(0.5)", # Land Use INITiaL
   lufinal = c("(0)", "(0.5)", "(1)") # Land Use FINAL
   # lufinal = c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)") # Land Use FINAL
@@ -289,7 +289,7 @@ figure6$plotB <- ggplot2::ggplot(
   y = "Richness",
   tag = "b)"
 ) + ggplot2::coord_cartesian(
-  ylim = c(0, 17),
+  ylim = if(figure6$pref == "50% 0, 50% 1") {c(0, 30)} else {c(0, 17)},
   expand = FALSE
 ) + ggplot2::scale_x_continuous(
   trans = "log1p",
