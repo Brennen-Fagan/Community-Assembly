@@ -20,7 +20,7 @@ if (!exists("ColExt")) {
 options(bitmapType = "cairo")
 
 dateSwitch <- switch(
-  c("Original", "Carrying Capacity", "Timescales")[1],
+  c("Original", "Carrying Capacity", "Timescales")[1], # SWITCH HERE
   "Original" = "2025-07-30",
   "Carrying Capacity" = "2025-09-04",
   "Timescales" = "2026-03-11"

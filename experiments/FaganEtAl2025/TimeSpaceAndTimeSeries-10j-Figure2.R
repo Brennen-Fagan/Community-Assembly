@@ -21,7 +21,7 @@ figure2 <- list(
   ),
   abundlog = TRUE,
   pref = "100% 0", #c("Uniform(0, 1)", "50% 0, 50% 1")
-  dist = "3"# defaultNicheDistance
+  dist = defaultNicheDistance #"3", "7"
 )
 
 figure2$graph$specification <- diversitiesRichness |> tidytable::select(c(
