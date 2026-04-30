@@ -2,29 +2,44 @@ renv
 
 .Rproj.user
 .Rhistory
+**/*.Rhistory
 .RData
 .Ruserdata
 
+# -- OS
+.DS_Store
+Thumbs.db
+**/Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+*.lnk
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# -- Data
 experiments/**/*.RDS
+*.RData
 experiments/**/*.RData
 experiments/**/*.knit.md
 experiments/**/Job[_]*
-
-src/*.o
-src/*.so
-src/*.dll
-
-inst/doc
+*.zip
 
 **/*.png
 **/*.csv
 **/*.pdf
-**/*.Rhistory
 *.csv
 *.html
-*.RData
-
-**/Thumbs.db
 **/*.mp4
-*.zip
 *.gif
+
+inst/doc
+
+# -- C/Dev
+src/*.o
+src/*.so
+src/*.dll
+
+
