@@ -1,3 +1,4 @@
+# Depends on "assignAttributes".
 extractBetas <- function(Diversity, Attributes) {
   dplyr::bind_rows(
     lapply(
