@@ -1,3 +1,4 @@
+`%>%`<- dplyr::`%>%` # Old piping was used in this project
 ConvertPreparedToBeta <- function(
   prepared, columns, method, presenceabsence, postfixes, indicator
 ) {

@@ -1,3 +1,4 @@
+`%>%`<- dplyr::`%>%` # Old piping was used in this project
 addDistanceColumns <- function(bootstrapSamples, mindig = 1, Time = "Time") {
   bootstrapSamples %>% dplyr::mutate(
     ##### Temporal Distance: ##################################################
