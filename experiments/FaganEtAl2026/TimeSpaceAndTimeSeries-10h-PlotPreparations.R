@@ -51,6 +51,8 @@ source(file.path("R", "changeInterventionLevels.R")) # Land-use names.
 source(file.path("R", "changePreferencesLevels.R")) # More human readable WISOTT.
 source(file.path("R", "colorPaletteAlg.R")) # Color scheme.
 source(file.path("R", "geom_flat_violin.R")) # Half-violin plots.
+source(file.path("R", "flattenDiversity.R")) # Req'd by below
+source(file.path("R", "generateNetworks.R")) # Plots and Stats of Networks.
 source(file.path("R", "interventionNamingScheme.R")) # WISOTT.
 source(file.path("R", "plotGraph.R")) # WISOTT.
 source(file.path("R", "plotMeanAndInner.R")) # WISOTT for Value over Time.
@@ -95,7 +97,7 @@ linetypePalette %assign% c(
   "50% 0, 50% 1" = "longdash",
   "Uniform(0, 1)" = "dotdash",
   # Paper Aliases
-  "1 Adaptation Type" = "solid",
+  "Single Adaptation Type" = "solid",
   "2 Adaptation Types" = "longdash",
   "Multiple Adaptation Types" = "dotdash"
 )
