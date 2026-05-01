@@ -6,8 +6,6 @@
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsAbund.R")
-source(file.path("R", "flattenDiversity.R")) # Req'd by below
-source(file.path("R", "generateNetworks.R")) # To create inset graphs.
 
 library(cowplot) # plot arrangement with pagination (ggarrange).
 library(tibble) # data.frames that can incorporate grobs.
@@ -21,7 +19,7 @@ figure2 <- list(
   ),
   abundlog = TRUE,
   pref = "100% 0", #c("Uniform(0, 1)", "50% 0, 50% 1")
-  dist = defaultNicheDistance #"3", "7"
+  dist = defaultNicheDistance #"3", defaultNicheDistance, "7"
 )
 
 figure2$graph$specification <- diversitiesRichness |> tidytable::select(c(
@@ -98,7 +96,7 @@ figure2$plotA <- plotMeanAndInner(
     )
   ) |> tidytable::mutate(
     SpeciesPreferences = tidytable::case_when(
-      SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
+      SpeciesPreferences == "100% 0" ~ "Single Adaptation Type",
       SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
       SpeciesPreferences == "Uniform(0, 1)" ~ "Multiple Adaptation Types",
       TRUE ~ SpeciesPreferences
@@ -131,7 +129,11 @@ figure2$plotA <- plotMeanAndInner(
   legend.text.position = "bottom",
   legend.title = ggplot2::element_blank(),
   panel.spacing = ggplot2::unit(1, "lines"),
-  strip.text = ggplot2::element_text(size = 12)
+  # strip.text = ggplot2::element_text(size = 12)
+  # Aggressively remove strips
+  strip.background = ggplot2::element_blank(),
+  strip.text.x = ggplot2::element_blank(),
+  strip.text.y = ggplot2::element_blank()
 ) + ggplot2::coord_cartesian(
   xlim = c(0, 31000), ylim = c(0, richnessYMax), expand = FALSE
 ) + ggplot2::scale_x_continuous(
@@ -405,7 +407,7 @@ if (figure2$dist == defaultNicheDistance) {
       )
     ) |> tidytable::mutate(
       SpeciesPreferences = tidytable::case_when(
-        SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
+        SpeciesPreferences == "100% 0" ~ "Single Adaptation Type",
         SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
         SpeciesPreferences == "Uniform(0, 1)" ~ "Multiple Adaptation Types",
         TRUE ~ SpeciesPreferences
@@ -451,5 +453,8 @@ if (figure2$dist == defaultNicheDistance) {
 
   ggplot2::ggsave(plot = figure2$plotS1,
                   filename = file.path(dirImages, "FigureS1_Prototype1.png"),
+                  units = "cm", width = 6.5*3, height = 6.5*2)
+  ggplot2::ggsave(plot = figure2$plotS1,
+                  filename = file.path(dirImages, "FigureS1_Prototype1.pdf"),
                   units = "cm", width = 6.5*3, height = 6.5*2)
 }
