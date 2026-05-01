@@ -2,7 +2,7 @@
 source("TimeSpaceAndTimeSeries-10h-PlotPreparations.R")
 source("TimeSpaceAndTimeSeries-10i-PreparationsRichness.R")
 
-figureS10 <- list(
+figureS9 <- list(
   # pref = "100% 0",
   # pref = "50% 0, 50% 1",
   pref = "Uniform(0, 1)",
@@ -12,22 +12,22 @@ figureS10 <- list(
   # lufinal = c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)")
 )
 
-figureS10$prefstring <- switch(
-  figureS10$pref,
+figureS9$prefstring <- switch(
+  figureS9$pref,
   "100% 0" = "1000",
   "50% 0, 50% 1" = "5050",
   "Uniform(0, 1)" = "Unif"
 )
 
-figureS10$lustring <- paste0(
-  length(figureS10$luinitl),"to",length(figureS10$lufinal)
+figureS9$lustring <- paste0(
+  length(figureS9$luinitl),"to",length(figureS9$lufinal)
 )
 
 # Main Plots: #################################################################
 ### Plot 9: ###################################################################
 ##### Data: ###################################################################
 
-figureS10$interventionTimes <- diversitiesRichness |> tidytable::filter(
+figureS9$interventionTimes <- diversitiesRichness |> tidytable::filter(
   NicheDistance == defaultNicheDistance,
   PoolPatchSeed %in% basePoolPatchSeeds,
   Metric == "Alpha Hill:0",
@@ -44,16 +44,16 @@ figureS10$interventionTimes <- diversitiesRichness |> tidytable::filter(
   .groups = "drop"
 )
 
-figureS10$data <- diversitiesRichness |> tidytable::filter(
-  SpeciesPreferences == figureS10$pref,
-  InterventionInitial %in% figureS10$luinitl,
-  InterventionFinal %in% figureS10$lufinal,
+figureS9$data <- diversitiesRichness |> tidytable::filter(
+  SpeciesPreferences == figureS9$pref,
+  InterventionInitial %in% figureS9$luinitl,
+  InterventionFinal %in% figureS9$lufinal,
   NicheDistance == defaultNicheDistance,
   PoolPatchSeed %in% basePoolPatchSeeds,
   Metric == "Alpha Hill:0" ,
   is.na(Subset)
 ) |> tidytable::left_join(
-  figureS10$interventionTimes |> tidytable::rename(
+  figureS9$interventionTimes |> tidytable::rename(
     InterventionTime = Time
   ),
   by = c("PoolPatch", "PoolPatchSeed")
@@ -92,7 +92,7 @@ figureS10$data <- diversitiesRichness |> tidytable::filter(
 )
 
 # ggplot2::ggplot(
-#   figureS10$data,
+#   figureS9$data,
 #   ggplot2::aes(
 #     x = TimeSinceIntervention, y = Value,
 #     color = Intervention, group = interaction(Intervention, PoolPatchSeed))
@@ -100,7 +100,7 @@ figureS10$data <- diversitiesRichness |> tidytable::filter(
 #   InterventionInitial ~ InterventionFinal
 # )
 
-figureS10$dataSummary <- figureS10$data |> tidytable::group_by(
+figureS9$dataSummary <- figureS9$data |> tidytable::group_by(
   # Summarise across PoolPatchSeed
   Intervention, InterventionInitial, InterventionFinal, Metric,
   SpeciesPreferences, InterventionChange, TimeSinceIntervention
@@ -111,7 +111,7 @@ figureS10$dataSummary <- figureS10$data |> tidytable::group_by(
   Zero = sum(ValueDifference == 0),
   Pos = sum(ValueDifference > 0)
 ) |> tidytable::filter(
-  Total == length(unique(figureS10$data$PoolPatchSeed)) # Num. of sims!
+  Total == length(unique(figureS9$data$PoolPatchSeed)) # Num. of sims!
 ) |> tidytable::pivot_longer(
   cols = Neg:Pos, names_to = "Type", values_to = "Counts"
 ) |> tidytable::mutate(
@@ -121,8 +121,8 @@ figureS10$dataSummary <- figureS10$data |> tidytable::group_by(
 )
 
 ##### Main Plot: ##############################################################
-figureS10$plot <- ggplot2::ggplot(
-  figureS10$dataSummary |> tidytable::filter(
+figureS9$plot <- ggplot2::ggplot(
+  figureS9$dataSummary |> tidytable::filter(
     Type == "Neg"
   ),
   ggplot2::aes(x = TimeSinceIntervention, color = Intervention,
@@ -155,12 +155,12 @@ figureS10$plot <- ggplot2::ggplot(
 
 ##### Save: ###################################################################
 
-figureS10$suffix <- paste0("_", figureS10$prefstring, "_", figureS10$lustring)
-figureS10$prefix <- "FigureS10"
-figureS10$iter <- "_Prototype1"
-figureS10$ext <- c(".png", ".pdf")
+figureS9$suffix <- paste0("_", figureS9$prefstring, "_", figureS9$lustring)
+figureS9$prefix <- "FigureS9"
+figureS9$iter <- "_Prototype1"
+figureS9$ext <- c(".png", ".pdf")
 
-with(figureS10,
+with(figureS9,
      ggplot2::ggsave(
        plot = plot,
        filename = file.path(dirImages, paste0(
@@ -168,7 +168,7 @@ with(figureS10,
        )),
        units = "cm", width = 6.5*3, height = 6.5*2)
 )
-with(figureS10,
+with(figureS9,
      ggplot2::ggsave(
        plot = plot,
        filename = file.path(dirImages, paste0(
