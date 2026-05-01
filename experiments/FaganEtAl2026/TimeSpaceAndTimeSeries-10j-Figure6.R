@@ -21,7 +21,7 @@ figure6 <- list(
     seed = "2", # "11", "17", "2"!,
     time = 25000
   ),
-  pref = "50% 0, 50% 1", #"Uniform(0, 1)",
+  pref = "50% 0, 50% 1", # "50% 0, 50% 1", "Uniform(0, 1)",
   luinitl = "(0.5)", # Land Use INITiaL
   lufinal = c("(0)", "(0.5)", "(1)") # Land Use FINAL
   # lufinal = c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)") # Land Use FINAL
