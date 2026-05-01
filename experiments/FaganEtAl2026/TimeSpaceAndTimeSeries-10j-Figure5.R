@@ -87,7 +87,7 @@ figure5$plotA <- lapply(
         )
       ) |> tidytable::mutate(
         SpeciesPreferences = tidytable::case_when(
-          SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
+          SpeciesPreferences == "100% 0" ~ "Single Adaptation Type",
           SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
           SpeciesPreferences == "Uniform(0, 1)" ~ "Multiple Adaptation Types",
           TRUE ~ SpeciesPreferences
@@ -104,9 +104,13 @@ figure5$plotA <- lapply(
                                    title = "Habitat Type")
     ) + ggplot2::theme(
       legend.position = c(0.5, 0.09),
-      plot.tag.position = c(0.025, 0.95),
+      plot.tag.position = c(0.01, 1),
       panel.spacing = ggplot2::unit(1, "lines"),
-      strip.text = ggplot2::element_text(size = 12)
+      # strip.text = ggplot2::element_text(size = 12)
+      # Aggressively remove strips
+      strip.background = ggplot2::element_blank(),
+      strip.text.x = ggplot2::element_blank(),
+      strip.text.y = ggplot2::element_blank()
     ) + ggplot2::coord_cartesian(
       ylim = c(0, 30), expand = FALSE
     ) + ggplot2::scale_x_continuous(
@@ -353,7 +357,7 @@ figure5$insetGrobs <- figure5$dataPers |> tidytable::filter(
   Intervention %in% c("(0)", "(0.5)", "(1)")
 ) |> tidytable::mutate(
   SpeciesPreferences = tidytable::case_when(
-    SpeciesPreferences == "100% 0" ~ "1 Adaptation Type",
+    SpeciesPreferences == "100% 0" ~ "Single Adaptation Type",
     SpeciesPreferences == "50% 0, 50% 1" ~ "2 Adaptation Types",
     SpeciesPreferences == "Uniform(0, 1)" ~ "Multiple Adaptation Types",
     TRUE ~ SpeciesPreferences
