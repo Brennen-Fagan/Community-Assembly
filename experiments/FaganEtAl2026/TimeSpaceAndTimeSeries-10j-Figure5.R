@@ -15,7 +15,7 @@ library(ggpp) # for the geom_grob function -> factor placement of grobs.
 # This is better as an environment, but that's more opaque.
 figure5 <- list(
   pref = c("Uniform(0, 1)", "50% 0, 50% 1"),
-  isSupplement = TRUE
+  isSupplement = FALSE
 )
 
 # Main Plots: #################################################################
@@ -156,9 +156,9 @@ figure5$plotB <- lapply(
       breaks = c(0, 10, 20, 30)
     ) + ggplot2::coord_cartesian(
       ylim = c(0, 30), expand = FALSE
-    ) + ggplot2::facet_wrap( # Instead of grid to have strips on top.
-      # switch = "y",
-      ggplot2::vars(SpeciesPreferences), ncol = 1
+    # ) + ggplot2::facet_wrap( # Instead of grid to have strips on top.
+    #   # switch = "y",
+    #   ggplot2::vars(SpeciesPreferences), ncol = 1
     ) + ggplot2::theme_minimal(
     ) + ggplot2::theme(
       plot.tag.position = c(0.01, 1),
@@ -205,9 +205,9 @@ figure5$plotC <- lapply(
     ) + ggplot2::scale_color_manual(
       values = colorPalette, aesthetics = c("color", "fill"),
       name = "Habitat Type"
-    ) + ggplot2::facet_wrap( # Instead of grid to have strips on top.
-      # switch = "y",
-      ggplot2::vars(SpeciesPreferences), ncol = 1
+    # ) + ggplot2::facet_wrap( # Instead of grid to have strips on top.
+    #   # switch = "y",
+    #   ggplot2::vars(SpeciesPreferences), ncol = 1
     ) + ggplot2::theme_minimal(
     ) + ggplot2::theme(
       plot.tag.position = c(0.01, 1),
@@ -223,7 +223,8 @@ figure5$plotC <- lapply(
       fill = "none"
     ) + scale_y_log10(
       label = scales::label_log(),
-      breaks = 10^(2+(0:20)/5)
+      breaks = 10^(2+(0:20)/5),
+      limits = c(10^3.2, 10^4.4)
     )
   }
 )
@@ -555,7 +556,7 @@ with(
       ggplot2::ggsave(
         plot = arg1,
         filename = file.path(dirImages, paste0(prefix, arg2, affix, arg3)),
-        units = "cm", width = 6.5*3, height = 6.5*3)
+        units = "cm", width = 7.5*3, height = 6.5*3)
     }
   )
 )
