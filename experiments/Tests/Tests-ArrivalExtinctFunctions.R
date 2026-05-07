@@ -3,6 +3,8 @@
 # Standard Opening: ###########################################################
 library(RMTRCode2)
 
+print("Script stops early if a test fails.")
+
 if (!exists("testseed")) {
   testseed <- runif(1) * 1E8
   if (exists(".Random.seed")) {

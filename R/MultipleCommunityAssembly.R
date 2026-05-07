@@ -171,7 +171,8 @@ MultipleNumericalAssembly_Dispersal <- function(
     ExtinctionProportion = ExtinctionProportion,
     ArrivalDensity = ArrivalDensity,
     MaximumTimeStep = MaximumTimeStep,
-    BetweenEventSteps = BetweenEventSteps
+    BetweenEventSteps = BetweenEventSteps,
+    DispersalMatrix = DispersalMatrix
   )
   retval$Ellipsis <- list(...)
 

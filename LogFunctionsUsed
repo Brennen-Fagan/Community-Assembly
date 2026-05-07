@@ -1,5 +1,52 @@
 Log of files and functions and function calls
 
+# Iteration 4: Post Gemini and New Experiments ################
+
+> check_functions
+ [1] "actTrivially"
+ [2] "CreateConnectanceByBlock"
+ [3] "defaultEvents"
+ [4] "evensplit_0.51"
+ [5] "evensplit_01"
+ [6] "ExtinctFUN_Example"
+ [7] "ExtinctFUN_Example2"
+ [8] "gradientline_01"
+ [9] "gradientline_0half1"
+[10] "interpolateMatrixLists"
+[11] "interpolateMatrixLists2"
+[12] "IslandPreprocess"
+[13] "LawMorton1996_CommunityMat"
+[14] "LawMorton1996_NumIntegration"
+[15] "LawMorton1996_PlotAbundance"
+[16] "nonzero"
+[17] "patchTypes.0.Half.1"
+[18] "rep_0"
+[19] "rep_0.25"
+[20] "rep_0.5"
+[21] "rep_0.75"
+[22] "rep_1"
+[23] "rho.10.0.1.euclidean"
+[24] "rho.10.1.2.euclidean"
+[25] "rho.2.0.1.euclidean"
+[26] "rho.2.1.2.euclidean"
+[27] "rho.5.0.1.euclidean"
+[28] "rho.5.1.2.euclidean"
+[29] "rho.noop"
+[30] "runifRing"
+[31] "sample.int.3"
+[32] "sample.int.normalized"
+[33] "switchMatrixLists"
+[34] "switchMatrixLists2"
+[35] "toCheddar"
+[36] "toIGraph"
+
+I'm fine with these; we aren't using them for the main project
+but they are useful to keep around for alternative examples or
+analyses.
+
+See also lintr though.
+
+
 # Iteration 3: ################################################
 
  [1] "ArrivalFUN_Example"

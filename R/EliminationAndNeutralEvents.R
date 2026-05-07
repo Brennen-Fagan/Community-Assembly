@@ -12,7 +12,7 @@ EliminationAndNeutralEvents <- function(
     RemainPercentage <- 1 - ExtinctionProportion
   else
     stop("ExtinctionProportion (= x) unclear. Please keep 0 <= x <= 1.")
-  
+
   function(t, y, parms,
            ReturnEvents = FALSE) {
     if (ReturnEvents) {return(EventDF)}
@@ -23,7 +23,7 @@ EliminationAndNeutralEvents <- function(
         print(paste(Sys.time(), "t:", t))
       }
     }
-    
+
     y <- ifelse(y <= EliminationThreshold, 0, y)
     event <- which(t == EventDF$Times)
     if (length(event)) {
@@ -40,7 +40,7 @@ EliminationAndNeutralEvents <- function(
         # <=> PerCapitaDynamics > 0.
         if (
           y[abundanceIndex] > 0 ||
-          PerCapitaDynams(0, y, NULL)[abundanceIndex] > 0
+          PerCapitaDynams(t, y, parms)[abundanceIndex] > 0
         ) {
           y[abundanceIndex] <- y[abundanceIndex] + ArrivalDens
           EventDF$Success[event] <<- TRUE

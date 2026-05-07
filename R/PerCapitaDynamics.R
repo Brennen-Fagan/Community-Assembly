@@ -1,5 +1,6 @@
 PerCapitaDynamics_Type1 <- function(
-  ReproductionRate, InteractionMatrix, NumEnvironments
+  ReproductionRate, InteractionMatrix,
+  NumEnvironments = NULL # Only valid if ReproductionRate is constant-numeric.
 ) {
   isvalid <- function(func) {
     forms <- names(formals(func))
@@ -29,7 +30,7 @@ PerCapitaDynamics_Type1 <- function(
       }
     }
 
-  } else {
+  } else if (!is.null(NumEnvironments)) {
     if (is.function(InteractionMatrix)) {
       stopifnot(isvalid(InteractionMatrix))
       function(t, y, parms = NULL) {
@@ -40,6 +41,21 @@ PerCapitaDynamics_Type1 <- function(
     } else {
       function(t, y, parms = NULL) {
         rep(ReproductionRate, NumEnvironments) +
+          InteractionMatrix %*% y
+      }
+    }
+
+  } else {
+    if (is.function(InteractionMatrix)) {
+      stopifnot(isvalid(InteractionMatrix))
+      function(t, y, parms = NULL) {
+        ReproductionRate +
+          InteractionMatrix(t = t, y = y, parms = parms) %*% y
+      }
+
+    } else {
+      function(t, y, parms = NULL) {
+        ReproductionRate +
           InteractionMatrix %*% y
       }
     }

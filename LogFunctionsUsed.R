@@ -1,33 +1,63 @@
+
+# Editted Gemini variation of existing script
+## --- R Project Clean-up & Deprecation Audit (Cross-Platform Optimized) ---
 # Check all functions used, sort them by whether they are internal to this pkg.
-
+# Goal: identify code no longer used in the production of the manuscripts.
+library(here)
 library(NCmisc)
-
+library(lintr)
 library(RMTRCode2)
-allOurFunctions <- ls("package:RMTRCode2")
 
-# Assumed this dir is root package directory.
-thisdir <- '.'
-targdirs <- file.path(thisdir, "experiments", c(
-  "Figure3-ExampleOutcomes", "Figure4-MetasimulationStudy", "Tests"
-))
-Rdir <- file.path(thisdir, "R")
+# 1. DEFINE TARGETS
+# We anchor all paths to the project root to ensure this script runs
+# identically across OS types.
+all_our_functions <- ls("package:RMTRCode2")
 
-# Get files, look for functions used that are mine.
-targfiles <- dir(
-  path = targdirs, pattern = "[.]R$",
-  full.names = TRUE, include.dirs = TRUE,
-  no.. = TRUE, ignore.case = TRUE,
-  recursive = TRUE # should be excessive
+r_dirs <- c(
+  here("R"),
+  here("experiments", "FaganEtAl2023", "R"),
+  here("experiments", "FaganEtAl2026", "R")
+)
+exp_dirs <- c(
+  here("experiments", "FaganEtAl2023", "Figure3-ExampleOutcomes"),
+  here("experiments", "FaganEtAl2023", "Figure4-MetasimulationStudy"),
+  here("experiments", "FaganEtAl2026"),
+  here("experiments", "FaganEtAl2026", "Tests"),
+  here("experiments", "Tests")
 )
 
-functionsused <- lapply(targfiles, NCmisc::list.functions.in.file)
-names(functionsused) <- targfiles
-functionsused_nots <- lapply(functionsused, function(x, keep) {
-  x[names(x) %in% keep]
-}, keep = c("character(0)", "package:RMTRCode2"))
-functionsused_nots <- sort(unique(unlist(functionsused_nots)))
+# 2. FUNCTION
+# Standard search for filtering both in and between calls.
+get_used_functions <- function(dirs) {
+  files <- list.files(
+    path = dirs,
+    pattern = "(?i)\\.R$", # Case insensitive
+    recursive = TRUE,
+    full.names = TRUE
+  )
 
-notmine <- c(
+  # Some local folders need to not be included
+  files <- files[!grepl("/(Deprecated|Extraneous)/", files)]
+
+  if(length(files) == 0) return(character(0))
+
+  usage_list <- lapply(files, NCmisc::list.functions.in.file)
+
+  # Extract names belonging to this project's namespace.
+  # character(0) captures internal calls (no package prefix).
+  unlist(lapply(usage_list, function(x) {
+    my_namespaces <- c("character(0)", "package:RMTRCode2")
+    return(unlist(x[names(x) %in% my_namespaces]))
+  }))
+}
+
+# 3. IDENTIFY ACTIVE FILES
+used_in_experiments <- get_used_functions(exp_dirs)
+used_in_r_files <- get_used_functions(r_dirs)
+all_used <- unique(c(used_in_experiments, used_in_r_files))
+
+# 4. FILTER EXTERNAL DEPENDENCIES
+not_mine <- c(
   '.', 'across', 'aes', 'aes_string', 'all_of', 'annotate', 'anti_join',
   'any_of', 'arrange', 'arrangeGrob', "as_data_frame", 'bandSparse', 'bdiag',
   'bind_rows', 'case_when', 'clusterEvalQ', 'clusterExport', 'cmpfun',
@@ -55,34 +85,15 @@ notmine <- c(
 
 )
 
-functionsused_nots <- functionsused_nots[
-  !(functionsused_nots %in% notmine)
-  ]
+actually_used <- all_used[!(all_used %in% not_mine)]
 
-# Repeat for R files.
-Rfiles <- dir(
-  path = Rdir, pattern = "[.]R$",
-  full.names = TRUE, include.dirs = TRUE,
-  no.. = TRUE, ignore.case = TRUE,
-  recursive = TRUE # should be excessive
-)
+# 5. RESULTS
+# setdiff for functions in the package but not called in analyses.
+check_functions <- setdiff(all_our_functions, actually_used)
 
-functionsusedR <- lapply(Rfiles, NCmisc::list.functions.in.file)
-names(functionsusedR) <- Rfiles
+# 6. LINTING
+r_files_to_lint <- list.files(path = r_dirs, pattern = "(?i)\\.R$", full.names = TRUE)
 
-functionsusedR_nots <- lapply(functionsusedR, function(x, keep) {
-  x[names(x) %in% keep]
-}, keep = c("character(0)", "package:RMTRCode2"))
-functionsusedR_nots <- sort(unique(unlist(functionsusedR_nots)))
-functionsusedR_nots <- functionsusedR_nots[
-  !(functionsusedR_nots %in% notmine)
-  ]
-
-# Compare the two to identify functions to potentially deprecate and move to
-# the "Extraneous" directory.
-possiblyDeprecated <- allOurFunctions[
-  !(allOurFunctions %in% c(functionsused_nots, functionsusedR_nots))
-  ]
-
-
-# The rest of the inspection needs to be by hand.
+check_lint <- do.call(rbind, lapply(r_files_to_lint, function(f) {
+  as.data.frame(lintr::lint(f, linters = lintr::object_usage_linter()))
+}))
