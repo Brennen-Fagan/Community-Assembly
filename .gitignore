@@ -5,6 +5,8 @@ renv
 **/*.Rhistory
 .RData
 .Ruserdata
+LogFunctionsUsed
+LogFunctionsUsed.R
 
 # -- OS
 .DS_Store
