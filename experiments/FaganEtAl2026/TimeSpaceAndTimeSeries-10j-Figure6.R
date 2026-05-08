@@ -235,9 +235,7 @@ figure6$plotA <- plotMeanAndInner(
   y = "Richness",
   tag = "a)"
 ) + ggplot2::guides(
-  linetype = "none",#,
-  # color = "none", # already covered by the main plot.
-  # fill = "none"
+  linetype = "none",
   fill = ggplot2::guide_legend(title = "Habitat Type",
                                override.aes = list(alpha = 1))
 ) + ggplot2::coord_cartesian(
@@ -414,31 +412,6 @@ figure6$plotE <- ggplot2::ggplot(
 )
 
 ##### Combine: ################################################################
-# figure6$plot <- ggpubr::ggarrange(
-#   plotlist = list(
-#     figure6$plotA + ggplot2::scale_y_continuous(
-#       breaks = c(0, 10, 20, 30, 40),
-#       labels = c("0", "10", "20", "30", "")
-#     ),
-#     ggpubr::ggarrange(plotlist = list(
-#       figure6$plotB + ggplot2::theme(legend.position = "none"),
-#       figure6$plotC + ggplot2::theme(legend.position = "none",
-#                                       axis.title.y = ggplot2::element_blank())
-#     ), nrow = 1),
-#     ggpubr::ggarrange(plotlist = list(
-#       figure6$plotD + ggplot2::theme(legend.position = "none",
-#                                      axis.text.y = ggplot2::element_text(
-#                                        margin = ggplot2::margin(0, 0, 0, -5)
-#                                      )),
-#       figure6$plotE + ggplot2::theme(legend.position = "none",
-#                                       axis.title.y = ggplot2::element_blank(),
-#                                       axis.text.y = ggplot2::element_text(
-#                                         margin = ggplot2::margin(0, 0, 0, -5)
-#                                       ))
-#     ), nrow = 1)
-#   ), nrow = 3, common.legend = TRUE
-# )
-
 figure6$plot <-
   figure6$plotA + ggplot2::scale_y_continuous(
     breaks = c(0, 10, 20, 30, 40),

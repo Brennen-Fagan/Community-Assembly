@@ -13,7 +13,6 @@ substituteTimeIntervention <- function(times) {
 # substituteTimeIntervention <- NULL
 
 datfolders <- dir(pattern = "TSTS_Simulations_.+2025-07-30$")
-# datfolders <- dir(pattern = "TSTS_Simulations_.+2025-01-2[0-9]$")
 
 cargs <- as.numeric(commandArgs(trailingOnly = TRUE)[1])
 if (!exists("cores")) {
@@ -116,7 +115,6 @@ allfiles <- dir(datfolders, full.names = TRUE,
 Interventions <- foreach::foreach(
   id = iterators::iter(1:length(allfiles)),
   x = iterators::iter(allfiles)
-  #, .packages = c("dplyr", "RMTRCode2")
 ) %op% {
   directory <- '.'
   librarypath <- file.path(directory, "Rlibs")
@@ -124,10 +122,7 @@ Interventions <- foreach::foreach(
   library(tidytable)
 
   x_properties <- strsplit(basename(x), split = splitchar)
-  stopifnot(length(x_properties) == 1#,
-            #x_properties[[1]][1] == "TSTS",
-            #x_properties[[1]][2] == "Simulation"
-  )
+  stopifnot(length(x_properties) == 1)
 
   print(paste(id, x))
   x_dir <- dirname(x)

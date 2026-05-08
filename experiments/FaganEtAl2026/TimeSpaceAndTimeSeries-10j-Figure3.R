@@ -408,31 +408,6 @@ figure3$plotE <- ggplot2::ggplot(
 )
 
 ##### Combine: ################################################################
-# figure3$plot <- ggpubr::ggarrange(
-#   plotlist = list(
-#     figure3$plotA + ggplot2::scale_y_continuous(
-#       breaks = c(0, 10, 20, 30, 40),
-#       labels = c("0", "10", "20", "30", "")
-#     ),
-#     ggpubr::ggarrange(plotlist = list(
-#       figure3$plotB + ggplot2::theme(legend.position = "none"),
-#       figure3$plotC + ggplot2::theme(legend.position = "none",
-#                                       axis.title.y = ggplot2::element_blank())
-#     ), nrow = 1),
-#     ggpubr::ggarrange(plotlist = list(
-#       figure3$plotD + ggplot2::theme(legend.position = "none",
-#                                      axis.text.y = ggplot2::element_text(
-#                                        margin = ggplot2::margin(0, 0, 0, -5)
-#                                      )),
-#       figure3$plotE + ggplot2::theme(legend.position = "none",
-#                                       axis.title.y = ggplot2::element_blank(),
-#                                       axis.text.y = ggplot2::element_text(
-#                                         margin = ggplot2::margin(0, 0, 0, -5)
-#                                       ))
-#     ), nrow = 1)
-#   ), nrow = 3, common.legend = TRUE
-# )
-
 figure3$plot <-
   figure3$plotA + ggplot2::scale_y_continuous(
     breaks = c(0, 10, 20, 30, 40),

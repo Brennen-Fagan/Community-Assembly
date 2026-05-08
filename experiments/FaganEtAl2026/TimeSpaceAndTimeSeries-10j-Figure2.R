@@ -129,7 +129,6 @@ figure2$plotA <- plotMeanAndInner(
   legend.text.position = "bottom",
   legend.title = ggplot2::element_blank(),
   panel.spacing = ggplot2::unit(1, "lines"),
-  # strip.text = ggplot2::element_text(size = 12)
   # Aggressively remove strips
   strip.background = ggplot2::element_blank(),
   strip.text.x = ggplot2::element_blank(),
@@ -147,17 +146,6 @@ figure2$plotA <- plotMeanAndInner(
 # Example networks from different scenarios of the same simulation, showing
 # effects of the current habitat type through time on network shape.
 # Previously, these were independent panels, but I'm switching to a facets.
-# figure2$plotNetworks <- figure2$graph$networks$Plot + ggplot2::facet_grid(
-#   # Reverse order
-#   factor(Intervention, levels = c("(1)", "(0.5)", "(0)"), ordered = T) ~ .
-# ) + ggplot2::theme(
-#   axis.title.x = ggplot2::element_blank(),
-#   panel.border = ggplot2::element_rect(color = "black", fill = NA),
-#   legend.position = "none",
-#   axis.text.y = ggplot2::element_text(margin = ggplot2::margin(r = -30),
-#                                       size = 12),
-#   axis.text.x = ggplot2::element_blank()
-# ) + ggplot2::coord_cartesian(xlim = c(-0.25, 1))
 figure2$plotNetworks <- dplyr::bind_rows(lapply(
   figure2$graph$networks$Envs, function(env) {
     value <- if (env$Row$Intervention == "(0)") {
@@ -364,9 +352,6 @@ if (figure2$dist == defaultNicheDistance) {
   ggplot2::ggsave(plot = figure2$plotA,
                   filename = file.path(dirImages, "Figure2A_Prototype3.pdf"),
                   units = "cm", width = 6.5*3, height = 6.5*2)
-  # ggplot2::ggsave(plot = figure2$plotNetworks,
-  #                 filename = file.path(dirImages, "Figure2Networks_Prototype1.pdf"),
-  #                 units = "cm", width = 6.5*1, height = 6.5*2)
   ggplot2::ggsave(plot = figure2$plotsViolin[[1]],
                   filename = file.path(dirImages, "Figure2B_Prototype3.pdf"),
                   units = "cm", width = 6.5*3, height = 6.5*2)
@@ -446,7 +431,6 @@ if (figure2$dist == defaultNicheDistance) {
   ) + ggplot2::scale_x_continuous(
     breaks = (0:3)*10000
   ) + ggplot2::facet_grid(
-    # switch = "y",
     cols = ggplot2::vars(SpeciesPreferences),
     rows = ggplot2::vars(Subset)
   )

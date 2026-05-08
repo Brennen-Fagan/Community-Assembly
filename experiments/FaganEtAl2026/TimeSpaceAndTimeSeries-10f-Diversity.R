@@ -98,7 +98,6 @@ allfiles <- dir(datfolders, full.names = TRUE,
 Diversity <- foreach::foreach(
   id = iterators::iter(1:length(allfiles)),
   x = iterators::iter(allfiles)
-  #, .packages = c("dplyr", "RMTRCode2")
 ) %op% {
   directory <- '.'
   librarypath <- file.path(directory, "Rlibs")
@@ -106,10 +105,7 @@ Diversity <- foreach::foreach(
   library(RMTRCode2); library(dplyr)
 
   x_properties <- strsplit(basename(x), split = splitchar)
-  stopifnot(length(x_properties) == 1#,
-            #x_properties[[1]][1] == "TSTS",
-            #x_properties[[1]][2] == "Simulation"
-  )
+  stopifnot(length(x_properties) == 1)
 
   filename <- file.path(
     dirname(x),

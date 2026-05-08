@@ -106,7 +106,6 @@ figure5$plotA <- lapply(
       legend.position = c(0.5, 0.09),
       plot.tag.position = c(0.01, 1),
       panel.spacing = ggplot2::unit(1, "lines"),
-      # strip.text = ggplot2::element_text(size = 12)
       # Aggressively remove strips
       strip.background = ggplot2::element_blank(),
       strip.text.x = ggplot2::element_blank(),
@@ -156,14 +155,10 @@ figure5$plotB <- lapply(
       breaks = c(0, 10, 20, 30)
     ) + ggplot2::coord_cartesian(
       ylim = c(0, 30), expand = FALSE
-    # ) + ggplot2::facet_wrap( # Instead of grid to have strips on top.
-    #   # switch = "y",
-    #   ggplot2::vars(SpeciesPreferences), ncol = 1
     ) + ggplot2::theme_minimal(
     ) + ggplot2::theme(
       plot.tag.position = c(0.01, 1),
       panel.grid.minor = ggplot2::element_blank(),
-      # strip.background = ggplot2::element_blank(),
       strip.text = ggplot2::element_text(color = NA),
       panel.spacing = ggplot2::unit(1, "lines")
     ) + ggplot2::labs(
@@ -205,14 +200,10 @@ figure5$plotC <- lapply(
     ) + ggplot2::scale_color_manual(
       values = colorPalette, aesthetics = c("color", "fill"),
       name = "Habitat Type"
-    # ) + ggplot2::facet_wrap( # Instead of grid to have strips on top.
-    #   # switch = "y",
-    #   ggplot2::vars(SpeciesPreferences), ncol = 1
     ) + ggplot2::theme_minimal(
     ) + ggplot2::theme(
       plot.tag.position = c(0.01, 1),
       panel.grid.minor = ggplot2::element_blank(),
-      # strip.background = ggplot2::element_blank(),
       strip.text = ggplot2::element_text(color = NA),
       panel.spacing = ggplot2::unit(1, "lines")
     ) + ggplot2::labs(

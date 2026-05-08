@@ -4,7 +4,7 @@ library(dplyr)
 library(RMTRCode2)
 
 # Directory Functions and Objects: ############################################
-directory <- "." # Should be "FaganEtAl2025"
+directory <- "." # Should be "FaganEtAl2026"
 source(file.path(directory, "TimeSpaceAndTimeSeries-10-Dictionaries.R"))
 
 modifiedcase <- basecase

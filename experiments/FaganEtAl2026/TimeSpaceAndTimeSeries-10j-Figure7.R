@@ -18,7 +18,7 @@ figure7 <- list(
 )
 
 # Main Plots: #################################################################
-### Plot 8: ###################################################################
+### Plot 7: ###################################################################
 ##### Data: ###################################################################
 
 # Interventions store the time right before intervention, then the
@@ -97,14 +97,6 @@ figure7$dataLogScale <- figure7$dataBase |> tidytable::filter(
 ) |> tidytable::summarise(
   Value = sum(Value), .groups = "drop"
 ) |> tidytable::mutate(
-  # Time = tidytable::case_when( # Create groupings for times, avoid doublecount
-  #   Time < -50 ~ round(Time, -2),
-  #   Time < 0 ~ -25, # In the last bin before regime change.
-  #   Time <= 50 ~ round(Time, 0),
-  #   Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
-  #   Time < 16350 ~ round(Time, -2),
-  #   TRUE ~ Time
-  # )
   Time = tidytable::case_when(
     round(Time) == 0 ~ 0, # Base Case for reference point analysis
     Time < 0 ~ -1, # Base Case for reference time segment analysis
@@ -262,8 +254,6 @@ figure7$plotRaw <- ggpubr::ggarrange(
     scalestrans = scales::label_number(accuracy = 0.1)
   ) + ggplot2::scale_fill_viridis_d(
     drop = FALSE
-    # transform = "identity", begin = 0.1,
-    # labels = scales::label_number(accuracy = 0.1)
   ),
   plotTextHeatmap(
     figure7$dataRawValues |> tidytable::filter(
@@ -275,8 +265,6 @@ figure7$plotRaw <- ggpubr::ggarrange(
     scalestrans = scales::label_number(accuracy = 1)
   ) + ggplot2::scale_fill_viridis_d(
     drop = FALSE
-    # transform = "log10", begin = 0.1,
-    # labels = scales::label_number(accuracy = 0.1)
   ),
   nrow = 2
 )

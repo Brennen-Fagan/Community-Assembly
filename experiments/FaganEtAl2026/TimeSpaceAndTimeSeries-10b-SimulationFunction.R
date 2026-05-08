@@ -7,7 +7,7 @@ library(dplyr)
 library(Matrix)
 
 # Directory Functions and Objects: ############################################
-directory <- "." # Should be "FaganEtAl2025"
+directory <- "." # Should be "FaganEtAl2026"
 source(file.path(directory, "TimeSpaceAndTimeSeries-10-Dictionaries.R"))
 
 # Function Definition: ########################################################

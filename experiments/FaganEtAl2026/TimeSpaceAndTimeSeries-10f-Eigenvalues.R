@@ -148,9 +148,6 @@ for (chunk in 1:nchunks) {
   EigenData <- foreach::foreach(
     id = iterators::iter(chunks[chunk]:(chunks[chunk+1]-1)),
     x = iterators::iter(allfiles[chunks[chunk]:(chunks[chunk+1]-1)])
-    # id = iterators::iter(c(1:100)),
-    # x = iterators::iter(sample(allfiles, 100))
-    #, .packages = c("dplyr", "RMTRCode2")
   ) %op% {
     directory <- '.'
     librarypath <- file.path(directory, "Rlibs")
@@ -184,7 +181,6 @@ for (chunk in 1:nchunks) {
       x_dir <- dirname(x)
       x_poolind <- which(unlist(lapply(poolmats, function(y) y$Dir == x_dir)))
       if(any(x_poolind)) {
-        # x_pool <- poolmats[[x_poolind]]$Pool
         DynamicsFunction <- poolmats[[x_poolind]]$DynamicsFunction
         InteractionMatrices <- poolmats[[x_poolind]]$InteractionMatrices
       } else {
@@ -374,12 +370,16 @@ if (cores > 1)
   parallel::stopCluster(clust)
 
 # At its core, we're looking at something like...
-# ggplot(EigenData, aes(x = abs(Timescale), color = Type, group = Type)) + ggplot2::geom_density(data = function(x) x |> filter(Type != "InteractionMatrix")) + geom_rug(data = function(x) x |> filter(Type == "InteractionMatrix")) + facet_grid(PoolPatchSeed ~ SpeciesAffinity + PatchAffinity + NicheDistance) + scale_x_log10() + scale_y_log10() + ggplot2::coord_cartesian(ylim = c(1e-8, NA))
-# ggplot(EigenData, aes(x = abs(Timescale), color = Type, group = Type)) + ggplot2::geom_density(adjust = 0.5) + facet_grid(SpeciesAffinity + NicheDistance ~ PatchAffinity) + scale_x_log10() + scale_y_log10() + ggplot2::coord_cartesian(ylim = c(1e-8, NA))
-# At its core, we're looking at something like...
-# ggplot(EigenData, aes(x = abs(Timescale), color = Type, group = Type)) + ggplot2::geom_density(data = function(x) x |> filter(Type != "InteractionMatrix")) + geom_rug(data = function(x) x |> filter(Type == "InteractionMatrix")) + facet_grid(PoolPatchSeed ~ SpeciesAffinity + PatchAffinity + NicheDistance) + scale_x_log10() + scale_y_log10() + ggplot2::coord_cartesian(ylim = c(1e-8, NA))
-# ggplot(EigenData, aes(y = Type, x = abs(Timescale), color = Type, group = Type)) + ggplot2::geom_point() + facet_grid(SpeciesAffinity + NicheDistance ~ PatchAffinity) + scale_x_log10() + ggplot2::coord_cartesian(ylim = c(1e-8, NA))
-ggplot(EigenData, aes(y = Type, x = abs(Timescale), color = Type, group = Type)) + ggplot2::geom_boxplot() + facet_grid(NicheDistance + SpeciesAffinity ~ PatchAffinity) + scale_x_log10() + ggplot2::coord_cartesian(ylim = c(1e-8, NA))
+ggplot(
+  EigenData, 
+  aes(y = Type, x = abs(Timescale), color = Type, group = Type)
+) + ggplot2::geom_boxplot(
+) + facet_grid(
+  NicheDistance + SpeciesAffinity ~ PatchAffinity
+) + scale_x_log10(
+) + ggplot2::coord_cartesian(
+  ylim = c(1e-8, NA)
+)
 for (i in unique(EigenData$NicheDistance)) {
   ggsave(ggplot(
     EigenData |> filter(

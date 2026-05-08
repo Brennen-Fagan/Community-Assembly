@@ -20,11 +20,7 @@ if (!dir.exists(librarypath)) {
 
 allLibraryPaths <- .libPaths()
 
-#update.packages(ask = FALSE, repos = c(CRAN = "https://cloud.r-project.org"), 
-#                instlib = librarypath, oldPkgs = "dplyr")
-
 source("TimeSpaceAndTimeSeries-10-Dictionaries.R")
-#source('TimeSpaceAndTimeSeries-0-Functions.R')
 library(tidytable)
 library(RMTRCode2)
 

@@ -33,8 +33,6 @@ allLibraryPaths <- .libPaths()
 library(dplyr)
 library(RMTRCode2)
 
-# source("TimeSpaceAndTimeSeries-0-Functions.R") # Abundance metrics.
-# debug(calculateColExtMetrics)
 source(file.path("R", "calculateColExtMetrics.R"))
 
 library(parallel)
@@ -132,17 +130,13 @@ allfiles <- dir(datfolders, full.names = TRUE,
 ColExt <- foreach::foreach(
   id = iterators::iter(1:length(allfiles)),
   x = iterators::iter(allfiles)
-  #, .packages = c("dplyr", "RMTRCode2")
 ) %op% {
   .libPaths(c(librarypath, .libPaths()))
   library("dplyr")
   library("RMTRCode2")
 
   x_properties <- strsplit(basename(x), split = splitchar)
-  stopifnot(length(x_properties) == 1#,
-            #x_properties[[1]][1] == "TSTS",
-            #x_properties[[1]][2] == "Simulation"
-  )
+  stopifnot(length(x_properties) == 1)
 
   filename <- file.path(
     dirname(x),

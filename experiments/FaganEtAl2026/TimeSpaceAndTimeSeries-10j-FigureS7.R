@@ -90,21 +90,13 @@ figureS7$graph$timeInterventions <-
       ]
   )
 
-# figureS7$graph$specification <-
-#   figureS7$graph$specification |> tidytable::filter(
-#     round(Time, 6) %in% round(figureS7$graph$time, 6) | # for examples
-#       (round(TimeSinceIntervention, 6) %in%
-#          round(figureS7$graph$timeInterventions, 6))
-#   )
-
 
 # Why to the level of summary? Because the PlotMeanAndInner function
 # isn't built to handle the multiple resolutions that we have in the
 # actual data, which makes it harder to portray the data accurately.
 figureS7$dataSummary <- tidytable::bind_rows(
-  diversitiesRichness,
+  diversitiesRichness
 ) |> tidytable::filter(
-  # SpeciesPreferences %in% figureS7$pref,
   NicheDistance == defaultNicheDistance,
   Intervention %in% c("(0)", "(0)->(0.5)", # (0)->(0.5) used for N6
                       "(0.5)", "(0.5)->(0)", # all others used in N3.
@@ -362,9 +354,9 @@ for (i in 1+5*(0:3)) {
            patchwork::plot_layout(
              design =
                "BBCCDDEEFF
-             BBCCDDEEFF
-             AAAAAAAAAA
-             AAAAAAAAAA"
+                BBCCDDEEFF
+                AAAAAAAAAA
+                AAAAAAAAAA"
            )
     ),
     path = dirImages,

@@ -2,7 +2,7 @@
 
 variant <- c("Networks")[1]
 figures <- c(7)
-# 2:6 # Available if variant == "Networks"
+# 2:8 # Available if variant == "Networks"
 pref <- c("50% 0, 50% 1", "Uniform(0, 1)")[1]
 # Break up the preferences to save memory for Networks 5.
 prefstring <- switch(
@@ -40,36 +40,6 @@ if (variant == "Networks") {
   }
 
   ##### Data Management: ######################################################
-  # Which seed to pick? How about one close to median performance?
-  # figureNetworks$dataRich |> filter(
-  #   is.na(Subset), Time > 16000,
-  #   Intervention != "(0.25)", Intervention != "(0.75)"
-  # ) |> pivot_wider(
-  #   id_cols = c(Intervention, SpeciesPreferences, Time, Metric),
-  #   values_from = Value, names_from = PoolPatchSeed
-  # ) |> group_by(
-  #   Intervention, SpeciesPreferences, Time, Metric
-  # ) |> mutate(
-  #   Median = median(
-  #     c(`1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `9`,
-  #       `10`, `11`, `12`, `13`, `14`, `15`, `16`, `17`, `18`, `19`,
-  #       `20`, `21`, `22`, `23`, `24`, `25`, `26`, `27`, `28`, `29`,
-  #       `30`, `31`, `32`, `33`, `34`, `35`, `36`, `37`, `38`, `39`,
-  #       `40`, `41`, `42`, `43`, `44`))
-  # ) |> mutate(
-  #   across(`1`:`9`, ~abs(.x - Median))
-  # )  |> group_by(Intervention, SpeciesPreferences, Metric) |> summarise(
-  #   across(`1`:`9`, ~sum(.x, na.rm = TRUE))
-  # ) |> pivot_longer(
-  #   cols = `1`:`9`, names_to = "Seed", values_to = "Value"
-  # ) |> group_by(Intervention, SpeciesPreferences, Metric) |> summarise(
-  #   Best = Seed[which.min(Value)],
-  #   Best2 = Seed[order(Value)[2]],
-  #   Best3 = Seed[order(Value)[3]],
-  #   Best4 = Seed[order(Value)[4]],
-  #   Best5 = Seed[order(Value)[5]]
-  # ) |> View()
-
   figureNetworks <- list(
     graph = list(
       # Note that, unusually, we need all max(time), but only seed for others.
@@ -152,7 +122,6 @@ if (variant == "Networks") {
 
   figureNetworks$dataRich <- tidytable::bind_rows(
     diversitiesRichness |> tidytable::filter(
-      # SpeciesPreferences %in% figureNetworks$pref,
       NicheDistance == defaultNicheDistance,
       Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
       PoolPatchSeed %in% basePoolPatchSeeds,
@@ -168,7 +137,6 @@ if (variant == "Networks") {
   ) |> tidytable::distinct()
 
   figureNetworks$dataAbund <- diversitiesAbund |> tidytable::filter(
-    # SpeciesPreferences %in% figure2$pref,
     NicheDistance == defaultNicheDistance,
     Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
     PoolPatchSeed %in% basePoolPatchSeeds,
@@ -176,7 +144,6 @@ if (variant == "Networks") {
   )
 
   figureNetworks$dataTurnover <- diversitiesTimeBC |> tidytable::filter(
-    # SpeciesPreferences %in% figure2$pref,
     NicheDistance == defaultNicheDistance,
     Intervention %in% c("(0)", "(0.25)", "(0.5)", "(0.75)", "(1)"),
     PoolPatchSeed %in% basePoolPatchSeeds,
@@ -195,7 +162,6 @@ if (variant == "Networks") {
       )
     }
   ) |> tidytable::filter(
-    # SpeciesPreferences %in% figureNetworks$pref,
     NicheDistance == defaultNicheDistance,
     Intervention %in% c("(0)", "(0)->(0.5)", # (0)->(0.5) used for N6
                         "(0.5)", "(0.5)->(0)", # all others used in N3.
@@ -290,8 +256,6 @@ if (variant == "Networks") {
     ) + ggplot2::scale_color_manual(
       values = colorPalette, aesthetics = c("color", "fill"),
       name = "Habitat Type"
-      # ) + ggplot2::facet_grid(
-      #   . ~ SpeciesPreferences
     ) + ggplot2::theme_minimal(
     ) + ggplot2::theme(
       plot.tag.position = c(0.01, 1),
@@ -440,9 +404,6 @@ if (variant == "Networks") {
       factor(Intervention, # Set the order precisely
              levels = c("(1)", "(0.5)", "(0)"), ordered = TRUE) ~ .
     ) + ggplot2::scale_y_log10(
-      # ) + ggplot2::scale_color_manual(
-      #   values = colorPalette,
-      #   name = "Habitat Land-use"
     ) + ggplot2::theme_minimal(
     ) + ggplot2::coord_cartesian(
       xlim = c(0, 4)
@@ -655,8 +616,7 @@ if (variant == "Networks") {
     ) + ggplot2::guides(
       fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
     ) + ggplot2::labs(
-      x = "Time Since Intervention"#,
-      # y = "Richness"
+      x = "Time Since Intervention"
     ) + ggplot2::coord_cartesian(
       ylim = c(0, richnessYMax), xlim = c(10000, 15000),
       expand = FALSE
@@ -896,7 +856,6 @@ if (variant == "Networks") {
     figureNetworks$plot5A <- plotMeanAndInner(
       figureNetworks$dataRich |> tidytable::filter(
         Intervention %in% c("(0)", "(0.5)", "(1)"),
-        # InterventionFinal == InterventionInitial,
         SpeciesPreferences != "100% 0", # Both prefs here.
         is.na(Subset)
       ) |> figureNetworks$renameSpeciesPreferences(
@@ -1173,9 +1132,6 @@ if (variant == "Networks") {
         ) + ggplot2::geom_vline(
           xintercept = 0, color = "black", linetype = "dashed"
         ) + ggplot2::geom_line(
-          # ) + ggplot2::geom_ribbon( # Too much going on in the plot at once.
-          #   ggplot2::aes(ymin = Lower, ymax = Upper),
-          #   alpha = 0.25, linewidth = 0.25
         ) + ggplot2::scale_color_manual(
           values = colorPalette, aesthetics = c("color", "fill"),
           name = ""
@@ -1202,30 +1158,7 @@ if (variant == "Networks") {
                      "(0.5)" = 1, "(0)->(0.5)" = 1),
           guide = "none"
         )
-
-        # Not convinced this is helping making the message clearer either.
-        # if (met == "Richness") {
-        #   plt <- plt + ggplot2::geom_point(
-        #     data = figureNetworks$dataRich |> tidytable::filter(
-        #       # Two step filter to reduce computation as much as possible.
-        #       PoolPatchSeed == figureNetworks$graph$seed,
-        #       Intervention %in% c("(0)", "(0.5)->(0)", "(0.5)", "(0)->(0.5)"),
-        #       is.na(Subset), SpeciesPreferences == "Uniform(0, 1)"
-        #     ) |> tidytable::left_join(
-        #       InterventionTimes
-        #     ) |> tidytable::mutate(
-        #       Time = Time - TimeIntervention
-        #     ) |> tidytable::filter(
-        #       Time %in% figureNetworks$graph$timeInterventions |
-        #         round(Time, 6) %in% round(figureNetworks$graph$timeInterventions, 6)
-        #     ) |> figureNetworks$renameSpeciesPreferences(
-        #     ) |> tidytable::distinct(),
-        #     mapping = ggplot2::aes(fill = Intervention, y = Value),
-        #     shape = 21,
-        #     color = "black",
-        #     alpha = 0.5
-        #   )
-        # }
+        
         return(plt)
       },
       dat = figureNetworks$dataSummary

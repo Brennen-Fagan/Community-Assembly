@@ -96,14 +96,6 @@ figure4$dataLogScale <- figure4$dataBase |> tidytable::filter(
 ) |> tidytable::summarise(
   Value = sum(Value), .groups = "drop"
 ) |> tidytable::mutate(
-  # Time = tidytable::case_when( # Create groupings for times, avoid doublecount
-  #   Time < -50 ~ round(Time, -2),
-  #   Time < 0 ~ -25, # In the last bin before regime change.
-  #   Time <= 50 ~ round(Time, 0),
-  #   Time < 1105 ~ round(Time, -1), # Skip breaks < 5, drop.
-  #   Time < 16350 ~ round(Time, -2),
-  #   TRUE ~ Time
-  # )
   Time = tidytable::case_when(
     round(Time) == 0 ~ 0, # Base Case for reference point analysis
     Time < 0 ~ -1, # Base Case for reference time segment analysis
@@ -260,8 +252,7 @@ figure4$plotRaw <- ggpubr::ggarrange(
     legendName = "Raw Values",
     scalestrans = scales::label_number(accuracy = 0.1)
   ) + ggplot2::scale_fill_viridis_d(
-    begin = 0.2#,
-    # labels = scales::label_number(accuracy = 0.1)
+    begin = 0.2
   ),
   plotTextHeatmap(
     figure4$dataRawValues |> tidytable::filter(
@@ -272,8 +263,7 @@ figure4$plotRaw <- ggpubr::ggarrange(
     legendName = "Raw Values", legendtrans = "log10",
     scalestrans = scales::label_number(accuracy = 1)
   ) + ggplot2::scale_fill_viridis_d(
-    begin = 0.2#,
-    # labels = scales::label_number(accuracy = 0.1)
+    begin = 0.2
   ),
   nrow = 2
 )
